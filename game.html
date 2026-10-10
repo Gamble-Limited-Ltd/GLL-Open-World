@@ -7481,5 +7481,38 @@ window.addEventListener('keydown', (e) => {
   }
 });
 </script>
+<script id="game-autologin-script">
+(function() {
+  const SESSION_KEY = 'openworld_session';
+  function hashPassword(pwd) {
+    let hash = 5381;
+    for (let i = 0; i < pwd.length; i++) { hash = ((hash << 5) + hash + pwd.charCodeAt(i)) | 0; }
+    return (hash >>> 0).toString(16);
+  }
+  function getSave(name) {
+    try { const raw = localStorage.getItem('openworld_save_' + name); return raw ? JSON.parse(raw) : null; }
+    catch (e) { return null; }
+  }
+  function tryAutoLogin() {
+    try {
+      const sess = sessionStorage.getItem(SESSION_KEY);
+      if (!sess) return false;
+      const parsed = JSON.parse(sess);
+      if (!parsed || !parsed.name || !parsed.pwd) return false;
+      const save = getSave(parsed.name);
+      if (!save || save.passwordHash !== hashPassword(parsed.pwd)) return false;
+      const nameInput = document.getElementById('login-name');
+      const pwdInput  = document.getElementById('login-pwd');
+      if (!nameInput || !pwdInput) return false;
+      nameInput.value = parsed.name;
+      pwdInput.value  = parsed.pwd;
+      setTimeout(() => { try { loginSubmit(); } catch (e) { console.warn('Auto-login failed:', e); } }, 150);
+      return true;
+    } catch (e) { return false; }
+  }
+  setTimeout(tryAutoLogin, 300);
+})();
+</script>
+
 </body>
 </html>
