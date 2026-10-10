@@ -269,15 +269,15 @@
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 glass-panel p-5 rounded-2xl border border-tactical-border max-w-4xl mx-auto font-orbitron">
                     <div class="text-left border-r border-white/10 pr-4">
                         <span class="text-[10px] text-gray-400 block uppercase tracking-wider">Starter Capital</span>
-                        <span class="text-lg sm:text-xl font-bold text-emerald-400 text-glow-emerald">$100,000</span>
+                        <span id="landing-money-display" class="text-lg sm:text-xl font-bold text-emerald-400 text-glow-emerald">$100,000</span>
                     </div>
                     <div class="text-left border-r border-white/10 pr-4">
                         <span class="text-[10px] text-gray-400 block uppercase tracking-wider">Territory Plots</span>
-                        <span class="text-lg sm:text-xl font-bold text-tactical-cyan">Global Grid</span>
+                        <span id="landing-plots-display" class="text-lg sm:text-xl font-bold text-tactical-cyan">Global Grid</span>
                     </div>
                     <div class="text-left border-r border-white/10 pr-4">
                         <span class="text-[10px] text-gray-400 block uppercase tracking-wider">Market Assets</span>
-                        <span class="text-lg sm:text-xl font-bold text-amber-400">5 Key Materials</span>
+                        <span id="landing-assets-display" class="text-lg sm:text-xl font-bold text-amber-400">5 Key Materials</span>
                     </div>
                     <div class="text-left">
                         <span class="text-[10px] text-gray-400 block uppercase tracking-wider">Browser Tech</span>
@@ -515,11 +515,11 @@
                     <div>
                         <label class="block font-orbitron text-xs text-gray-400 uppercase tracking-wider mb-3">Choose Faction Territory Accent Color:</label>
                         <div class="grid grid-cols-5 gap-3">
-                            <button onclick="setPlotColor('#00f0ff'); playSound('click')" class="h-10 rounded-lg bg-[#00f0ff] border border-white/20 hover:scale-110 transition-transform"></button>
-                            <button onclick="setPlotColor('#10b981'); playSound('click')" class="h-10 rounded-lg bg-[#10b981] border border-white/20 hover:scale-110 transition-transform"></button>
-                            <button onclick="setPlotColor('#f59e0b'); playSound('click')" class="h-10 rounded-lg bg-[#f59e0b] border border-white/20 hover:scale-110 transition-transform"></button>
-                            <button onclick="setPlotColor('#ef4444'); playSound('click')" class="h-10 rounded-lg bg-[#ef4444] border border-white/20 hover:scale-110 transition-transform"></button>
-                            <button onclick="setPlotColor('#a855f7'); playSound('click')" class="h-10 rounded-lg bg-[#a855f7] border border-white/20 hover:scale-110 transition-transform"></button>
+                            <button onclick="setPlotColor('#00f0ff'); playSound('click')" class="h-10 rounded-extbg-[#00f0ff] border border-white/20 hover:scale-110 transition-transform"></button>
+                            <button onclick="setPlotColor('#10b981'); playSound('click')" class="h-10 rounded-extbg-[#10b981] border border-white/20 hover:scale-110 transition-transform"></button>
+                            <button onclick="setPlotColor('#f59e0b'); playSound('click')" class="h-10 rounded-extbg-[#f59e0b] border border-white/20 hover:scale-110 transition-transform"></button>
+                            <button onclick="setPlotColor('#ef4444'); playSound('click')" class="h-10 rounded-extbg-[#ef4444] border border-white/20 hover:scale-110 transition-transform"></button>
+                            <button onclick="setPlotColor('#a855f7'); playSound('click')" class="h-10 rounded-extbg-[#a855f7] border border-white/20 hover:scale-110 transition-transform"></button>
                         </div>
                     </div>
                 </div>
@@ -565,19 +565,19 @@
             <input type="text" id="cmd-input" placeholder="Type a command or jump location..." class="w-full bg-black/70 border border-tactical-border rounded-xl p-3 text-white font-orbitron text-xs focus:outline-none focus:border-tactical-cyan" onkeyup="filterCommands(this.value)">
 
             <div class="space-y-2 font-orbitron text-xs" id="cmd-list">
-                <a href="game.html" class="block p-3 glass-card rounded-lg hover:bg-tactical-cyan/20 text-tactical-cyan font-bold flex justify-between">
+                <a href="game.html" class="block p-3 glass-card rounded-exthover:bg-tactical-cyan/20 text-tactical-cyan font-bold flex justify-between">
                     <span>&gt; Launch Game Application</span>
                     <span class="text-gray-400 font-normal">GitHub Pages</span>
                 </a>
-                <a href="#globe-map" onclick="toggleCommandModal()" class="block p-3 glass-card rounded-lg hover:bg-white/10 text-white flex justify-between">
+                <a href="#globe-map" onclick="toggleCommandModal()" class="block p-3 glass-card rounded-exthover:bg-white/10 text-white flex justify-between">
                     <span>&gt; Jump to Globe Map Info</span>
                     <span class="text-gray-400">#globe-map</span>
                 </a>
-                <a href="#calculator" onclick="toggleCommandModal()" class="block p-3 glass-card rounded-lg hover:bg-white/10 text-white flex justify-between">
+                <a href="#calculator" onclick="toggleCommandModal()" class="block p-3 glass-card rounded-exthover:bg-white/10 text-white flex justify-between">
                     <span>&gt; Open Business Calculator</span>
                     <span class="text-gray-400">#calculator</span>
                 </a>
-                <a href="#market" onclick="toggleCommandModal()" class="block p-3 glass-card rounded-lg hover:bg-white/10 text-white flex justify-between">
+                <a href="#market" onclick="toggleCommandModal()" class="block p-3 glass-card rounded-exthover:bg-white/10 text-white flex justify-between">
                     <span>&gt; View Commodity Market Index</span>
                     <span class="text-gray-400">#market</span>
                 </a>
@@ -992,6 +992,62 @@
       }
     }
   } catch (e) {}
+})();
+</script>
+
+<script id="landing-stats-sync">
+(function() {
+  function getSave() {
+    try {
+      const sess = JSON.parse(sessionStorage.getItem('openworld_session') || '{}');
+      if (!sess || !sess.name) return null;
+      const raw = localStorage.getItem('openworld_save_' + sess.name);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  function formatMoney(n) {
+    n = Math.floor(n || 0);
+    if (n >= 1_000_000) return '$' + (n / 1_000_000).toFixed(2) + 'M';
+    if (n >= 10_000)  return '$' + (n / 1_000).toFixed(1) + 'K';
+    return '$' + n.toLocaleString();
+  }
+
+  function updateStats() {
+    const save = getSave();
+    if (!save) return;
+
+    const moneyEl = document.getElementById('landing-money-display');
+    if (moneyEl && typeof save.money === 'number') {
+      moneyEl.textContent = formatMoney(save.money);
+      moneyEl.style.animation = 'pulse-cyan 1.5s ease-in-out';
+    }
+
+    const plotsEl = document.getElementById('landing-plots-display');
+    if (plotsEl && Array.isArray(save.ownedPlotIds)) {
+      const n = save.ownedPlotIds.length;
+      plotsEl.textContent = n === 0 ? 'None Yet' : n + (n === 1 ? ' Plot' : ' Plots');
+    }
+
+    const assetsEl = document.getElementById('landing-assets-display');
+    if (assetsEl && save.inventory && typeof save.inventory === 'object') {
+      const n = Object.keys(save.inventory).filter(k => (save.inventory[k] || 0) > 0).length;
+      assetsEl.textContent = n === 0 ? 'Empty' : n + (n === 1 ? ' Material' : ' Materials');
+    }
+  }
+
+  // Initial update (delayed so login overlay has time to settle)
+  setTimeout(updateStats, 800);
+
+  // Real-time sync: listen for localStorage changes from OTHER tabs
+  // (e.g., game.html updates money -> this tab gets a storage event)
+  window.addEventListener('storage', (e) => {
+    if (e.key && e.key.startsWith('openworld_save_')) updateStats();
+  });
+
+  // Fallback poll (every 3 seconds) — covers same-tab updates and browsers
+  // that don't fire storage events reliably
+  setInterval(updateStats, 3000);
 })();
 </script>
 
