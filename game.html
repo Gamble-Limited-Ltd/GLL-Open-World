@@ -7504,37 +7504,57 @@ window.addEventListener('keydown', (e) => {
       if (!save || save.passwordHash !== hashPassword(parsed.pwd)) return false;
     } catch (e) { return false; }
 
-    // Pre-emptively hide the menu screen to prevent any flash.
-    // This CSS rule stays active until enterGame() has run, then is removed.
+    // Hide BOTH the old login screen AND the old menu screen for the entire
+    // auto-login -> enter-game sequence. User sees only the loading overlay,
+    // then the world. The old screens are still in the DOM (so the game's
+    // JS can manipulate them) but never visible.
     const style = document.createElement('style');
-    style.id = 'temp-hide-menu';
-    style.textContent = '#menu { display: none !important; }';
+    style.id = 'temp-hide-old-screens';
+    style.textContent = '#login-screen, #menu { display: none !important; }';
     document.head.appendChild(style);
+
+    // Loading overlay shown while login + game-load happen
+    const loading = document.createElement('div');
+    loading.id = 'auto-login-loading';
+    loading.style.cssText = 'position:fixed;inset:0;z-index:9999;background:radial-gradient(ellipse at 50% 50%, #0b1d29 0%, #03050a 70%);display:flex;align-items:center;justify-content:center;font-family:Arial,Helvetica,sans-serif;color:#00f0ff;font-size:18px;letter-spacing:3px;text-transform:uppercase;text-shadow:0 0 12px rgba(0,240,255,0.6);';
+    loading.innerHTML = '<div>Entering world<span style="animation:blink 1s infinite">...</span></div>';
+    if (!document.getElementById('auto-login-blink-style')) {
+      const bs = document.createElement('style');
+      bs.id = 'auto-login-blink-style';
+      bs.textContent = '@keyframes blink{0%,50%{opacity:1}51%,100%{opacity:0}}';
+      document.head.appendChild(bs);
+    }
+    document.body.appendChild(loading);
 
     const nameInput = document.getElementById('login-name');
     const pwdInput  = document.getElementById('login-pwd');
-    if (!nameInput || !pwdInput) { style.remove(); return false; }
+    if (!nameInput || !pwdInput) {
+      style.remove();
+      loading.remove();
+      return false;
+    }
     nameInput.value = parsed.name;
     pwdInput.value  = parsed.pwd;
 
     setTimeout(() => {
       try {
         loginSubmit();
-        // Call enterGame immediately — no polling, no delay.
-        // The login screen will cross-fade out while the game screen appears.
         setTimeout(() => {
           try {
             if (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) {
               enterGame();
             }
           } catch (e) { console.warn('Auto-enter game failed:', e); }
-          // Remove the temp CSS — menu now has .hidden class (added by enterGame),
-          // so it stays hidden normally.
-          style.remove();
+          // Give the game canvas a moment to mount, then drop the loading overlay
+          setTimeout(() => {
+            style.remove();
+            loading.remove();
+          }, 600);
         }, 50);
       } catch (e) {
         console.warn('Auto-login failed:', e);
         style.remove();
+        loading.remove();
       }
     }, 150);
     return true;
