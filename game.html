@@ -952,7 +952,7 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 
   <div class="hud">
     <div class="top-bar">
-      <button class="back-btn" onclick="exitGame()">← Menu</button>
+      <button class="back-btn" onclick="exitGame()">← Home</button>
       <button class="logout-btn" onclick="logout()">Logout</button>
       <div class="brand">Open World<small>Live · Earth Edition</small></div>
       <div class="stats">
@@ -7491,8 +7491,12 @@ window.enterGame = function() {
 };
 
 window.exitGame = function() {
-  document.getElementById('game').classList.add('hidden');
-  document.getElementById('menu').classList.remove('hidden');
+  // Navigate to the landing page (home) instead of the in-game menu screen.
+  // The landing page's session check will detect the existing sessionStorage
+  // session and auto-skip the login overlay, so the user sees the home page
+  // immediately.
+  try { saveGame && saveGame(); } catch (e) {}  // best-effort autosave before leaving
+  location.href = './';
 };
 
 // ---- Settings → Plot color ----
