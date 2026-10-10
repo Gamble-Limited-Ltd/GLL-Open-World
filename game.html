@@ -7493,6 +7493,20 @@ window.addEventListener('keydown', (e) => {
     try { const raw = localStorage.getItem('openworld_save_' + name); return raw ? JSON.parse(raw) : null; }
     catch (e) { return null; }
   }
+  function waitForLoginThenEnterGame() {
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      if (attempts > 30) { clearInterval(interval); return; }
+      const loginScreen = document.getElementById('login-screen');
+      if (loginScreen && (loginScreen.classList.contains('hide') || loginScreen.style.display === 'none')) {
+        clearInterval(interval);
+        setTimeout(() => {
+          try { enterGame(); } catch (e) { console.warn('Auto-enter game failed:', e); }
+        }, 800);
+      }
+    }, 200);
+  }
   function tryAutoLogin() {
     try {
       const sess = sessionStorage.getItem(SESSION_KEY);
@@ -7506,7 +7520,12 @@ window.addEventListener('keydown', (e) => {
       if (!nameInput || !pwdInput) return false;
       nameInput.value = parsed.name;
       pwdInput.value  = parsed.pwd;
-      setTimeout(() => { try { loginSubmit(); } catch (e) { console.warn('Auto-login failed:', e); } }, 150);
+      setTimeout(() => {
+        try {
+          loginSubmit();
+          waitForLoginThenEnterGame();
+        } catch (e) { console.warn('Auto-login failed:', e); }
+      }, 150);
       return true;
     } catch (e) { return false; }
   }
