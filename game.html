@@ -4019,52 +4019,76 @@ function initScene() {
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.rotateSpeed = 0.45;
-  controls.zoomSpeed = 0.3;
+  // === CUSTOM ZOOM SYSTEM ===
+  // Completely disable OrbitControls' built-in zoom (it over-zooms on touchpads).
+  // We handle zoom ourselves with strict per-event + smooth-interpolation limits.
+  controls.enableZoom = false;
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.rotateSpeed = 0.45;
 
-  // Throttle ALL zoom-input events so rapid touchpad swipes / pinches don't
-  // over-zoom. The key fix: stopImmediatePropagation() actually blocks other
-  // listeners on the SAME element (OrbitControls registers its wheel listener
-  // on the same domElement in bubble phase, so plain stopPropagation() does
-  // nothing — that was the bug).
-  let _lastZoomTime = 0;
-  const ZOOM_THROTTLE_MS = 100;
-  function _shouldDropZoom(e) {
+  // Target distance the user wants to zoom to. We smoothly interpolate
+  // the actual camera distance toward this value each frame.
+  let _targetZoomDist = STATE.zoomMax;  // start at the initial camera distance
+  let _lastZoomEventTime = 0;
+  const _zoomEventThrottleMs = 150;  // max 1 zoom event per 150ms (~6.7/sec)
+  const _zoomStepFactor = 0.93;      // each event changes distance by 7%
+
+  function _applyZoomEvent(direction) {
+    // direction: -1 = zoom IN (decrease distance), +1 = zoom OUT (increase distance)
     const now = performance.now();
-    if (now - _lastZoomTime < ZOOM_THROTTLE_MS) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      return true;
-    }
-    _lastZoomTime = now;
-    return false;
+    if (now - _lastZoomEventTime < _zoomEventThrottleMs) return;  // throttled
+    _lastZoomEventTime = now;
+    const multiplier = direction > 0 ? (1 / _zoomStepFactor) : _zoomStepFactor;
+    _targetZoomDist = THREE.MathUtils.clamp(
+      _targetZoomDist * multiplier,
+      STATE.zoomMin, STATE.zoomMax
+    );
   }
-  // Wheel events (mouse wheel + two-finger scroll on touchpad)
+
+  // Wheel events (mouse wheel + 2-finger scroll on touchpad)
   renderer.domElement.addEventListener('wheel', (e) => {
-    if (_shouldDropZoom(e)) return;
-  }, { capture: true, passive: false });
-  // Two-finger pinch (touchpad pinch-to-zoom on Chrome OS / Mac)
-  renderer.domElement.addEventListener('touchmove', (e) => {
-    if (e.touches && e.touches.length === 2) {
-      if (_shouldDropZoom(e)) return;
-    }
-  }, { capture: true, passive: false });
-  // Chrome OS gesturechange (some Chromebooks fire this for pinch)
-  renderer.domElement.addEventListener('gesturechange', (e) => {
-    // Always block gesturechange — apply our own controlled zoom
     e.preventDefault();
     e.stopImmediatePropagation();
-    if (_shouldDropZoom(e)) return;
-    // Apply a small fixed zoom based on scale
-    try {
-      const scale = e.scale || 1;
-      const dir = scale > 1 ? -0.15 : 0.15;
-      const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
-      const newDist = THREE.MathUtils.clamp(offset.length() + dir, controls.minDistance, controls.maxDistance);
-      offset.normalize().multiplyScalar(newDist);
-      camera.position.copy(controls.target).add(offset);
-      controls.update();
-    } catch (err) {}
+    _applyZoomEvent(e.deltaY > 0 ? 1 : -1);
   }, { capture: true, passive: false });
+
+  // Touch pinch (2 fingers) — trackpad pinch-to-zoom on Chrome OS / Mac
+  let _prevTouchDist = 0;
+  renderer.domElement.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].pageX - e.touches[1].pageX;
+      const dy = e.touches[0].pageY - e.touches[1].pageY;
+      _prevTouchDist = Math.sqrt(dx * dx + dy * dy);
+    }
+  }, { capture: true, passive: false });
+  renderer.domElement.addEventListener('touchmove', (e) => {
+    if (e.touches && e.touches.length === 2) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const dx = e.touches[0].pageX - e.touches[1].pageX;
+      const dy = e.touches[0].pageY - e.touches[1].pageY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (_prevTouchDist > 0) {
+        const ratio = dist / _prevTouchDist;
+        if (ratio > 1.05) _applyZoomEvent(-1);        // fingers moving apart = zoom in
+        else if (ratio < 0.95) _applyZoomEvent(1);   // fingers moving together = zoom out
+      }
+      _prevTouchDist = dist;
+    }
+  }, { capture: true, passive: false });
+
+  // Chrome OS gesturechange (some Chromebooks fire this for pinch)
+  renderer.domElement.addEventListener('gesturechange', (e) => {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.scale > 1.05) _applyZoomEvent(-1);
+    else if (e.scale < 0.95) _applyZoomEvent(1);
+  }, { capture: true, passive: false });
+
+  // Expose _targetZoomDist globally so animate() can interpolate toward it
+  window._targetZoomDist = () => _targetZoomDist;
+
   controls.minDistance = STATE.zoomMin;
   controls.maxDistance = STATE.zoomMax;
   controls.enablePan = false;
@@ -7422,6 +7446,19 @@ function animate() {
   if (earthAutoRotate && !paused) {
     earth.rotation.y += 0.0004;
   }
+  // Smooth zoom interpolation — move camera distance toward _targetZoomDist
+  try {
+    if (typeof window._targetZoomDist === 'function') {
+      const target = window._targetZoomDist();
+      const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
+      const currentDist = offset.length();
+      if (Math.abs(currentDist - target) > 0.001) {
+        const newDist = currentDist + (target - currentDist) * 0.15;
+        offset.normalize().multiplyScalar(newDist);
+        camera.position.copy(controls.target).add(offset);
+      }
+    }
+  } catch (e) {}
   controls.update();
   // Keep the sun glued to the camera: whichever side of the world you are
   // looking at is always the lit side — no more dark hemisphere.
