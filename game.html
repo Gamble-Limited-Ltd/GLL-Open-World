@@ -7493,41 +7493,51 @@ window.addEventListener('keydown', (e) => {
     try { const raw = localStorage.getItem('openworld_save_' + name); return raw ? JSON.parse(raw) : null; }
     catch (e) { return null; }
   }
-  function waitForLoginThenEnterGame() {
-    let attempts = 0;
-    const interval = setInterval(() => {
-      attempts++;
-      if (attempts > 30) { clearInterval(interval); return; }
-      const loginScreen = document.getElementById('login-screen');
-      if (loginScreen && (loginScreen.classList.contains('hide') || loginScreen.style.display === 'none')) {
-        clearInterval(interval);
-        setTimeout(() => {
-          try { enterGame(); } catch (e) { console.warn('Auto-enter game failed:', e); }
-        }, 800);
-      }
-    }, 200);
-  }
   function tryAutoLogin() {
+    let parsed;
     try {
       const sess = sessionStorage.getItem(SESSION_KEY);
       if (!sess) return false;
-      const parsed = JSON.parse(sess);
+      parsed = JSON.parse(sess);
       if (!parsed || !parsed.name || !parsed.pwd) return false;
       const save = getSave(parsed.name);
       if (!save || save.passwordHash !== hashPassword(parsed.pwd)) return false;
-      const nameInput = document.getElementById('login-name');
-      const pwdInput  = document.getElementById('login-pwd');
-      if (!nameInput || !pwdInput) return false;
-      nameInput.value = parsed.name;
-      pwdInput.value  = parsed.pwd;
-      setTimeout(() => {
-        try {
-          loginSubmit();
-          waitForLoginThenEnterGame();
-        } catch (e) { console.warn('Auto-login failed:', e); }
-      }, 150);
-      return true;
     } catch (e) { return false; }
+
+    // Pre-emptively hide the menu screen to prevent any flash.
+    // This CSS rule stays active until enterGame() has run, then is removed.
+    const style = document.createElement('style');
+    style.id = 'temp-hide-menu';
+    style.textContent = '#menu { display: none !important; }';
+    document.head.appendChild(style);
+
+    const nameInput = document.getElementById('login-name');
+    const pwdInput  = document.getElementById('login-pwd');
+    if (!nameInput || !pwdInput) { style.remove(); return false; }
+    nameInput.value = parsed.name;
+    pwdInput.value  = parsed.pwd;
+
+    setTimeout(() => {
+      try {
+        loginSubmit();
+        // Call enterGame immediately — no polling, no delay.
+        // The login screen will cross-fade out while the game screen appears.
+        setTimeout(() => {
+          try {
+            if (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) {
+              enterGame();
+            }
+          } catch (e) { console.warn('Auto-enter game failed:', e); }
+          // Remove the temp CSS — menu now has .hidden class (added by enterGame),
+          // so it stays hidden normally.
+          style.remove();
+        }, 50);
+      } catch (e) {
+        console.warn('Auto-login failed:', e);
+        style.remove();
+      }
+    }, 150);
+    return true;
   }
   setTimeout(tryAutoLogin, 300);
 })();
