@@ -4019,20 +4019,51 @@ function initScene() {
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.rotateSpeed = 0.45;
-  controls.zoomSpeed = 0.45;
+  controls.zoomSpeed = 0.3;
 
-  // Throttle wheel events so rapid touchpad swipes don't over-zoom.
-  // Only let OrbitControls see one wheel event per 80ms.
-  let _lastWheelTime = 0;
-  renderer.domElement.addEventListener('wheel', (e) => {
+  // Throttle ALL zoom-input events so rapid touchpad swipes / pinches don't
+  // over-zoom. The key fix: stopImmediatePropagation() actually blocks other
+  // listeners on the SAME element (OrbitControls registers its wheel listener
+  // on the same domElement in bubble phase, so plain stopPropagation() does
+  // nothing — that was the bug).
+  let _lastZoomTime = 0;
+  const ZOOM_THROTTLE_MS = 100;
+  function _shouldDropZoom(e) {
     const now = performance.now();
-    if (now - _lastWheelTime < 80) {
+    if (now - _lastZoomTime < ZOOM_THROTTLE_MS) {
       e.preventDefault();
-      e.stopPropagation();
-    } else {
-      _lastWheelTime = now;
-      // let OrbitControls handle this one event normally
+      e.stopImmediatePropagation();
+      return true;
     }
+    _lastZoomTime = now;
+    return false;
+  }
+  // Wheel events (mouse wheel + two-finger scroll on touchpad)
+  renderer.domElement.addEventListener('wheel', (e) => {
+    if (_shouldDropZoom(e)) return;
+  }, { capture: true, passive: false });
+  // Two-finger pinch (touchpad pinch-to-zoom on Chrome OS / Mac)
+  renderer.domElement.addEventListener('touchmove', (e) => {
+    if (e.touches && e.touches.length === 2) {
+      if (_shouldDropZoom(e)) return;
+    }
+  }, { capture: true, passive: false });
+  // Chrome OS gesturechange (some Chromebooks fire this for pinch)
+  renderer.domElement.addEventListener('gesturechange', (e) => {
+    // Always block gesturechange — apply our own controlled zoom
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (_shouldDropZoom(e)) return;
+    // Apply a small fixed zoom based on scale
+    try {
+      const scale = e.scale || 1;
+      const dir = scale > 1 ? -0.15 : 0.15;
+      const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
+      const newDist = THREE.MathUtils.clamp(offset.length() + dir, controls.minDistance, controls.maxDistance);
+      offset.normalize().multiplyScalar(newDist);
+      camera.position.copy(controls.target).add(offset);
+      controls.update();
+    } catch (err) {}
   }, { capture: true, passive: false });
   controls.minDistance = STATE.zoomMin;
   controls.maxDistance = STATE.zoomMax;
