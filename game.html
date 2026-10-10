@@ -4019,7 +4019,21 @@ function initScene() {
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.rotateSpeed = 0.45;
-  controls.zoomSpeed = 1.1;
+  controls.zoomSpeed = 0.45;
+
+  // Throttle wheel events so rapid touchpad swipes don't over-zoom.
+  // Only let OrbitControls see one wheel event per 80ms.
+  let _lastWheelTime = 0;
+  renderer.domElement.addEventListener('wheel', (e) => {
+    const now = performance.now();
+    if (now - _lastWheelTime < 80) {
+      e.preventDefault();
+      e.stopPropagation();
+    } else {
+      _lastWheelTime = now;
+      // let OrbitControls handle this one event normally
+    }
+  }, { capture: true, passive: false });
   controls.minDistance = STATE.zoomMin;
   controls.maxDistance = STATE.zoomMax;
   controls.enablePan = false;
