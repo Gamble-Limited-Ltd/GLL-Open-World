@@ -7484,6 +7484,8 @@ window.addEventListener('keydown', (e) => {
 <script id="game-autologin-script">
 (function() {
   const SESSION_KEY = 'openworld_session';
+  let styleEl = null, loadingEl = null;
+
   function hashPassword(pwd) {
     let hash = 5381;
     for (let i = 0; i < pwd.length; i++) { hash = ((hash << 5) + hash + pwd.charCodeAt(i)) | 0; }
@@ -7493,6 +7495,59 @@ window.addEventListener('keydown', (e) => {
     try { const raw = localStorage.getItem('openworld_save_' + name); return raw ? JSON.parse(raw) : null; }
     catch (e) { return null; }
   }
+
+  function hideMenu() {
+    if (styleEl) return;
+    styleEl = document.createElement('style');
+    styleEl.id = 'temp-hide-menu';
+    styleEl.textContent = '#menu { display: none !important; }';
+    document.head.appendChild(styleEl);
+  }
+  function showLoading() {
+    if (loadingEl) return;
+    if (!document.getElementById('auto-login-blink')) {
+      const bs = document.createElement('style');
+      bs.id = 'auto-login-blink';
+      bs.textContent = '@keyframes blink{0%,50%{opacity:1}51%,100%{opacity:0}}';
+      document.head.appendChild(bs);
+    }
+    loadingEl = document.createElement('div');
+    loadingEl.id = 'auto-login-loading';
+    loadingEl.style.cssText = 'position:fixed;inset:0;z-index:9999;background:radial-gradient(ellipse at 50% 50%, #0b1d29 0%, #03050a 70%);display:flex;align-items:center;justify-content:center;font-family:Arial,Helvetica,sans-serif;color:#00f0ff;font-size:18px;letter-spacing:3px;text-transform:uppercase;text-shadow:0 0 12px rgba(0,240,255,0.6);';
+    loadingEl.innerHTML = '<div>Entering world<span style="animation:blink 1s infinite">...</span></div>';
+    document.body.appendChild(loadingEl);
+  }
+  function cleanup() {
+    if (styleEl) { styleEl.remove(); styleEl = null; }
+    if (loadingEl) { setTimeout(() => { if (loadingEl) { loadingEl.remove(); loadingEl = null; } }, 600); }
+  }
+  function enterWorld() {
+    try { if (typeof enterGame === 'function') enterGame(); }
+    catch (e) { console.warn('enterGame failed:', e); }
+    setTimeout(cleanup, 600);
+  }
+
+  // Watch the login screen for the .hide class (set by loginSubmit on success).
+  // This catches BOTH auto-login AND manual login — either way, we go straight to the world.
+  function startObserver() {
+    const loginScreen = document.getElementById('login-screen');
+    if (!loginScreen) { setTimeout(startObserver, 50); return; }
+
+    // If login already complete (e.g., we started after auto-login), act now
+    if (loginScreen.classList.contains('hide') || loginScreen.style.display === 'none') {
+      hideMenu(); enterWorld(); return;
+    }
+
+    const obs = new MutationObserver(() => {
+      if (loginScreen.classList.contains('hide') || loginScreen.style.display === 'none') {
+        hideMenu();
+        enterWorld();
+        obs.disconnect();
+      }
+    });
+    obs.observe(loginScreen, { attributes: true, attributeFilter: ['class', 'style'] });
+  }
+
   function tryAutoLogin() {
     let parsed;
     try {
@@ -7504,62 +7559,26 @@ window.addEventListener('keydown', (e) => {
       if (!save || save.passwordHash !== hashPassword(parsed.pwd)) return false;
     } catch (e) { return false; }
 
-    // Hide BOTH the old login screen AND the old menu screen for the entire
-    // auto-login -> enter-game sequence. User sees only the loading overlay,
-    // then the world. The old screens are still in the DOM (so the game's
-    // JS can manipulate them) but never visible.
-    const style = document.createElement('style');
-    style.id = 'temp-hide-old-screens';
-    style.textContent = '#login-screen, #menu { display: none !important; }';
-    document.head.appendChild(style);
-
-    // Loading overlay shown while login + game-load happen
-    const loading = document.createElement('div');
-    loading.id = 'auto-login-loading';
-    loading.style.cssText = 'position:fixed;inset:0;z-index:9999;background:radial-gradient(ellipse at 50% 50%, #0b1d29 0%, #03050a 70%);display:flex;align-items:center;justify-content:center;font-family:Arial,Helvetica,sans-serif;color:#00f0ff;font-size:18px;letter-spacing:3px;text-transform:uppercase;text-shadow:0 0 12px rgba(0,240,255,0.6);';
-    loading.innerHTML = '<div>Entering world<span style="animation:blink 1s infinite">...</span></div>';
-    if (!document.getElementById('auto-login-blink-style')) {
-      const bs = document.createElement('style');
-      bs.id = 'auto-login-blink-style';
-      bs.textContent = '@keyframes blink{0%,50%{opacity:1}51%,100%{opacity:0}}';
-      document.head.appendChild(bs);
-    }
-    document.body.appendChild(loading);
+    // Session is valid — pre-emptively hide menu + show loading overlay
+    hideMenu();
+    showLoading();
 
     const nameInput = document.getElementById('login-name');
     const pwdInput  = document.getElementById('login-pwd');
-    if (!nameInput || !pwdInput) {
-      style.remove();
-      loading.remove();
-      return false;
-    }
+    if (!nameInput || !pwdInput) { cleanup(); return false; }
     nameInput.value = parsed.name;
     pwdInput.value  = parsed.pwd;
-
     setTimeout(() => {
-      try {
-        loginSubmit();
-        setTimeout(() => {
-          try {
-            if (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) {
-              enterGame();
-            }
-          } catch (e) { console.warn('Auto-enter game failed:', e); }
-          // Give the game canvas a moment to mount, then drop the loading overlay
-          setTimeout(() => {
-            style.remove();
-            loading.remove();
-          }, 600);
-        }, 50);
-      } catch (e) {
-        console.warn('Auto-login failed:', e);
-        style.remove();
-        loading.remove();
-      }
+      try { loginSubmit(); }
+      catch (e) { console.warn('Auto-login failed:', e); cleanup(); }
     }, 150);
     return true;
   }
-  setTimeout(tryAutoLogin, 300);
+
+  setTimeout(() => {
+    startObserver();   // catches manual logins too
+    tryAutoLogin();    // attempts auto-login if session exists
+  }, 300);
 })();
 </script>
 
