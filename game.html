@@ -1,6 +1,52 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script id="preemptive-hide-screens">
+(function() {
+  try {
+    const sess = sessionStorage.getItem('openworld_session');
+    if (!sess) return;
+    const parsed = JSON.parse(sess);
+    if (!parsed || !parsed.name || !parsed.pwd) return;
+
+    // Validate against localStorage (must match the stored password hash)
+    const raw = localStorage.getItem('openworld_save_' + parsed.name);
+    if (!raw) return;
+    const save = JSON.parse(raw);
+
+    // Compute DJB2 hash of the session password
+    let hash = 5381;
+    for (let i = 0; i < parsed.pwd.length; i++) {
+      hash = ((hash << 5) + hash + parsed.pwd.charCodeAt(i)) | 0;
+    }
+    const hashHex = (hash >>> 0).toString(16);
+    if (save.passwordHash !== hashHex) return;  // Mismatch — let normal login screen show
+
+    // Session is valid — hide login + menu immediately, show loading via body::before
+    const style = document.createElement('style');
+    style.id = 'preemptive-hide-screens-style';
+    style.textContent = `
+      #login-screen, #menu { display: none !important; }
+      body { background: radial-gradient(ellipse at 50% 50%, #0b1d29 0%, #03050a 70%) !important; }
+      body::before {
+        content: 'ENTERING WORLD...';
+        position: fixed; top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        color: #00f0ff;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 18px; letter-spacing: 3px;
+        text-transform: uppercase;
+        text-shadow: 0 0 12px rgba(0,240,255,0.6);
+        z-index: 9999;
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+      @keyframes pulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+    `;
+    document.head.appendChild(style);
+  } catch (e) { console.warn('Preemptive hide failed:', e); }
+})();
+</script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Open World</title>
@@ -7484,7 +7530,7 @@ window.addEventListener('keydown', (e) => {
 <script id="game-autologin-script">
 (function() {
   const SESSION_KEY = 'openworld_session';
-  let styleEl = null, loadingEl = null;
+  let styleEl = null;
 
   function hashPassword(pwd) {
     let hash = 5381;
@@ -7503,41 +7549,25 @@ window.addEventListener('keydown', (e) => {
     styleEl.textContent = '#menu { display: none !important; }';
     document.head.appendChild(styleEl);
   }
-  function showLoading() {
-    if (loadingEl) return;
-    if (!document.getElementById('auto-login-blink')) {
-      const bs = document.createElement('style');
-      bs.id = 'auto-login-blink';
-      bs.textContent = '@keyframes blink{0%,50%{opacity:1}51%,100%{opacity:0}}';
-      document.head.appendChild(bs);
-    }
-    loadingEl = document.createElement('div');
-    loadingEl.id = 'auto-login-loading';
-    loadingEl.style.cssText = 'position:fixed;inset:0;z-index:9999;background:radial-gradient(ellipse at 50% 50%, #0b1d29 0%, #03050a 70%);display:flex;align-items:center;justify-content:center;font-family:Arial,Helvetica,sans-serif;color:#00f0ff;font-size:18px;letter-spacing:3px;text-transform:uppercase;text-shadow:0 0 12px rgba(0,240,255,0.6);';
-    loadingEl.innerHTML = '<div>Entering world<span style="animation:blink 1s infinite">...</span></div>';
-    document.body.appendChild(loadingEl);
-  }
-  function cleanup() {
+  function removePreemptive() {
+    const p = document.getElementById('preemptive-hide-screens-style');
+    if (p) p.remove();
     if (styleEl) { styleEl.remove(); styleEl = null; }
-    if (loadingEl) { setTimeout(() => { if (loadingEl) { loadingEl.remove(); loadingEl = null; } }, 600); }
   }
   function enterWorld() {
     try { if (typeof enterGame === 'function') enterGame(); }
     catch (e) { console.warn('enterGame failed:', e); }
-    setTimeout(cleanup, 600);
+    // Give the canvas a moment to mount, then drop the loading overlay
+    setTimeout(removePreemptive, 800);
   }
 
-  // Watch the login screen for the .hide class (set by loginSubmit on success).
-  // This catches BOTH auto-login AND manual login — either way, we go straight to the world.
+  // Watch for login completion (catches BOTH auto-login AND manual login)
   function startObserver() {
     const loginScreen = document.getElementById('login-screen');
     if (!loginScreen) { setTimeout(startObserver, 50); return; }
-
-    // If login already complete (e.g., we started after auto-login), act now
     if (loginScreen.classList.contains('hide') || loginScreen.style.display === 'none') {
       hideMenu(); enterWorld(); return;
     }
-
     const obs = new MutationObserver(() => {
       if (loginScreen.classList.contains('hide') || loginScreen.style.display === 'none') {
         hideMenu();
@@ -7559,25 +7589,22 @@ window.addEventListener('keydown', (e) => {
       if (!save || save.passwordHash !== hashPassword(parsed.pwd)) return false;
     } catch (e) { return false; }
 
-    // Session is valid — pre-emptively hide menu + show loading overlay
-    hideMenu();
-    showLoading();
-
+    hideMenu();  // extra safety (preemptive CSS already hides it, but doesn't hurt)
     const nameInput = document.getElementById('login-name');
     const pwdInput  = document.getElementById('login-pwd');
-    if (!nameInput || !pwdInput) { cleanup(); return false; }
+    if (!nameInput || !pwdInput) return false;
     nameInput.value = parsed.name;
     pwdInput.value  = parsed.pwd;
     setTimeout(() => {
       try { loginSubmit(); }
-      catch (e) { console.warn('Auto-login failed:', e); cleanup(); }
+      catch (e) { console.warn('Auto-login failed:', e); removePreemptive(); }
     }, 150);
     return true;
   }
 
   setTimeout(() => {
-    startObserver();   // catches manual logins too
-    tryAutoLogin();    // attempts auto-login if session exists
+    startObserver();
+    tryAutoLogin();
   }, 300);
 })();
 </script>
