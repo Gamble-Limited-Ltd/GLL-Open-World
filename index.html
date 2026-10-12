@@ -915,6 +915,58 @@
             }
         });
 
+        // === Faction Accent Color Picker ===
+        // Updates the preview plot's color AND saves the choice to the user's
+        // save so the game (game.html) can apply it to their plots on load.
+        window.setPlotColor = function(color) {
+            const preview = document.getElementById('plot-hex-preview');
+            if (preview) {
+                // Update the preview's background (with 20% opacity), border, and glow
+                preview.style.backgroundColor = color + '33';
+                preview.style.borderColor = color;
+                preview.style.boxShadow = '0 0 25px ' + color + '55';
+            }
+            // Mark the active button
+            document.querySelectorAll('[onclick^="setPlotColor"]').forEach(btn => {
+                const btnColor = btn.getAttribute('onclick').match(/'#([0-9a-fA-F]{6})'/);
+                if (btnColor && '#' + btnColor[1].toLowerCase() === color.toLowerCase()) {
+                    btn.style.outline = '2px solid white';
+                    btn.style.outlineOffset = '2px';
+                } else {
+                    btn.style.outline = '';
+                    btn.style.outlineOffset = '';
+                }
+            });
+            // Save the choice to the user's save (so the game picks it up on load)
+            try {
+                const sess = JSON.parse(sessionStorage.getItem('openworld_session') || '{}');
+                if (sess && sess.name) {
+                    const key = 'openworld_save_' + sess.name;
+                    const raw = localStorage.getItem(key);
+                    if (raw) {
+                        const save = JSON.parse(raw);
+                        save.plotColor = color;
+                        save.savedAt = Date.now();
+                        localStorage.setItem(key, JSON.stringify(save));
+                    }
+                }
+            } catch (e) { console.warn('Could not save plot color:', e); }
+        };
+
+        // On page load, if the user has a saved plot color, apply it to the preview
+        (function applySavedPlotColor() {
+            try {
+                const sess = JSON.parse(sessionStorage.getItem('openworld_session') || '{}');
+                if (!sess || !sess.name) return;
+                const raw = localStorage.getItem('openworld_save_' + sess.name);
+                if (!raw) return;
+                const save = JSON.parse(raw);
+                if (save.plotColor) {
+                    window.setPlotColor(save.plotColor);
+                }
+            } catch (e) {}
+        })();
+
         // Mobile Menu Drawer Toggle
         document.getElementById('mobile-menu-btn').addEventListener('click', () => {
             document.getElementById('mobile-menu').classList.toggle('hidden');

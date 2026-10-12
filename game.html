@@ -7837,8 +7837,9 @@ window.addEventListener('keydown', (e) => {
   function enterWorld() {
     try { if (typeof enterGame === 'function') enterGame(); }
     catch (e) { console.warn('enterGame failed:', e); }
-    // Give the canvas a moment to mount, then drop the loading overlay
-    setTimeout(removePreemptive, 800);
+    // enterGame() is synchronous — when it returns, the canvas is mounted
+    // and the first frame is rendering. Drop the overlay ASAP.
+    setTimeout(removePreemptive, 100);
   }
 
   // Watch for login completion (catches BOTH auto-login AND manual login)
@@ -7875,17 +7876,15 @@ window.addEventListener('keydown', (e) => {
     if (!nameInput || !pwdInput) return false;
     nameInput.value = parsed.name;
     pwdInput.value  = parsed.pwd;
-    setTimeout(() => {
-      try { loginSubmit(); }
-      catch (e) { console.warn('Auto-login failed:', e); removePreemptive(); }
-    }, 150);
+    try { loginSubmit(); }
+    catch (e) { console.warn('Auto-login failed:', e); removePreemptive(); }
     return true;
   }
 
   setTimeout(() => {
     startObserver();
     tryAutoLogin();
-  }, 300);
+  }, 50);
 })();
 </script>
 
