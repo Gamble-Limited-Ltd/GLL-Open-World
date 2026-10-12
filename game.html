@@ -804,6 +804,12 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 </style>
 </head>
 <body>
+<!-- Loading screen — visible immediately before any JS runs -->
+<div id="game-loading-screen" style="position:fixed;inset:0;z-index:99999;background:radial-gradient(ellipse at 50% 50%, #0b1d29 0%, #03050a 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Arial,Helvetica,sans-serif;color:#00f0ff;font-size:18px;letter-spacing:3px;text-transform:uppercase;text-shadow:0 0 12px rgba(0,240,255,0.6);">
+  <div id="game-loading-text">Loading game...</div>
+  <div style="margin-top:12px;font-size:10px;color:#5e7d87;letter-spacing:1px;">If this takes too long, <a href="game.html?noinit=1" style="color:#00f0ff;text-decoration:underline;">click here</a></div>
+</div>
+
 
 <!-- ============ LOGIN SCREEN ============ -->
 <div id="login-screen" class="login-screen">
@@ -7762,10 +7768,16 @@ window.addEventListener('keydown', (e) => {
 });
 </script>
 <script id="game-autologin-script">
+// === REDESIGNED LAUNCH FLOW ===
+// The game's main code is in a <script type="module"> which is DEFERRED —
+// it doesn't execute until after HTML parsing. This classic script runs
+// BEFORE the module. So we POLL for the game's functions to be defined
+// before attempting auto-login.
+
 (function() {
   const SESSION_KEY = 'openworld_session';
-  let loadingOverlay = null;
-  let menuHideStyle = null;
+  const LOAD_SCREEN_ID = 'game-loading-screen';
+  const LOAD_TEXT_ID = 'game-loading-text';
 
   function hashPassword(pwd) {
     let hash = 5381;
@@ -7776,79 +7788,149 @@ window.addEventListener('keydown', (e) => {
     try { const raw = localStorage.getItem('openworld_save_' + name); return raw ? JSON.parse(raw) : null; }
     catch (e) { return null; }
   }
-
-  function showLoading() {
-    if (loadingOverlay) return;
-    loadingOverlay = document.createElement('div');
-    loadingOverlay.id = 'auto-login-loading';
-    loadingOverlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:radial-gradient(ellipse at 50% 50%, #0b1d29 0%, #03050a 70%);display:flex;align-items:center;justify-content:center;font-family:Arial,Helvetica,sans-serif;color:#00f0ff;font-size:18px;letter-spacing:3px;text-transform:uppercase;text-shadow:0 0 12px rgba(0,240,255,0.6);';
-    loadingOverlay.innerHTML = '<div>Entering world...</div>';
-    document.body.appendChild(loadingOverlay);
-    // Also hide the menu screen (not the login screen — let auto-login handle that)
-    menuHideStyle = document.createElement('style');
-    menuHideStyle.textContent = '#menu { display: none !important; }';
-    document.head.appendChild(menuHideStyle);
+  function setLoadText(txt) {
+    const el = document.getElementById(LOAD_TEXT_ID);
+    if (el) el.textContent = txt;
   }
-  function hideLoading() {
-    if (loadingOverlay) { loadingOverlay.remove(); loadingOverlay = null; }
-    if (menuHideStyle) { menuHideStyle.remove(); menuHideStyle = null; }
+  function removeLoadScreen() {
+    const el = document.getElementById(LOAD_SCREEN_ID);
+    if (el) el.remove();
+    const menuStyle = document.getElementById('temp-hide-menu');
+    if (menuStyle) menuStyle.remove();
   }
 
-  function enterWorld() {
-    try { if (typeof enterGame === 'function') enterGame(); }
-    catch (e) { console.warn('enterGame failed:', e); }
-    setTimeout(hideLoading, 200);
-  }
-
-  // Watch for login completion
-  function startObserver() {
-    const loginScreen = document.getElementById('login-screen');
-    if (!loginScreen) { setTimeout(startObserver, 50); return; }
-    if (loginScreen.classList.contains('hide') || loginScreen.style.display === 'none') {
-      enterWorld(); return;
+  // === Step 1: Wait for the game's module to load ===
+  // The module defines window.loginSubmit, window.enterGame, etc.
+  // Poll every 50ms until they're available.
+  function waitForGameModule(attempts) {
+    if (attempts > 200) {  // 200 * 50ms = 10 seconds
+      console.error('Game module failed to load after 10s');
+      setLoadText('Failed to load game. Click here to retry.');
+      const link = document.querySelector('#game-loading-screen a');
+      if (link) { link.textContent = 'Reload page'; link.href = location.href; }
+      return;
     }
-    const obs = new MutationObserver(() => {
-      if (loginScreen.classList.contains('hide') || loginScreen.style.display === 'none') {
-        enterWorld();
-        obs.disconnect();
-      }
-    });
-    obs.observe(loginScreen, { attributes: true, attributeFilter: ['class', 'style'] });
+    if (typeof window.loginSubmit === 'function' && typeof window.enterGame === 'function') {
+      setLoadText('Entering world...');
+      startAutoLogin();
+    } else {
+      if (attempts % 20 === 0) setLoadText('Loading game' + '.'.repeat(Math.floor(attempts / 20) % 4));
+      setTimeout(() => waitForGameModule(attempts + 1), 50);
+    }
   }
 
-  function tryAutoLogin() {
+  // === Step 2: Attempt auto-login (if session exists) ===
+  function startAutoLogin() {
     let parsed;
     try {
       const sess = sessionStorage.getItem(SESSION_KEY);
-      if (!sess) return false;
+      if (!sess) { removeLoadScreen(); return; }  // no session → show login screen
       parsed = JSON.parse(sess);
-      if (!parsed || !parsed.name || !parsed.pwd) return false;
+      if (!parsed || !parsed.name || !parsed.pwd) { removeLoadScreen(); return; }
       const save = getSave(parsed.name);
-      if (!save || save.passwordHash !== hashPassword(parsed.pwd)) return false;
-    } catch (e) { return false; }
+      if (!save || save.passwordHash !== hashPassword(parsed.pwd)) {
+        console.warn('Auto-login: password mismatch (cloud sync overwrite?)');
+        removeLoadScreen();  // show login screen so user can log in manually
+        return;
+      }
+    } catch (e) {
+      console.warn('Auto-login: session parse error', e);
+      removeLoadScreen();
+      return;
+    }
 
-    // Session is valid — show loading overlay + hide menu
-    showLoading();
+    // Session is valid — hide the menu screen (skip it) + keep loading screen
+    const menuStyle = document.createElement('style');
+    menuStyle.id = 'temp-hide-menu';
+    menuStyle.textContent = '#menu { display: none !important; }';
+    document.head.appendChild(menuStyle);
 
+    // Fill the login form and submit
     const nameInput = document.getElementById('login-name');
-    const pwdInput  = document.getElementById('login-pwd');
-    if (!nameInput || !pwdInput) { hideLoading(); return false; }
+    const pwdInput = document.getElementById('login-pwd');
+    if (!nameInput || !pwdInput) {
+      console.warn('Auto-login: login form not found');
+      removeLoadScreen();
+      return;
+    }
     nameInput.value = parsed.name;
-    pwdInput.value  = parsed.pwd;
-    try { loginSubmit(); }
-    catch (e) { console.warn('Auto-login failed:', e); hideLoading(); }
+    pwdInput.value = parsed.pwd;
 
-    // Safety: if login doesn't complete in 5 seconds, remove the overlay
-    // so the user can see whatever state the game is in
-    setTimeout(() => { if (loadingOverlay) hideLoading(); }, 5000);
-    return true;
+    setLoadText('Logging in...');
+
+    // Watch for login completion via MutationObserver
+    const loginScreen = document.getElementById('login-screen');
+    if (!loginScreen) {
+      console.warn('Auto-login: login-screen element not found');
+      removeLoadScreen();
+      return;
+    }
+
+    // If login is already complete (somehow), enter the game now
+    if (loginScreen.classList.contains('hide') || loginScreen.style.display === 'none') {
+      enterWorld();
+      return;
+    }
+
+    // Set up observer to detect login completion
+    const obs = new MutationObserver(() => {
+      if (loginScreen.classList.contains('hide') || loginScreen.style.display === 'none') {
+        obs.disconnect();
+        enterWorld();
+      }
+    });
+    obs.observe(loginScreen, { attributes: true, attributeFilter: ['class', 'style'] });
+
+    // Call loginSubmit
+    try {
+      window.loginSubmit();
+      setLoadText('Entering world...');
+    } catch (e) {
+      console.warn('Auto-login: loginSubmit threw', e);
+      removeLoadScreen();
+      return;
+    }
+
+    // Safety: if login doesn't complete in 8 seconds, remove everything
+    setTimeout(() => {
+      if (document.getElementById(LOAD_SCREEN_ID)) {
+        console.warn('Auto-login: timed out after 8s, showing login screen');
+        removeLoadScreen();
+        // Make sure login screen is visible
+        if (loginScreen) {
+          loginScreen.classList.remove('hide');
+          loginScreen.style.display = '';
+        }
+      }
+    }, 8000);
   }
 
-  // Start as early as possible
+  // === Step 3: Enter the game world ===
+  function enterWorld() {
+    setLoadText('Loading 3D world...');
+    try {
+      window.enterGame();
+    } catch (e) {
+      console.error('enterGame threw:', e);
+      removeLoadScreen();
+      return;
+    }
+    // Give the canvas a moment to mount, then remove the loading screen
+    setTimeout(removeLoadScreen, 300);
+  }
+
+  // === Start the flow ===
+  // Don't use setTimeout — start polling immediately
+  waitForGameModule(0);
+
+  // Global safety net: after 15 seconds, force-remove the loading screen
+  // no matter what state we're in
   setTimeout(() => {
-    startObserver();
-    tryAutoLogin();
-  }, 50);
+    if (document.getElementById(LOAD_SCREEN_ID)) {
+      console.error('Global safety: removing loading screen after 15s timeout');
+      removeLoadScreen();
+    }
+  }, 15000);
 })();
 </script>
 
