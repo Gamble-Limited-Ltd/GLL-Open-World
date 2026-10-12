@@ -3782,77 +3782,77 @@ const BUSINESS_TYPES = [
     id: 'farm', name: 'Farm', icon: '🌾',
     buildCost: 16000, produces: 'food', rate: 0.5,
     color: 0x7cb342, shape: 'cone',
-    desc: 'Grows food. Slow but steady production.'
+    desc: 'Grows food. Slow but steady production.',
     planets: ['earth'],
   },
   {
     id: 'mine', name: 'Mine', icon: '⛏️',
     buildCost: 40000, produces: 'ore', rate: 0.6,
     color: 0x8d6e63, shape: 'cylinder',
-    desc: 'Extracts ore from the earth.'
+    desc: 'Extracts ore from the earth.',
     planets: ['earth', 'luna', 'mars'],
   },
   {
     id: 'factory', name: 'Factory', icon: '🏭',
     buildCost: 120000, produces: 'goods', rate: 0.6,
     color: 0x546e7a, shape: 'box',
-    desc: 'Manufactures goods from raw materials.'
+    desc: 'Manufactures goods from raw materials.',
     planets: ['earth', 'luna', 'mars'],
   },
   {
     id: 'resort', name: 'Resort', icon: '🏖️',
     buildCost: 180000, produces: 'tourism', rate: 0.6,
     color: 0x4dd0e1, shape: 'dome',
-    desc: 'Generates tourism revenue from visitors.'
+    desc: 'Generates tourism revenue from visitors.',
     planets: ['earth', 'mars', 'oceanus'],
   },
   {
     id: 'oilrig', name: 'Oil Rig', icon: '🛢️',
     buildCost: 280000, produces: 'oil', rate: 0.7,
     color: 0x37474f, shape: 'pyramid',
-    desc: 'Pumps crude oil. High-value material.'
+    desc: 'Pumps crude oil. High-value material.',
     planets: ['earth', 'oceanus'],
   },
   {
     id: 'casino', name: 'Casino', icon: '🎰',
     buildCost: 360000, produces: 'fun', rate: 0.7,
     color: 0xd32f2f, shape: 'sphere',
-    desc: 'Runs slot machines that produce Entertainment at a steady rate — and you can step up and spin them yourself. Every extra casino trims the bust chance at the tables.'
+    desc: 'Runs slot machines that produce Entertainment at a steady rate — and you can step up and spin them yourself. Every extra casino trims the bust chance at the tables.',
     planets: ['earth', 'oceanus'],
   },
   {
     id: 'bank', name: 'Bank', icon: '🏦',
     buildCost: 600000, produces: 'capital', rate: 0.7,
     color: 0xf5cc74, shape: 'cylinder',
-    desc: 'Generates financial capital services.'
+    desc: 'Generates financial capital services.',
     planets: ['earth', 'luna'],
   },
   {
     id: 'techhub', name: 'Tech Hub', icon: '💻',
     buildCost: 1200000, produces: 'tech', rate: 0.7,
     color: 0x7c4dff, shape: 'octahedron',
-    desc: 'Produces cutting-edge electronics.'
+    desc: 'Produces cutting-edge electronics.',
     planets: ['earth', 'luna', 'mars', 'oceanus'],
   },
   {
     id: 'barracks', name: 'Barracks', icon: '⚔️',
     buildCost: 120000, produces: 'troops', rate: 0.4,
     color: 0x9c3428, shape: 'barracks', military: true,
-    desc: 'Trains troops. Each Barracks houses 500 troops — build more to raise your army cap. Deploy troops to conquer other commanders\' plots.'
+    desc: 'Trains troops. Each Barracks houses 500 troops — build more to raise your army cap. Deploy troops to conquer other commanders\' plots.',
     planets: ['earth', 'luna', 'mars'],
   },
   {
     id: 'navalyard', name: 'Naval Yard', icon: '⚓',
     buildCost: 180000, produces: 'ships', rate: 0.35,
     color: 0x2b5f75, shape: 'navalyard', military: true,
-    desc: 'Builds warships on coasts and oceans. Ships fight naval invasions and defend sea plots.'
+    desc: 'Builds warships on coasts and oceans. Ships fight naval invasions and defend sea plots.',
     planets: ['earth', 'oceanus'],
   },
   {
     id: 'airfield', name: 'Airfield', icon: '✈️',
     buildCost: 280000, produces: 'planes', rate: 0.25,
     color: 0x78909c, shape: 'airfield', military: true,
-    desc: 'Operates an airstrip. Planes provide air support to every battle you fight.'
+    desc: 'Operates an airstrip. Planes provide air support to every battle you fight.',
     planets: ['earth', 'luna', 'mars'],
   },
   // === PLANET-UNIQUE BUSINESSES ===
@@ -3864,28 +3864,28 @@ const BUSINESS_TYPES = [
     id: 'stockexchange', name: 'Stock Exchange', icon: '📈',
     buildCost: 1500000, produces: 'capital', rate: 1.4,
     color: 0x00e676, shape: 'sphere',
-    desc: 'A high-frequency trading hub at the heart of Earth's financial district. Produces capital at 2x the rate of a Bank. Earth-only — the Empire's financial center.'
+    desc: 'A high-frequency trading hub at the heart of Earth\'s financial district. Produces capital at 2x the rate of a Bank. Earth-only — the Empire\'s financial center.',
     planets: ['earth'],
   },
   {
     id: 'helium3', name: 'Helium-3 Extractor', icon: '⚛️',
     buildCost: 2000000, produces: 'tech', rate: 1.4,
     color: 0xc0ca33, shape: 'octahedron',
-    desc: 'Mines helium-3 from lunar regolith — the rare isotope that powers fusion reactors across the system. Produces tech at 2x the rate of a Tech Hub. Luna-only.'
+    desc: 'Mines helium-3 from lunar regolith — the rare isotope that powers fusion reactors across the system. Produces tech at 2x the rate of a Tech Hub. Luna-only.',
     planets: ['luna'],
   },
   {
     id: 'biodome', name: 'Biodome', icon: '🌱',
     buildCost: 800000, produces: 'food', rate: 1.0,
     color: 0x66bb6a, shape: 'dome',
-    desc: 'A sealed greenhouse complex for terraforming research. Produces food at 2x the rate of a Farm — and works on Mars where Farms cannot. Mars-only.'
+    desc: 'A sealed greenhouse complex for terraforming research. Produces food at 2x the rate of a Farm — and works on Mars where Farms cannot. Mars-only.',
     planets: ['mars'],
   },
   {
     id: 'wavefarm', name: 'Wave Farm', icon: '🌊',
     buildCost: 1200000, produces: 'oil', rate: 1.4,
     color: 0x26c6da, shape: 'cylinder',
-    desc: 'Harvests energy from ocean waves and converts it to refined fuel. Produces oil at 2x the rate of an Oil Rig. Oceanus-only — works on water plots.'
+    desc: 'Harvests energy from ocean waves and converts it to refined fuel. Produces oil at 2x the rate of an Oil Rig. Oceanus-only — works on water plots.',
     planets: ['oceanus'],
   },
 ];
