@@ -464,11 +464,11 @@
                     <div>
                         <label class="block font-orbitron text-xs text-gray-400 uppercase tracking-wider mb-3">Choose Faction Territory Accent Color:</label>
                         <div class="grid grid-cols-5 gap-3">
-                            <button onclick="setPlotColor('#00f0ff'); playSound('click')" class="h-10 rounded-extbg-[#00f0ff] border border-white/20 hover:scale-110 transition-transform"></button>
-                            <button onclick="setPlotColor('#10b981'); playSound('click')" class="h-10 rounded-extbg-[#10b981] border border-white/20 hover:scale-110 transition-transform"></button>
-                            <button onclick="setPlotColor('#f59e0b'); playSound('click')" class="h-10 rounded-extbg-[#f59e0b] border border-white/20 hover:scale-110 transition-transform"></button>
-                            <button onclick="setPlotColor('#ef4444'); playSound('click')" class="h-10 rounded-extbg-[#ef4444] border border-white/20 hover:scale-110 transition-transform"></button>
-                            <button onclick="setPlotColor('#a855f7'); playSound('click')" class="h-10 rounded-extbg-[#a855f7] border border-white/20 hover:scale-110 transition-transform"></button>
+                            <button onclick="setPlotColor('#00f0ff'); playSound('click')" class="h-10 rounded-xl bg-[#00f0ff] border border-white/20 hover:scale-110 transition-transform"></button>
+                            <button onclick="setPlotColor('#10b981'); playSound('click')" class="h-10 rounded-xl bg-[#10b981] border border-white/20 hover:scale-110 transition-transform"></button>
+                            <button onclick="setPlotColor('#f59e0b'); playSound('click')" class="h-10 rounded-xl bg-[#f59e0b] border border-white/20 hover:scale-110 transition-transform"></button>
+                            <button onclick="setPlotColor('#ef4444'); playSound('click')" class="h-10 rounded-xl bg-[#ef4444] border border-white/20 hover:scale-110 transition-transform"></button>
+                            <button onclick="setPlotColor('#a855f7'); playSound('click')" class="h-10 rounded-xl bg-[#a855f7] border border-white/20 hover:scale-110 transition-transform"></button>
                         </div>
                     </div>
                 </div>
@@ -514,19 +514,19 @@
             <input type="text" id="cmd-input" placeholder="Type a command or jump location..." class="w-full bg-black/70 border border-tactical-border rounded-xl p-3 text-white font-orbitron text-xs focus:outline-none focus:border-tactical-cyan" onkeyup="filterCommands(this.value)">
 
             <div class="space-y-2 font-orbitron text-xs" id="cmd-list">
-                <a href="game.html" class="block p-3 glass-card rounded-exthover:bg-tactical-cyan/20 text-tactical-cyan font-bold flex justify-between">
+                <a href="game.html" class="block p-3 glass-card rounded-xl hover:bg-tactical-cyan/20 text-tactical-cyan font-bold flex justify-between">
                     <span>&gt; Launch Game Application</span>
                     <span class="text-gray-400 font-normal">GitHub Pages</span>
                 </a>
-                <a href="#globe-map" onclick="toggleCommandModal()" class="block p-3 glass-card rounded-exthover:bg-white/10 text-white flex justify-between">
+                <a href="#globe-map" onclick="toggleCommandModal()" class="block p-3 glass-card rounded-xl hover:bg-white/10 text-white flex justify-between">
                     <span>&gt; Jump to Globe Map Info</span>
                     <span class="text-gray-400">#globe-map</span>
                 </a>
-                <a href="#calculator" onclick="toggleCommandModal()" class="block p-3 glass-card rounded-exthover:bg-white/10 text-white flex justify-between">
-                    <span>&gt; Open Business Calculator</span>
-                    <span class="text-gray-400">#calculator</span>
+                <a href="#income" onclick="toggleCommandModal()" class="block p-3 glass-card rounded-xl hover:bg-white/10 text-white flex justify-between">
+                    <span>&gt; View Live Income</span>
+                    <span class="text-gray-400">#income</span>
                 </a>
-                <a href="#market" onclick="toggleCommandModal()" class="block p-3 glass-card rounded-exthover:bg-white/10 text-white flex justify-between">
+                <a href="#market" onclick="toggleCommandModal()" class="block p-3 glass-card rounded-xl hover:bg-white/10 text-white flex justify-between">
                     <span>&gt; View Commodity Market Index</span>
                     <span class="text-gray-400">#market</span>
                 </a>
