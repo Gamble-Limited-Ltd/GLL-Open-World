@@ -7764,81 +7764,98 @@ window.addEventListener('keydown', (e) => {
 });
 </script>
 <script id="game-autologin-script">
-// Minimal auto-login: wait for module, fill form, submit, enter game.
-// No overlays, no CSS injection — if it fails, the login screen is visible.
+// === LAUNCH FLOW ===
+// Always watches for login completion → calls enterGame().
+// Also auto-fills the form if a session exists.
 (function() {
   function hashPassword(pwd) {
-    let h = 5381;
-    for (let i = 0; i < pwd.length; i++) h = ((h << 5) + h + pwd.charCodeAt(i)) | 0;
+    var h = 5381;
+    for (var i = 0; i < pwd.length; i++) h = ((h << 5) + h + pwd.charCodeAt(i)) | 0;
     return (h >>> 0).toString(16);
   }
   function getSave(name) {
-    try { const r = localStorage.getItem('openworld_save_' + name); return r ? JSON.parse(r) : null; }
+    try { var r = localStorage.getItem('openworld_save_' + name); return r ? JSON.parse(r) : null; }
     catch (e) { return null; }
   }
 
-  var loginStarted = false;
+  var enterGameCalled = false;
 
-  function doLogin() {
-    if (loginStarted) return;
-    loginStarted = true;
+  // Called when login completes (login screen gets .hide class).
+  // Works for BOTH auto-login AND manual login.
+  function onLoginComplete() {
+    if (enterGameCalled) return;
+    enterGameCalled = true;
+    console.log('[Launch] Login complete, entering game...');
+    setTimeout(function() {
+      try { window.enterGame(); }
+      catch (e) { console.error('[Launch] enterGame error:', e); }
+    }, 50);
+  }
 
-    // Check for session
+  // Set up the observer that watches for login completion
+  function setupObserver() {
+    var loginScreen = document.getElementById('login-screen');
+    if (!loginScreen) { setTimeout(setupObserver, 50); return; }
+
+    // Check if login is already complete
+    if (loginScreen.classList.contains('hide') || loginScreen.style.display === 'none') {
+      onLoginComplete();
+      return;
+    }
+
+    // Watch for login screen getting .hide class
+    var obs = new MutationObserver(function() {
+      if (loginScreen.classList.contains('hide') || loginScreen.style.display === 'none') {
+        obs.disconnect();
+        onLoginComplete();
+      }
+    });
+    obs.observe(loginScreen, { attributes: true, attributeFilter: ['class', 'style'] });
+    console.log('[Launch] Observer set up on login screen');
+  }
+
+  // Try to auto-fill the login form if a session exists
+  function tryAutoLogin() {
     var parsed;
     try {
       var sess = sessionStorage.getItem('openworld_session');
-      if (!sess) return;  // no session — login screen is visible
+      if (!sess) { console.log('[Launch] No session — manual login required'); return; }
       parsed = JSON.parse(sess);
-      if (!parsed || !parsed.name || !parsed.pwd) return;
+      if (!parsed || !parsed.name || !parsed.pwd) { console.log('[Launch] Invalid session'); return; }
       var save = getSave(parsed.name);
-      if (!save || save.passwordHash !== hashPassword(parsed.pwd)) return;
-    } catch (e) { return; }
-
-    // Session valid — fill the login form
-    var nameInput = document.getElementById('login-name');
-    var pwdInput = document.getElementById('login-pwd');
-    if (!nameInput || !pwdInput) return;
-    nameInput.value = parsed.name;
-    pwdInput.value = parsed.pwd;
-
-    // Watch for login completion (login screen gets .hide class)
-    var loginScreen = document.getElementById('login-screen');
-    if (loginScreen) {
-      // If already hidden, enter game now
-      if (loginScreen.classList.contains('hide') || loginScreen.style.display === 'none') {
-        enterWorld();
+      if (!save || save.passwordHash !== hashPassword(parsed.pwd)) {
+        console.log('[Launch] Password mismatch — manual login required');
         return;
       }
-      // Otherwise watch for it
-      var obs = new MutationObserver(function() {
-        if (loginScreen.classList.contains('hide') || loginScreen.style.display === 'none') {
-          obs.disconnect();
-          enterWorld();
-        }
-      });
-      obs.observe(loginScreen, { attributes: true, attributeFilter: ['class', 'style'] });
-    }
+    } catch (e) { console.log('[Launch] Session error:', e); return; }
 
-    // Submit the login form
-    try { window.loginSubmit(); } catch (e) { console.warn('loginSubmit error:', e); }
+    // Session valid — fill the form
+    var nameInput = document.getElementById('login-name');
+    var pwdInput = document.getElementById('login-pwd');
+    if (!nameInput || !pwdInput) { console.log('[Launch] Login form not found'); return; }
+    nameInput.value = parsed.name;
+    pwdInput.value = parsed.pwd;
+    console.log('[Launch] Auto-filling login for:', parsed.name);
+
+    // Submit
+    try { window.loginSubmit(); console.log('[Launch] loginSubmit called'); }
+    catch (e) { console.warn('[Launch] loginSubmit error:', e); }
   }
 
-  function enterWorld() {
-    // Small delay to let the menu screen render, then enter the game
-    setTimeout(function() {
-      try { window.enterGame(); }
-      catch (e) { console.warn('enterGame error:', e); }
-    }, 100);
-  }
-
-  // Poll for the game module to load (loginSubmit defined = module is ready)
+  // Poll for the game module to load
   var pollCount = 0;
   function poll() {
     if (typeof window.loginSubmit === 'function' && typeof window.enterGame === 'function') {
-      doLogin();
-    } else if (pollCount < 300) {  // 300 * 100ms = 30 seconds max
+      console.log('[Launch] Game module loaded, setting up...');
+      // ALWAYS set up the observer (for both auto + manual login)
+      setupObserver();
+      // Then try auto-login (if session exists)
+      tryAutoLogin();
+    } else if (pollCount < 300) {
       pollCount++;
       setTimeout(poll, 100);
+    } else {
+      console.error('[Launch] Game module did not load after 30s');
     }
   }
   poll();
