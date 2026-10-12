@@ -175,7 +175,7 @@
             <!-- Navigation Links -->
             <nav class="hidden lg:flex items-center space-x-8 font-orbitron text-xs tracking-widest uppercase">
                 <a href="#globe-map" class="hover:text-tactical-cyan transition-colors py-1 border-b-2 border-transparent hover:border-tactical-cyan" onmouseenter="playSound('hover')">Globe & Land</a>
-                <a href="#calculator" class="hover:text-tactical-cyan transition-colors py-1 border-b-2 border-transparent hover:border-tactical-cyan" onmouseenter="playSound('hover')">Yield Calculator</a>
+                <a href="#income" class="hover:text-tactical-cyan transition-colors py-1 border-b-2 border-transparent hover:border-tactical-cyan" onmouseenter="playSound('hover')">Live Income</a>
                 <a href="#market" class="hover:text-tactical-cyan transition-colors py-1 border-b-2 border-transparent hover:border-tactical-cyan" onmouseenter="playSound('hover')">Commodity Market</a>
                 <a href="#military" class="hover:text-tactical-cyan transition-colors py-1 border-b-2 border-transparent hover:border-tactical-cyan" onmouseenter="playSound('hover')">Clans & Armies</a>
                 <a href="#customizer" class="hover:text-tactical-cyan transition-colors py-1 border-b-2 border-transparent hover:border-tactical-cyan" onmouseenter="playSound('hover')">Banner Customizer</a>
@@ -211,7 +211,7 @@
         <!-- Mobile Drawer -->
         <div id="mobile-menu" class="hidden lg:hidden glass-panel border-b border-tactical-border px-4 pt-2 pb-6 space-y-3 font-orbitron text-xs">
             <a href="#globe-map" class="block py-2 text-gray-300 hover:text-tactical-cyan">Globe & Land</a>
-            <a href="#calculator" class="block py-2 text-gray-300 hover:text-tactical-cyan">Yield Calculator</a>
+            <a href="#income" class="block py-2 text-gray-300 hover:text-tactical-cyan">Live Income</a>
             <a href="#market" class="block py-2 text-gray-300 hover:text-tactical-cyan">Commodity Market</a>
             <a href="#military" class="block py-2 text-gray-300 hover:text-tactical-cyan">Clans & Armies</a>
             <a href="#customizer" class="block py-2 text-gray-300 hover:text-tactical-cyan">Banner Customizer</a>
@@ -259,8 +259,8 @@
                     <span>PLAY FREE IN BROWSER</span>
                 </a>
                 <a href="#calculator" onclick="playSound('click')" class="w-full sm:w-auto px-8 py-4 glass-card border border-tactical-cyan/40 text-tactical-cyan font-orbitron font-bold text-sm tracking-widest uppercase rounded hover:bg-tactical-cyan hover:text-black transition-all duration-300 hover:shadow-cyan-glow flex items-center justify-center space-x-3">
-                    <i class="fa-solid fa-calculator"></i>
-                    <span>SIMULATE YIELDS</span>
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>VIEW INCOME</span>
                 </a>
             </div>
 
@@ -339,88 +339,44 @@
     </section>
 
     <!-- Business & Commodity Yield Simulator -->
-    <section id="calculator" class="py-20 relative">
+    <section id="income" class="py-20 relative">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center space-y-3 mb-16">
-                <h2 class="font-rajdhani text-emerald-400 text-lg tracking-widest uppercase font-bold">Industrial Economics</h2>
-                <h3 class="font-orbitron text-3xl sm:text-5xl font-extrabold text-white">YIELD & REVENUE CALCULATOR</h3>
-                <p class="text-gray-400 max-w-2xl mx-auto text-sm">Select business types to simulate hourly output, material requirements, and estimated market earnings before making land investments.</p>
+                <h2 class="font-rajdhani text-emerald-400 text-lg tracking-widest uppercase font-bold">Live Production</h2>
+                <h3 class="font-orbitron text-3xl sm:text-5xl font-extrabold text-white">YOUR EMPIRE INCOME</h3>
+                <p class="text-gray-400 max-w-2xl mx-auto text-sm">Real-time income from your businesses across all planets. Updates live as you build, buy, and sell.</p>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center glass-panel p-6 sm:p-10 rounded-3xl border border-tactical-border">
-                
-                <!-- Business Selector & Controls -->
-                <div class="lg:col-span-6 space-y-6">
-                    <div>
-                        <label class="block font-orbitron text-xs text-gray-400 uppercase tracking-widest mb-2">Select Business Facility</label>
-                        <select id="calc-business-type" onchange="updateYieldCalculator()" class="w-full bg-black/60 border border-tactical-border rounded-xl p-4 font-orbitron text-sm text-white focus:outline-none focus:border-tactical-cyan">
-                            <option value="mine">Iron & Minerals Mine</option>
-                            <option value="refinery">Crude Oil Refinery</option>
-                            <option value="tech-lab">Microchip Tech Lab</option>
-                            <option value="farm">Hydroponic Grain Farm</option>
-                            <option value="barracks">Military Barracks (Troops)</option>
-                        </select>
-                    </div>
-
-                    <!-- Level Slider -->
-                    <div>
-                        <div class="flex justify-between font-orbitron text-xs mb-2">
-                            <span class="text-gray-400">Facility Level / Quantity:</span>
-                            <span id="calc-level-val" class="text-tactical-cyan font-bold">Level 5</span>
-                        </div>
-                        <input type="range" id="calc-level-slider" min="1" max="20" value="5" oninput="updateYieldCalculator()" class="w-full h-2 bg-black/60 rounded-lg appearance-none cursor-pointer accent-tactical-cyan">
-                    </div>
-
-                    <!-- Material Market Sell Price Override -->
-                    <div>
-                        <div class="flex justify-between font-orbitron text-xs mb-2">
-                            <span class="text-gray-400">Current Market Price Per Unit ($):</span>
-                            <span id="calc-price-val" class="text-emerald-400 font-bold">$120 / unit</span>
-                        </div>
-                        <input type="range" id="calc-price-slider" min="20" max="500" value="120" oninput="updateYieldCalculator()" class="w-full h-2 bg-black/60 rounded-lg appearance-none cursor-pointer accent-emerald-400">
-                    </div>
+            <div class="max-w-4xl mx-auto glass-panel p-8 sm:p-12 rounded-3xl border border-tactical-border text-center">
+                <div class="font-orbitron text-xs text-gray-400 uppercase tracking-widest mb-4">Total Income Rate</div>
+                <div class="font-orbitron text-5xl sm:text-7xl font-black mb-2">
+                    <span id="live-income-rate" class="text-transparent bg-clip-text bg-gradient-to-r from-tactical-cyan via-emerald-400 to-amber-400 text-glow-cyan">$0.00</span>
+                    <span class="text-2xl sm:text-3xl text-gray-400 font-bold">/sec</span>
+                </div>
+                <div class="text-gray-400 text-sm font-rajdhani mb-8">
+                    <span id="live-business-count" class="text-tactical-cyan font-bold">0</span> businesses producing across <span id="live-planet-count" class="text-tactical-cyan font-bold">0</span> planets
                 </div>
 
-                <!-- Simulation Output Metrics Card -->
-                <div class="lg:col-span-6 glass-card p-6 sm:p-8 rounded-2xl border border-white/10 space-y-6">
-                    <div class="flex items-center justify-between border-b border-white/10 pb-4">
-                        <span class="font-orbitron text-xs text-gray-400 uppercase tracking-wider">Simulated Production Metrics</span>
-                        <span class="font-orbitron text-xs px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded">HOURLY ESTIMATE</span>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4 font-orbitron">
-                        <div class="p-4 bg-black/40 rounded-xl border border-white/5">
-                            <span class="text-[10px] text-gray-400 block uppercase">Base Yield Output</span>
-                            <span id="calc-output-units" class="text-xl font-bold text-tactical-cyan">250 Units / hr</span>
-                        </div>
-                        <div class="p-4 bg-black/40 rounded-xl border border-white/5">
-                            <span class="text-[10px] text-gray-400 block uppercase">Est. Hourly Gross</span>
-                            <span id="calc-gross-revenue" class="text-xl font-bold text-emerald-400">$30,000 / hr</span>
-                        </div>
-                        <div class="p-4 bg-black/40 rounded-xl border border-white/5">
-                            <span class="text-[10px] text-gray-400 block uppercase">Energy & Upkeep</span>
-                            <span id="calc-upkeep-cost" class="text-xl font-bold text-amber-400">-$4,500 / hr</span>
-                        </div>
-                        <div class="p-4 bg-black/40 rounded-xl border border-white/5">
-                            <span class="text-[10px] text-gray-400 block uppercase">Net Profit Margin</span>
-                            <span id="calc-net-profit" class="text-xl font-bold text-white text-glow-emerald">$25,500 / hr</span>
-                        </div>
-                    </div>
-
-                    <div class="p-4 bg-tactical-cyan/5 rounded-xl border border-tactical-cyan/20 flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <i class="fa-solid fa-chart-line text-tactical-cyan text-xl"></i>
-                            <span class="font-orbitron text-xs text-gray-300">Target ROI Payback Period: <strong id="calc-roi-hours" class="text-tactical-cyan">3.9 Hours</strong></span>
-                        </div>
-                        <a href="game.html" onclick="playSound('click')" class="px-4 py-2 bg-tactical-cyan text-black font-orbitron font-bold text-xs uppercase rounded hover:shadow-cyan-glow transition-all">Build In Game</a>
-                    </div>
+                <div id="live-income-breakdown" class="grid grid-cols-2 sm:grid-cols-4 gap-3 font-orbitron text-left">
+                    <!-- Filled by JS — shows per-material income breakdown -->
                 </div>
 
+                <div id="live-income-login-prompt" class="hidden mt-6 p-4 bg-amber-500/5 rounded-xl border border-amber-500/20 text-amber-400 font-rajdhani">
+                    <i class="fa-solid fa-lock mr-2"></i>
+                    Log in to see your empire's real-time income
+                </div>
+
+                <div class="mt-8">
+                    <a href="game.html" onclick="playSound('tactical')" class="inline-flex items-center space-x-3 px-6 py-3 bg-gradient-to-r from-tactical-cyan to-emerald-500 text-black font-orbitron font-bold text-sm tracking-widest uppercase rounded shadow-cyan-glow hover:scale-105 transition-all duration-300">
+                        <i class="fa-solid fa-earth-americas"></i>
+                        <span>Enter World</span>
+                    </a>
+                </div>
             </div>
         </div>
     </section>
 
-    <!-- Live Fluctuating Commodity Market Ticker -->
+    
     <section id="market" class="py-20 relative bg-tactical-dark border-t border-b border-tactical-border">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex flex-col md:flex-row md:items-end justify-between mb-12">
@@ -653,41 +609,119 @@
         window.onload = function() {
             renderGlobeVFX();
             initMarketData();
-            updateYieldCalculator();
         };
 
-        // 2. Business Yield Calculator Logic
-        const businessConfigs = {
-            'mine': { name: "Iron & Minerals Mine", baseOutput: 50, price: 120, unit: "Iron", upkeep: 900 },
-            'refinery': { name: "Crude Oil Refinery", baseOutput: 30, price: 210, unit: "Barrels", upkeep: 1400 },
-            'tech-lab': { name: "Microchip Tech Lab", baseOutput: 15, price: 450, unit: "Chips", upkeep: 2500 },
-            'farm': { name: "Hydroponic Grain Farm", baseOutput: 80, price: 45, unit: "Bushels", upkeep: 500 },
-            'barracks': { name: "Military Barracks", baseOutput: 10, price: 300, unit: "Regiments", upkeep: 1800 }
+        // 2. Live Empire Income — reads from save data and computes income/sec
+        // Mirrors BUSINESS_TYPES rates from the game (kept in sync manually)
+        const BUSINESS_RATES = {
+            farm:          { rate: 0.5,  produces: 'food',     icon: '🌾' },
+            mine:          { rate: 0.6,  produces: 'ore',      icon: '⛏️' },
+            factory:       { rate: 0.6,  produces: 'goods',    icon: '🏭' },
+            resort:        { rate: 0.6,  produces: 'tourism',   icon: '🏖️' },
+            oilrig:        { rate: 0.7,  produces: 'oil',       icon: '🛢️' },
+            casino:        { rate: 0.7,  produces: 'fun',       icon: '🎰' },
+            bank:          { rate: 0.7,  produces: 'capital',   icon: '🏦' },
+            techhub:       { rate: 0.7,  produces: 'tech',      icon: '💻' },
+            barracks:      { rate: 0.4,  produces: 'troops',    icon: '⚔️' },
+            navalyard:     { rate: 0.35, produces: 'ships',     icon: '⚓' },
+            airfield:      { rate: 0.25, produces: 'planes',    icon: '✈️' },
+            stockexchange: { rate: 1.4,  produces: 'capital',   icon: '📈' },
+            helium3:       { rate: 1.4,  produces: 'tech',      icon: '⚛️' },
+            biodome:       { rate: 1.0,  produces: 'food',       icon: '🌱' },
+            wavefarm:      { rate: 1.4,  produces: 'oil',       icon: '🌊' },
+        };
+        const MATERIAL_NAMES = {
+            food: 'Food', ore: 'Ore', goods: 'Goods', tourism: 'Tourism',
+            oil: 'Oil', fun: 'Entertainment', capital: 'Capital', tech: 'Tech',
+            troops: 'Troops', ships: 'Ships', planes: 'Planes',
+        };
+        const DEFAULT_MARKET_PRICES = {
+            food: 45, ore: 120, goods: 200, tourism: 350,
+            oil: 215, fun: 400, capital: 800, tech: 460,
+            troops: 300, ships: 700, planes: 900,
         };
 
-        function updateYieldCalculator() {
-            const bType = document.getElementById('calc-business-type').value;
-            const level = parseInt(document.getElementById('calc-level-slider').value);
-            const customPrice = parseInt(document.getElementById('calc-price-slider').value);
+        function updateLiveIncome() {
+            const rateEl = document.getElementById('live-income-rate');
+            const countEl = document.getElementById('live-business-count');
+            const planetEl = document.getElementById('live-planet-count');
+            const breakdownEl = document.getElementById('live-income-breakdown');
+            const loginPrompt = document.getElementById('live-income-login-prompt');
+            if (!rateEl) return;
 
-            const config = businessConfigs[bType];
-            document.getElementById('calc-level-val').innerText = `Level ${level}`;
-            document.getElementById('calc-price-val').innerText = `$${customPrice} / unit`;
+            try {
+                const sess = JSON.parse(sessionStorage.getItem('openworld_session') || '{}');
+                if (!sess || !sess.name) {
+                    rateEl.textContent = '$0.00';
+                    countEl.textContent = '0';
+                    planetEl.textContent = '0';
+                    breakdownEl.innerHTML = '';
+                    if (loginPrompt) loginPrompt.classList.remove('hidden');
+                    return;
+                }
+                if (loginPrompt) loginPrompt.classList.add('hidden');
 
-            const hourlyUnits = config.baseOutput * level;
-            const grossRev = hourlyUnits * customPrice;
-            const upkeepCost = config.upkeep * level;
-            const netProfit = grossRev - upkeepCost;
+                const save = JSON.parse(localStorage.getItem('openworld_save_' + sess.name) || 'null');
+                if (!save || !save.businesses || !save.businesses.length) {
+                    rateEl.textContent = '$0.00';
+                    countEl.textContent = '0';
+                    planetEl.textContent = save && save.ownedPlotIds ? '1' : '0';
+                    breakdownEl.innerHTML = '<div class="col-span-2 sm:col-span-4 text-center text-gray-400 text-sm py-4">No businesses yet — build some in the world to start earning.</div>';
+                    return;
+                }
 
-            document.getElementById('calc-output-units').innerText = `${hourlyUnits} ${config.unit} / hr`;
-            document.getElementById('calc-gross-revenue').innerText = `$${grossRev.toLocaleString()} / hr`;
-            document.getElementById('calc-upkeep-cost').innerText = `-$${upkeepCost.toLocaleString()} / hr`;
-            document.getElementById('calc-net-profit').innerText = `$${netProfit.toLocaleString()} / hr`;
+                const marketPrices = save.marketPrices || {};
+                const businesses = save.businesses || [];
 
-            const estCost = level * 10000;
-            const roiHours = netProfit > 0 ? (estCost / netProfit).toFixed(1) : "N/A";
-            document.getElementById('calc-roi-hours').innerText = `${roiHours} Hours`;
+                let totalPerSec = 0;
+                const byMaterial = {};
+
+                for (const biz of businesses) {
+                    const binfo = BUSINESS_RATES[biz.type];
+                    if (!binfo) continue;
+                    const price = marketPrices[binfo.produces] || DEFAULT_MARKET_PRICES[binfo.produces] || 100;
+                    const income = binfo.rate * price;
+                    totalPerSec += income;
+                    byMaterial[binfo.produces] = (byMaterial[binfo.produces] || 0) + income;
+                }
+
+                // Estimate planet count from plot IDs (each planet has a different ID range)
+                const planetsSet = new Set();
+                if (save.ownedPlotIds) {
+                    for (const id of save.ownedPlotIds) {
+                        if (id < 10000) planetsSet.add('earth');
+                        else if (id < 20000) planetsSet.add('luna');
+                        else if (id < 30000) planetsSet.add('mars');
+                        else planetsSet.add('oceanus');
+                    }
+                }
+
+                rateEl.textContent = '$' + totalPerSec.toFixed(2);
+                countEl.textContent = businesses.length;
+                planetEl.textContent = planetsSet.size || 1;
+
+                // Render breakdown — top materials by income
+                const sortedMaterials = Object.entries(byMaterial).sort((a, b) => b[1] - a[1]);
+                breakdownEl.innerHTML = sortedMaterials.length ? sortedMaterials.map(([mat, income]) => {
+                    const icon = Object.values(BUSINESS_RATES).find(b => b.produces === mat)?.icon || '·';
+                    return `
+                        <div class="p-3 bg-black/40 rounded-xl border border-white/5">
+                            <div class="text-[10px] text-gray-400 uppercase tracking-wider">${icon} ${MATERIAL_NAMES[mat] || mat}</div>
+                            <div class="text-lg font-bold text-emerald-400">$${income.toFixed(2)}<span class="text-[10px] text-gray-500 font-normal">/s</span></div>
+                        </div>
+                    `;
+                }).join('') : '<div class="col-span-2 sm:col-span-4 text-center text-gray-400 text-sm py-4">No active production.</div>';
+            } catch (e) {
+                console.warn('Live income update failed:', e);
+            }
         }
+
+        // Run on page load + every 3 seconds + on storage events from other tabs
+        setTimeout(updateLiveIncome, 800);
+        setInterval(updateLiveIncome, 3000);
+        window.addEventListener('storage', (e) => {
+            if (e.key && (e.key.startsWith('openworld_save_') || e.key === 'openworld_session')) updateLiveIncome();
+        });
 
         // 3. Commodity Market Simulator & Chart
         const marketItems = [
