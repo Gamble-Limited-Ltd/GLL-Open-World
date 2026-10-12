@@ -1029,17 +1029,18 @@
         const ADMIN_ACCOUNT = 'kingkayne26';
         let _adminFilterTerm = '';
 
-        function checkAdminAccess() {
+        window.checkAdminAccess = function() {
             let isAdmin = false;
             try {
                 const sess = JSON.parse(sessionStorage.getItem('openworld_session') || '{}');
-                isAdmin = sess && sess.name === ADMIN_ACCOUNT;
-            } catch (e) {}
+                isAdmin = sess && sess.name === 'kingkayne26';
+                console.log('[Admin] checkAdminAccess:', sess.name || '(no session)', '→ isAdmin:', isAdmin);
+            } catch (e) { console.warn('[Admin] checkAdminAccess error:', e); }
             const navLink = document.getElementById('admin-nav-link');
             if (navLink) navLink.classList.toggle('hidden', !isAdmin);
             const mobileLink = document.getElementById('admin-nav-link-mobile');
             if (mobileLink) mobileLink.classList.toggle('hidden', !isAdmin);
-        }
+        };
 
         window.openAdminLanding = function() {
             let sess;
@@ -1223,8 +1224,8 @@
             try { localStorage.removeItem('openworld_save_' + name); const profiles = JSON.parse(localStorage.getItem('openworld_profiles') || '[]'); localStorage.setItem('openworld_profiles', JSON.stringify(profiles.filter(p => p !== name))); adminRefreshLanding(); } catch (e) {}
         };
 
-        setTimeout(checkAdminAccess, 600);
-        setInterval(checkAdminAccess, 1000);
+        setTimeout(function() { if (typeof window.checkAdminAccess === 'function') window.checkAdminAccess(); }, 600);
+        setInterval(function() { if (typeof window.checkAdminAccess === 'function') window.checkAdminAccess(); }, 1000);
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAdminLanding(); });
 
         // Mobile Menu Drawer Toggle
