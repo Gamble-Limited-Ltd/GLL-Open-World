@@ -1,71 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script id="preemptive-hide-screens">
-(function() {
-  try {
-    const sess = sessionStorage.getItem('openworld_session');
-    if (!sess) return;
-    const parsed = JSON.parse(sess);
-    if (!parsed || !parsed.name || !parsed.pwd) return;
-
-    // Validate against localStorage (must match the stored password hash)
-    const raw = localStorage.getItem('openworld_save_' + parsed.name);
-    if (!raw) return;
-    const save = JSON.parse(raw);
-
-    // Compute DJB2 hash of the session password
-    let hash = 5381;
-    for (let i = 0; i < parsed.pwd.length; i++) {
-      hash = ((hash << 5) + hash + parsed.pwd.charCodeAt(i)) | 0;
-    }
-    const hashHex = (hash >>> 0).toString(16);
-    if (save.passwordHash !== hashHex) return;  // Mismatch — let normal login screen show
-
-    // Session is valid — hide login + menu immediately, show loading via body::before
-    const style = document.createElement('style');
-    style.id = 'preemptive-hide-screens-style';
-    style.textContent = `
-      #login-screen, #menu { display: none !important; }
-      body { background: radial-gradient(ellipse at 50% 50%, #0b1d29 0%, #03050a 70%) !important; }
-      body::before {
-        content: 'ENTERING WORLD...';
-        position: fixed; top: 50%; left: 50%;
-        transform: translate(-50%, -50%);
-        color: #00f0ff;
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 18px; letter-spacing: 3px;
-        text-transform: uppercase;
-        text-shadow: 0 0 12px rgba(0,240,255,0.6);
-        z-index: 9999;
-        animation: pulse 1.5s ease-in-out infinite;
-      }
-      @keyframes pulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
-    `;
-    document.head.appendChild(style);
-
-    // Safety net: if auto-login + enterGame haven't completed in 5 seconds,
-    // remove the overlay so the user isn't stuck forever. This handles the
-    // race condition where CloudSync.pullAndMerge() overwrites localStorage
-    // between the preemptive check and tryAutoLogin, causing auto-login to
-    // silently fail.
-    setTimeout(function() {
-      const stillThere = document.getElementById('preemptive-hide-screens-style');
-      if (stillThere) {
-        console.warn('Auto-login timed out after 5s — removing preemptive overlay');
-        stillThere.remove();
-        // Re-show the login screen so the user can log in manually
-        const loginScreen = document.getElementById('login-screen');
-        if (loginScreen) {
-          loginScreen.style.display = '';
-          loginScreen.classList.remove('hide');
-        }
-      }
-    }, 5000);
-  } catch (e) { console.warn('Preemptive hide failed:', e); }
-})();
-</script>
-
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Open World</title>
@@ -7829,7 +7764,8 @@ window.addEventListener('keydown', (e) => {
 <script id="game-autologin-script">
 (function() {
   const SESSION_KEY = 'openworld_session';
-  let styleEl = null;
+  let loadingOverlay = null;
+  let menuHideStyle = null;
 
   function hashPassword(pwd) {
     let hash = 5381;
@@ -7841,36 +7777,38 @@ window.addEventListener('keydown', (e) => {
     catch (e) { return null; }
   }
 
-  function hideMenu() {
-    if (styleEl) return;
-    styleEl = document.createElement('style');
-    styleEl.id = 'temp-hide-menu';
-    styleEl.textContent = '#menu { display: none !important; }';
-    document.head.appendChild(styleEl);
+  function showLoading() {
+    if (loadingOverlay) return;
+    loadingOverlay = document.createElement('div');
+    loadingOverlay.id = 'auto-login-loading';
+    loadingOverlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:radial-gradient(ellipse at 50% 50%, #0b1d29 0%, #03050a 70%);display:flex;align-items:center;justify-content:center;font-family:Arial,Helvetica,sans-serif;color:#00f0ff;font-size:18px;letter-spacing:3px;text-transform:uppercase;text-shadow:0 0 12px rgba(0,240,255,0.6);';
+    loadingOverlay.innerHTML = '<div>Entering world...</div>';
+    document.body.appendChild(loadingOverlay);
+    // Also hide the menu screen (not the login screen — let auto-login handle that)
+    menuHideStyle = document.createElement('style');
+    menuHideStyle.textContent = '#menu { display: none !important; }';
+    document.head.appendChild(menuHideStyle);
   }
-  function removePreemptive() {
-    const p = document.getElementById('preemptive-hide-screens-style');
-    if (p) p.remove();
-    if (styleEl) { styleEl.remove(); styleEl = null; }
+  function hideLoading() {
+    if (loadingOverlay) { loadingOverlay.remove(); loadingOverlay = null; }
+    if (menuHideStyle) { menuHideStyle.remove(); menuHideStyle = null; }
   }
+
   function enterWorld() {
     try { if (typeof enterGame === 'function') enterGame(); }
     catch (e) { console.warn('enterGame failed:', e); }
-    // enterGame() is synchronous — when it returns, the canvas is mounted
-    // and the first frame is rendering. Drop the overlay ASAP.
-    setTimeout(removePreemptive, 100);
+    setTimeout(hideLoading, 200);
   }
 
-  // Watch for login completion (catches BOTH auto-login AND manual login)
+  // Watch for login completion
   function startObserver() {
     const loginScreen = document.getElementById('login-screen');
     if (!loginScreen) { setTimeout(startObserver, 50); return; }
     if (loginScreen.classList.contains('hide') || loginScreen.style.display === 'none') {
-      hideMenu(); enterWorld(); return;
+      enterWorld(); return;
     }
     const obs = new MutationObserver(() => {
       if (loginScreen.classList.contains('hide') || loginScreen.style.display === 'none') {
-        hideMenu();
         enterWorld();
         obs.disconnect();
       }
@@ -7880,36 +7818,33 @@ window.addEventListener('keydown', (e) => {
 
   function tryAutoLogin() {
     let parsed;
-    let sessionValid = false;
     try {
       const sess = sessionStorage.getItem(SESSION_KEY);
-      if (!sess) { removePreemptive(); return false; }
+      if (!sess) return false;
       parsed = JSON.parse(sess);
-      if (!parsed || !parsed.name || !parsed.pwd) { removePreemptive(); return false; }
+      if (!parsed || !parsed.name || !parsed.pwd) return false;
       const save = getSave(parsed.name);
-      if (!save || save.passwordHash !== hashPassword(parsed.pwd)) {
-        // Most likely cause: CloudSync.pullAndMerge() overwrote localStorage
-        // with the cloud save (which has a different passwordHash) between
-        // the preemptive CSS check and now. Remove the overlay so the user
-        // sees the login screen and can re-enter their credentials.
-        console.warn('Auto-login: password hash mismatch (cloud overwrite?)');
-        removePreemptive();
-        return false;
-      }
-      sessionValid = true;
-    } catch (e) { removePreemptive(); return false; }
+      if (!save || save.passwordHash !== hashPassword(parsed.pwd)) return false;
+    } catch (e) { return false; }
 
-    hideMenu();  // extra safety (preemptive CSS already hides it, but doesn't hurt)
+    // Session is valid — show loading overlay + hide menu
+    showLoading();
+
     const nameInput = document.getElementById('login-name');
     const pwdInput  = document.getElementById('login-pwd');
-    if (!nameInput || !pwdInput) { removePreemptive(); return false; }
+    if (!nameInput || !pwdInput) { hideLoading(); return false; }
     nameInput.value = parsed.name;
     pwdInput.value  = parsed.pwd;
     try { loginSubmit(); }
-    catch (e) { console.warn('Auto-login failed:', e); removePreemptive(); }
+    catch (e) { console.warn('Auto-login failed:', e); hideLoading(); }
+
+    // Safety: if login doesn't complete in 5 seconds, remove the overlay
+    // so the user can see whatever state the game is in
+    setTimeout(() => { if (loadingOverlay) hideLoading(); }, 5000);
     return true;
   }
 
+  // Start as early as possible
   setTimeout(() => {
     startObserver();
     tryAutoLogin();
