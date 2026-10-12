@@ -195,6 +195,12 @@
                     <i class="fa-solid fa-volume-high text-base"></i>
                 </button>
 
+                <!-- Logout Button (only shown when logged in) -->
+                <button id="logout-btn" onclick="logoutLanding()" class="hidden relative inline-flex items-center space-x-2 px-4 py-2.5 bg-crimson/10 border border-crimson/40 text-crimson font-orbitron font-bold text-xs tracking-widest uppercase rounded hover:bg-crimson/20 transition-all duration-300" title="Log out of your account">
+                    <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
+                    <span>Logout</span>
+                </button>
+
                 <!-- Direct Play Button -->
                 <a href="game.html" onclick="playSound('click')" class="relative inline-flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-tactical-cyan to-emerald-500 text-black font-orbitron font-extrabold text-xs tracking-widest uppercase rounded shadow-cyan-glow hover:scale-105 transition-all duration-300">
                     <i class="fa-solid fa-play text-xs"></i>
@@ -216,6 +222,7 @@
             <a href="#military" class="block py-2 text-gray-300 hover:text-tactical-cyan">Clans & Armies</a>
             <a href="#customizer" class="block py-2 text-gray-300 hover:text-tactical-cyan">Banner Customizer</a>
             <a href="game.html" class="block text-center py-3 bg-tactical-cyan text-black font-bold uppercase rounded">Launch Game In Browser</a>
+            <button id="logout-btn-mobile" onclick="logoutLanding()" class="hidden block w-full text-center py-3 bg-crimson/10 border border-crimson/40 text-crimson font-bold uppercase rounded">Logout</button>
         </div>
     </header>
 
@@ -967,6 +974,50 @@
             } catch (e) {}
         })();
 
+        // === Logout ===
+        window.logoutLanding = function() {
+            try { sessionStorage.removeItem('openworld_session'); } catch (e) {}
+            const overlay = document.getElementById('landing-login-overlay');
+            if (overlay) {
+                overlay.classList.remove('hide');
+                overlay.style.display = '';
+            }
+            const lb = document.getElementById('logout-btn');
+            if (lb) lb.classList.add('hidden');
+            const lbm = document.getElementById('logout-btn-mobile');
+            if (lbm) lbm.classList.add('hidden');
+            const rateEl = document.getElementById('live-income-rate');
+            if (rateEl) rateEl.textContent = '$0.00';
+            const countEl = document.getElementById('live-business-count');
+            if (countEl) countEl.textContent = '0';
+            const planetEl = document.getElementById('live-planet-count');
+            if (planetEl) planetEl.textContent = '0';
+            const breakdownEl = document.getElementById('live-income-breakdown');
+            if (breakdownEl) breakdownEl.innerHTML = '';
+            const loginPrompt = document.getElementById('live-income-login-prompt');
+            if (loginPrompt) loginPrompt.classList.remove('hidden');
+            try { initMarketData(); } catch (e) {}
+            setTimeout(() => {
+                const nameInput = document.getElementById('ll-name');
+                if (nameInput) nameInput.focus();
+            }, 200);
+            try { playSound('click'); } catch (e) {}
+        };
+
+        function updateLogoutButtonVisibility() {
+            let hasSession = false;
+            try {
+                const sess = sessionStorage.getItem('openworld_session');
+                hasSession = !!(sess && JSON.parse(sess).name);
+            } catch (e) {}
+            const lb = document.getElementById('logout-btn');
+            if (lb) lb.classList.toggle('hidden', !hasSession);
+            const lbm = document.getElementById('logout-btn-mobile');
+            if (lbm) lbm.classList.toggle('hidden', !hasSession);
+        }
+        setTimeout(updateLogoutButtonVisibility, 500);
+        setInterval(updateLogoutButtonVisibility, 2000);
+
         // Mobile Menu Drawer Toggle
         document.getElementById('mobile-menu-btn').addEventListener('click', () => {
             document.getElementById('mobile-menu').classList.toggle('hidden');
@@ -1158,6 +1209,16 @@
     const overlay = document.getElementById('landing-login-overlay');
     overlay.classList.add('hide');
     setTimeout(() => { overlay.style.display = 'none'; }, 400);
+    // Show the logout button now that we're logged in
+    setTimeout(() => {
+      const lb = document.getElementById('logout-btn');
+      if (lb) lb.classList.remove('hidden');
+      const lbm = document.getElementById('logout-btn-mobile');
+      if (lbm) lbm.classList.remove('hidden');
+      // Also refresh the live income display now that we have a session
+      if (typeof updateLiveIncome === 'function') updateLiveIncome();
+      if (typeof initMarketData === 'function') initMarketData();
+    }, 500);
   };
 
   // If a session already exists (user reloads after login), skip the overlay
@@ -1171,6 +1232,13 @@
           const overlay = document.getElementById('landing-login-overlay');
           overlay.classList.add('hide');
           setTimeout(() => { overlay.style.display = 'none'; }, 400);
+          // Show the logout button since we're logged in
+          setTimeout(() => {
+            const lb = document.getElementById('logout-btn');
+            if (lb) lb.classList.remove('hidden');
+            const lbm = document.getElementById('logout-btn-mobile');
+            if (lbm) lbm.classList.remove('hidden');
+          }, 500);
         }
       }
     }
