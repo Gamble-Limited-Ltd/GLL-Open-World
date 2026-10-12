@@ -390,22 +390,15 @@
                 </div>
             </div>
 
-            <!-- Market Items Grid -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8" id="market-ticker-grid">
-                <!-- Dynamically Populated by JS -->
+            <!-- Per-Material 1-Hour Price History Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8" id="market-ticker-grid">
+                <!-- Dynamically Populated by JS — each card has a sparkline chart -->
             </div>
 
-            <!-- Market Chart Analytics Preview -->
-            <div class="glass-panel p-6 sm:p-8 rounded-2xl border border-tactical-border space-y-4">
-                <div class="flex items-center justify-between font-orbitron">
-                    <h4 class="text-sm font-bold text-white uppercase flex items-center space-x-2">
-                        <i class="fa-solid fa-arrow-trend-up text-tactical-cyan"></i>
-                        <span>Historical Price Volatility Analytics</span>
-                    </h4>
-                    <span class="text-xs text-gray-400">24-Hour Cycle</span>
-                </div>
-                <div class="w-full h-64">
-                    <canvas id="marketChart"></canvas>
+            <div class="glass-panel p-4 sm:p-6 rounded-2xl border border-tactical-border">
+                <div class="flex items-center justify-between font-orbitron text-xs text-gray-400">
+                    <span><i class="fa-solid fa-clock text-tactical-cyan mr-1"></i> Each card shows the past 60 minutes of price data</span>
+                    <span><i class="fa-solid fa-circle-info text-gray-500 mr-1"></i> Updates every 60 seconds from your save</span>
                 </div>
             </div>
         </div>
@@ -723,71 +716,175 @@
             if (e.key && (e.key.startsWith('openworld_save_') || e.key === 'openworld_session')) updateLiveIncome();
         });
 
-        // 3. Commodity Market Simulator & Chart
-        const marketItems = [
-            { name: "Iron Ore", price: 124, change: +4.2, icon: "fa-cubes" },
-            { name: "Crude Oil", price: 215, change: -1.8, icon: "fa-oil-well" },
-            { name: "Microchips", price: 460, change: +8.5, icon: "fa-microchip" },
-            { name: "Grain", price: 48, change: +0.5, icon: "fa-wheat-awn" },
-            { name: "Energy Units", price: 85, change: -3.1, icon: "fa-bolt" }
+        // 3. Per-Material Market History (1-hour sparkline per material)
+        // Reads from the user's save marketPrices + marketTrend. Persists
+        // 60 minutes of history per material to localStorage so the graphs
+        // accumulate real data over time. On first load, synthesizes
+        // plausible past data based on current price + trend direction.
+        const MARKET_MATERIALS = [
+            { id: 'food',    name: 'Food',     icon: 'fa-wheat-awn',  color: '#7cb342', defaultPrice: 45  },
+            { id: 'ore',     name: 'Ore',      icon: 'fa-cubes',      color: '#8d6e63', defaultPrice: 120 },
+            { id: 'goods',   name: 'Goods',    icon: 'fa-industry',   color: '#546e7a', defaultPrice: 200 },
+            { id: 'tourism', name: 'Tourism',  icon: 'fa-umbrella-beach', color: '#4dd0e1', defaultPrice: 350 },
+            { id: 'oil',     name: 'Oil',      icon: 'fa-oil-well',   color: '#37474f', defaultPrice: 215 },
+            { id: 'fun',     name: 'Fun',      icon: 'fa-dice',       color: '#d32f2f', defaultPrice: 400 },
+            { id: 'capital', name: 'Capital',  icon: 'fa-money-bill-wave', color: '#f5cc74', defaultPrice: 800 },
+            { id: 'tech',    name: 'Tech',     icon: 'fa-microchip',  color: '#7c4dff', defaultPrice: 460 },
         ];
+        const HISTORY_KEY_PREFIX = 'openworld_market_history_';
+        const HISTORY_LENGTH = 60;   // 60 data points = 60 minutes
+        const SNAPSHOT_INTERVAL_MS = 60_000;  // take a new snapshot every minute
+        let _marketSparkCharts = {};  // chart instances by material id
+
+        function _getSave() {
+            try {
+                const sess = JSON.parse(sessionStorage.getItem('openworld_session') || '{}');
+                if (!sess || !sess.name) return null;
+                return JSON.parse(localStorage.getItem('openworld_save_' + sess.name) || 'null');
+            } catch (e) { return null; }
+        }
+        function _getHistoryKey() {
+            try {
+                const sess = JSON.parse(sessionStorage.getItem('openworld_session') || '{}');
+                return sess && sess.name ? HISTORY_KEY_PREFIX + sess.name : null;
+            } catch (e) { return null; }
+        }
+        function _loadHistory() {
+            const key = _getHistoryKey();
+            if (!key) return {};
+            try { return JSON.parse(localStorage.getItem(key) || '{}'); }
+            catch (e) { return {}; }
+        }
+        function _saveHistory(history) {
+            const key = _getHistoryKey();
+            if (!key) return;
+            try { localStorage.setItem(key, JSON.stringify(history)); } catch (e) {}
+        }
+        function _synthesizeHistory(currentPrice, trend) {
+            // Generate 60 plausible data points ending at currentPrice.
+            // Random walk with slight trend bias.
+            const trendBias = trend === 'up' ? 1.001 : trend === 'down' ? 0.999 : 1.0;
+            const volatility = Math.max(2, currentPrice * 0.02);  // ±2% per step
+            const points = [];
+            let price = currentPrice * (trend === 'up' ? 0.92 : trend === 'down' ? 1.08 : 1.0);
+            for (let i = 0; i < HISTORY_LENGTH - 1; i++) {
+                points.push(Math.max(1, Math.round(price * 100) / 100));
+                price = price * trendBias + (Math.random() - 0.5) * volatility;
+            }
+            points.push(currentPrice);  // last point = current
+            return points;
+        }
 
         function initMarketData() {
+            const save = _getSave();
+            const marketPrices = (save && save.marketPrices) || {};
+            const marketTrend = (save && save.marketTrend) || {};
+            const history = _loadHistory();
+
+            // For each material, ensure we have history data
+            for (const mat of MARKET_MATERIALS) {
+                if (!history[mat.id] || history[mat.id].length < HISTORY_LENGTH) {
+                    const currentPrice = marketPrices[mat.id] || mat.defaultPrice;
+                    const trend = marketTrend[mat.id] || 'flat';
+                    history[mat.id] = _synthesizeHistory(currentPrice, trend);
+                }
+            }
+            _saveHistory(history);
+
+            // Render the grid of cards
             const grid = document.getElementById('market-ticker-grid');
+            if (!grid) return;
             grid.innerHTML = '';
 
-            marketItems.forEach((item) => {
-                const isPos = item.change >= 0;
+            for (const mat of MARKET_MATERIALS) {
+                const data = history[mat.id] || [];
+                const current = data[data.length - 1] || marketPrices[mat.id] || mat.defaultPrice;
+                const hourAgo = data[0] || current;
+                const changePct = hourAgo > 0 ? ((current - hourAgo) / hourAgo * 100) : 0;
+                const isPos = changePct >= 0;
+                const changeColor = changePct > 0.5 ? '#10b981' : (changePct < -0.5 ? '#ef4444' : '#9bb4bd');
+
                 const card = document.createElement('div');
                 card.className = "glass-card p-4 rounded-xl border border-white/10 font-orbitron";
                 card.innerHTML = `
-                    <div class="flex items-center justify-between text-xs text-gray-400 mb-2">
-                        <span><i class="fa-solid ${item.icon} text-tactical-cyan mr-1"></i> ${item.name}</span>
-                        <span class="${isPos ? 'text-emerald-400' : 'text-crimson'} font-bold">${isPos ? '+' : ''}${item.change}%</span>
+                    <div class="flex items-center justify-between text-xs text-gray-400 mb-1">
+                        <span><i class="fa-solid ${mat.icon} mr-1" style="color:${mat.color}"></i> ${mat.name}</span>
+                        <span class="font-bold" style="color:${changeColor}">${isPos ? '+' : ''}${changePct.toFixed(1)}%</span>
                     </div>
-                    <div class="text-xl font-bold text-white">$${item.price} <span class="text-[10px] text-gray-500 font-normal">/ unit</span></div>
+                    <div class="text-lg font-bold text-white mb-2">$${current.toLocaleString(undefined, {maximumFractionDigits: 2})} <span class="text-[10px] text-gray-500 font-normal">/ unit</span></div>
+                    <div class="w-full h-16">
+                        <canvas id="market-spark-${mat.id}"></canvas>
+                    </div>
                 `;
                 grid.appendChild(card);
-            });
 
-            initMarketChart();
+                // Initialize the sparkline chart for this material
+                const ctx = card.querySelector(`#market-spark-${mat.id}`).getContext('2d');
+                _marketSparkCharts[mat.id] = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.map((_, i) => `${HISTORY_LENGTH - 1 - i}m`),
+                        datasets: [{
+                            data: data,
+                            borderColor: mat.color,
+                            backgroundColor: mat.color + '20',  // hex with alpha
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 0,
+                            borderWidth: 2,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: false,
+                        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                        scales: {
+                            x: { display: false },
+                            y: { display: false }
+                        }
+                    }
+                });
+            }
+
+            // Start snapshot loop
+            if (!window._marketSnapshotTimer) {
+                window._marketSnapshotTimer = setInterval(takeMarketSnapshot, SNAPSHOT_INTERVAL_MS);
+            }
         }
 
-        function initMarketChart() {
-            const ctx = document.getElementById('marketChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'],
-                    datasets: [
-                        {
-                            label: 'Microchips ($)',
-                            data: [410, 425, 420, 445, 450, 455, 460],
-                            borderColor: '#00f0ff',
-                            backgroundColor: 'rgba(0, 240, 255, 0.1)',
-                            fill: true,
-                            tension: 0.4
-                        },
-                        {
-                            label: 'Crude Oil ($)',
-                            data: [230, 225, 228, 220, 218, 216, 215],
-                            borderColor: '#f59e0b',
-                            backgroundColor: 'transparent',
-                            borderDash: [5, 5],
-                            tension: 0.4
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#888', font: { family: 'Orbitron', size: 10 } } },
-                        y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#888', font: { family: 'Orbitron', size: 10 } } }
-                    },
-                    plugins: { legend: { labels: { color: '#ccc', font: { family: 'Orbitron', size: 11 } } } }
+        function takeMarketSnapshot() {
+            const save = _getSave();
+            if (!save) return;
+            const marketPrices = save.marketPrices || {};
+            const history = _loadHistory();
+
+            for (const mat of MARKET_MATERIALS) {
+                const current = marketPrices[mat.id] || mat.defaultPrice;
+                if (!history[mat.id]) history[mat.id] = [];
+                history[mat.id].push(current);
+                // Trim to HISTORY_LENGTH
+                if (history[mat.id].length > HISTORY_LENGTH) {
+                    history[mat.id] = history[mat.id].slice(-HISTORY_LENGTH);
                 }
-            });
+                // Update chart
+                const chart = _marketSparkCharts[mat.id];
+                if (chart) {
+                    chart.data.labels = history[mat.id].map((_, i) => `${HISTORY_LENGTH - 1 - i}m`);
+                    chart.data.datasets[0].data = history[mat.id];
+                    chart.update('none');
+                }
+            }
+            _saveHistory(history);
+        }
+
+        // Also update on storage events from other tabs (e.g., market refresh in game)
+        window.addEventListener('storage', (e) => {
+            if (e.key && (e.key.startsWith('openworld_save_') || e.key === 'openworld_session')) {
+                setTimeout(initMarketData, 200);  // rebuild grid + charts
+            }
+        });
+
         }
 
         // 4. Banner Color Customizer Logic
