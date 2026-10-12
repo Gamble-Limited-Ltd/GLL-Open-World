@@ -966,6 +966,7 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
         <button class="market-btn" id="myland-btn" onclick="openMyPlots()" title="My Land — see your plots and sell the ones you don't want">🗺</button>
         <button class="market-btn" id="wars-btn" onclick="openWars()" title="Wars — your marches, incoming attacks and battle reports">⚔</button>
         <button class="market-btn" id="multibuy-btn" onclick="toggleMultiBuy()" title="Multi-Buy — click several plots, then buy them all at once (each must border your land)">✚</button>
+        <button class="market-btn" id="multisell-btn" onclick="toggleMultiSell()" title="Multi-Sell — click several of your plots, then sell them all at once (refunds 50% each)">💰</button>
         <button class="market-btn" id="support-btn" onclick="openSupport()" title="Support — report a bug or share an idea with the world owner">📮</button>
         <button class="market-btn" id="gamble-btn" onclick="openGambling()" style="display:none" title="Play at your casinos">🎰 Casino</button>
       </div>
@@ -992,7 +993,7 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
   <div class="multibuy-bar" id="multibuy-bar" style="display:none">
     <span class="mb-tag">✚ Multi-Buy</span>
     <span class="mb-stats"><b id="multibuy-count">0</b> selected · <b id="multibuy-total">$0</b></span>
-    <button class="btn primary" id="multibuy-buy" onclick="multiBuyAll()" disabled>Buy All</button>
+    <button class="btn primary" id="multibuy-buy" onclick="multiActionAll()" disabled>Buy All</button>
     <button class="btn" onclick="clearMultiSelect()">Clear</button>
   </div>
 
@@ -1306,6 +1307,7 @@ const STATE = {
   unlockedPlanets: ['earth'],
   // MULTI-BUY — session-only selection mode (never saved)
   multiBuy: false,
+  multiSell: false,  // mirror of multiBuy for selling owned plots
   multiSelect: new Set()
 };
 
@@ -5256,6 +5258,11 @@ function onPointerClick(e) {
     if (target) togglePlotSelection(target);
     return;
   }
+  if (STATE.multiSell) {
+    const target = hit || STATE.hoveredPlot;
+    if (target) togglePlotSellSelection(target);
+    return;
+  }
   if (hit) {
     openPlotModal(hit);
     return;
@@ -5877,6 +5884,13 @@ function togglePlotSelection(p) {
 }
 
 window.toggleMultiBuy = function() {
+  // Turn off multi-sell if it's on (mutually exclusive)
+  if (STATE.multiSell) {
+    STATE.multiSell = false;
+    const sb = document.getElementById('multisell-btn');
+    if (sb) sb.classList.toggle('active', false);
+    clearMultiSelect();
+  }
   STATE.multiBuy = !STATE.multiBuy;
   if (!STATE.multiBuy) clearMultiSelect();
   else showToast('Multi-Buy on — click plots to select them, then Buy All', true);
@@ -5885,11 +5899,118 @@ window.toggleMultiBuy = function() {
   updateMultiBuyBar();
 };
 
+// === MULTI-SELL (mirrors Multi-Buy for selling owned plots) ===
+const MULTI_SELL_FILL = 0xff6b4a;     // orange-red — visually distinct from multi-buy's cyan
+const MULTI_SELL_OUTLINE = 0xffffff;
+
+function togglePlotSellSelection(p) {
+  if (!p) return;
+  const id = p.userData.id;
+  if (!p.userData.owned) { showToast("You don't own this plot — Multi-Sell only works on your land", false); return; }
+  if (p.userData.ownedByOther) { showToast(`Claimed by ${p.userData.ownerName}`, false); return; }
+  // Plots with businesses can't be sold — demolish them first
+  const types = (typeof BUSINESS_REGISTRY !== 'undefined' && BUSINESS_REGISTRY.get(id)) || [];
+  if (types.length) { showToast('Demolish all businesses on this plot first', false); return; }
+  if (STATE.multiSelect.has(id)) {
+    STATE.multiSelect.delete(id);
+    p.userData._selected = false;
+    const pair = ownedPlotColorsFor(CURRENT_USER);
+    setPlotColors(p, pair[0], pair[1]);
+    flushPlotPools();
+    updateMultiBuyBar();
+    return;
+  }
+  STATE.multiSelect.add(id);
+  p.userData._selected = true;
+  setPlotColors(p, MULTI_SELL_FILL, MULTI_SELL_OUTLINE);
+  flushPlotPools();
+  updateMultiBuyBar();
+}
+
+window.toggleMultiSell = function() {
+  // Turn off multi-buy if it's on (mutually exclusive)
+  if (STATE.multiBuy) {
+    STATE.multiBuy = false;
+    const bb = document.getElementById('multibuy-btn');
+    if (bb) bb.classList.toggle('active', false);
+    clearMultiSelect();
+  }
+  STATE.multiSell = !STATE.multiSell;
+  if (!STATE.multiSell) clearMultiSelect();
+  else showToast('Multi-Sell on — click your plots to select them, then Sell All', true);
+  const btn = document.getElementById('multisell-btn');
+  if (btn) btn.classList.toggle('active', STATE.multiSell);
+  updateMultiBuyBar();
+};
+
+window.multiSellAll = function() {
+  if (!STATE.multiSelect.size) return;
+  const ids = [...STATE.multiSelect];
+  // Validate all plots are still owned by user and have no businesses
+  for (const id of ids) {
+    const p = ACTIVE_PLOT_BY_ID.get(id);
+    if (!p || !p.userData.owned) {
+      showToast('⚠️ Your selection changed — a plot is no longer yours. Review and try again.', false);
+      return;
+    }
+    const types = (typeof BUSINESS_REGISTRY !== 'undefined' && BUSINESS_REGISTRY.get(id)) || [];
+    if (types.length) {
+      showToast('⚠️ Demolish all businesses on selected plots first', false);
+      return;
+    }
+  }
+  // Compute total refund (50% of plot price each, mirroring single-sell logic)
+  let totalRefund = 0;
+  for (const id of ids) {
+    const p = ACTIVE_PLOT_BY_ID.get(id);
+    totalRefund += Math.round(p.userData.price * (typeof SELL_REFUND_RATE !== 'undefined' ? SELL_REFUND_RATE : 0.5));
+  }
+  // Confirm with user
+  const pluralS = ids.length > 1 ? 's' : '';
+  if (!confirm(`Sell ${ids.length} plot${pluralS} for $${totalRefund.toLocaleString()} total? They become unclaimed land anyone can buy.`)) return;
+  // All checks passed — sell them all in one transaction
+  const claims = getClaims();
+  for (const id of ids) {
+    const p = ACTIVE_PLOT_BY_ID.get(id);
+    p.userData.owned = false;
+    p.userData.ownedByOther = false;
+    p.userData.ownerName = null;
+    p.userData.businesses = [];
+    p.userData._selected = false;
+    STATE.owned.delete(id);
+    delete claims[id];
+    setPlotColors(p, p.userData.baseColor, PLOT_UNOWNED_OUTLINE);
+    const ci = STATE.claimedPlots.indexOf(p);
+    if (ci >= 0) STATE.claimedPlots.splice(ci, 1);
+    STATE.multiSelect.delete(id);
+  }
+  STATE.money += totalRefund;
+  saveClaims(claims);
+  flushPlotPools();
+  updateHUD();
+  saveGame();
+  updateMultiBuyBar();
+  showToast(`✅ Sold ${ids.length} plot${pluralS} for $${totalRefund.toLocaleString()}`, true);
+};
+
+// Dispatcher: the bar's action button calls this — it routes to buy or sell
+// based on which mode is active.
+window.multiActionAll = function() {
+  if (STATE.multiSell) return multiSellAll();
+  return multiBuyAll();
+};
+
 function clearMultiSelect() {
   for (const id of STATE.multiSelect) {
     const p = ACTIVE_PLOT_BY_ID.get(id);
-    if (p && !p.userData.owned && !p.userData.ownedByOther) {
-      p.userData._selected = false;
+    if (!p) continue;
+    p.userData._selected = false;
+    if (p.userData.owned) {
+      // Restore the player's ownership colors (multi-sell selection)
+      const pair = ownedPlotColorsFor(CURRENT_USER);
+      setPlotColors(p, pair[0], pair[1]);
+    } else if (!p.userData.ownedByOther) {
+      // Restore the unowned terrain tint (multi-buy selection)
       setPlotColors(p, p.userData.baseColor, plotBaseOutline(p));
     }
   }
@@ -5911,15 +6032,33 @@ window.selectPlotById = function(id) {
 function updateMultiBuyBar() {
   const bar = document.getElementById('multibuy-bar');
   if (!bar) return;
-  bar.style.display = STATE.multiBuy ? 'flex' : 'none';
+  const active = STATE.multiBuy || STATE.multiSell;
+  bar.style.display = active ? 'flex' : 'none';
   let count = 0, total = 0;
   for (const id of STATE.multiSelect) {
     const p = ACTIVE_PLOT_BY_ID.get(id);
-    if (p) { count++; total += p.userData.price; }
+    if (!p) continue;
+    count++;
+    if (STATE.multiSell) {
+      total += Math.round(p.userData.price * (typeof SELL_REFUND_RATE !== 'undefined' ? SELL_REFUND_RATE : 0.5));
+    } else {
+      total += p.userData.price;
+    }
+  }
+  const tag = bar.querySelector('.mb-tag');
+  const totalEl = document.getElementById('multibuy-total');
+  const buyBtn = document.getElementById('multibuy-buy');
+  if (STATE.multiSell) {
+    if (tag) tag.textContent = '💰 Multi-Sell';
+    if (totalEl) totalEl.textContent = '+$' + total.toLocaleString();
+    if (buyBtn) buyBtn.textContent = 'Sell All';
+  } else {
+    if (tag) tag.textContent = '✚ Multi-Buy';
+    if (totalEl) totalEl.textContent = '$' + total.toLocaleString();
+    if (buyBtn) buyBtn.textContent = 'Buy All';
   }
   document.getElementById('multibuy-count').textContent = count;
-  document.getElementById('multibuy-total').textContent = '$' + total.toLocaleString();
-  document.getElementById('multibuy-buy').disabled = count === 0;
+  if (buyBtn) buyBtn.disabled = count === 0;
 }
 
 window.multiBuyAll = function() {
