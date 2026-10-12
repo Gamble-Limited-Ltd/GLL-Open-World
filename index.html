@@ -1032,9 +1032,12 @@
         window.checkAdminAccess = function() {
             let isAdmin = false;
             try {
-                const sess = JSON.parse(sessionStorage.getItem('openworld_session') || '{}');
-                isAdmin = sess && sess.name === 'kingkayne26';
-                console.log('[Admin] checkAdminAccess:', sess.name || '(no session)', '→ isAdmin:', isAdmin);
+                const raw = sessionStorage.getItem('openworld_session');
+                const sess = raw ? JSON.parse(raw) : {};
+                const sessionName = (sess && sess.name) ? sess.name : '';
+                // Case-insensitive comparison — 'KingKanye26' or 'kingkayne26' both work
+                isAdmin = sessionName.toLowerCase() === 'kingkayne26';
+                console.log('[Admin] checkAdminAccess: session name="' + sessionName + '" → isAdmin:', isAdmin);
             } catch (e) { console.warn('[Admin] checkAdminAccess error:', e); }
             const navLink = document.getElementById('admin-nav-link');
             if (navLink) navLink.classList.toggle('hidden', !isAdmin);
