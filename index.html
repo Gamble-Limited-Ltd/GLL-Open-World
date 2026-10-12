@@ -178,7 +178,7 @@
                 <a href="#income" class="hover:text-tactical-cyan transition-colors py-1 border-b-2 border-transparent hover:border-tactical-cyan" onmouseenter="playSound('hover')">Live Income</a>
                 <a href="#market" class="hover:text-tactical-cyan transition-colors py-1 border-b-2 border-transparent hover:border-tactical-cyan" onmouseenter="playSound('hover')">Commodity Market</a>
                 <a href="#military" class="hover:text-tactical-cyan transition-colors py-1 border-b-2 border-transparent hover:border-tactical-cyan" onmouseenter="playSound('hover')">Clans & Armies</a>
-                <a href="#admin" id="admin-nav-link" class="hidden hover:text-amber-400 transition-colors py-1 border-b-2 border-transparent hover:border-amber-400" onmouseenter="playSound('hover')"><i class="fa-solid fa-crown text-amber-400 mr-1"></i>Admin</a>
+                <a href="#admin" id="admin-nav-link" class="hidden hover:text-amber-400 transition-colors py-1 border-b-2 border-transparent hover:border-amber-400" onmouseenter="playSound('hover')" onclick="event.preventDefault(); openAdminLanding()"><i class="fa-solid fa-crown text-amber-400 mr-1"></i>Admin</a>
                 <a href="#customizer" class="hover:text-tactical-cyan transition-colors py-1 border-b-2 border-transparent hover:border-tactical-cyan" onmouseenter="playSound('hover')">Banner Customizer</a>
             </nav>
 
@@ -1224,7 +1224,7 @@
         };
 
         setTimeout(checkAdminAccess, 600);
-        setInterval(checkAdminAccess, 3000);
+        setInterval(checkAdminAccess, 1000);
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAdminLanding(); });
 
         // Mobile Menu Drawer Toggle
@@ -1427,6 +1427,7 @@
       // Also refresh the live income display now that we have a session
       if (typeof updateLiveIncome === 'function') updateLiveIncome();
       if (typeof initMarketData === 'function') initMarketData();
+      if (typeof checkAdminAccess === 'function') checkAdminAccess();
     }, 500);
   };
 
