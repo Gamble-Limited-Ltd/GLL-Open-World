@@ -178,6 +178,7 @@
                 <a href="#income" class="hover:text-tactical-cyan transition-colors py-1 border-b-2 border-transparent hover:border-tactical-cyan" onmouseenter="playSound('hover')">Live Income</a>
                 <a href="#market" class="hover:text-tactical-cyan transition-colors py-1 border-b-2 border-transparent hover:border-tactical-cyan" onmouseenter="playSound('hover')">Commodity Market</a>
                 <a href="#military" class="hover:text-tactical-cyan transition-colors py-1 border-b-2 border-transparent hover:border-tactical-cyan" onmouseenter="playSound('hover')">Clans & Armies</a>
+                <a href="#admin" id="admin-nav-link" class="hidden hover:text-amber-400 transition-colors py-1 border-b-2 border-transparent hover:border-amber-400" onmouseenter="playSound('hover')"><i class="fa-solid fa-crown text-amber-400 mr-1"></i>Admin</a>
                 <a href="#customizer" class="hover:text-tactical-cyan transition-colors py-1 border-b-2 border-transparent hover:border-tactical-cyan" onmouseenter="playSound('hover')">Banner Customizer</a>
             </nav>
 
@@ -220,6 +221,7 @@
             <a href="#income" class="block py-2 text-gray-300 hover:text-tactical-cyan">Live Income</a>
             <a href="#market" class="block py-2 text-gray-300 hover:text-tactical-cyan">Commodity Market</a>
             <a href="#military" class="block py-2 text-gray-300 hover:text-tactical-cyan">Clans & Armies</a>
+            <a href="#admin" id="admin-nav-link-mobile" class="hidden block py-2 text-amber-400 hover:text-amber-300"><i class="fa-solid fa-crown mr-1"></i>Admin</a>
             <a href="#customizer" class="block py-2 text-gray-300 hover:text-tactical-cyan">Banner Customizer</a>
             <a href="game.html" class="block text-center py-3 bg-tactical-cyan text-black font-bold uppercase rounded">Launch Game In Browser</a>
             <button id="logout-btn-mobile" onclick="logoutLanding()" class="hidden block w-full text-center py-3 bg-crimson/10 border border-crimson/40 text-crimson font-bold uppercase rounded">Logout</button>
@@ -482,6 +484,53 @@
 
             </div>
         </div>
+    </section>
+
+    <!-- Admin Control Center — only visible for the world owner (kingkanye26) -->
+    <section id="admin" class="py-20 relative bg-tactical-dark border-t border-b border-tactical-border hidden">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex flex-col md:flex-row md:items-end justify-between mb-12">
+          <div>
+            <h2 class="font-rajdhani text-amber-400 text-lg tracking-widest uppercase font-bold">World Owner</h2>
+            <h3 class="font-orbitron text-3xl sm:text-5xl font-extrabold text-white">ADMIN CONTROL CENTER</h3>
+          </div>
+          <div class="mt-4 md:mt-0 font-orbitron text-xs text-gray-400 flex items-center space-x-2">
+            <i class="fa-solid fa-crown text-amber-400"></i>
+            <span>kingkayne26 &middot; Owner Session</span>
+          </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8" id="admin-stats-grid"></div>
+
+        <!-- Account Table -->
+        <div class="glass-panel rounded-2xl border border-tactical-border overflow-hidden">
+          <div class="p-4 border-b border-white/10 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <input type="text" id="admin-search-input" placeholder="Search accounts..." class="bg-black/60 border border-tactical-border rounded-lg px-4 py-2 text-white font-orbitron text-xs focus:outline-none focus:border-tactical-cyan flex-1">
+            <button onclick="adminRefreshLanding()" class="px-4 py-2 bg-tactical-cyan/10 border border-tactical-cyan/40 text-tactical-cyan rounded-lg font-orbitron text-xs uppercase hover:bg-tactical-cyan/20 transition-colors whitespace-nowrap">
+              <i class="fa-solid fa-rotate-right mr-1"></i> Refresh
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full font-orbitron text-xs">
+              <thead>
+                <tr class="border-b border-white/10">
+                  <th class="text-left p-4 text-gray-400 uppercase tracking-wider">Account</th>
+                  <th class="text-right p-4 text-gray-400 uppercase tracking-wider">Money</th>
+                  <th class="text-right p-4 text-gray-400 uppercase tracking-wider">Plots</th>
+                  <th class="text-right p-4 text-gray-400 uppercase tracking-wider">Businesses</th>
+                  <th class="text-right p-4 text-gray-400 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="admin-tbody-landing"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="mt-4 p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl text-amber-400/70 font-rajdhani text-xs">
+          <i class="fa-solid fa-circle-info mr-1"></i> This panel shows local browser data. For cloud-synced admin actions (across all devices), use the in-game admin panel.
+        </div>
+      </div>
     </section>
 
     <!-- Footer Section -->
@@ -1015,6 +1064,140 @@
         }
         setTimeout(updateLogoutButtonVisibility, 500);
         setInterval(updateLogoutButtonVisibility, 2000);
+
+        // === Admin Control Center ===
+        const ADMIN_ACCOUNT = 'kingkanye26';
+        let _adminFilterTerm = '';
+
+        function checkAdminAccess() {
+            let isAdmin = false;
+            try {
+                const sess = JSON.parse(sessionStorage.getItem('openworld_session') || '{}');
+                isAdmin = sess && sess.name === ADMIN_ACCOUNT;
+            } catch (e) {}
+            const adminSection = document.getElementById('admin');
+            if (adminSection) adminSection.classList.toggle('hidden', !isAdmin);
+            const navLink = document.getElementById('admin-nav-link');
+            if (navLink) navLink.classList.toggle('hidden', !isAdmin);
+            const mobileLink = document.getElementById('admin-nav-link-mobile');
+            if (mobileLink) mobileLink.classList.toggle('hidden', !isAdmin);
+            if (isAdmin) adminRefreshLanding();
+        }
+
+        function adminRefreshLanding() {
+            let profiles = [];
+            try { profiles = JSON.parse(localStorage.getItem('openworld_profiles') || '[]'); } catch (e) {}
+            const searchInput = document.getElementById('admin-search-input');
+            _adminFilterTerm = searchInput && searchInput.value ? searchInput.value.toLowerCase() : '';
+
+            let totalMoney = 0, totalPlots = 0, totalBiz = 0;
+            const rows = [];
+
+            for (const name of profiles) {
+                let save;
+                try { save = JSON.parse(localStorage.getItem('openworld_save_' + name) || 'null'); } catch (e) { save = null; }
+                if (!save) continue;
+                if (_adminFilterTerm && !name.toLowerCase().includes(_adminFilterTerm)) continue;
+
+                const money = Math.floor(save.money || 0);
+                const plots = (save.ownedPlotIds || []).length;
+                const biz = (save.businesses || []).length;
+                totalMoney += money;
+                totalPlots += plots;
+                totalBiz += biz;
+
+                rows.push(`
+                    <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <td class="p-4 text-white font-bold">${name === ADMIN_ACCOUNT ? '<i class="fa-solid fa-crown text-amber-400 mr-1"></i>' : '<i class="fa-solid fa-user text-gray-500 mr-1"></i>'}${name}</td>
+                        <td class="p-4 text-right text-emerald-400 font-bold">$${money.toLocaleString()}</td>
+                        <td class="p-4 text-right text-tactical-cyan">${plots}</td>
+                        <td class="p-4 text-right text-amber-400">${biz}</td>
+                        <td class="p-4 text-right whitespace-nowrap">
+                            <button onclick="adminSetMoneyLanding('${name}')" class="px-2 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded text-[10px] hover:bg-emerald-500/20 transition-colors mr-1">Set $</button>
+                            <button onclick="adminResetOneLanding('${name}')" class="px-2 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded text-[10px] hover:bg-amber-500/20 transition-colors mr-1">Reset</button>
+                            <button onclick="adminDeleteLanding('${name}')" class="px-2 py-1 bg-red-500/10 border border-red-500/30 text-red-400 rounded text-[10px] hover:bg-red-500/20 transition-colors">Delete</button>
+                        </td>
+                    </tr>
+                `);
+            }
+
+            const tbody = document.getElementById('admin-tbody-landing');
+            if (tbody) {
+                tbody.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="5" class="p-8 text-center text-gray-500">No accounts found</td></tr>';
+            }
+
+            const statsGrid = document.getElementById('admin-stats-grid');
+            if (statsGrid) {
+                statsGrid.innerHTML = `
+                    <div class="glass-card p-4 rounded-xl border border-white/10">
+                        <div class="text-[10px] text-gray-400 uppercase tracking-wider mb-1"><i class="fa-solid fa-users text-tactical-cyan mr-1"></i>Accounts</div>
+                        <div class="text-2xl font-bold text-white">${profiles.length}</div>
+                    </div>
+                    <div class="glass-card p-4 rounded-xl border border-white/10">
+                        <div class="text-[10px] text-gray-400 uppercase tracking-wider mb-1"><i class="fa-solid fa-coins text-emerald-400 mr-1"></i>Total Money</div>
+                        <div class="text-2xl font-bold text-emerald-400">$${totalMoney.toLocaleString()}</div>
+                    </div>
+                    <div class="glass-card p-4 rounded-xl border border-white/10">
+                        <div class="text-[10px] text-gray-400 uppercase tracking-wider mb-1"><i class="fa-solid fa-globe text-tactical-cyan mr-1"></i>Plots Owned</div>
+                        <div class="text-2xl font-bold text-tactical-cyan">${totalPlots}</div>
+                    </div>
+                    <div class="glass-card p-4 rounded-xl border border-white/10">
+                        <div class="text-[10px] text-gray-400 uppercase tracking-wider mb-1"><i class="fa-solid fa-industry text-amber-400 mr-1"></i>Businesses</div>
+                        <div class="text-2xl font-bold text-amber-400">${totalBiz}</div>
+                    </div>
+                `;
+            }
+        }
+
+        window.adminSetMoneyLanding = function(name) {
+            const amount = prompt('Set ' + name + '\u2019s money to:', '');
+            if (!amount) return;
+            const v = Math.floor(parseFloat(amount));
+            if (isNaN(v) || v < 0) { alert('Enter a valid amount'); return; }
+            try {
+                const save = JSON.parse(localStorage.getItem('openworld_save_' + name) || 'null');
+                if (!save) { alert('Account not found'); return; }
+                save.money = v;
+                save.savedAt = Date.now();
+                localStorage.setItem('openworld_save_' + name, JSON.stringify(save));
+                adminRefreshLanding();
+            } catch (e) { alert('Error: ' + e.message); }
+        };
+
+        window.adminResetOneLanding = function(name) {
+            if (!confirm('Reset ' + name + ' to $100,000 with no plots and no businesses?')) return;
+            try {
+                const save = JSON.parse(localStorage.getItem('openworld_save_' + name) || 'null');
+                if (!save) return;
+                save.money = 100000;
+                save.ownedPlotIds = [];
+                save.businesses = [];
+                save.savedAt = Date.now();
+                localStorage.setItem('openworld_save_' + name, JSON.stringify(save));
+                adminRefreshLanding();
+            } catch (e) { alert('Error: ' + e.message); }
+        };
+
+        window.adminDeleteLanding = function(name) {
+            if (!confirm('DELETE "' + name + '" completely? Its plots become unclaimed. This cannot be undone.')) return;
+            try {
+                localStorage.removeItem('openworld_save_' + name);
+                const profiles = JSON.parse(localStorage.getItem('openworld_profiles') || '[]');
+                const newProfiles = profiles.filter(p => p !== name);
+                localStorage.setItem('openworld_profiles', JSON.stringify(newProfiles));
+                adminRefreshLanding();
+            } catch (e) { alert('Error: ' + e.message); }
+        };
+
+        // Search input handler
+        setTimeout(function() {
+            const si = document.getElementById('admin-search-input');
+            if (si) si.addEventListener('input', adminRefreshLanding);
+        }, 500);
+
+        // Run admin check on page load + periodically
+        setTimeout(checkAdminAccess, 600);
+        setInterval(checkAdminAccess, 3000);
 
         // Mobile Menu Drawer Toggle
         document.getElementById('mobile-menu-btn').addEventListener('click', () => {
