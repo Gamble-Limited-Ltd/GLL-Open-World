@@ -43,6 +43,25 @@
       @keyframes pulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
     `;
     document.head.appendChild(style);
+
+    // Safety net: if auto-login + enterGame haven't completed in 5 seconds,
+    // remove the overlay so the user isn't stuck forever. This handles the
+    // race condition where CloudSync.pullAndMerge() overwrites localStorage
+    // between the preemptive check and tryAutoLogin, causing auto-login to
+    // silently fail.
+    setTimeout(function() {
+      const stillThere = document.getElementById('preemptive-hide-screens-style');
+      if (stillThere) {
+        console.warn('Auto-login timed out after 5s — removing preemptive overlay');
+        stillThere.remove();
+        // Re-show the login screen so the user can log in manually
+        const loginScreen = document.getElementById('login-screen');
+        if (loginScreen) {
+          loginScreen.style.display = '';
+          loginScreen.classList.remove('hide');
+        }
+      }
+    }, 5000);
   } catch (e) { console.warn('Preemptive hide failed:', e); }
 })();
 </script>
@@ -7861,19 +7880,29 @@ window.addEventListener('keydown', (e) => {
 
   function tryAutoLogin() {
     let parsed;
+    let sessionValid = false;
     try {
       const sess = sessionStorage.getItem(SESSION_KEY);
-      if (!sess) return false;
+      if (!sess) { removePreemptive(); return false; }
       parsed = JSON.parse(sess);
-      if (!parsed || !parsed.name || !parsed.pwd) return false;
+      if (!parsed || !parsed.name || !parsed.pwd) { removePreemptive(); return false; }
       const save = getSave(parsed.name);
-      if (!save || save.passwordHash !== hashPassword(parsed.pwd)) return false;
-    } catch (e) { return false; }
+      if (!save || save.passwordHash !== hashPassword(parsed.pwd)) {
+        // Most likely cause: CloudSync.pullAndMerge() overwrote localStorage
+        // with the cloud save (which has a different passwordHash) between
+        // the preemptive CSS check and now. Remove the overlay so the user
+        // sees the login screen and can re-enter their credentials.
+        console.warn('Auto-login: password hash mismatch (cloud overwrite?)');
+        removePreemptive();
+        return false;
+      }
+      sessionValid = true;
+    } catch (e) { removePreemptive(); return false; }
 
     hideMenu();  // extra safety (preemptive CSS already hides it, but doesn't hurt)
     const nameInput = document.getElementById('login-name');
     const pwdInput  = document.getElementById('login-pwd');
-    if (!nameInput || !pwdInput) return false;
+    if (!nameInput || !pwdInput) { removePreemptive(); return false; }
     nameInput.value = parsed.name;
     pwdInput.value  = parsed.pwd;
     try { loginSubmit(); }
