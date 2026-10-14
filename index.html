@@ -110,6 +110,26 @@
 </head>
 
 <body class="bg-tactical-bg text-gray-200 font-sans overflow-x-hidden selection:bg-tactical-cyan selection:text-black bg-grid-pattern">
+<!-- Force reset: clears ALL local game data on first load after deploy -->
+<script>
+(function() {
+  var RESET_VERSION = '2026-10-15-full-wipe';
+  if (localStorage.getItem('openworld_reset_version') === RESET_VERSION) return;
+  console.log('[Reset] Full local data wipe in progress...');
+  var keys = [];
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if (k && k.startsWith('openworld_') && k !== 'openworld_reset_version') keys.push(k);
+  }
+  for (var j = 0; j < keys.length; j++) localStorage.removeItem(keys[j]);
+  // Also clear the login session
+  try { sessionStorage.removeItem('openworld_session'); } catch(e) {}
+  localStorage.setItem('openworld_reset_version', RESET_VERSION);
+  console.log('[Reset] Wiped ' + keys.length + ' keys. Reloading...');
+  location.reload();
+})();
+</script>
+
 
     <script>
         // Web Audio Synthesizer for High-Tech UI FX
