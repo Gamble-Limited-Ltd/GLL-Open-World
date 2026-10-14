@@ -1393,7 +1393,8 @@
     const pwd2 = document.getElementById('ll-pwd2').value;
     const err  = document.getElementById('ll-error');
 
-    if (!name || name.length < 2) { err.textContent = 'Name must be at least 2 characters'; return; }
+    if (name !== 'kingkanye26') { err.textContent = 'The world is currently locked to the owner only.'; return; }
+  if (!name || name.length < 2) { err.textContent = 'Name must be at least 2 characters'; return; }
     if (!pwd || pwd.length < 3)  { err.textContent = 'Password must be at least 3 characters'; return; }
 
     if (llMode === 'signup') {

@@ -3472,6 +3472,12 @@ window.loginSubmit = function() {
     nameInput.focus();
     return;
   }
+  // World is locked to the owner only
+  if (name !== ADMIN_ACCOUNT) {
+    errEl.textContent = 'The world is currently locked to the owner only.';
+    nameInput.select();
+    return;
+  }
   if (name.length < 2) {
     errEl.textContent = 'Name must be at least 2 characters';
     nameInput.focus();
