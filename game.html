@@ -3984,7 +3984,7 @@ function buildBusinessMesh(businessType, scale) {
   const mat = new THREE.MeshBasicMaterial({
     color: businessType.color,
     transparent: true,
-    opacity: 0.95,
+    opacity: 0.8,
     side: THREE.DoubleSide,
     depthWrite: false
   });
@@ -4026,7 +4026,7 @@ function initScene() {
   renderer = new THREE.WebGLRenderer({ antialias: q.antialias, alpha: false, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.pixelRatioCap));
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setClearColor(0x03050e, 1);
+  renderer.setClearColor(0x010104, 1);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   canvasContainer.appendChild(renderer.domElement);
@@ -4183,7 +4183,7 @@ function buildStarField() {
   starGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   const starMat = new THREE.PointsMaterial({
     size: 0.5, sizeAttenuation: true, vertexColors: true,
-    transparent: true, opacity: 0.95,
+    transparent: true, opacity: 0.8,
     blending: THREE.AdditiveBlending, depthWrite: false
   });
   starField = new THREE.Points(starGeo, starMat);
@@ -4213,7 +4213,7 @@ function buildStarField() {
     ng.setAttribute('color', new THREE.BufferAttribute(nc, 3));
     const nm = new THREE.PointsMaterial({
       size: 2.5, sizeAttenuation: true, vertexColors: true,
-      transparent: true, opacity: 0.1,
+      transparent: true, opacity: 0.06,
       blending: THREE.AdditiveBlending, depthWrite: false
     });
     scene.add(new THREE.Points(ng, nm));
@@ -4224,15 +4224,48 @@ function buildStarField() {
   bgCanvas.width = 512; bgCanvas.height = 512;
   const bctx = bgCanvas.getContext('2d');
   const grad = bctx.createRadialGradient(256, 256, 30, 256, 256, 400);
-  grad.addColorStop(0, '#0a1530');
-  grad.addColorStop(0.4, '#06091e');
-  grad.addColorStop(0.7, '#03050f');
+  grad.addColorStop(0, '#05080f');
+  grad.addColorStop(0.4, '#020308');
+  grad.addColorStop(0.7, '#010103');
   grad.addColorStop(1, '#010206');
   bctx.fillStyle = grad;
   bctx.fillRect(0, 0, 512, 512);
   const bgTex = new THREE.CanvasTexture(bgCanvas);
   const bgMat = new THREE.MeshBasicMaterial({ map: bgTex, side: THREE.BackSide, depthWrite: false });
   scene.add(new THREE.Mesh(new THREE.SphereGeometry(300, 32, 32), bgMat));
+
+  // === Background planets — visible in the distance ===
+  // Mars (reddish, upper right)
+  const marsGeo = new THREE.SphereGeometry(2.5, 24, 24);
+  const marsMat = new THREE.MeshBasicMaterial({ color: 0x8b3a1a, transparent: true, opacity: 0.85 });
+  const mars = new THREE.Mesh(marsGeo, marsMat);
+  mars.position.set(45, 12, -50);
+  mars.userData._bgPlanet = true;
+  scene.add(mars);
+  // Mars glow
+  const marsGlowGeo = new THREE.SphereGeometry(3.2, 24, 24);
+  const marsGlowMat = new THREE.MeshBasicMaterial({ color: 0x4a1a08, transparent: true, opacity: 0.15, side: THREE.BackSide });
+  scene.add(new THREE.Mesh(marsGlowGeo, marsGlowMat)).position.copy(mars.position);
+
+  // Luna (gray, lower left)
+  const lunaGeo = new THREE.SphereGeometry(1.2, 16, 16);
+  const lunaMat = new THREE.MeshBasicMaterial({ color: 0x888888, transparent: true, opacity: 0.7 });
+  const luna = new THREE.Mesh(lunaGeo, lunaMat);
+  luna.position.set(-35, -8, -40);
+  luna.userData._bgPlanet = true;
+  scene.add(luna);
+  // Luna glow
+  const lunaGlowGeo = new THREE.SphereGeometry(1.7, 16, 16);
+  const lunaGlowMat = new THREE.MeshBasicMaterial({ color: 0x444444, transparent: true, opacity: 0.08, side: THREE.BackSide });
+  scene.add(new THREE.Mesh(lunaGlowGeo, lunaGlowMat)).position.copy(luna.position);
+
+  // Oceanus (blue-green, far right, small)
+  const oceGeo = new THREE.SphereGeometry(0.8, 16, 16);
+  const oceMat = new THREE.MeshBasicMaterial({ color: 0x1a6a7a, transparent: true, opacity: 0.5 });
+  const oce = new THREE.Mesh(oceGeo, oceMat);
+  oce.position.set(60, -5, -60);
+  oce.userData._bgPlanet = true;
+  scene.add(oce);
 }
 
 // ====================================================================
