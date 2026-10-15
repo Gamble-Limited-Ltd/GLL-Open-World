@@ -4406,6 +4406,9 @@ function initScene() {
 
   // Star field skipped — using CSS background image instead
   buildEarth();
+  // Hide the 3D Earth mesh — the CSS background image replaces it visually
+  // but the mesh still exists for plot positioning + click raycasting
+  if (earth) earth.visible = false;
   // Boot directly onto the saved planet — swap the sphere material before
   // the first frame (Earth keeps its NASA textures, others are procedural)
   const _bootPlanet = PLANET_BY_ID[STATE.planet] || PLANET_BY_ID.earth;
