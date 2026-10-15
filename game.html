@@ -9,13 +9,13 @@
 #menu { display: none !important; }
 
 *{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#050814}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#08141d}
 body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
-.screen{position:relative;width:100vw;height:100vh;overflow:hidden;background:#050814}
+.screen{position:relative;width:100vw;height:100vh;overflow:hidden;background:#08141d}
 .hidden{display:none !important}
 
 /* ============ MENU ============ */
-.menu-screen{position:relative;width:100vw;height:100vh;overflow:hidden;background:radial-gradient(ellipse at 50% 50%,#0a1628 0%,#070d1a 40%,#040810 70%,#020408 100%)}
+.menu-screen{position:relative;width:100vw;height:100vh;overflow:hidden;background:radial-gradient(ellipse at 70% 50%,#0b1d29 0%,#08141d 60%,#040a10 100%)}
 .menu-stars{position:absolute;inset:0;pointer-events:none;
   background-image:radial-gradient(1.5px 1.5px at 15% 20%,#fff,transparent),
     radial-gradient(1px 1px at 35% 65%,#fff,transparent),
@@ -165,7 +165,7 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 
 /* ============ GAME (Earth view) ============ */
 #game{background:#000}
-#canvas-container{position:absolute;inset:0;background:url("assets/space-bg.jpg") no-repeat center center;background-size:cover}
+#canvas-container{position:absolute;inset:0}
 #canvas-container canvas{display:block}
 
 .hud{position:absolute;z-index:20;pointer-events:none;font-family:Arial,Helvetica,sans-serif}
@@ -585,7 +585,7 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 
 /* Loading overlay */
 .loader{position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  background:#050814;transition:opacity .8s}
+  background:#08141d;transition:opacity .8s}
 .loader.hide{opacity:0;pointer-events:none}
 .loader .ring{width:60px;height:60px;border:3px solid #1a3340;border-top-color:#f5cc74;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:18px}
 .loader .text{font-family:Georgia,serif;color:#f5cc74;font-size:16px;letter-spacing:3px;text-transform:uppercase}
@@ -805,255 +805,6 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
   .zoom-bar{width:120px}
 }
 </style>
-
-<!-- Tactical HUD Override -->
-<style id="tactical-hud">
-:root {
-  --tac-cyan: #00d9ff;
-  --tac-gold: #ffd700;
-  --tac-bg: rgba(10, 22, 40, 0.85);
-  --tac-border: rgba(0, 217, 255, 0.3);
-  --tac-glow: 0 0 10px rgba(0, 217, 255, 0.4);
-}
-
-/* Top bar — pill-shaped buttons, tactical style */
-.top-bar {
-  background: var(--tac-bg) !important;
-  backdrop-filter: blur(12px) !important;
-  border-bottom: 1px solid var(--tac-border) !important;
-  padding: 8px 16px !important;
-  gap: 6px !important;
-  flex-wrap: wrap !important;
-}
-.back-btn, .logout-btn {
-  border: 2px solid var(--tac-cyan) !important;
-  border-radius: 20px !important;
-  background: rgba(0, 217, 255, 0.08) !important;
-  color: var(--tac-cyan) !important;
-  padding: 6px 16px !important;
-  font-family: 'Orbitron', Arial, sans-serif !important;
-  font-size: 10px !important;
-  letter-spacing: 1.5px !important;
-  text-transform: uppercase !important;
-  font-weight: 700 !important;
-  transition: all 0.2s !important;
-}
-.back-btn:hover, .logout-btn:hover {
-  background: rgba(0, 217, 255, 0.2) !important;
-  box-shadow: var(--tac-glow) !important;
-}
-.logout-btn { border-color: #ef4444 !important; color: #ef4444 !important; background: rgba(239,68,68,0.08) !important; }
-
-.brand {
-  color: var(--tac-gold) !important;
-  font-family: 'Orbitron', Georgia, serif !important;
-  letter-spacing: 2px !important;
-  text-transform: uppercase !important;
-  font-weight: 900 !important;
-  text-shadow: 0 0 8px rgba(255, 215, 0, 0.5) !important;
-}
-.brand small { color: var(--tac-cyan) !important; letter-spacing: 1px !important; }
-
-/* Stat chips — tactical resource display */
-.stats { gap: 4px !important; flex-wrap: wrap !important; }
-.stat-chip {
-  background: var(--tac-bg) !important;
-  border: 1px solid var(--tac-border) !important;
-  border-radius: 8px !important;
-  padding: 4px 10px !important;
-  backdrop-filter: blur(8px) !important;
-  flex-direction: column !important;
-  align-items: flex-start !important;
-  gap: 0 !important;
-  min-width: 70px !important;
-}
-.stat-chip .icon { font-size: 14px !important; }
-.stat-chip span { font-size: 8px !important; color: #5e7d87 !important; text-transform: uppercase !important; letter-spacing: 1px !important; }
-.stat-chip b { font-size: 14px !important; font-family: 'Orbitron', monospace !important; }
-.stat-chip b { color: var(--tac-cyan) !important; }
-#money { color: var(--tac-gold) !important; }
-#stock-value { color: #10b981 !important; }
-#owned-count { color: var(--tac-cyan) !important; }
-#army-count { color: #ef4444 !important; }
-
-/* Market buttons — pill-shaped with cyan borders */
-.market-btn {
-  border: 2px solid var(--tac-cyan) !important;
-  border-radius: 20px !important;
-  background: rgba(0, 217, 255, 0.05) !important;
-  color: var(--tac-cyan) !important;
-  padding: 6px 14px !important;
-  font-family: 'Orbitron', Arial, sans-serif !important;
-  font-size: 9px !important;
-  letter-spacing: 1px !important;
-  text-transform: uppercase !important;
-  font-weight: 700 !important;
-  transition: all 0.2s !important;
-  backdrop-filter: blur(6px) !important;
-}
-.market-btn:hover {
-  background: rgba(0, 217, 255, 0.2) !important;
-  box-shadow: var(--tac-glow) !important;
-  transform: translateY(-1px) !important;
-}
-.market-btn.active {
-  border-color: var(--tac-gold) !important;
-  color: var(--tac-gold) !important;
-  background: rgba(255, 215, 0, 0.12) !important;
-  box-shadow: 0 0 10px rgba(255, 215, 0, 0.4) !important;
-}
-
-/* Bottom bar — tactical readout style */
-.bottom-bar {
-  background: var(--tac-bg) !important;
-  backdrop-filter: blur(12px) !important;
-  border-top: 1px solid var(--tac-border) !important;
-  padding: 8px 20px !important;
-}
-.controls-hint { font-family: 'Orbitron', Arial, sans-serif !important; color: #5e7d87 !important; }
-.controls-hint span b {
-  color: var(--tac-cyan) !important;
-  border: 1px solid var(--tac-border) !important;
-  border-radius: 4px !important;
-  background: rgba(0, 217, 255, 0.1) !important;
-}
-.quality-btn {
-  border: 2px solid var(--tac-cyan) !important;
-  border-radius: 20px !important;
-  background: rgba(0, 217, 255, 0.05) !important;
-  color: var(--tac-cyan) !important;
-  font-family: 'Orbitron', Arial, sans-serif !important;
-  font-size: 10px !important;
-  letter-spacing: 1px !important;
-  text-transform: uppercase !important;
-}
-.quality-btn:hover { border-color: var(--tac-gold) !important; color: var(--tac-gold) !important; box-shadow: 0 0 8px rgba(255,215,0,0.3) !important; }
-
-/* Zoom meter — tactical altitude readout */
-.zoom-meter .label { color: #5e7d87 !important; letter-spacing: 2px !important; }
-.zoom-meter .value { color: var(--tac-gold) !important; font-family: 'Orbitron', monospace !important; text-shadow: 0 0 6px rgba(255,215,0,0.4) !important; }
-.zoom-bar { border-color: var(--tac-border) !important; }
-.zoom-bar .fill { background: linear-gradient(90deg, var(--tac-gold), var(--tac-cyan)) !important; box-shadow: 0 0 6px rgba(0,217,255,0.5) !important; }
-
-/* Multi-buy/sell bar — tactical style */
-.multibuy-bar {
-  background: var(--tac-bg) !important;
-  backdrop-filter: blur(12px) !important;
-  border: 1px solid var(--tac-border) !important;
-  border-radius: 12px !important;
-  box-shadow: var(--tac-glow) !important;
-}
-.multibuy-bar .mb-tag { color: var(--tac-gold) !important; font-family: 'Orbitron', sans-serif !important; }
-.multibuy-bar .mb-stats b { color: var(--tac-cyan) !important; }
-.multibuy-bar .btn { border-radius: 20px !important; font-family: 'Orbitron', sans-serif !important; text-transform: uppercase !important; letter-spacing: 1px !important; }
-
-/* Plot tip — tactical tooltip */
-.plot-tip {
-  background: var(--tac-bg) !important;
-  border: 1px solid var(--tac-cyan) !important;
-  border-radius: 8px !important;
-  box-shadow: var(--tac-glow) !important;
-  font-family: 'Orbitron', Arial, sans-serif !important;
-}
-
-/* Decorative tactical radar (lower-left corner) */
-#tactical-radar {
-  position: fixed;
-  bottom: 70px;
-  left: 20px;
-  width: 180px;
-  height: 180px;
-  z-index: 25;
-  pointer-events: none;
-}
-#tactical-radar::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 217, 255, 0.2);
-  box-shadow: inset 0 0 30px rgba(0, 217, 255, 0.05), 0 0 15px rgba(0, 217, 255, 0.1);
-  background: radial-gradient(circle, rgba(0,217,255,0.03) 0%, transparent 70%);
-}
-#tactical-radar::after {
-  content: '';
-  position: absolute;
-  top: 50%; left: 50%;
-  width: 50%; height: 2px;
-  background: linear-gradient(90deg, var(--tac-cyan), transparent);
-  transform-origin: left center;
-  animation: radar-sweep 4s linear infinite;
-}
-#tactical-radar .radar-blip {
-  position: absolute;
-  width: 4px; height: 4px;
-  background: #10b981;
-  border-radius: 50%;
-  box-shadow: 0 0 4px #10b981;
-}
-#tactical-radar .radar-ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 217, 255, 0.15);
-}
-#tactical-radar .radar-ring.r2 { inset: 20%; }
-#tactical-radar .radar-ring.r3 { inset: 35%; }
-#tactical-radar .radar-cross {
-  position: absolute;
-  top: 0; bottom: 0; left: 50%;
-  width: 1px;
-  background: rgba(0, 217, 255, 0.1);
-}
-#tactical-radar .radar-cross-h {
-  position: absolute;
-  left: 0; right: 0; top: 50%;
-  height: 1px;
-  background: rgba(0, 217, 255, 0.1);
-}
-@keyframes radar-sweep {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* Commander profile panel (upper-right, below top bar) */
-#commander-panel {
-  position: fixed;
-  top: 60px;
-  right: 16px;
-  width: 220px;
-  z-index: 25;
-  background: var(--tac-bg);
-  backdrop-filter: blur(12px);
-  border-left: 3px solid var(--tac-cyan);
-  border-radius: 0 12px 12px 0;
-  padding: 12px 16px;
-  font-family: 'Orbitron', Arial, sans-serif;
-  pointer-events: none;
-}
-#commander-panel .cp-name { color: white; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
-#commander-panel .cp-sub { color: var(--tac-cyan); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; }
-#commander-panel .cp-coords { color: #5e7d87; font-size: 10px; font-family: monospace; margin-top: 6px; }
-
-/* Resource panel (right side, below commander panel) */
-#resource-panel {
-  position: fixed;
-  top: 150px;
-  right: 16px;
-  width: 200px;
-  z-index: 25;
-  background: var(--tac-bg);
-  backdrop-filter: blur(12px);
-  border-radius: 12px;
-  padding: 12px 16px;
-  font-family: 'Orbitron', Arial, sans-serif;
-  pointer-events: none;
-}
-#resource-panel .rp-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid rgba(0,217,255,0.1); }
-#resource-panel .rp-row:last-child { border-bottom: none; }
-#resource-panel .rp-label { color: #5e7d87; font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; }
-#resource-panel .rp-value { color: white; font-size: 14px; font-weight: 700; }
-</style>
 </head>
 <body>
 <!-- Force reset: clears ALL local game data on first load after deploy -->
@@ -1174,33 +925,6 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 <!-- ============ GAME SCREEN (3D Earth) ============ -->
 <div id="game" class="screen hidden">
   <div id="canvas-container"></div>
-  <!-- Interactive 2D background overlay — pannable/zoomable image that replaces the 3D feel -->
-  <div id="bg-interactive" style="position:absolute;inset:0;z-index:1;pointer-events:auto;cursor:grab;overflow:hidden;background:url('assets/space-bg.jpg') no-repeat center center;background-size:cover;" onmousedown="bgDragStart(event)" onmousemove="bgDragMove(event)" onmouseup="bgDragEnd()" onmouseleave="bgDragEnd()" onwheel="bgZoom(event)">
-    <div id="bg-plots" style="position:absolute;inset:0;pointer-events:none;"></div>
-  </div>
-  <!-- Tactical radar overlay -->
-  <div id="tactical-radar"><div class="radar-ring"></div><div class="radar-ring r2"></div><div class="radar-ring r3"></div><div class="radar-cross"></div><div class="radar-cross-h"></div><div class="radar-blip" style="top:30%;left:60%"></div><div class="radar-blip" style="top:65%;left:40%"></div><div class="radar-blip" style="top:45%;left:70%"></div></div>
-  <!-- Commander profile panel -->
-  <div id="commander-panel">
-    <div class="cp-name" id="cp-name">COMMANDER</div>
-    <div class="cp-sub" id="cp-sub">EARTH EDITION · TACTICAL</div>
-    <div class="cp-coords" id="cp-coords">SECTOR SCAN</div>
-  </div>
-  <!-- Clan alerts + LAUNCH button (bottom-right) -->
-  <div id="clan-alerts" style="position:fixed;bottom:70px;right:16px;z-index:25;width:220px;background:rgba(10,22,40,0.85);backdrop-filter:blur(12px);border:1px solid rgba(0,217,255,0.3);border-radius:8px;padding:10px 14px;font-family:'Orbitron',Arial,sans-serif;pointer-events:none;">
-    <div style="color:#ff9100;font-size:10px;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">⚠ CLAN ALERT</div>
-    <div style="color:#ccc;font-size:11px;">No active threats</div>
-  </div>
-  <button id="launch-btn" style="position:fixed;bottom:16px;right:16px;z-index:26;padding:12px 24px;background:rgba(10,22,40,0.85);backdrop-filter:blur(12px);border:2px solid #00d4ff;border-radius:8px;color:#00d4ff;font-family:'Orbitron',Arial,sans-serif;font-size:14px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;box-shadow:0 0 10px rgba(0,217,255,0.3);transition:all 0.2s;" onmouseover="this.style.boxShadow='0 0 20px rgba(0,217,255,0.6)'" onmouseout="this.style.boxShadow='0 0 10px rgba(0,217,255,0.3)'" onclick="showToast('🚀 Launch sequence ready', true)">
-    🚀 LAUNCH
-  </button>
-  <!-- Resource panel -->
-  <div id="resource-panel">
-    <div class="rp-row"><span class="rp-label">CREDITS</span><span class="rp-value" id="rp-credits">$0</span></div>
-    <div class="rp-row"><span class="rp-label">OWNED</span><span class="rp-value" id="rp-owned">0</span></div>
-    <div class="rp-row"><span class="rp-label">ARMY</span><span class="rp-value" id="rp-army">0</span></div>
-  </div>
-
 
   <div class="hud">
     <div class="top-bar">
@@ -1474,8 +1198,7 @@ function applyQualityChange() {
     scene.remove(starField);
     starField.geometry.dispose();
     starField.material.dispose();
-    // Star field + nebulae skipped — using CSS background image instead
-  buildOrbitalRings();
+    buildStarField();
   }
   if (earth) {
     earth.geometry.dispose();
@@ -1577,7 +1300,7 @@ const EARTH_RADIUS = STATE.radius;
 // ====================================================================
 const PLOTS_PER_PLANET = 2200;
 const PLANETS = [
-  { id: 'earth',   name: 'Earth',   icon: '🌍', cost: 0,         seed: 1337,  idBase: 0,      water: 'mask', priceMult: 1,   atmo: 0x00d4ff,
+  { id: 'earth',   name: 'Earth',   icon: '🌍', cost: 0,         seed: 1337,  idBase: 0,      water: 'mask', priceMult: 1,   atmo: 0x6cc8ff,
     desc: 'Home. Every empire starts here — oceans, coasts and every climate.' },
   { id: 'luna',    name: 'Luna',    icon: '🌙', cost: 2_000_000,  seed: 42424, idBase: 10_000, water: 'none', priceMult: 2.5, atmo: null,
     desc: 'An airless gray frontier. No oceans — but dry, cratered ground where Mines, Factories, Banks and Barracks thrive. No farms, no resorts, no casinos, no oil rigs, no naval yards.' },
@@ -4300,10 +4023,10 @@ function initScene() {
   camera.position.set(0, 0, STATE.zoomMax);
 
   const q = QUALITY_LEVELS[getEffectiveQuality()];
-  renderer = new THREE.WebGLRenderer({ antialias: q.antialias, alpha: true, powerPreference: 'high-performance' });
+  renderer = new THREE.WebGLRenderer({ antialias: q.antialias, alpha: false, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.pixelRatioCap));
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setClearColor(0x000000, 0);
+  renderer.setClearColor(0x05080d, 1);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   canvasContainer.appendChild(renderer.domElement);
@@ -4408,7 +4131,7 @@ function initScene() {
   raycaster = new THREE.Raycaster();
   pointer = new THREE.Vector2();
 
-  // Star field skipped — using CSS background image instead
+  buildStarField();
   buildEarth();
   // Boot directly onto the saved planet — swap the sphere material before
   // the first frame (Earth keeps its NASA textures, others are procedural)
@@ -4433,135 +4156,31 @@ function initScene() {
 // ====================================================================
 function buildStarField() {
   const q = QUALITY_LEVELS[getEffectiveQuality()];
-  const starCount = Math.floor(q.stars * 1.5);  // 50% more stars
   const starGeo = new THREE.BufferGeometry();
+  const starCount = q.stars;
   const positions = new Float32Array(starCount * 3);
   const colors = new Float32Array(starCount * 3);
-  const sizes = new Float32Array(starCount);
   for (let i = 0; i < starCount; i++) {
-    const r = 80 + Math.random() * 140;
+    const r = 80 + Math.random() * 120;
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos(2 * Math.random() - 1);
     positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
     positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
     positions[i * 3 + 2] = r * Math.cos(phi);
-    // Varied star colors: mostly white/pale blue, some warm
-    const colorType = Math.random();
-    if (colorType < 0.5) {         // 50% pure white
-      colors[i*3] = 1.0; colors[i*3+1] = 1.0; colors[i*3+2] = 1.0;
-    } else if (colorType < 0.75) { // 25% pale blue
-      colors[i*3] = 0.8; colors[i*3+1] = 0.9; colors[i*3+2] = 1.0;
-    } else if (colorType < 0.9) {  // 15% pale yellow
-      colors[i*3] = 1.0; colors[i*3+1] = 0.98; colors[i*3+2] = 0.8;
-    } else {                        // 10% pale orange
-      colors[i*3] = 1.0; colors[i*3+1] = 0.85; colors[i*3+2] = 0.72;
-    }
-    // Varied sizes: most small, some bright
-    sizes[i] = Math.random() < 0.08 ? 1.5 + Math.random() * 1.0 : 0.15 + Math.random() * 0.35;
+    const t = Math.random();
+    // mostly white, some warm/cool
+    colors[i * 3]     = 0.9 + t * 0.1;
+    colors[i * 3 + 1] = 0.9 + t * 0.1;
+    colors[i * 3 + 2] = 1.0;
   }
   starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   starGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   const starMat = new THREE.PointsMaterial({
-    size: 0.5, sizeAttenuation: true, vertexColors: true,
-    transparent: true, opacity: 0.95,
-    blending: THREE.AdditiveBlending, depthWrite: false
+    size: 0.45, sizeAttenuation: true, vertexColors: true, transparent: true, opacity: 0.9
   });
   starField = new THREE.Points(starGeo, starMat);
   scene.add(starField);
-
-  // === NEBULA CLOUDS ===
-  // Dense particle clusters in different colors to simulate nebulae
-  const nebulaConfigs = [
-    { color: [0.55, 0.0, 0.55], count: 1200, pos: [-120, 0, -60], spread: 65 },   // deep magenta/purple (left)
-    { color: [0.0, 0.5, 0.5], count: 800, pos: [100, 10, -80], spread: 50 },     // teal/cyan (right)
-    { color: [1.0, 0.08, 0.58], count: 300, pos: [-60, -20, -40], spread: 30 },  // bright pink pinpricks
-    { color: [0.3, 0.0, 0.4], count: 500, pos: [0, 40, -100], spread: 55 },      // purple wisp (top)
-  ];
-  for (const cfg of nebulaConfigs) {
-    const nGeo = new THREE.BufferGeometry();
-    const nPos = new Float32Array(cfg.count * 3);
-    const nCol = new Float32Array(cfg.count * 3);
-    for (let i = 0; i < cfg.count; i++) {
-      // Gaussian-ish cluster around cfg.pos
-      nPos[i*3]   = cfg.pos[0] + (Math.random() - 0.5) * cfg.spread * 2;
-      nPos[i*3+1] = cfg.pos[1] + (Math.random() - 0.5) * cfg.spread * 2;
-      nPos[i*3+2] = cfg.pos[2] + (Math.random() - 0.5) * cfg.spread * 2;
-      // Fade towards edges
-      const dist = Math.random();
-      const fade = 1.0 - dist * dist;
-      nCol[i*3]   = cfg.color[0] * fade;
-      nCol[i*3+1] = cfg.color[1] * fade;
-      nCol[i*3+2] = cfg.color[2] * fade;
-    }
-    nGeo.setAttribute('position', new THREE.BufferAttribute(nPos, 3));
-    nGeo.setAttribute('color', new THREE.BufferAttribute(nCol, 3));
-    const nMat = new THREE.PointsMaterial({
-      size: 3.0, sizeAttenuation: true, vertexColors: true,
-      transparent: true, opacity: 0.15,
-      blending: THREE.AdditiveBlending, depthWrite: false
-    });
-    const nebula = new THREE.Points(nGeo, nMat);
-    nebula.userData._nebula = true;
-    scene.add(nebula);
-  }
-
-  // === BACKGROUND GRADIENT SPHERE ===
-  // Large sphere behind everything with a dark blue→purple gradient
-  const bgGeo = new THREE.SphereGeometry(300, 32, 32);
-  const bgCanvas = document.createElement('canvas');
-  bgCanvas.width = 512; bgCanvas.height = 512;
-  const bgCtx = bgCanvas.getContext('2d');
-  const grad = bgCtx.createRadialGradient(256, 256, 50, 256, 256, 400);
-  grad.addColorStop(0, '#0a1628');
-  grad.addColorStop(0.3, '#070d1a');
-  grad.addColorStop(0.6, '#040810');
-  grad.addColorStop(1, '#020408');
-  bgCtx.fillStyle = grad;
-  bgCtx.fillRect(0, 0, 512, 512);
-  const bgTex = new THREE.CanvasTexture(bgCanvas);
-  const bgMat = new THREE.MeshBasicMaterial({
-    map: bgTex, side: THREE.BackSide, depthWrite: false
-  });
-  const bgSphere = new THREE.Mesh(bgGeo, bgMat);
-  bgSphere.userData._bgSphere = true;
-  scene.add(bgSphere);
 }
-
-// === ORBITAL RING LINES ===
-// Faint cyan elliptical rings around Earth (tactical display aesthetic)
-function buildOrbitalRings() {
-  const ringConfigs = [
-    { radius: 1.8, tilt: 0.3, color: 0x00d4ff, opacity: 0.15 },
-    { radius: 2.2, tilt: -0.5, color: 0x00d4ff, opacity: 0.1 },
-    { radius: 2.6, tilt: 0.8, color: 0x00aaff, opacity: 0.08 },
-    { radius: 3.0, tilt: -0.2, color: 0x0088ff, opacity: 0.06 },
-  ];
-  for (const cfg of ringConfigs) {
-    const geo = new THREE.RingGeometry(cfg.radius - 0.005, cfg.radius + 0.005, 128);
-    const mat = new THREE.MeshBasicMaterial({
-      color: cfg.color, transparent: true, opacity: cfg.opacity,
-      side: THREE.DoubleSide, depthWrite: false,
-      blending: THREE.AdditiveBlending
-    });
-    const ring = new THREE.Mesh(geo, mat);
-    ring.rotation.x = cfg.tilt;
-    ring.rotation.z = Math.random() * Math.PI;
-    ring.userData._orbitalRing = true;
-    scene.add(ring);
-  }
-  // Small node markers on the rings (waypoint dots)
-  for (let i = 0; i < 12; i++) {
-    const angle = (i / 12) * Math.PI * 2;
-    const r = 1.8 + Math.random() * 1.2;
-    const nodeGeo = new THREE.SphereGeometry(0.02, 8, 8);
-    const nodeMat = new THREE.MeshBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.6 });
-    const node = new THREE.Mesh(nodeGeo, nodeMat);
-    node.position.set(Math.cos(angle) * r, (Math.random() - 0.5) * 0.5, Math.sin(angle) * r);
-    node.userData._orbitalNode = true;
-    scene.add(node);
-  }
-}
-
 
 // ====================================================================
 // EARTH
@@ -8170,96 +7789,6 @@ window.addEventListener('keydown', (e) => {
   }
 });
 </script>
-
-<script id="tactical-hud-sync">
-// Sync commander panel + resource panel with game state
-(function() {
-  function syncHUD() {
-    try {
-      if (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) {
-        var cpName = document.getElementById('cp-name');
-        if (cpName) cpName.textContent = CURRENT_USER.toUpperCase();
-        var cpSub = document.getElementById('cp-sub');
-        if (cpSub) cpSub.textContent = 'LVL · EARTH EDITION';
-      }
-      var moneyEl = document.getElementById('money');
-      var rpCredits = document.getElementById('rp-credits');
-      if (moneyEl && rpCredits) rpCredits.textContent = moneyEl.textContent;
-      var ownedEl = document.getElementById('owned-count');
-      var rpOwned = document.getElementById('rp-owned');
-      if (ownedEl && rpOwned) rpOwned.textContent = ownedEl.textContent;
-      var armyEl = document.getElementById('army-count');
-      var rpArmy = document.getElementById('rp-army');
-      if (armyEl && rpArmy) rpArmy.textContent = armyEl.textContent;
-    } catch(e) {}
-  }
-  setInterval(syncHUD, 500);
-})();
-</script>
-
-<script id="bg-interactive-js">
-// === Interactive 2D Background ===
-// Makes the background image pannable + zoomable, replacing the 3D world feel
-var _bgX = 0, _bgY = 0, _bgScale = 1, _bgDragging = false, _bgStartX = 0, _bgStartY = 0, _bgOrigX = 0, _bgOrigY = 0;
-
-function bgUpdateTransform() {
-  var el = document.getElementById('bg-interactive');
-  if (!el) return;
-  el.style.backgroundPosition = (50 + _bgX) + '% ' + (50 + _bgY) + '%';
-  el.style.backgroundSize = (100 * _bgScale) + '%';
-}
-
-window.bgDragStart = function(e) {
-  _bgDragging = true;
-  _bgStartX = e.clientX;
-  _bgStartY = e.clientY;
-  _bgOrigX = _bgX;
-  _bgOrigY = _bgY;
-  var el = document.getElementById('bg-interactive');
-  if (el) el.style.cursor = 'grabbing';
-};
-
-window.bgDragMove = function(e) {
-  if (!_bgDragging) return;
-  var el = document.getElementById('bg-interactive');
-  if (!el) return;
-  var w = el.offsetWidth, h = el.offsetHeight;
-  _bgX = _bgOrigX + ((e.clientX - _bgStartX) / w * 100);
-  _bgY = _bgOrigY - ((e.clientY - _bgStartY) / h * 100);
-  _bgX = Math.max(-50, Math.min(50, _bgX));
-  _bgY = Math.max(-50, Math.min(50, _bgY));
-  bgUpdateTransform();
-};
-
-window.bgDragEnd = function() {
-  _bgDragging = false;
-  var el = document.getElementById('bg-interactive');
-  if (el) el.style.cursor = 'grab';
-};
-
-window.bgZoom = function(e) {
-  e.preventDefault();
-  var delta = e.deltaY > 0 ? 0.9 : 1.1;
-  _bgScale = Math.max(0.5, Math.min(5, _bgScale * delta));
-  bgUpdateTransform();
-};
-
-// Click on background → open a plot-buy modal (simplified)
-document.addEventListener('click', function(e) {
-  if (_bgDragging) return;
-  var bg = document.getElementById('bg-interactive');
-  if (!bg || !bg.contains(e.target)) return;
-  // Skip if clicking on a 3D canvas element instead
-  if (e.target.tagName === 'CANVAS') return;
-  // Show a toast
-  if (typeof showToast === 'function') {
-    showToast('📍 Click on the 3D globe to buy plots', true);
-  }
-});
-
-bgUpdateTransform();
-</script>
-
 <script id="game-autologin-script">
 // === LAUNCH FLOW ===
 // Always watches for login completion → calls enterGame().
