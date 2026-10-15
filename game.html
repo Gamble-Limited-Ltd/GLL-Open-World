@@ -1174,6 +1174,10 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 <!-- ============ GAME SCREEN (3D Earth) ============ -->
 <div id="game" class="screen hidden">
   <div id="canvas-container"></div>
+  <!-- Interactive 2D background overlay — pannable/zoomable image that replaces the 3D feel -->
+  <div id="bg-interactive" style="position:absolute;inset:0;z-index:1;pointer-events:auto;cursor:grab;overflow:hidden;background:url('assets/space-bg.jpg') no-repeat center center;background-size:cover;" onmousedown="bgDragStart(event)" onmousemove="bgDragMove(event)" onmouseup="bgDragEnd()" onmouseleave="bgDragEnd()" onwheel="bgZoom(event)">
+    <div id="bg-plots" style="position:absolute;inset:0;pointer-events:none;"></div>
+  </div>
   <!-- Tactical radar overlay -->
   <div id="tactical-radar"><div class="radar-ring"></div><div class="radar-ring r2"></div><div class="radar-ring r3"></div><div class="radar-cross"></div><div class="radar-cross-h"></div><div class="radar-blip" style="top:30%;left:60%"></div><div class="radar-blip" style="top:65%;left:40%"></div><div class="radar-blip" style="top:45%;left:70%"></div></div>
   <!-- Commander profile panel -->
@@ -4406,9 +4410,6 @@ function initScene() {
 
   // Star field skipped — using CSS background image instead
   buildEarth();
-  // Hide the 3D Earth mesh — the CSS background image replaces it visually
-  // but the mesh still exists for plot positioning + click raycasting
-  if (earth) earth.visible = false;
   // Boot directly onto the saved planet — swap the sphere material before
   // the first frame (Earth keeps its NASA textures, others are procedural)
   const _bootPlanet = PLANET_BY_ID[STATE.planet] || PLANET_BY_ID.earth;
@@ -8195,6 +8196,70 @@ window.addEventListener('keydown', (e) => {
   setInterval(syncHUD, 500);
 })();
 </script>
+
+<script id="bg-interactive-js">
+// === Interactive 2D Background ===
+// Makes the background image pannable + zoomable, replacing the 3D world feel
+var _bgX = 0, _bgY = 0, _bgScale = 1, _bgDragging = false, _bgStartX = 0, _bgStartY = 0, _bgOrigX = 0, _bgOrigY = 0;
+
+function bgUpdateTransform() {
+  var el = document.getElementById('bg-interactive');
+  if (!el) return;
+  el.style.backgroundPosition = (50 + _bgX) + '% ' + (50 + _bgY) + '%';
+  el.style.backgroundSize = (100 * _bgScale) + '%';
+}
+
+window.bgDragStart = function(e) {
+  _bgDragging = true;
+  _bgStartX = e.clientX;
+  _bgStartY = e.clientY;
+  _bgOrigX = _bgX;
+  _bgOrigY = _bgY;
+  var el = document.getElementById('bg-interactive');
+  if (el) el.style.cursor = 'grabbing';
+};
+
+window.bgDragMove = function(e) {
+  if (!_bgDragging) return;
+  var el = document.getElementById('bg-interactive');
+  if (!el) return;
+  var w = el.offsetWidth, h = el.offsetHeight;
+  _bgX = _bgOrigX + ((e.clientX - _bgStartX) / w * 100);
+  _bgY = _bgOrigY - ((e.clientY - _bgStartY) / h * 100);
+  _bgX = Math.max(-50, Math.min(50, _bgX));
+  _bgY = Math.max(-50, Math.min(50, _bgY));
+  bgUpdateTransform();
+};
+
+window.bgDragEnd = function() {
+  _bgDragging = false;
+  var el = document.getElementById('bg-interactive');
+  if (el) el.style.cursor = 'grab';
+};
+
+window.bgZoom = function(e) {
+  e.preventDefault();
+  var delta = e.deltaY > 0 ? 0.9 : 1.1;
+  _bgScale = Math.max(0.5, Math.min(5, _bgScale * delta));
+  bgUpdateTransform();
+};
+
+// Click on background → open a plot-buy modal (simplified)
+document.addEventListener('click', function(e) {
+  if (_bgDragging) return;
+  var bg = document.getElementById('bg-interactive');
+  if (!bg || !bg.contains(e.target)) return;
+  // Skip if clicking on a 3D canvas element instead
+  if (e.target.tagName === 'CANVAS') return;
+  // Show a toast
+  if (typeof showToast === 'function') {
+    showToast('📍 Click on the 3D globe to buy plots', true);
+  }
+});
+
+bgUpdateTransform();
+</script>
+
 <script id="game-autologin-script">
 // === LAUNCH FLOW ===
 // Always watches for login completion → calls enterGame().
