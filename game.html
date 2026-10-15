@@ -1470,7 +1470,7 @@ function applyQualityChange() {
     scene.remove(starField);
     starField.geometry.dispose();
     starField.material.dispose();
-    buildStarField();
+    // Star field + nebulae skipped — using CSS background image instead
   buildOrbitalRings();
   }
   if (earth) {
@@ -4296,10 +4296,10 @@ function initScene() {
   camera.position.set(0, 0, STATE.zoomMax);
 
   const q = QUALITY_LEVELS[getEffectiveQuality()];
-  renderer = new THREE.WebGLRenderer({ antialias: q.antialias, alpha: false, powerPreference: 'high-performance' });
+  renderer = new THREE.WebGLRenderer({ antialias: q.antialias, alpha: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.pixelRatioCap));
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setClearColor(0x050814, 1);
+  renderer.setClearColor(0x000000, 0);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   canvasContainer.appendChild(renderer.domElement);
