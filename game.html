@@ -984,6 +984,33 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
   transform-origin: left center;
   animation: radar-sweep 4s linear infinite;
 }
+#tactical-radar .radar-blip {
+  position: absolute;
+  width: 4px; height: 4px;
+  background: #10b981;
+  border-radius: 50%;
+  box-shadow: 0 0 4px #10b981;
+}
+#tactical-radar .radar-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 217, 255, 0.15);
+}
+#tactical-radar .radar-ring.r2 { inset: 20%; }
+#tactical-radar .radar-ring.r3 { inset: 35%; }
+#tactical-radar .radar-cross {
+  position: absolute;
+  top: 0; bottom: 0; left: 50%;
+  width: 1px;
+  background: rgba(0, 217, 255, 0.1);
+}
+#tactical-radar .radar-cross-h {
+  position: absolute;
+  left: 0; right: 0; top: 50%;
+  height: 1px;
+  background: rgba(0, 217, 255, 0.1);
+}
 @keyframes radar-sweep {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
@@ -1148,13 +1175,21 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 <div id="game" class="screen hidden">
   <div id="canvas-container"></div>
   <!-- Tactical radar overlay -->
-  <div id="tactical-radar"></div>
+  <div id="tactical-radar"><div class="radar-ring"></div><div class="radar-ring r2"></div><div class="radar-ring r3"></div><div class="radar-cross"></div><div class="radar-cross-h"></div><div class="radar-blip" style="top:30%;left:60%"></div><div class="radar-blip" style="top:65%;left:40%"></div><div class="radar-blip" style="top:45%;left:70%"></div></div>
   <!-- Commander profile panel -->
   <div id="commander-panel">
     <div class="cp-name" id="cp-name">COMMANDER</div>
     <div class="cp-sub" id="cp-sub">EARTH EDITION · TACTICAL</div>
     <div class="cp-coords" id="cp-coords">SECTOR SCAN</div>
   </div>
+  <!-- Clan alerts + LAUNCH button (bottom-right) -->
+  <div id="clan-alerts" style="position:fixed;bottom:70px;right:16px;z-index:25;width:220px;background:rgba(10,22,40,0.85);backdrop-filter:blur(12px);border:1px solid rgba(0,217,255,0.3);border-radius:8px;padding:10px 14px;font-family:'Orbitron',Arial,sans-serif;pointer-events:none;">
+    <div style="color:#ff9100;font-size:10px;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">⚠ CLAN ALERT</div>
+    <div style="color:#ccc;font-size:11px;">No active threats</div>
+  </div>
+  <button id="launch-btn" style="position:fixed;bottom:16px;right:16px;z-index:26;padding:12px 24px;background:rgba(10,22,40,0.85);backdrop-filter:blur(12px);border:2px solid #00d4ff;border-radius:8px;color:#00d4ff;font-family:'Orbitron',Arial,sans-serif;font-size:14px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;box-shadow:0 0 10px rgba(0,217,255,0.3);transition:all 0.2s;" onmouseover="this.style.boxShadow='0 0 20px rgba(0,217,255,0.6)'" onmouseout="this.style.boxShadow='0 0 10px rgba(0,217,255,0.3)'" onclick="showToast('🚀 Launch sequence ready', true)">
+    🚀 LAUNCH
+  </button>
   <!-- Resource panel -->
   <div id="resource-panel">
     <div class="rp-row"><span class="rp-label">CREDITS</span><span class="rp-value" id="rp-credits">$0</span></div>
@@ -1436,6 +1471,7 @@ function applyQualityChange() {
     starField.geometry.dispose();
     starField.material.dispose();
     buildStarField();
+  buildOrbitalRings();
   }
   if (earth) {
     earth.geometry.dispose();
@@ -4486,6 +4522,42 @@ function buildStarField() {
   bgSphere.userData._bgSphere = true;
   scene.add(bgSphere);
 }
+
+// === ORBITAL RING LINES ===
+// Faint cyan elliptical rings around Earth (tactical display aesthetic)
+function buildOrbitalRings() {
+  const ringConfigs = [
+    { radius: 1.8, tilt: 0.3, color: 0x00d4ff, opacity: 0.15 },
+    { radius: 2.2, tilt: -0.5, color: 0x00d4ff, opacity: 0.1 },
+    { radius: 2.6, tilt: 0.8, color: 0x00aaff, opacity: 0.08 },
+    { radius: 3.0, tilt: -0.2, color: 0x0088ff, opacity: 0.06 },
+  ];
+  for (const cfg of ringConfigs) {
+    const geo = new THREE.RingGeometry(cfg.radius - 0.005, cfg.radius + 0.005, 128);
+    const mat = new THREE.MeshBasicMaterial({
+      color: cfg.color, transparent: true, opacity: cfg.opacity,
+      side: THREE.DoubleSide, depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+    const ring = new THREE.Mesh(geo, mat);
+    ring.rotation.x = cfg.tilt;
+    ring.rotation.z = Math.random() * Math.PI;
+    ring.userData._orbitalRing = true;
+    scene.add(ring);
+  }
+  // Small node markers on the rings (waypoint dots)
+  for (let i = 0; i < 12; i++) {
+    const angle = (i / 12) * Math.PI * 2;
+    const r = 1.8 + Math.random() * 1.2;
+    const nodeGeo = new THREE.SphereGeometry(0.02, 8, 8);
+    const nodeMat = new THREE.MeshBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.6 });
+    const node = new THREE.Mesh(nodeGeo, nodeMat);
+    node.position.set(Math.cos(angle) * r, (Math.random() - 0.5) * 0.5, Math.sin(angle) * r);
+    node.userData._orbitalNode = true;
+    scene.add(node);
+  }
+}
+
 
 // ====================================================================
 // EARTH
