@@ -805,6 +805,228 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
   .zoom-bar{width:120px}
 }
 </style>
+
+<!-- Tactical HUD Override -->
+<style id="tactical-hud">
+:root {
+  --tac-cyan: #00d9ff;
+  --tac-gold: #ffd700;
+  --tac-bg: rgba(10, 22, 40, 0.85);
+  --tac-border: rgba(0, 217, 255, 0.3);
+  --tac-glow: 0 0 10px rgba(0, 217, 255, 0.4);
+}
+
+/* Top bar — pill-shaped buttons, tactical style */
+.top-bar {
+  background: var(--tac-bg) !important;
+  backdrop-filter: blur(12px) !important;
+  border-bottom: 1px solid var(--tac-border) !important;
+  padding: 8px 16px !important;
+  gap: 6px !important;
+  flex-wrap: wrap !important;
+}
+.back-btn, .logout-btn {
+  border: 2px solid var(--tac-cyan) !important;
+  border-radius: 20px !important;
+  background: rgba(0, 217, 255, 0.08) !important;
+  color: var(--tac-cyan) !important;
+  padding: 6px 16px !important;
+  font-family: 'Orbitron', Arial, sans-serif !important;
+  font-size: 10px !important;
+  letter-spacing: 1.5px !important;
+  text-transform: uppercase !important;
+  font-weight: 700 !important;
+  transition: all 0.2s !important;
+}
+.back-btn:hover, .logout-btn:hover {
+  background: rgba(0, 217, 255, 0.2) !important;
+  box-shadow: var(--tac-glow) !important;
+}
+.logout-btn { border-color: #ef4444 !important; color: #ef4444 !important; background: rgba(239,68,68,0.08) !important; }
+
+.brand {
+  color: var(--tac-gold) !important;
+  font-family: 'Orbitron', Georgia, serif !important;
+  letter-spacing: 2px !important;
+  text-transform: uppercase !important;
+  font-weight: 900 !important;
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.5) !important;
+}
+.brand small { color: var(--tac-cyan) !important; letter-spacing: 1px !important; }
+
+/* Stat chips — tactical resource display */
+.stats { gap: 4px !important; flex-wrap: wrap !important; }
+.stat-chip {
+  background: var(--tac-bg) !important;
+  border: 1px solid var(--tac-border) !important;
+  border-radius: 8px !important;
+  padding: 4px 10px !important;
+  backdrop-filter: blur(8px) !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 0 !important;
+  min-width: 70px !important;
+}
+.stat-chip .icon { font-size: 14px !important; }
+.stat-chip span { font-size: 8px !important; color: #5e7d87 !important; text-transform: uppercase !important; letter-spacing: 1px !important; }
+.stat-chip b { font-size: 14px !important; font-family: 'Orbitron', monospace !important; }
+.stat-chip b { color: var(--tac-cyan) !important; }
+#money { color: var(--tac-gold) !important; }
+#stock-value { color: #10b981 !important; }
+#owned-count { color: var(--tac-cyan) !important; }
+#army-count { color: #ef4444 !important; }
+
+/* Market buttons — pill-shaped with cyan borders */
+.market-btn {
+  border: 2px solid var(--tac-cyan) !important;
+  border-radius: 20px !important;
+  background: rgba(0, 217, 255, 0.05) !important;
+  color: var(--tac-cyan) !important;
+  padding: 6px 14px !important;
+  font-family: 'Orbitron', Arial, sans-serif !important;
+  font-size: 9px !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+  font-weight: 700 !important;
+  transition: all 0.2s !important;
+  backdrop-filter: blur(6px) !important;
+}
+.market-btn:hover {
+  background: rgba(0, 217, 255, 0.2) !important;
+  box-shadow: var(--tac-glow) !important;
+  transform: translateY(-1px) !important;
+}
+.market-btn.active {
+  border-color: var(--tac-gold) !important;
+  color: var(--tac-gold) !important;
+  background: rgba(255, 215, 0, 0.12) !important;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.4) !important;
+}
+
+/* Bottom bar — tactical readout style */
+.bottom-bar {
+  background: var(--tac-bg) !important;
+  backdrop-filter: blur(12px) !important;
+  border-top: 1px solid var(--tac-border) !important;
+  padding: 8px 20px !important;
+}
+.controls-hint { font-family: 'Orbitron', Arial, sans-serif !important; color: #5e7d87 !important; }
+.controls-hint span b {
+  color: var(--tac-cyan) !important;
+  border: 1px solid var(--tac-border) !important;
+  border-radius: 4px !important;
+  background: rgba(0, 217, 255, 0.1) !important;
+}
+.quality-btn {
+  border: 2px solid var(--tac-cyan) !important;
+  border-radius: 20px !important;
+  background: rgba(0, 217, 255, 0.05) !important;
+  color: var(--tac-cyan) !important;
+  font-family: 'Orbitron', Arial, sans-serif !important;
+  font-size: 10px !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+}
+.quality-btn:hover { border-color: var(--tac-gold) !important; color: var(--tac-gold) !important; box-shadow: 0 0 8px rgba(255,215,0,0.3) !important; }
+
+/* Zoom meter — tactical altitude readout */
+.zoom-meter .label { color: #5e7d87 !important; letter-spacing: 2px !important; }
+.zoom-meter .value { color: var(--tac-gold) !important; font-family: 'Orbitron', monospace !important; text-shadow: 0 0 6px rgba(255,215,0,0.4) !important; }
+.zoom-bar { border-color: var(--tac-border) !important; }
+.zoom-bar .fill { background: linear-gradient(90deg, var(--tac-gold), var(--tac-cyan)) !important; box-shadow: 0 0 6px rgba(0,217,255,0.5) !important; }
+
+/* Multi-buy/sell bar — tactical style */
+.multibuy-bar {
+  background: var(--tac-bg) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid var(--tac-border) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--tac-glow) !important;
+}
+.multibuy-bar .mb-tag { color: var(--tac-gold) !important; font-family: 'Orbitron', sans-serif !important; }
+.multibuy-bar .mb-stats b { color: var(--tac-cyan) !important; }
+.multibuy-bar .btn { border-radius: 20px !important; font-family: 'Orbitron', sans-serif !important; text-transform: uppercase !important; letter-spacing: 1px !important; }
+
+/* Plot tip — tactical tooltip */
+.plot-tip {
+  background: var(--tac-bg) !important;
+  border: 1px solid var(--tac-cyan) !important;
+  border-radius: 8px !important;
+  box-shadow: var(--tac-glow) !important;
+  font-family: 'Orbitron', Arial, sans-serif !important;
+}
+
+/* Decorative tactical radar (lower-left corner) */
+#tactical-radar {
+  position: fixed;
+  bottom: 70px;
+  left: 20px;
+  width: 180px;
+  height: 180px;
+  z-index: 25;
+  pointer-events: none;
+}
+#tactical-radar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 217, 255, 0.2);
+  box-shadow: inset 0 0 30px rgba(0, 217, 255, 0.05), 0 0 15px rgba(0, 217, 255, 0.1);
+  background: radial-gradient(circle, rgba(0,217,255,0.03) 0%, transparent 70%);
+}
+#tactical-radar::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 50%; height: 2px;
+  background: linear-gradient(90deg, var(--tac-cyan), transparent);
+  transform-origin: left center;
+  animation: radar-sweep 4s linear infinite;
+}
+@keyframes radar-sweep {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Commander profile panel (upper-right, below top bar) */
+#commander-panel {
+  position: fixed;
+  top: 60px;
+  right: 16px;
+  width: 220px;
+  z-index: 25;
+  background: var(--tac-bg);
+  backdrop-filter: blur(12px);
+  border-left: 3px solid var(--tac-cyan);
+  border-radius: 0 12px 12px 0;
+  padding: 12px 16px;
+  font-family: 'Orbitron', Arial, sans-serif;
+  pointer-events: none;
+}
+#commander-panel .cp-name { color: white; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+#commander-panel .cp-sub { color: var(--tac-cyan); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; }
+#commander-panel .cp-coords { color: #5e7d87; font-size: 10px; font-family: monospace; margin-top: 6px; }
+
+/* Resource panel (right side, below commander panel) */
+#resource-panel {
+  position: fixed;
+  top: 150px;
+  right: 16px;
+  width: 200px;
+  z-index: 25;
+  background: var(--tac-bg);
+  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-family: 'Orbitron', Arial, sans-serif;
+  pointer-events: none;
+}
+#resource-panel .rp-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid rgba(0,217,255,0.1); }
+#resource-panel .rp-row:last-child { border-bottom: none; }
+#resource-panel .rp-label { color: #5e7d87; font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; }
+#resource-panel .rp-value { color: white; font-size: 14px; font-weight: 700; }
+</style>
 </head>
 <body>
 <!-- Force reset: clears ALL local game data on first load after deploy -->
@@ -925,6 +1147,21 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 <!-- ============ GAME SCREEN (3D Earth) ============ -->
 <div id="game" class="screen hidden">
   <div id="canvas-container"></div>
+  <!-- Tactical radar overlay -->
+  <div id="tactical-radar"></div>
+  <!-- Commander profile panel -->
+  <div id="commander-panel">
+    <div class="cp-name" id="cp-name">COMMANDER</div>
+    <div class="cp-sub" id="cp-sub">EARTH EDITION · TACTICAL</div>
+    <div class="cp-coords" id="cp-coords">SECTOR SCAN</div>
+  </div>
+  <!-- Resource panel -->
+  <div id="resource-panel">
+    <div class="rp-row"><span class="rp-label">CREDITS</span><span class="rp-value" id="rp-credits">$0</span></div>
+    <div class="rp-row"><span class="rp-label">OWNED</span><span class="rp-value" id="rp-owned">0</span></div>
+    <div class="rp-row"><span class="rp-label">ARMY</span><span class="rp-value" id="rp-army">0</span></div>
+  </div>
+
 
   <div class="hud">
     <div class="top-bar">
@@ -7788,6 +8025,32 @@ window.addEventListener('keydown', (e) => {
     if (STATE.multiBuy) window.toggleMultiBuy();
   }
 });
+</script>
+
+<script id="tactical-hud-sync">
+// Sync commander panel + resource panel with game state
+(function() {
+  function syncHUD() {
+    try {
+      if (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) {
+        var cpName = document.getElementById('cp-name');
+        if (cpName) cpName.textContent = CURRENT_USER.toUpperCase();
+        var cpSub = document.getElementById('cp-sub');
+        if (cpSub) cpSub.textContent = 'LVL · EARTH EDITION';
+      }
+      var moneyEl = document.getElementById('money');
+      var rpCredits = document.getElementById('rp-credits');
+      if (moneyEl && rpCredits) rpCredits.textContent = moneyEl.textContent;
+      var ownedEl = document.getElementById('owned-count');
+      var rpOwned = document.getElementById('rp-owned');
+      if (ownedEl && rpOwned) rpOwned.textContent = ownedEl.textContent;
+      var armyEl = document.getElementById('army-count');
+      var rpArmy = document.getElementById('rp-army');
+      if (armyEl && rpArmy) rpArmy.textContent = armyEl.textContent;
+    } catch(e) {}
+  }
+  setInterval(syncHUD, 500);
+})();
 </script>
 <script id="game-autologin-script">
 // === LAUNCH FLOW ===
