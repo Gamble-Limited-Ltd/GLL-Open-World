@@ -4263,7 +4263,7 @@ function initScene() {
   renderer = new THREE.WebGLRenderer({ antialias: q.antialias, alpha: false, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.pixelRatioCap));
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setClearColor(0x05080d, 1);
+  renderer.setClearColor(0x01020a, 1);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   canvasContainer.appendChild(renderer.domElement);
@@ -4393,30 +4393,98 @@ function initScene() {
 // ====================================================================
 function buildStarField() {
   const q = QUALITY_LEVELS[getEffectiveQuality()];
+  const starCount = Math.floor(q.stars * 1.5);  // 50% more stars
   const starGeo = new THREE.BufferGeometry();
-  const starCount = q.stars;
   const positions = new Float32Array(starCount * 3);
   const colors = new Float32Array(starCount * 3);
+  const sizes = new Float32Array(starCount);
   for (let i = 0; i < starCount; i++) {
-    const r = 80 + Math.random() * 120;
+    const r = 80 + Math.random() * 140;
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos(2 * Math.random() - 1);
     positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
     positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
     positions[i * 3 + 2] = r * Math.cos(phi);
-    const t = Math.random();
-    // mostly white, some warm/cool
-    colors[i * 3]     = 0.9 + t * 0.1;
-    colors[i * 3 + 1] = 0.9 + t * 0.1;
-    colors[i * 3 + 2] = 1.0;
+    // Varied star colors: white, cyan, warm, purple
+    const colorType = Math.random();
+    if (colorType < 0.6) {        // 60% white
+      colors[i*3] = 0.95; colors[i*3+1] = 0.95; colors[i*3+2] = 1.0;
+    } else if (colorType < 0.75) { // 15% cyan
+      colors[i*3] = 0.4; colors[i*3+1] = 0.8; colors[i*3+2] = 1.0;
+    } else if (colorType < 0.9) {  // 15% warm
+      colors[i*3] = 1.0; colors[i*3+1] = 0.85; colors[i*3+2] = 0.6;
+    } else {                       // 10% purple
+      colors[i*3] = 0.8; colors[i*3+1] = 0.5; colors[i*3+2] = 1.0;
+    }
+    // Varied sizes: most small, some bright
+    sizes[i] = Math.random() < 0.05 ? 1.2 + Math.random() * 0.8 : 0.2 + Math.random() * 0.4;
   }
   starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   starGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   const starMat = new THREE.PointsMaterial({
-    size: 0.45, sizeAttenuation: true, vertexColors: true, transparent: true, opacity: 0.9
+    size: 0.5, sizeAttenuation: true, vertexColors: true,
+    transparent: true, opacity: 0.95,
+    blending: THREE.AdditiveBlending, depthWrite: false
   });
   starField = new THREE.Points(starGeo, starMat);
   scene.add(starField);
+
+  // === NEBULA CLOUDS ===
+  // Dense particle clusters in different colors to simulate nebulae
+  const nebulaConfigs = [
+    { color: [0.0, 0.5, 0.9], count: 800, pos: [120, 30, -80], spread: 50 },   // cyan
+    { color: [0.6, 0.1, 0.7], count: 600, pos: [-100, -20, -60], spread: 45 },  // purple
+    { color: [0.9, 0.2, 0.4], count: 400, pos: [60, -40, 90], spread: 35 },    // magenta
+    { color: [0.1, 0.3, 0.6], count: 500, pos: [-80, 40, 70], spread: 40 },    // deep blue
+  ];
+  for (const cfg of nebulaConfigs) {
+    const nGeo = new THREE.BufferGeometry();
+    const nPos = new Float32Array(cfg.count * 3);
+    const nCol = new Float32Array(cfg.count * 3);
+    for (let i = 0; i < cfg.count; i++) {
+      // Gaussian-ish cluster around cfg.pos
+      nPos[i*3]   = cfg.pos[0] + (Math.random() - 0.5) * cfg.spread * 2;
+      nPos[i*3+1] = cfg.pos[1] + (Math.random() - 0.5) * cfg.spread * 2;
+      nPos[i*3+2] = cfg.pos[2] + (Math.random() - 0.5) * cfg.spread * 2;
+      // Fade towards edges
+      const dist = Math.random();
+      const fade = 1.0 - dist * dist;
+      nCol[i*3]   = cfg.color[0] * fade;
+      nCol[i*3+1] = cfg.color[1] * fade;
+      nCol[i*3+2] = cfg.color[2] * fade;
+    }
+    nGeo.setAttribute('position', new THREE.BufferAttribute(nPos, 3));
+    nGeo.setAttribute('color', new THREE.BufferAttribute(nCol, 3));
+    const nMat = new THREE.PointsMaterial({
+      size: 3.0, sizeAttenuation: true, vertexColors: true,
+      transparent: true, opacity: 0.12,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    const nebula = new THREE.Points(nGeo, nMat);
+    nebula.userData._nebula = true;
+    scene.add(nebula);
+  }
+
+  // === BACKGROUND GRADIENT SPHERE ===
+  // Large sphere behind everything with a dark blue→purple gradient
+  const bgGeo = new THREE.SphereGeometry(300, 32, 32);
+  const bgCanvas = document.createElement('canvas');
+  bgCanvas.width = 512; bgCanvas.height = 512;
+  const bgCtx = bgCanvas.getContext('2d');
+  const grad = bgCtx.createRadialGradient(256, 256, 50, 256, 256, 400);
+  grad.addColorStop(0, '#0a1a3a');
+  grad.addColorStop(0.3, '#080d2a');
+  grad.addColorStop(0.6, '#050518');
+  grad.addColorStop(1, '#01020a');
+  bgCtx.fillStyle = grad;
+  bgCtx.fillRect(0, 0, 512, 512);
+  const bgTex = new THREE.CanvasTexture(bgCanvas);
+  const bgMat = new THREE.MeshBasicMaterial({
+    map: bgTex, side: THREE.BackSide, depthWrite: false
+  });
+  const bgSphere = new THREE.Mesh(bgGeo, bgMat);
+  bgSphere.userData._bgSphere = true;
+  scene.add(bgSphere);
 }
 
 // ====================================================================
