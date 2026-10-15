@@ -9,13 +9,13 @@
 #menu { display: none !important; }
 
 *{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#08141d}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#050814}
 body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
-.screen{position:relative;width:100vw;height:100vh;overflow:hidden;background:#08141d}
+.screen{position:relative;width:100vw;height:100vh;overflow:hidden;background:#050814}
 .hidden{display:none !important}
 
 /* ============ MENU ============ */
-.menu-screen{position:relative;width:100vw;height:100vh;overflow:hidden;background:radial-gradient(ellipse at 70% 50%,#0b1d29 0%,#08141d 60%,#040a10 100%)}
+.menu-screen{position:relative;width:100vw;height:100vh;overflow:hidden;background:radial-gradient(ellipse at 50% 50%,#0a1628 0%,#070d1a 40%,#040810 70%,#020408 100%)}
 .menu-stars{position:absolute;inset:0;pointer-events:none;
   background-image:radial-gradient(1.5px 1.5px at 15% 20%,#fff,transparent),
     radial-gradient(1px 1px at 35% 65%,#fff,transparent),
@@ -585,7 +585,7 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 
 /* Loading overlay */
 .loader{position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  background:#08141d;transition:opacity .8s}
+  background:#050814;transition:opacity .8s}
 .loader.hide{opacity:0;pointer-events:none}
 .loader .ring{width:60px;height:60px;border:3px solid #1a3340;border-top-color:#f5cc74;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:18px}
 .loader .text{font-family:Georgia,serif;color:#f5cc74;font-size:16px;letter-spacing:3px;text-transform:uppercase}
@@ -1537,7 +1537,7 @@ const EARTH_RADIUS = STATE.radius;
 // ====================================================================
 const PLOTS_PER_PLANET = 2200;
 const PLANETS = [
-  { id: 'earth',   name: 'Earth',   icon: '🌍', cost: 0,         seed: 1337,  idBase: 0,      water: 'mask', priceMult: 1,   atmo: 0x6cc8ff,
+  { id: 'earth',   name: 'Earth',   icon: '🌍', cost: 0,         seed: 1337,  idBase: 0,      water: 'mask', priceMult: 1,   atmo: 0x00d4ff,
     desc: 'Home. Every empire starts here — oceans, coasts and every climate.' },
   { id: 'luna',    name: 'Luna',    icon: '🌙', cost: 2_000_000,  seed: 42424, idBase: 10_000, water: 'none', priceMult: 2.5, atmo: null,
     desc: 'An airless gray frontier. No oceans — but dry, cratered ground where Mines, Factories, Banks and Barracks thrive. No farms, no resorts, no casinos, no oil rigs, no naval yards.' },
@@ -4263,7 +4263,7 @@ function initScene() {
   renderer = new THREE.WebGLRenderer({ antialias: q.antialias, alpha: false, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.pixelRatioCap));
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setClearColor(0x01020a, 1);
+  renderer.setClearColor(0x050814, 1);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   canvasContainer.appendChild(renderer.domElement);
@@ -4405,19 +4405,19 @@ function buildStarField() {
     positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
     positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
     positions[i * 3 + 2] = r * Math.cos(phi);
-    // Varied star colors: white, cyan, warm, purple
+    // Varied star colors: mostly white/pale blue, some warm
     const colorType = Math.random();
-    if (colorType < 0.6) {        // 60% white
-      colors[i*3] = 0.95; colors[i*3+1] = 0.95; colors[i*3+2] = 1.0;
-    } else if (colorType < 0.75) { // 15% cyan
-      colors[i*3] = 0.4; colors[i*3+1] = 0.8; colors[i*3+2] = 1.0;
-    } else if (colorType < 0.9) {  // 15% warm
-      colors[i*3] = 1.0; colors[i*3+1] = 0.85; colors[i*3+2] = 0.6;
-    } else {                       // 10% purple
-      colors[i*3] = 0.8; colors[i*3+1] = 0.5; colors[i*3+2] = 1.0;
+    if (colorType < 0.5) {         // 50% pure white
+      colors[i*3] = 1.0; colors[i*3+1] = 1.0; colors[i*3+2] = 1.0;
+    } else if (colorType < 0.75) { // 25% pale blue
+      colors[i*3] = 0.8; colors[i*3+1] = 0.9; colors[i*3+2] = 1.0;
+    } else if (colorType < 0.9) {  // 15% pale yellow
+      colors[i*3] = 1.0; colors[i*3+1] = 0.98; colors[i*3+2] = 0.8;
+    } else {                        // 10% pale orange
+      colors[i*3] = 1.0; colors[i*3+1] = 0.85; colors[i*3+2] = 0.72;
     }
     // Varied sizes: most small, some bright
-    sizes[i] = Math.random() < 0.05 ? 1.2 + Math.random() * 0.8 : 0.2 + Math.random() * 0.4;
+    sizes[i] = Math.random() < 0.08 ? 1.5 + Math.random() * 1.0 : 0.15 + Math.random() * 0.35;
   }
   starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   starGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -4432,10 +4432,10 @@ function buildStarField() {
   // === NEBULA CLOUDS ===
   // Dense particle clusters in different colors to simulate nebulae
   const nebulaConfigs = [
-    { color: [0.0, 0.5, 0.9], count: 800, pos: [120, 30, -80], spread: 50 },   // cyan
-    { color: [0.6, 0.1, 0.7], count: 600, pos: [-100, -20, -60], spread: 45 },  // purple
-    { color: [0.9, 0.2, 0.4], count: 400, pos: [60, -40, 90], spread: 35 },    // magenta
-    { color: [0.1, 0.3, 0.6], count: 500, pos: [-80, 40, 70], spread: 40 },    // deep blue
+    { color: [0.55, 0.0, 0.55], count: 1200, pos: [-120, 0, -60], spread: 65 },   // deep magenta/purple (left)
+    { color: [0.0, 0.5, 0.5], count: 800, pos: [100, 10, -80], spread: 50 },     // teal/cyan (right)
+    { color: [1.0, 0.08, 0.58], count: 300, pos: [-60, -20, -40], spread: 30 },  // bright pink pinpricks
+    { color: [0.3, 0.0, 0.4], count: 500, pos: [0, 40, -100], spread: 55 },      // purple wisp (top)
   ];
   for (const cfg of nebulaConfigs) {
     const nGeo = new THREE.BufferGeometry();
@@ -4457,7 +4457,7 @@ function buildStarField() {
     nGeo.setAttribute('color', new THREE.BufferAttribute(nCol, 3));
     const nMat = new THREE.PointsMaterial({
       size: 3.0, sizeAttenuation: true, vertexColors: true,
-      transparent: true, opacity: 0.12,
+      transparent: true, opacity: 0.15,
       blending: THREE.AdditiveBlending, depthWrite: false
     });
     const nebula = new THREE.Points(nGeo, nMat);
@@ -4472,10 +4472,10 @@ function buildStarField() {
   bgCanvas.width = 512; bgCanvas.height = 512;
   const bgCtx = bgCanvas.getContext('2d');
   const grad = bgCtx.createRadialGradient(256, 256, 50, 256, 256, 400);
-  grad.addColorStop(0, '#0a1a3a');
-  grad.addColorStop(0.3, '#080d2a');
-  grad.addColorStop(0.6, '#050518');
-  grad.addColorStop(1, '#01020a');
+  grad.addColorStop(0, '#0a1628');
+  grad.addColorStop(0.3, '#070d1a');
+  grad.addColorStop(0.6, '#040810');
+  grad.addColorStop(1, '#020408');
   bgCtx.fillStyle = grad;
   bgCtx.fillRect(0, 0, 512, 512);
   const bgTex = new THREE.CanvasTexture(bgCanvas);
