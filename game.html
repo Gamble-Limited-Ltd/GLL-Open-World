@@ -4061,7 +4061,7 @@ function initScene() {
 
   // Target distance the user wants to zoom to. We smoothly interpolate
   // the actual camera distance toward this value each frame.
-  let _targetZoomDist = STATE.zoomMax;  // start at the initial camera distance
+  let _targetZoomDist = 2.8;  // start at the initial camera distance
   let _lastZoomEventTime = 0;
   const _zoomEventThrottleMs = 150;  // max 1 zoom event per 150ms (~6.7/sec)
   const _zoomStepFactor = 0.93;      // each event changes distance by 7%
