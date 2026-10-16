@@ -805,6 +805,165 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
   .zoom-bar{width:120px}
 }
 </style>
+<style id="sf-theme">
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap');
+
+/* ═══════════════════════════════════════════════════════════════
+   ORBITAL COMMAND THEME — sci-fi sector-scan HUD
+   Deep-space glass panels, cyan edges, orange active states,
+   CRT scanlines, sweeping radar. Matches the reference screenshot.
+   ═══════════════════════════════════════════════════════════════ */
+#game{font-family:'Rajdhani','Segoe UI',Arial,sans-serif;color:#d7e9f5}
+/* Fill the screen so the absolutely-positioned panels anchor to the viewport
+   (the base .hud rule has no inset — with all-absolute children it collapses
+   to 0x0 and every panel flies off-screen). */
+#game .hud{position:absolute;inset:0;font-family:'Rajdhani','Segoe UI',Arial,sans-serif}
+
+/* — CRT scanlines + vignette over the whole sector view (below modals) — */
+.sf-fx{position:absolute;inset:0;z-index:28;pointer-events:none;opacity:.55;
+  background:
+    repeating-linear-gradient(0deg, rgba(0,0,0,.15) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at center, transparent 55%, rgba(1,4,12,.5) 100%);}
+
+/* — shared panel: dark translucent glass, cyan edge, corner ticks — */
+.sf-panel{position:absolute;pointer-events:auto;
+  background:linear-gradient(160deg, rgba(10,26,44,.82), rgba(6,14,28,.78));
+  border:1px solid rgba(46,148,255,.5);border-radius:6px;
+  box-shadow:0 0 18px rgba(20,110,220,.22), inset 0 0 22px rgba(10,60,140,.18);
+  backdrop-filter:blur(7px);padding:10px 12px;}
+.sf-panel::before,.sf-panel::after{content:'';position:absolute;width:9px;height:9px;
+  pointer-events:none;border:1px solid rgba(0,229,255,.85)}
+.sf-panel::before{top:-1px;left:-1px;border-right:none;border-bottom:none}
+.sf-panel::after{bottom:-1px;right:-1px;border-left:none;border-top:none}
+.sf-panel-head{font-family:'Orbitron','Rajdhani',sans-serif;font-size:10px;font-weight:700;
+  letter-spacing:3px;color:#5fd2ff;text-transform:uppercase;margin-bottom:8px;padding-bottom:6px;
+  border-bottom:1px solid rgba(46,148,255,.35);display:flex;align-items:center;gap:6px}
+.sf-panel-head::before{content:'';width:5px;height:5px;background:#ff9a2e;border-radius:50%;
+  box-shadow:0 0 8px rgba(255,154,46,.9)}
+
+/* — top command bar — */
+.sf-nav{position:absolute;top:0;left:0;right:0;z-index:21;pointer-events:auto;
+  display:flex;align-items:center;gap:6px;padding:9px 14px;overflow-x:auto;scrollbar-width:none;
+  background:linear-gradient(180deg, rgba(4,10,22,.9), rgba(4,10,22,.55) 80%, transparent);
+  border-bottom:1px solid rgba(46,148,255,.28);backdrop-filter:blur(8px)}
+.sf-nav::-webkit-scrollbar{display:none}
+.sf-pill{flex:0 0 auto;font-family:'Orbitron','Rajdhani',sans-serif;font-size:10.5px;font-weight:700;
+  letter-spacing:1.6px;color:#9cc7e8;text-transform:uppercase;cursor:pointer;white-space:nowrap;
+  padding:7px 13px;border-radius:999px;border:1px solid rgba(46,148,255,.4);
+  background:rgba(10,26,44,.6);transition:all .16s}
+.sf-pill:hover{color:#eaf6ff;border-color:#39b7ff;background:rgba(20,60,110,.75);
+  box-shadow:0 0 12px rgba(40,150,255,.4)}
+.sf-pill-active{color:#ffc46b;border-color:#ff9a2e;background:rgba(90,50,8,.5);cursor:default;
+  box-shadow:0 0 14px rgba(255,154,46,.35), inset 0 0 8px rgba(255,154,46,.15)}
+.sf-pill-active:hover{color:#ffc46b;border-color:#ff9a2e;background:rgba(90,50,8,.5)}
+.sf-pill-danger{color:#ff9c9c;border-color:rgba(255,90,90,.45)}
+.sf-pill-danger:hover{color:#fff;border-color:#ff6b6b;background:rgba(120,30,30,.6);
+  box-shadow:0 0 12px rgba(255,80,80,.35)}
+.sf-pill-util{font-size:9px;padding:6px 10px;color:#7fd4c0;border-color:rgba(60,190,160,.4)}
+.sf-pill.active{color:#7fffd4 !important;border-color:#7fffd4 !important;
+  background:rgba(20,80,70,.55) !important;box-shadow:0 0 14px rgba(127,255,212,.4) !important}
+
+/* — right column: COMMS + NAVIGATION — */
+.sf-right{position:absolute;top:64px;right:14px;z-index:21;display:flex;flex-direction:column;
+  gap:10px;width:230px;pointer-events:none}
+.sf-right .sf-panel{position:relative;pointer-events:auto}
+.sf-row{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;
+  letter-spacing:.8px;color:#8cb4d8;padding:3px 0;text-transform:uppercase}
+.sf-row b{font-family:'Orbitron','Rajdhani',sans-serif;font-size:12px;color:#fff;letter-spacing:1px;
+  text-shadow:0 0 8px rgba(90,200,255,.55);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sf-tags{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.sf-tags i{font-style:normal;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#ffb066;
+  border:1px solid rgba(255,154,46,.45);border-radius:3px;padding:3px 7px;background:rgba(90,50,8,.35)}
+.sf-res{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;letter-spacing:1px;
+  color:#8cb4d8;padding:3.5px 0;text-transform:uppercase;border-bottom:1px dashed rgba(46,148,255,.16)}
+.sf-res b{font-family:'Orbitron','Rajdhani',sans-serif;font-size:13.5px;color:#5fe8ff;letter-spacing:.5px;
+  text-shadow:0 0 10px rgba(0,229,255,.6)}
+.sf-click{cursor:pointer;border-radius:4px;transition:background .15s}
+.sf-click:hover{background:rgba(20,60,110,.5)}
+.sf-res-bar{height:4px;border-radius:2px;background:rgba(8,24,44,.9);margin-top:9px;overflow:hidden;
+  border:1px solid rgba(46,148,255,.3)}
+.sf-res-bar i{display:block;height:100%;width:0%;
+  background:linear-gradient(90deg,#00aaff,#00e5ff);box-shadow:0 0 8px rgba(0,229,255,.8);transition:width .25s}
+.sf-res-sub{display:flex;justify-content:space-between;align-items:baseline;font-size:10px;letter-spacing:2px;
+  color:#5e86a3;margin-top:6px;text-transform:uppercase}
+.sf-res-sub b{color:#cfe9ff;font-family:'Orbitron',sans-serif;font-size:10.5px;letter-spacing:1px}
+
+/* — left radar — */
+.sf-radar{left:14px;bottom:14px;width:236px}
+#sf-radar-canvas{display:block;width:212px;height:212px;margin:2px auto 6px}
+.sf-radar-foot{font-family:'Orbitron','Rajdhani',sans-serif}
+.sf-radar-coords{display:flex;justify-content:space-between;font-size:10.5px;letter-spacing:1px;color:#8cb4d8}
+.sf-radar-coords b{color:#5fe8ff;margin-left:4px;font-weight:600}
+.sf-radar-scan{font-size:9.5px;font-weight:700;letter-spacing:2.4px;color:#ffc46b;text-align:center;
+  margin:7px 0 6px;text-transform:uppercase;text-shadow:0 0 10px rgba(255,170,60,.5)}
+.sf-radar-time{display:flex;justify-content:center;gap:6px;align-items:baseline;font-size:10px;color:#5e86a3}
+.sf-radar-time b{color:#d7ecff;font-size:12px;letter-spacing:1.5px}
+
+/* — bottom-right contact log + LAUNCH — */
+.sf-launchpad{right:14px;bottom:14px;width:254px;display:flex;flex-direction:column}
+.sf-contact{display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:1.2px;color:#a8c8e2;
+  padding:5px 2px;text-transform:uppercase}
+.sf-contact .dot{width:7px;height:7px;border-radius:50%;background:#39e0ff;flex-shrink:0;
+  box-shadow:0 0 9px rgba(57,224,255,.9);animation:sfPulse 2.2s infinite}
+.sf-contact .dot-warn{background:#ffb02e;box-shadow:0 0 9px rgba(255,176,46,.9)}
+@keyframes sfPulse{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes sfFlash{0%{background:rgba(0,229,255,.22)}100%{background:transparent}}
+.sf-contact.flash{animation:sfFlash .9s ease-out}
+.sf-launch{margin-top:10px;font-family:'Orbitron',sans-serif;font-size:17px;font-weight:900;letter-spacing:6px;
+  color:#ffc46b;background:linear-gradient(180deg, rgba(70,34,4,.75), rgba(40,20,4,.85));
+  border:1px solid #ff9a2e;border-radius:6px;padding:13px 10px;cursor:pointer;text-transform:uppercase;
+  box-shadow:0 0 22px rgba(255,154,46,.35), inset 0 0 14px rgba(255,154,46,.14);transition:all .18s}
+.sf-launch:hover{color:#fff;border-color:#ffc46b;
+  box-shadow:0 0 30px rgba(255,170,60,.6), inset 0 0 18px rgba(255,170,60,.25)}
+.sf-launch:active{transform:translateY(1px)}
+.sf-launch.launching{color:#fff;border-color:#00e5ff;box-shadow:0 0 30px rgba(0,229,255,.7);
+  animation:sfPulse .5s infinite}
+
+/* — bottom center strip: controls + quality — */
+.sf-bottom{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:21;
+  display:flex;align-items:center;gap:16px;pointer-events:auto;
+  background:linear-gradient(180deg, rgba(4,10,22,.55), rgba(4,10,22,.85));
+  border:1px solid rgba(46,148,255,.4);border-radius:999px;padding:8px 18px;backdrop-filter:blur(7px);
+  box-shadow:0 0 16px rgba(20,110,220,.25)}
+#game .controls-hint{gap:14px;font-size:10.5px;letter-spacing:1px;color:#7fa8c4;text-transform:uppercase}
+#game .controls-hint span b{color:#5fe8ff;border:1px solid rgba(46,148,255,.45);background:rgba(10,26,44,.7);
+  border-radius:3px;padding:2px 6px;font-weight:600;letter-spacing:1.5px}
+#game .quality-btn{margin-right:0;border-color:rgba(46,148,255,.45);color:#9cc7e8;background:rgba(10,26,44,.6);
+  font-family:'Orbitron','Rajdhani',sans-serif;font-size:9px;letter-spacing:1.6px;border-radius:999px;padding:6px 12px}
+#game .quality-btn:hover{border-color:#39b7ff;color:#eaf6ff}
+
+/* — theme touch-ups on existing widgets — */
+#game .toast{font-family:'Orbitron','Rajdhani',sans-serif;letter-spacing:1.2px;
+  border:1px solid rgba(46,148,255,.6);background:rgba(6,16,32,.92);color:#dff2ff;
+  box-shadow:0 0 24px rgba(20,110,220,.4)}
+#game .toast.success{color:#7fffd4}
+#game .loader .text{font-family:'Orbitron',sans-serif;letter-spacing:4px;color:#5fd2ff}
+#game .loader .sub{font-family:'Rajdhani',sans-serif;letter-spacing:2px;color:#7fa8c4;text-transform:uppercase}
+#game .plot-tip{font-family:'Rajdhani',sans-serif;letter-spacing:.5px;border-color:rgba(46,148,255,.55);
+  background:rgba(6,16,32,.92);box-shadow:0 0 18px rgba(20,110,220,.35)}
+.multibuy-bar{border:1px solid rgba(46,148,255,.55);background:rgba(6,16,32,.9);backdrop-filter:blur(8px);
+  box-shadow:0 0 20px rgba(20,110,220,.35);font-family:'Rajdhani',sans-serif;letter-spacing:1px}
+
+/* — responsive — */
+@media (max-width: 1100px){
+  .sf-right{width:196px}
+  .sf-launchpad{width:220px}
+  .sf-launch{font-size:14px;letter-spacing:4px;padding:11px 8px}
+}
+@media (max-width: 900px){
+  .sf-right{top:54px;width:168px}
+  .sf-row,.sf-res{font-size:11px}
+  .sf-radar{width:172px;bottom:104px}
+  #sf-radar-canvas{width:148px;height:148px}
+  .sf-radar-scan{letter-spacing:1.6px;font-size:8.5px}
+  .sf-launchpad{width:186px;bottom:104px}
+  .sf-contact{font-size:9px}
+  .sf-bottom{bottom:12px;padding:6px 12px;gap:10px}
+  #game .controls-hint span:nth-child(3){display:none}
+  .sf-fx{opacity:.4}
+}
+</style>
+
 </head>
 <body>
 <!-- Force reset: clears ALL local game data on first load after deploy -->
@@ -927,41 +1086,74 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
   <div id="canvas-container"></div>
 
   <div class="hud">
-    <div class="top-bar">
-      <button class="back-btn" onclick="exitGame()">← Home</button>
-      <button class="logout-btn" onclick="logout()">Logout</button>
-      <div class="brand">Open World<small>Live · Earth Edition</small></div>
-      <div class="stats">
-        <div class="stat-chip"><span class="icon">💰</span><span>Budget</span><b id="money">$100,000</b></div>
-        <div class="stat-chip stock-chip" onclick="openMarketModal()" title="Open Market"><span class="icon">📦</span><span>Stock</span><b id="stock-value">$0</b></div>
-        <div class="stat-chip"><span class="icon">🌍</span><span>Owned</span><b id="owned-count">0</b></div>
-        <div class="stat-chip" title="Your army — each Barracks houses 500 troops. Deploy troops to other commanders' plots to take them."><span class="icon">⚔️</span><span>Army</span><b id="army-count">0</b></div>
-        <button class="market-btn" onclick="openMarketModal()">📈 Market</button>
-        <button class="market-btn" id="clans-btn" onclick="openClans()" title="Clans & Alliances — team up with other commanders">🛡 Clans</button>
-        <button class="market-btn" id="planets-btn" onclick="openPlanets()" title="Planets — buy into new worlds and travel between them">🪐</button>
-        <button class="market-btn" id="myland-btn" onclick="openMyPlots()" title="My Land — see your plots and sell the ones you don't want">🗺</button>
-        <button class="market-btn" id="wars-btn" onclick="openWars()" title="Wars — your marches, incoming attacks and battle reports">⚔</button>
-        <button class="market-btn" id="multibuy-btn" onclick="toggleMultiBuy()" title="Multi-Buy — click several plots, then buy them all at once (each must border your land)">✚</button>
-        <button class="market-btn" id="multisell-btn" onclick="toggleMultiSell()" title="Multi-Sell — click several of your plots, then sell them all at once (refunds 50% each)">💰</button>
-        <button class="market-btn" id="support-btn" onclick="openSupport()" title="Support — report a bug or share an idea with the world owner">📮</button>
-        <button class="market-btn" id="gamble-btn" onclick="openGambling()" style="display:none" title="Play at your casinos">🎰 Casino</button>
-      </div>
-    </div>
+    <!-- ══ TOP COMMAND BAR ══ -->
+    <nav class="sf-nav">
+      <button class="sf-pill" onclick="exitGame()">HOME</button>
+      <button class="sf-pill sf-pill-danger" onclick="logout()">LOGOUT</button>
+      <button class="sf-pill sf-pill-active" title="You are here — the open world">OPEN WORLD</button>
+      <button class="sf-pill" id="support-btn" onclick="openSupport()" title="Support — report a bug or share an idea with the world owner">SUPPORT</button>
+      <button class="sf-pill" id="wars-btn" onclick="openWars()" title="Wars — your marches, incoming attacks and battle reports">WAR</button>
+      <button class="sf-pill" id="myland-btn" onclick="openMyPlots()" title="My Land — see your plots and sell the ones you don't want">HI-LAND</button>
+      <button class="sf-pill" id="planets-btn" onclick="openPlanets()" title="Planets — buy into new worlds and travel between them">PLANETS</button>
+      <button class="sf-pill" id="clans-btn" onclick="openClans()" title="Clans &amp; Alliances — team up with other commanders">UNIONS</button>
+      <button class="sf-pill" onclick="openMarketModal()" title="Market — buy and sell materials">MARKET</button>
+      <button class="sf-pill sf-pill-util" id="multibuy-btn" onclick="toggleMultiBuy()" title="Multi-Buy — click several plots, then buy them all at once (each must border your land)">✚ MULTI</button>
+      <button class="sf-pill sf-pill-util" id="multisell-btn" onclick="toggleMultiSell()" title="Multi-Sell — click several of your plots, then sell them all at once (refunds 50% each)">✚ SELL</button>
+      <button class="sf-pill sf-pill-util" id="gamble-btn" onclick="openGambling()" style="display:none" title="Play at your casinos">🎰 CASINO</button>
+    </nav>
 
-    <div class="bottom-bar">
+    <!-- ══ RIGHT — COMMS (commander) + NAVIGATION (resources) ══ -->
+    <aside class="sf-right">
+      <div class="sf-panel">
+        <div class="sf-panel-head">COMMS</div>
+        <div class="sf-row"><span>COMMANDER:</span><b id="sf-commander">VALKYRIE</b></div>
+        <div class="sf-row"><span>RANK:</span><b id="sf-rank">64</b></div>
+        <div class="sf-row"><span>LVL:</span><b id="sf-lvl">166</b></div>
+        <div class="sf-tags"><i>CRIMINAL RISK</i><i>SPY CHAIN</i></div>
+      </div>
+      <div class="sf-panel">
+        <div class="sf-panel-head">NAVIGATION</div>
+        <div class="sf-res" title="Your budget"><span>CREDITS:</span><b id="money">$100,000</b></div>
+        <div class="sf-res sf-click" onclick="openMarketModal()" title="Value of materials in stock — click to open the Market"><span>ALLOYS:</span><b id="stock-value">$0</b></div>
+        <div class="sf-res" title="Plots of land you own on this world"><span>ENERGY:</span><b id="owned-count">0</b></div>
+        <div class="sf-res" title="Your troops — each Barracks houses 500. Deploy them to take other commanders' plots."><span>ORE:</span><b id="army-count">0</b></div>
+        <div class="sf-res-bar"><i id="zoom-fill"></i></div>
+        <div class="sf-res-sub"><span>ALTITUDE</span><b id="altitude">— km</b></div>
+      </div>
+    </aside>
+
+    <!-- ══ LEFT — SWEEPING RADAR ══ -->
+    <aside class="sf-panel sf-radar">
+      <div class="sf-panel-head">ACTIVE CONTACTS</div>
+      <canvas id="sf-radar-canvas"></canvas>
+      <div class="sf-radar-foot">
+        <div class="sf-radar-coords"><span>X:<b id="sf-coord-x">0.0</b></span><span>Y:<b id="sf-coord-y">0.0</b></span></div>
+        <div class="sf-radar-scan">SECTOR SCAN — ORBITAL VIEW</div>
+        <div class="sf-radar-time"><b id="sf-clock">00:00:00</b><span>UTC</span></div>
+      </div>
+    </aside>
+
+    <!-- ══ BOTTOM RIGHT — CONTACT LOG + LAUNCH ══ -->
+    <aside class="sf-panel sf-launchpad">
+      <div class="sf-panel-head">CONTACT LOG</div>
+      <div class="sf-contact" id="sf-contact-1"><i class="dot"></i><span>CLAN KAEL IRAHMANTE IN SECTOR 7</span></div>
+      <div class="sf-contact" id="sf-contact-2"><i class="dot dot-warn"></i><span>PATROL WING DELTA — SECTOR 3</span></div>
+      <button class="sf-launch" id="sf-launch-btn" onclick="sfLaunch()">LAUNCH</button>
+    </aside>
+
+    <!-- ══ BOTTOM CENTER — controls + quality ══ -->
+    <div class="sf-bottom">
       <div class="controls-hint">
-        <span><b>Drag</b>Rotate</span>
-        <span><b>Scroll</b>Zoom</span>
-        <span><b>Click</b>Buy plot</span>
+        <span><b>DRAG</b>ROTATE</span>
+        <span><b>SCROLL</b>ZOOM</span>
+        <span><b>CLICK</b>BUY PLOT</span>
       </div>
-      <button class="quality-btn" id="quality-btn" onclick="cycleQuality()" title="Cycle graphics quality (also in Settings)">⚡ Auto</button>
-      <div class="zoom-meter">
-        <div class="label">Altitude</div>
-        <div class="value" id="altitude">— km</div>
-        <div class="zoom-bar"><div class="fill" id="zoom-fill"></div></div>
-      </div>
+      <button class="quality-btn" id="quality-btn" onclick="cycleQuality()" title="Cycle graphics quality (also in Settings)">⚡ AUTO</button>
     </div>
   </div>
+
+  <!-- CRT scanlines + vignette over the whole sector view -->
+  <div class="sf-fx" aria-hidden="true"></div>
 
   <div class="plot-tip" id="plot-tip"></div>
 
@@ -1206,7 +1398,7 @@ function applyQualityChange() {
   }
   if (atmosphere) {
     atmosphere.geometry.dispose();
-    atmosphere.geometry = new THREE.SphereGeometry(EARTH_RADIUS * 1.025, q.atmoSegments, q.atmoSegments);
+    atmosphere.geometry = new THREE.SphereGeometry(EARTH_RADIUS * 1.034, q.atmoSegments, q.atmoSegments);
   }
   const btn = document.getElementById('quality-btn');
   if (btn) btn.innerHTML = qualityButtonLabel();
@@ -1270,11 +1462,11 @@ const STATE = {
   lastProductionTime: 0,        // timestamp of last production tick
   marketUpdateInterval: 15 * 60 * 1000,  // 15 minutes in ms (v1.4 slow pacing)
   radius: 1.0,                // Earth radius in scene units
-  zoomMin: 1.30,              // closest zoom — world stays framed (no surface-grinding extreme)
-  zoomMax: 4.5,               // farthest (keeps the world big on screen)
-  zoomTarget: 1.8,            // where wheel-zoom is heading (eased toward every frame)
-  plotRevealDist: 3.2,        // camera distance at which plots begin to appear
-  plotFullDist: 1.8,          // camera distance at which plots are fully visible
+  zoomMin: 1.12,              // closest zoom — low orbit over the surface (wide zoom range now)
+  zoomMax: 7.5,               // farthest — full orbital sector view with rings and ships
+  zoomTarget: 2.9,            // where wheel-zoom is heading (eased toward every frame)
+  plotRevealDist: 3.3,        // camera distance at which plots begin to appear
+  plotFullDist: 2.0,          // camera distance at which plots are fully visible
   // Convert scene units to km for display. Earth radius ≈ 6371 km.
   unitToKm: 6371,
   // PLANETS — the active world and the ones this account has bought into.
@@ -3362,8 +3554,13 @@ function addBusinessToPlot(plot, bt, index) {
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.11';
+const GAME_VERSION = 'v1.12';
 const RELEASE_NOTES = [
+  { v: 'v1.12', items: [
+    '🛰 <b>Orbital Command view</b> — the world now opens as a live sector scan: Earth front and center with city lights on the night side, a drifting cloud deck, glowing orbital rings and patrol ships.',
+    '📡 <b>Space-command HUD</b> — top command bar, COMMS / NAVIGATION panels, a sweeping radar with live contacts, and a big LAUNCH button that dives you down to low orbit.',
+    '🎛 <b>Gentler zoom</b> — the scroll wheel now steps softly through a much wider zoom range, from surface detail all the way out to the full orbital view. No more slamming to max zoom.'
+  ]},
   { v: 'v1.11', items: [
     '🆕 <b>This popup</b> — from now on you\'ll see what\'s new right here after logging in whenever the game updates.',
     '💬 <b>World Chat</b> and slow-paced <b>war marches</b> (this update\'s headliners — check them out!).'
@@ -3596,6 +3793,8 @@ function updateMenuWelcome() {
   if (!nameEl || !statsEl) return;
 
   nameEl.textContent = CURRENT_USER;
+  const sfCmd = document.getElementById('sf-commander');
+  if (sfCmd) sfCmd.textContent = String(CURRENT_USER || 'COMMANDER').toUpperCase();
 
   // Admin button on the home (menu) screen — only the world owner sees it,
   // and it opens the panel instantly (they already proved their password
@@ -4011,6 +4210,10 @@ function buildBusinessMesh(businessType, scale) {
 // ====================================================================
 let scene, camera, renderer, controls;
 let earth, atmosphere, starField;
+let clouds = null;        // Earth's cloud deck — transparent, slowly drifting
+let orbitalGroup = null;  // glowing cyan orbital rings around the world
+let shipGroup = null;     // patrol ships + station riding those orbits
+let radarCtx = null;      // 2D context for the HUD radar canvas
 let raycaster, pointer;
 let canvasContainer;
 let sunLight; // camera-locked sun — keeps the whole world lit from every angle
@@ -4020,14 +4223,14 @@ function initScene() {
 
   scene = new THREE.Scene();
 
-  camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
-  camera.position.set(0, 0, 1.8);   // start zoomed in close — plots fully visible
+  camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.01, 1000);
+  camera.position.set(0, 0.15, 2.9);   // orbital view — Earth framed big, rings & ships visible
 
   const q = QUALITY_LEVELS[getEffectiveQuality()];
   renderer = new THREE.WebGLRenderer({ antialias: q.antialias, alpha: false, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.pixelRatioCap));
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setClearColor(0x010104, 1);
+  renderer.setClearColor(0x020209, 1);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   canvasContainer.appendChild(renderer.domElement);
@@ -4035,15 +4238,15 @@ function initScene() {
   // Lighting — the sun is locked to the camera and ambient is strong, so the
   // ENTIRE world stays evenly lit no matter where you orbit or how the globe
   // spins. (A fixed low sun used to leave one whole hemisphere dark.)
-  const sun = new THREE.DirectionalLight(0xfff6e0, 2.0);
+  const sun = new THREE.DirectionalLight(0xfff6e0, 2.3);
   sun.position.set(5, 2, 4);
   scene.add(sun);
   sunLight = sun;
 
-  const ambient = new THREE.AmbientLight(0x9fc4dd, 1.0);
+  const ambient = new THREE.AmbientLight(0x7ba8cc, 0.42);
   scene.add(ambient);
   // Gentle back-fill for soft edge shading around the globe's limb
-  const fill = new THREE.DirectionalLight(0x5577aa, 0.45);
+  const fill = new THREE.DirectionalLight(0x5e82b8, 0.5);
   fill.position.set(-5, -2, -4);
   scene.add(fill);
 
@@ -4078,8 +4281,8 @@ function initScene() {
     else if (e.deltaMode === 2) dy *= 100; // "pages" -> px-ish
     // One classic wheel tick ~= 100px. Clamp each event's contribution so a
     // single bursty event can never jump the zoom far on its own.
-    const steps = THREE.MathUtils.clamp(dy / 100, -1.2, 1.2);
-    const ZOOM_STEP = 0.12;                // distance change per wheel tick
+    const steps = THREE.MathUtils.clamp(dy / 100, -0.8, 0.8);
+    const ZOOM_STEP = 0.045;               // distance change per wheel tick (gentle, gradual)
     const factor = steps < 0
       ? Math.pow(1 - ZOOM_STEP, -steps)         // scroll up  -> zoom in
       : Math.pow(1 / (1 - ZOOM_STEP), steps);   // scroll down -> zoom out
@@ -4099,6 +4302,9 @@ function initScene() {
   if (_bootPlanet.id !== 'earth') earth.material = planetMaterial(_bootPlanet);
   setAtmosphere(_bootPlanet);
   generatePlots(_bootPlanet);
+  buildOrbitalRings();
+  buildShips();
+  initRadar();
 
   window.addEventListener('resize', onResize);
   renderer.domElement.addEventListener('pointermove', onPointerMove);
@@ -4173,7 +4379,7 @@ function buildStarField() {
     ng.setAttribute('color', new THREE.BufferAttribute(nc, 3));
     const nm = new THREE.PointsMaterial({
       size: 2.5, sizeAttenuation: true, vertexColors: true,
-      transparent: true, opacity: 0.06,
+      transparent: true, opacity: 0.095,
       blending: THREE.AdditiveBlending, depthWrite: false
     });
     scene.add(new THREE.Points(ng, nm));
@@ -4287,6 +4493,27 @@ function buildEarth() {
   loadScaledTexture(TEX + 'earth-water.png', q.textureWidth, (tex) => {
     if (!earthMat) return;
     earthMat.specularMap = tex; earthMat.needsUpdate = true;
+  });
+
+  // Night-side city lights (NASA black-marble map) — warm glow on the dark limb
+  loadScaledTexture(TEX + 'earth-night.jpg', q.textureWidth, (tex) => {
+    if (!earthMat) return;
+    earthMat.emissiveMap = tex;
+    earthMat.emissive = new THREE.Color(0xffc98a);
+    earthMat.emissiveIntensity = 1.15;
+    earthMat.needsUpdate = true;
+  });
+
+  // Semi-transparent cloud deck, drifting just above the surface
+  loadScaledTexture('https://unpkg.com/three-globe/example/clouds/clouds.png', q.textureWidth, (tex) => {
+    if (!earth || clouds) return;
+    const cMat = new THREE.MeshPhongMaterial({
+      map: tex, transparent: true, opacity: 0.55, depthWrite: false
+    });
+    clouds = new THREE.Mesh(new THREE.SphereGeometry(EARTH_RADIUS * 1.014, 48, 48), cMat);
+    clouds.raycast = () => {};      // never intercept plot picking
+    clouds.frustumCulled = false;
+    scene.add(clouds);
   });
 
   earth = new THREE.Mesh(geo, earthMat);
@@ -4487,7 +4714,7 @@ function classifyPlotsByTerrain() {
 function buildAtmosphere() {
   // Glow shell slightly larger than Earth
   const q = QUALITY_LEVELS[getEffectiveQuality()];
-  const geo = new THREE.SphereGeometry(EARTH_RADIUS * 1.025, q.atmoSegments, q.atmoSegments);
+  const geo = new THREE.SphereGeometry(EARTH_RADIUS * 1.034, q.atmoSegments, q.atmoSegments);
   const mat = new THREE.ShaderMaterial({
     uniforms: { glowColor: { value: new THREE.Color(0x6cc8ff) } },
     vertexShader: `
@@ -4624,7 +4851,7 @@ function setAtmosphere(planet) {
   }
   if (!planet || planet.atmo == null) return;
   const q = QUALITY_LEVELS[getEffectiveQuality()];
-  const geo = new THREE.SphereGeometry(EARTH_RADIUS * 1.025, q.atmoSegments, q.atmoSegments);
+  const geo = new THREE.SphereGeometry(EARTH_RADIUS * 1.034, q.atmoSegments, q.atmoSegments);
   const mat = new THREE.ShaderMaterial({
     uniforms: { glowColor: { value: new THREE.Color(planet.atmo) } },
     vertexShader: `
@@ -4648,6 +4875,249 @@ function setAtmosphere(planet) {
   atmosphere.frustumCulled = false;
   scene.add(atmosphere);
 }
+
+// ====================================================================
+// ORBITAL COMMAND — glowing rings, patrol ships, HUD radar & contacts.
+// The sci-fi "sector scan" layer: Earth front and center with orbital
+// rings, patrol craft, night-side city lights and a sweeping radar.
+// Nothing here intercepts plot picking (raycast disabled everywhere).
+// ====================================================================
+const SHIP_ORBITS = [
+  { r: 1.30, speed: 0.22, incl: 0.16,  phase: 0.7, kind: 'dart' },
+  { r: 1.42, speed: 0.15, incl: -0.34, phase: 2.3, kind: 'dart' },
+  { r: 1.56, speed: 0.11, incl: 0.52,  phase: 4.1, kind: 'dart' },
+  { r: 1.70, speed: 0.17, incl: -0.10, phase: 1.4, kind: 'dart' },
+  { r: 1.86, speed: 0.09, incl: 0.28,  phase: 5.2, kind: 'dart' },
+  { r: 1.50, speed: 0.05, incl: 0.06,  phase: 3.3, kind: 'station' },
+];
+
+const SF_CONTACTS = [
+  'CLAN KAEL IRAHMANTE IN SECTOR 7',
+  'PATROL WING DELTA — SECTOR 3 CLEAR',
+  'UNKNOWN CONTACT — SECTOR 9 · TRACKING',
+  'TRADE CONVOY INBOUND — DOCK 4',
+  'SURVEY DRONE ACTIVE — SECTOR 5',
+  'ION STORM ADVISORY — SECTOR 11',
+  'SIGNAL LOST · PROBE 7 REACQUIRED',
+  'ORBITAL GUARD RELIEF — SECTOR 2',
+];
+
+function buildOrbitalRings() {
+  orbitalGroup = new THREE.Group();
+  // Solid glowing tori (thin additive cyan tubes) — reads as bright orbital
+  // paths like the reference, far punchier than 1px lines.
+  const defs = [
+    { r: 1.34, rx: Math.PI / 2,        rz: 0.16,  color: 0x37b6ff, op: 0.75 },
+    { r: 1.62, rx: Math.PI / 2 + 0.38, rz: -0.52, color: 0x1899ff, op: 0.55 },
+    { r: 1.95, rx: Math.PI / 2 - 0.26, rz: 0.88,  color: 0x00e5ff, op: 0.40 },
+  ];
+  for (const d of defs) {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(d.r, 0.0035, 8, 220),
+      new THREE.MeshBasicMaterial({
+        color: d.color, transparent: true, opacity: d.op,
+        blending: THREE.AdditiveBlending, depthWrite: false
+      }));
+    ring.rotation.set(d.rx, 0, d.rz);
+    ring.raycast = () => {};      // never intercept plot picking
+    ring.frustumCulled = false;
+    orbitalGroup.add(ring);
+  }
+  scene.add(orbitalGroup);
+}
+
+function buildShips() {
+  shipGroup = new THREE.Group();
+  const dartGeo = new THREE.ConeGeometry(0.031, 0.105, 6);
+  dartGeo.rotateX(Math.PI / 2);              // nose points along +Z
+  const dartMat = new THREE.MeshBasicMaterial({ color: 0xe4f6ff });
+  for (const d of SHIP_ORBITS) {
+    const pivot = new THREE.Group();
+    pivot.rotation.x = d.incl;
+    let ship;
+    if (d.kind === 'station') {
+      ship = new THREE.Group();
+      const hull = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.024, 0.024, 0.11, 10),
+        new THREE.MeshPhongMaterial({ color: 0xcfd9df, shininess: 60 }));
+      hull.rotation.z = Math.PI / 2;
+      ship.add(hull);
+      const panelMat = new THREE.MeshPhongMaterial({ color: 0x2a4d8f, shininess: 80, specular: 0x88aaff });
+      for (const s of [-1, 1]) {
+        const wing = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.007, 0.04), panelMat);
+        wing.position.x = s * 0.1;
+        ship.add(wing);
+      }
+    } else {
+      ship = new THREE.Mesh(dartGeo, dartMat);
+    }
+    ship.userData = d;
+    ship.raycast = () => {};      // never intercept plot picking
+    ship.frustumCulled = false;
+    pivot.userData = d;
+    pivot.add(ship);
+    shipGroup.add(pivot);
+  }
+  scene.add(shipGroup);
+}
+
+function updateShips(now) {
+  if (!shipGroup) return;
+  const t = now * 0.001;
+  for (const pivot of shipGroup.children) {
+    const d = pivot.userData;
+    const a = d.phase + t * d.speed;
+    const ship = pivot.children[0];
+    ship.position.set(Math.cos(a) * d.r, 0, Math.sin(a) * d.r);
+    ship.rotation.y = -a;         // nose (+Z) along travel direction
+  }
+}
+
+function initRadar() {
+  const cv = document.getElementById('sf-radar-canvas');
+  if (!cv) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = 212 * dpr;
+  cv.height = 212 * dpr;
+  radarCtx = cv.getContext('2d');
+  radarCtx.scale(dpr, dpr);
+}
+
+function _normAngle(a) {
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
+}
+
+function drawRadar(now) {
+  if (!radarCtx || !camera) return;
+  const ctx = radarCtx, C = 106, R = 97, RR = R - 6;
+  ctx.clearRect(0, 0, 212, 212);
+  // dial backdrop + rim
+  ctx.beginPath(); ctx.arc(C, C, R, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(3,12,28,.8)'; ctx.fill();
+  ctx.strokeStyle = 'rgba(56,178,255,.6)'; ctx.lineWidth = 1; ctx.stroke();
+  // range rings + crosshair
+  ctx.strokeStyle = 'rgba(56,178,255,.28)';
+  for (let i = 1; i <= 3; i++) {
+    ctx.beginPath(); ctx.arc(C, C, RR * i / 3, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.moveTo(C - RR, C); ctx.lineTo(C + RR, C);
+  ctx.moveTo(C, C - RR); ctx.lineTo(C, C + RR);
+  ctx.stroke();
+  // perimeter ticks
+  ctx.strokeStyle = 'rgba(56,178,255,.5)';
+  for (let i = 0; i < 24; i++) {
+    const a = i * Math.PI / 12;
+    ctx.beginPath();
+    ctx.moveTo(C + Math.cos(a) * (RR - 3), C + Math.sin(a) * (RR - 3));
+    ctx.lineTo(C + Math.cos(a) * RR, C + Math.sin(a) * RR);
+    ctx.stroke();
+  }
+  // rotating sweep — orange with a fading trail, like the reference
+  const sweep = (now * 0.0012) % (Math.PI * 2);
+  const TRAIL = 1.3;
+  for (let k = 0; k < 26; k++) {
+    const a0 = sweep - TRAIL * (k + 1) / 26;
+    const a1 = sweep - TRAIL * k / 26;
+    const alpha = 0.42 * (1 - k / 26);
+    ctx.beginPath(); ctx.moveTo(C, C);
+    ctx.arc(C, C, RR, a0, a1);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,168,58,' + alpha.toFixed(3) + ')';
+    ctx.fill();
+  }
+  ctx.strokeStyle = 'rgba(255,205,110,.95)'; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(C, C);
+  ctx.lineTo(C + Math.cos(sweep) * RR, C + Math.sin(sweep) * RR);
+  ctx.stroke();
+  // blips: patrol ships, positioned relative to where the camera looks
+  const camA = Math.atan2(camera.position.z, camera.position.x);
+  const t = now * 0.001;
+  for (const d of SHIP_ORBITS) {
+    const a = d.phase + t * d.speed;
+    const rel = _normAngle(a - camA);
+    const dist = Math.min(0.92, Math.max(0.18, (d.r - 1.0) / 1.05));
+    const x = C + Math.sin(rel) * dist * RR;
+    const y = C - Math.cos(rel) * dist * RR;
+    // a blip flashes bright right as the sweep passes over it
+    const da = Math.abs(_normAngle((rel - Math.PI / 2) - sweep));
+    const glow = da < 0.6 ? (1 - da / 0.6) : 0;
+    const alpha = 0.45 + 0.55 * glow;
+    ctx.beginPath(); ctx.arc(x, y, d.kind === 'station' ? 3.4 : 2.6, 0, Math.PI * 2);
+    ctx.fillStyle = d.kind === 'station'
+      ? 'rgba(255,214,140,' + alpha.toFixed(3) + ')'
+      : 'rgba(96,226,255,' + alpha.toFixed(3) + ')';
+    ctx.fill();
+    if (glow > 0.05) {           // fresh-paint ring on recent contacts
+      ctx.beginPath(); ctx.arc(x, y, 4.5 + 3 * (1 - glow), 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(120,235,255,' + (glow * 0.7).toFixed(3) + ')';
+      ctx.lineWidth = 1; ctx.stroke();
+    }
+  }
+  // center marker — you
+  ctx.beginPath(); ctx.arc(C, C, 2.2, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,205,110,.95)'; ctx.fill();
+}
+
+function updateSpaceHud(now) {
+  // UTC clock + camera coords (updated at the ~10 Hz DOM throttle)
+  const clockEl = document.getElementById('sf-clock');
+  if (clockEl) clockEl.textContent = new Date().toISOString().slice(11, 19);
+  const cx = document.getElementById('sf-coord-x');
+  const cy = document.getElementById('sf-coord-y');
+  if (cx && cy && camera) {
+    cx.textContent = (camera.position.x * STATE.unitToKm).toFixed(1);
+    cy.textContent = (camera.position.y * STATE.unitToKm).toFixed(1);
+  }
+  // RANK / LVL readouts derived from your empire
+  const owned = parseInt((document.getElementById('owned-count') || {}).textContent || '0', 10) || 0;
+  const army = parseInt((document.getElementById('army-count') || {}).textContent || '0', 10) || 0;
+  const lvlEl = document.getElementById('sf-lvl');
+  const rankEl = document.getElementById('sf-rank');
+  if (lvlEl) lvlEl.textContent = String(100 + owned * 2 + Math.floor(army / 400));
+  if (rankEl) rankEl.textContent = String(Math.max(1, 64 - Math.floor(owned / 8)));
+  // rotate the contacts feed every 9 s
+  if (now - _contactSwapT > 9000) {
+    _contactSwapT = now;
+    const c1 = document.getElementById('sf-contact-1');
+    const c2 = document.getElementById('sf-contact-2');
+    const s1 = c1 && c1.querySelector('span');
+    const s2 = c2 && c2.querySelector('span');
+    if (s1 && s2) {
+      const a = SF_CONTACTS[_contactIdx % SF_CONTACTS.length];
+      const b = SF_CONTACTS[(_contactIdx + 3) % SF_CONTACTS.length];
+      _contactIdx++;
+      if (s1.textContent !== a) {
+        s1.textContent = a;
+        c1.classList.remove('flash'); void c1.offsetWidth; c1.classList.add('flash');
+      }
+      if (s2.textContent !== b) {
+        s2.textContent = b;
+        c2.classList.remove('flash'); void c2.offsetWidth; c2.classList.add('flash');
+      }
+    }
+  }
+}
+
+// LAUNCH — dive from the orbital view down to low orbit with a boosted
+// (but still capped) glide. Feels like dropping from the sector scan
+// into atmosphere-skimming range without ever slamming the camera.
+window.sfLaunch = function () {
+  STATE.zoomTarget = Math.max(STATE.zoomMin + 0.05, 1.35);
+  sfLaunchTime = performance.now();
+  lastInteractionTime = performance.now();
+  const btn = document.getElementById('sf-launch-btn');
+  if (btn) {
+    btn.classList.add('launching');
+    btn.textContent = 'LAUNCHING';
+    setTimeout(() => {
+      btn.classList.remove('launching');
+      btn.textContent = 'LAUNCH';
+    }, 2500);
+  }
+};
 
 function hideLoader() {
   // Called on first texture load (or error). Hide loader after a short beat.
@@ -7642,6 +8112,11 @@ let earthAutoRotate = true;
 let lastInteractionTime = 0;
 let _zoomLastT = 0;     // timestamp of the last zoom-glide frame (smooth zoom)
 let _lastZoomDom = 0;   // throttle zoom-meter DOM writes (~10/s)
+let sfLaunchTime = -1e9;    // LAUNCH-button boost window (faster glide while diving)
+let _lastRadarDraw = 0;     // throttle radar canvas redraws (~25 fps)
+let _contactSwapT = 0;      // rotate the contacts feed every 9 s
+let _contactIdx = 0;
+const _sunSph = new THREE.Spherical();   // reused for the off-axis sun position
 let _pointerDownPos = null;   // where the current drag started (rotation vs click)
 function animate() {
   requestAnimationFrame(animate);
@@ -7684,20 +8159,35 @@ function animate() {
     const _curDist = camera.position.distanceTo(controls.target);
     if (Math.abs(STATE.zoomTarget - _curDist) > 0.0005) {
       const _dt = Math.min(Math.max((now - _zoomLastT) / 1000, 0.001), 0.1);
-      const _maxRatio = Math.exp(0.6 * _dt);
+      const _boost = (now - sfLaunchTime < 2600) ? 1.15 : 0.32;   // LAUNCH dives faster
+      const _maxRatio = Math.exp(_boost * _dt);
       const _ratio = THREE.MathUtils.clamp(STATE.zoomTarget / _curDist, 1 / _maxRatio, _maxRatio);
       camera.position.sub(controls.target).setLength(_curDist * _ratio).add(controls.target);
     }
   }
   _zoomLastT = now;
   controls.update();
-  // Keep the sun glued to the camera: whichever side of the world you are
-  // looking at is always the lit side — no more dark hemisphere.
-  if (sunLight) sunLight.position.copy(camera.position);
+  // Sun rides just off the camera's shoulder (rotated ~35 degrees right):
+  // the globe always shows a day/night terminator like a real orbital view,
+  // while the side you are looking at stays readable for gameplay.
+  if (sunLight) {
+    _sunSph.setFromVector3(camera.position);
+    _sunSph.theta += 0.62;
+    _sunSph.phi = Math.max(0.6, Math.min(Math.PI - 0.6, _sunSph.phi));
+    sunLight.position.setFromSpherical(_sunSph);
+  }
+  if (clouds) { clouds.visible = STATE.planet === 'earth'; clouds.rotation.y += 0.00055; }
+  if (orbitalGroup) orbitalGroup.rotation.y += 0.00028;
+  updateShips(now);
   updatePlotVisibility();
   if (now - _lastZoomDom > 100) {
     _lastZoomDom = now;
     updateZoomMeter();
+    updateSpaceHud(now);
+  }
+  if (now - _lastRadarDraw > 40) {
+    _lastRadarDraw = now;
+    drawRadar(now);
   }
   renderer.render(scene, camera);
 }
