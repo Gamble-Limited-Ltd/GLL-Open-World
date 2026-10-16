@@ -1270,8 +1270,9 @@ const STATE = {
   lastProductionTime: 0,        // timestamp of last production tick
   marketUpdateInterval: 15 * 60 * 1000,  // 15 minutes in ms (v1.4 slow pacing)
   radius: 1.0,                // Earth radius in scene units
-  zoomMin: 1.15,              // closest (just above surface — safe for rendering)
+  zoomMin: 1.30,              // closest zoom — world stays framed (no surface-grinding extreme)
   zoomMax: 4.5,               // farthest (keeps the world big on screen)
+  zoomTarget: 1.8,            // where wheel-zoom is heading (eased toward every frame)
   plotRevealDist: 3.2,        // camera distance at which plots begin to appear
   plotFullDist: 1.8,          // camera distance at which plots are fully visible
   // Convert scene units to km for display. Earth radius ≈ 6371 km.
@@ -4057,6 +4058,35 @@ function initScene() {
   // Track drag state for auto-rotate pause
   controls.addEventListener('start', () => { controls._isInteracting = true; });
   controls.addEventListener('end',   () => { controls._isInteracting = false; });
+
+  // ---- Smooth wheel zoom (fix: one scroll used to slam to max zoom) ----
+  // three r160 OrbitControls applies a fixed distance step to EVERY wheel
+  // event (scaled by raw deltaY / pixel ratio). Smooth-scroll wheels and
+  // trackpads fire dozens of events per gesture, so a single flick sent the
+  // camera all the way to the closest zoom. We intercept the wheel before
+  // OrbitControls ever sees it and instead ease toward a target distance:
+  // small clamped steps per event, capped zoom speed per second — zooming
+  // feels the same on every mouse, wheel, trackpad and screen.
+  STATE.zoomTarget = camera.position.distanceTo(controls.target);
+  window.addEventListener('wheel', (e) => {
+    // Only when scrolling over the 3D canvas — menus and modals scroll normally
+    if (e.target !== renderer.domElement) return;
+    e.preventDefault();
+    e.stopPropagation();                   // OrbitControls never sees this wheel
+    let dy = e.deltaY;
+    if (e.deltaMode === 1) dy *= 16;       // Firefox "lines" -> px-ish
+    else if (e.deltaMode === 2) dy *= 100; // "pages" -> px-ish
+    // One classic wheel tick ~= 100px. Clamp each event's contribution so a
+    // single bursty event can never jump the zoom far on its own.
+    const steps = THREE.MathUtils.clamp(dy / 100, -1.2, 1.2);
+    const ZOOM_STEP = 0.12;                // distance change per wheel tick
+    const factor = steps < 0
+      ? Math.pow(1 - ZOOM_STEP, -steps)         // scroll up  -> zoom in
+      : Math.pow(1 / (1 - ZOOM_STEP), steps);   // scroll down -> zoom out
+    STATE.zoomTarget = THREE.MathUtils.clamp(
+      STATE.zoomTarget * factor, STATE.zoomMin, STATE.zoomMax);
+    lastInteractionTime = performance.now();    // pause auto-rotate while zooming
+  }, { passive: false, capture: true });
 
   raycaster = new THREE.Raycaster();
   pointer = new THREE.Vector2();
@@ -7610,6 +7640,7 @@ function showToast(msg, success) {
 // ====================================================================
 let earthAutoRotate = true;
 let lastInteractionTime = 0;
+let _zoomLastT = 0;     // timestamp of the last zoom-glide frame (smooth zoom)
 let _lastZoomDom = 0;   // throttle zoom-meter DOM writes (~10/s)
 let _pointerDownPos = null;   // where the current drag started (rotation vs click)
 function animate() {
@@ -7642,6 +7673,23 @@ function animate() {
   if (earthAutoRotate && !paused) {
     earth.rotation.y += 0.0004;
   }
+  // Smooth zoom glide: ease the actual camera distance toward the wheel
+  // target with a capped speed (~60% distance change per second), so no
+  // gesture can ever slam the view across the zoom range — it glides.
+  // While OrbitControls itself is dragging / pinch-zooming, the gesture
+  // stays authoritative and the target just follows along.
+  if (controls._isInteracting) {
+    STATE.zoomTarget = camera.position.distanceTo(controls.target);
+  } else {
+    const _curDist = camera.position.distanceTo(controls.target);
+    if (Math.abs(STATE.zoomTarget - _curDist) > 0.0005) {
+      const _dt = Math.min(Math.max((now - _zoomLastT) / 1000, 0.001), 0.1);
+      const _maxRatio = Math.exp(0.6 * _dt);
+      const _ratio = THREE.MathUtils.clamp(STATE.zoomTarget / _curDist, 1 / _maxRatio, _maxRatio);
+      camera.position.sub(controls.target).setLength(_curDist * _ratio).add(controls.target);
+    }
+  }
+  _zoomLastT = now;
   controls.update();
   // Keep the sun glued to the camera: whichever side of the world you are
   // looking at is always the lit side — no more dark hemisphere.
