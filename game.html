@@ -3554,8 +3554,12 @@ function addBusinessToPlot(plot, bt, index) {
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.12';
+const GAME_VERSION = 'v1.13';
 const RELEASE_NOTES = [
+  { v: 'v1.13', items: [
+    '🛰 <b>Satellites rebuilt</b> — every orbiter is now a detailed spacecraft: gold-foil buses, segmented solar wings, nadir dishes and a survey telescope, with blinking nav lights that glint in the sunlight.',
+    '🛰 <b>Patrol craft & station upgraded</b> — sleek ships with engine plumes and running lights; the station grew a truss, habitat modules, radiators and four solar arrays that slowly gimbal to track the sun.'
+  ]},
   { v: 'v1.12', items: [
     '🛰 <b>Orbital Command view</b> — the world now opens as a live sector scan: Earth front and center with city lights on the night side, a drifting cloud deck, glowing orbital rings and patrol ships.',
     '📡 <b>Space-command HUD</b> — top command bar, COMMS / NAVIGATION panels, a sweeping radar with live contacts, and a big LAUNCH button that dives you down to low orbit.',
@@ -4883,11 +4887,11 @@ function setAtmosphere(planet) {
 // Nothing here intercepts plot picking (raycast disabled everywhere).
 // ====================================================================
 const SHIP_ORBITS = [
-  { r: 1.30, speed: 0.22, incl: 0.16,  phase: 0.7, kind: 'dart' },
-  { r: 1.42, speed: 0.15, incl: -0.34, phase: 2.3, kind: 'dart' },
-  { r: 1.56, speed: 0.11, incl: 0.52,  phase: 4.1, kind: 'dart' },
-  { r: 1.70, speed: 0.17, incl: -0.10, phase: 1.4, kind: 'dart' },
-  { r: 1.86, speed: 0.09, incl: 0.28,  phase: 5.2, kind: 'dart' },
+  { r: 1.30, speed: 0.22, incl: 0.16,  phase: 0.7, kind: 'patrol' },
+  { r: 1.42, speed: 0.15, incl: -0.34, phase: 2.3, kind: 'comm' },
+  { r: 1.56, speed: 0.11, incl: 0.52,  phase: 4.1, kind: 'relay' },
+  { r: 1.70, speed: 0.17, incl: -0.10, phase: 1.4, kind: 'survey' },
+  { r: 1.86, speed: 0.09, incl: 0.28,  phase: 5.2, kind: 'comm' },
   { r: 1.50, speed: 0.05, incl: 0.06,  phase: 3.3, kind: 'station' },
 ];
 
@@ -4896,7 +4900,7 @@ const SF_CONTACTS = [
   'PATROL WING DELTA — SECTOR 3 CLEAR',
   'UNKNOWN CONTACT — SECTOR 9 · TRACKING',
   'TRADE CONVOY INBOUND — DOCK 4',
-  'SURVEY DRONE ACTIVE — SECTOR 5',
+  'SURVEY SAT ARRAY DEPLOYED — SECTOR 5',
   'ION STORM ADVISORY — SECTOR 11',
   'SIGNAL LOST · PROBE 7 REACQUIRED',
   'ORBITAL GUARD RELIEF — SECTOR 2',
@@ -4926,34 +4930,408 @@ function buildOrbitalRings() {
   scene.add(orbitalGroup);
 }
 
+// ──────────────────────────────────────────────────────────────────
+// CRAFT FACTORY — detailed satellites, patrol craft and the station.
+// Every craft is an assembly of Phong-shaded parts so the sun glints
+// off solar wings and gold foil as they cross the terminator.
+// Local frame while orbiting: +Z = travel direction (prograde),
+// +X = away from Earth (zenith), -X = nadir (points at the globe).
+// ──────────────────────────────────────────────────────────────────
+const SAT_MAT = {
+  gold:   new THREE.MeshPhongMaterial({ color: 0xcfa23a, specular: 0xffe6a3, shininess: 80 }),
+  panel:  new THREE.MeshPhongMaterial({ color: 0x12306e, specular: 0xa8ccff, shininess: 120 }),
+  silver: new THREE.MeshPhongMaterial({ color: 0xd4dbe2, specular: 0xffffff, shininess: 70 }),
+  dark:   new THREE.MeshPhongMaterial({ color: 0x3a434e, specular: 0x778899, shininess: 25 }),
+  white:  new THREE.MeshPhongMaterial({ color: 0xeef1f4, specular: 0xdde3e8, shininess: 40 }),
+  hull:   new THREE.MeshPhongMaterial({ color: 0xaebfd0, specular: 0xffffff, shininess: 90 }),
+  glass:  new THREE.MeshPhongMaterial({ color: 0x2e5f8a, specular: 0xbfe6ff, shininess: 160 }),
+  dish:   new THREE.MeshPhongMaterial({ color: 0xe8ecef, specular: 0xffffff, shininess: 55, side: THREE.DoubleSide }),
+};
+
+// soft radial glow texture for engine plumes, strobes and beacons
+function _satGlowTex(r, g, b) {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 64;
+  const ctx = cv.getContext('2d');
+  const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0,   'rgba(' + r + ',' + g + ',' + b + ',1)');
+  grad.addColorStop(0.3, 'rgba(' + r + ',' + g + ',' + b + ',.55)');
+  grad.addColorStop(1,   'rgba(' + r + ',' + g + ',' + b + ',0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 64, 64);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+const SAT_GLOW = {
+  cyan:  _satGlowTex(140, 225, 255),
+  red:   _satGlowTex(255, 90, 90),
+  green: _satGlowTex(120, 255, 160),
+  white: _satGlowTex(255, 255, 255),
+};
+
+// tiny unlit bulb + additive halo — updateShips toggles them for blinks
+function _satLight(color, tex, size) {
+  const bulb = new THREE.Mesh(
+    new THREE.SphereGeometry(size * 0.3, 8, 6),
+    new THREE.MeshBasicMaterial({ color: color }));
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tex, transparent: true, blending: THREE.AdditiveBlending,
+    depthWrite: false, opacity: 0.95 }));
+  halo.scale.setScalar(size);
+  const g = new THREE.Group();
+  g.add(bulb);
+  g.add(halo);
+  return { group: g, bulb: bulb, halo: halo };
+}
+
+// segmented solar wing extending along local +Z (cells face +Y)
+function _satPanelWing(len, wid, segs) {
+  const wing = new THREE.Group();
+  const seg = len / segs;
+  for (let i = 0; i < segs; i++) {
+    const z = seg * (i + 0.5);
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(wid * 1.05, 0.0035, seg * 0.92), SAT_MAT.dark);
+    frame.position.z = z;
+    wing.add(frame);
+    const cells = new THREE.Mesh(new THREE.BoxGeometry(wid * 0.92, 0.003, seg * 0.84), SAT_MAT.panel);
+    cells.position.set(0, 0.0032, z);
+    wing.add(cells);
+  }
+  return wing;
+}
+
+// ——— PATROL CRAFT — sleek interceptor with engine plume ———
+function _makePatrolShip() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.0155, 0.009, 0.09, 10), SAT_MAT.hull);
+  body.rotation.x = Math.PI / 2;
+  body.position.z = 0.012;
+  g.add(body);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.0155, 0.042, 10), SAT_MAT.hull);
+  nose.rotation.x = Math.PI / 2;
+  nose.position.z = 0.078;
+  g.add(nose);
+  const canopy = new THREE.Mesh(new THREE.SphereGeometry(0.011, 12, 8), SAT_MAT.glass);
+  canopy.scale.set(0.72, 0.6, 1.5);
+  canopy.position.set(0, 0.012, 0.028);
+  g.add(canopy);
+  for (const s of [-1, 1]) {
+    const wing = new THREE.Mesh(new THREE.BoxGeometry(0.088, 0.0038, 0.03), SAT_MAT.hull);
+    wing.position.set(s * 0.052, -0.003, -0.012);
+    wing.rotation.y = s * 0.45;
+    g.add(wing);
+    const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.026, 6), SAT_MAT.dark);
+    pod.rotation.x = Math.PI / 2;
+    pod.position.set(s * 0.096, -0.003, -0.024);
+    g.add(pod);
+  }
+  const fin = new THREE.Mesh(new THREE.BoxGeometry(0.0035, 0.028, 0.022), SAT_MAT.hull);
+  fin.position.set(0, 0.015, -0.046);
+  g.add(fin);
+  const eng = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.013, 0.02, 10), SAT_MAT.dark);
+  eng.rotation.x = Math.PI / 2;
+  eng.position.z = -0.044;
+  g.add(eng);
+  const plume = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: SAT_GLOW.cyan, transparent: true, blending: THREE.AdditiveBlending,
+    depthWrite: false, opacity: 0.9 }));
+  plume.scale.set(0.062, 0.026, 1);
+  plume.position.z = -0.066;
+  g.add(plume);
+  const port = _satLight(0xff4444, SAT_GLOW.red, 0.026);
+  port.group.position.set(-0.1, -0.003, -0.024);
+  g.add(port.group);
+  const stbd = _satLight(0x50ff90, SAT_GLOW.green, 0.026);
+  stbd.group.position.set(0.1, -0.003, -0.024);
+  g.add(stbd.group);
+  const strobe = _satLight(0xffffff, SAT_GLOW.white, 0.036);
+  strobe.group.position.set(0, 0.034, -0.046);
+  g.add(strobe.group);
+  return { group: g, anim: {
+    roll: 0.1, rollSpeed: 0.5, rollPhase: 0.6, rollAmp: 0.06,
+    engine: plume,
+    strobes: [
+      { sprite: port.halo, bulb: port.bulb, freq: 0.6, phase: 0, duty: 0.45 },
+      { sprite: stbd.halo, bulb: stbd.bulb, freq: 0.6, phase: 0.5, duty: 0.45 },
+      { sprite: strobe.halo, bulb: strobe.bulb, freq: 1.1, phase: 0.2, duty: 0.06 },
+    ] } };
+}
+
+// ——— COMM SATELLITE — gold-foil bus, solar wings, nadir dish ———
+function _makeCommSat(variant) {
+  const g = new THREE.Group();
+  const bus = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.055), SAT_MAT.gold);
+  g.add(bus);
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.042, 0.042), SAT_MAT.silver);
+  deck.position.x = -0.032;
+  g.add(deck);
+  // nadir-pointing high-gain dish (concave side faces the globe)
+  const dishG = new THREE.Group();
+  const dish = new THREE.Mesh(
+    new THREE.SphereGeometry(0.03, 24, 12, 0, Math.PI * 2, 0, Math.PI / 4.5), SAT_MAT.dish);
+  dish.rotation.z = -Math.PI / 2;
+  dishG.add(dish);
+  const feed = new THREE.Mesh(new THREE.CylinderGeometry(0.0016, 0.0016, 0.028, 6), SAT_MAT.silver);
+  feed.rotation.z = Math.PI / 2;
+  feed.position.x = -0.02;
+  dishG.add(feed);
+  dishG.position.x = -0.05;
+  g.add(dishG);
+  // zenith whip antennas
+  for (const s of [-1, 1]) {
+    const whip = new THREE.Mesh(new THREE.CylinderGeometry(0.0012, 0.0012, 0.068, 5), SAT_MAT.silver);
+    whip.position.set(0.042, s * 0.013, 0);
+    whip.rotation.z = -0.3 * s;
+    g.add(whip);
+  }
+  // solar wings fore & aft
+  for (const s of [-1, 1]) {
+    const yoke = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.028, 6), SAT_MAT.dark);
+    yoke.rotation.x = Math.PI / 2;
+    yoke.position.z = s * 0.041;
+    g.add(yoke);
+    const wing = _satPanelWing(0.088, 0.05, 3);
+    if (s < 0) wing.rotation.y = Math.PI;
+    wing.position.z = s * 0.055;
+    g.add(wing);
+  }
+  // lights: red fore tip, green aft tip, white strobe on the zenith corner
+  const red = _satLight(0xff4444, SAT_GLOW.red, 0.03);
+  red.group.position.set(0, 0.003, 0.148);
+  g.add(red.group);
+  const grn = _satLight(0x50ff90, SAT_GLOW.green, 0.03);
+  grn.group.position.set(0, 0.003, -0.148);
+  g.add(grn.group);
+  const strobe = _satLight(0xffffff, SAT_GLOW.white, 0.034);
+  strobe.group.position.set(0.026, 0.026, 0);
+  g.add(strobe.group);
+  return { group: g, anim: {
+    roll: variant ? -0.75 : 0.55, rollSpeed: 0.22, rollPhase: variant ? 2.1 : 0.3, rollAmp: 0.26,
+    strobes: [
+      { sprite: red.halo, bulb: red.bulb, freq: 0.5, phase: 0, duty: 0.4 },
+      { sprite: grn.halo, bulb: grn.bulb, freq: 0.5, phase: 0.5, duty: 0.4 },
+      { sprite: strobe.halo, bulb: strobe.bulb, freq: 0.9, phase: 0.35, duty: 0.07 },
+    ] } };
+}
+
+// ——— RELAY SATELLITE — big folding dish that slowly scans ———
+function _makeRelaySat() {
+  const g = new THREE.Group();
+  const bus = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.042, 0.05), SAT_MAT.gold);
+  g.add(bus);
+  // rolled thermal blanket cylinder along Z
+  const blanket = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.05, 12), SAT_MAT.gold);
+  blanket.rotation.x = Math.PI / 2;
+  blanket.position.z = 0.046;
+  g.add(blanket);
+  // big scanning dish (concave faces nadir, tilted, sweeps back and forth)
+  const dishG = new THREE.Group();
+  const dish = new THREE.Mesh(
+    new THREE.SphereGeometry(0.062, 28, 14, 0, Math.PI * 2, 0, Math.PI / 4.2), SAT_MAT.dish);
+  dish.rotation.z = -Math.PI / 2;
+  dishG.add(dish);
+  for (const s of [-1, 0, 1]) {           // asymmetric feed tripod — the scan reads
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.0013, 0.0013, 0.06, 5), SAT_MAT.silver);
+    leg.position.set(-0.028, s * 0.016, s * 0.016);
+    leg.rotation.z = 1.1;
+    dishG.add(leg);
+  }
+  const feed = new THREE.Mesh(new THREE.SphereGeometry(0.005, 8, 6), SAT_MAT.silver);
+  feed.position.x = -0.042;
+  dishG.add(feed);
+  dishG.position.x = -0.048;
+  dishG.rotation.z = 0.4;                 // boresight tilted off nadir
+  g.add(dishG);
+  // shorter solar wings
+  for (const s of [-1, 1]) {
+    const yoke = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.024, 6), SAT_MAT.dark);
+    yoke.rotation.x = Math.PI / 2;
+    yoke.position.z = s * 0.036;
+    g.add(yoke);
+    const wing = _satPanelWing(0.072, 0.046, 2);
+    if (s < 0) wing.rotation.y = Math.PI;
+    wing.position.z = s * 0.048;
+    g.add(wing);
+  }
+  const strobe = _satLight(0xffffff, SAT_GLOW.white, 0.032);
+  strobe.group.position.set(0.024, 0.024, 0);
+  g.add(strobe.group);
+  const grn = _satLight(0x50ff90, SAT_GLOW.green, 0.026);
+  grn.group.position.set(0, 0.003, 0.124);
+  g.add(grn.group);
+  return { group: g, anim: {
+    roll: -0.5, rollSpeed: 0.18, rollPhase: 1.2, rollAmp: 0.22,
+    dishScan: dishG,
+    strobes: [
+      { sprite: strobe.halo, bulb: strobe.bulb, freq: 0.75, phase: 0.1, duty: 0.08 },
+      { sprite: grn.halo, bulb: grn.bulb, freq: 0.5, phase: 0, duty: 0.4 },
+    ] } };
+}
+
+// ——— SURVEY SATELLITE — silver bus, nadir telescope, radiators ———
+function _makeSurveySat() {
+  const g = new THREE.Group();
+  const bus = new THREE.Mesh(new THREE.BoxGeometry(0.046, 0.046, 0.05), SAT_MAT.silver);
+  g.add(bus);
+  // gold instrument section on the zenith side
+  const inst = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.02, 0.036), SAT_MAT.gold);
+  inst.position.set(0.032, 0.01, 0);
+  g.add(inst);
+  // nadir telescope boom + lens
+  const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.05, 8), SAT_MAT.dark);
+  boom.rotation.z = Math.PI / 2;
+  boom.position.x = -0.046;
+  g.add(boom);
+  const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.011, 0.026, 12), SAT_MAT.white);
+  scope.rotation.z = Math.PI / 2;
+  scope.position.x = -0.078;
+  g.add(scope);
+  const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, 0.004, 12), SAT_MAT.glass);
+  lens.rotation.z = Math.PI / 2;
+  lens.position.x = -0.092;
+  g.add(lens);
+  // wide solar wings
+  for (const s of [-1, 1]) {
+    const yoke = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.008, 0.02), SAT_MAT.dark);
+    yoke.position.set(0, 0, s * 0.034);
+    g.add(yoke);
+    const wing = _satPanelWing(0.1, 0.056, 3);
+    if (s < 0) wing.rotation.y = Math.PI;
+    wing.position.z = s * 0.044;
+    g.add(wing);
+  }
+  // white radiator fins top & bottom
+  for (const s of [-1, 1]) {
+    const rad = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.002, 0.05), SAT_MAT.white);
+    rad.position.set(0, s * 0.034, 0.012);
+    rad.rotation.x = s * 0.55;
+    g.add(rad);
+  }
+  const strobe = _satLight(0xffffff, SAT_GLOW.white, 0.03);
+  strobe.group.position.set(0.04, 0.026, 0);
+  g.add(strobe.group);
+  const red = _satLight(0xff4444, SAT_GLOW.red, 0.026);
+  red.group.position.set(0, 0.003, 0.148);
+  g.add(red.group);
+  return { group: g, anim: {
+    roll: 0.42, rollSpeed: 0.26, rollPhase: 4.4, rollAmp: 0.24,
+    strobes: [
+      { sprite: strobe.halo, bulb: strobe.bulb, freq: 0.85, phase: 0.55, duty: 0.07 },
+      { sprite: red.halo, bulb: red.bulb, freq: 0.5, phase: 0.25, duty: 0.4 },
+    ] } };
+}
+
+// ——— ORBITAL STATION — truss, habitats, sun-tracking arrays ———
+function _makeStation() {
+  const g = new THREE.Group();
+  // backbone truss + cross braces
+  const truss = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.36, 8), SAT_MAT.dark);
+  truss.rotation.x = Math.PI / 2;
+  g.add(truss);
+  for (const z of [-0.11, 0, 0.11]) {
+    const brace = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.16, 6), SAT_MAT.dark);
+    brace.rotation.z = Math.PI / 2;
+    brace.position.z = z;
+    g.add(brace);
+  }
+  // pressurized habitat modules above the truss (silver + gold foil)
+  const mods = [
+    { z: 0.082, len: 0.082, mat: SAT_MAT.silver },
+    { z: -0.082, len: 0.082, mat: SAT_MAT.gold },
+  ];
+  for (const m of mods) {
+    const hab = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.021, m.len, 14), m.mat);
+    hab.rotation.x = Math.PI / 2;
+    hab.position.set(0, 0.033, m.z);
+    g.add(hab);
+    for (const s of [-1, 1]) {
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.021, 12, 8), m.mat);
+      cap.position.set(0, 0.033, m.z + s * m.len / 2);
+      g.add(cap);
+    }
+  }
+  // docking node with radial ports
+  const node = new THREE.Mesh(new THREE.SphereGeometry(0.017, 12, 10), SAT_MAT.silver);
+  node.position.set(0, 0.033, 0);
+  g.add(node);
+  for (const s of [-1, 1]) {
+    const port = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.02, 8), SAT_MAT.dark);
+    port.rotation.z = Math.PI / 2;
+    port.position.set(s * 0.026, 0.033, 0);
+    g.add(port);
+  }
+  // comms dish on the node (concave faces up)
+  const dish = new THREE.Mesh(
+    new THREE.SphereGeometry(0.02, 16, 8, 0, Math.PI * 2, 0, Math.PI / 4.5), SAT_MAT.dish);
+  dish.rotation.z = Math.PI;
+  dish.position.set(0, 0.058, 0);
+  g.add(dish);
+  // white radiator panels
+  for (const s of [-1, 1]) {
+    const rad = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.002, 0.1), SAT_MAT.white);
+    rad.position.set(0, s * 0.05, 0);
+    rad.rotation.x = s * 0.5;
+    g.add(rad);
+  }
+  // four solar arrays on rotating gimbals (track the sun like the ISS)
+  const arrays = [];
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      const gim = new THREE.Group();
+      gim.position.set(sx * 0.075, 0, sz * 0.055);
+      gim.userData.ph = (sx + 1) * 1.3 + (sz + 1) * 2.1;
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.045, 6), SAT_MAT.dark);
+      mast.rotation.z = Math.PI / 2;
+      mast.position.x = sx * 0.0225;
+      gim.add(mast);
+      const wing = _satPanelWing(0.105, 0.052, 4);
+      wing.rotation.y = sx * Math.PI / 2;
+      wing.position.x = sx * 0.048;
+      gim.add(wing);
+      arrays.push(gim);
+      g.add(gim);
+    }
+  }
+  // beacons: white strobes on the truss ends, red on the brace tips
+  const strobeA = _satLight(0xffffff, SAT_GLOW.white, 0.034);
+  strobeA.group.position.set(0, 0, 0.185);
+  g.add(strobeA.group);
+  const strobeB = _satLight(0xffffff, SAT_GLOW.white, 0.034);
+  strobeB.group.position.set(0, 0, -0.185);
+  g.add(strobeB.group);
+  const beaconA = _satLight(0xff4444, SAT_GLOW.red, 0.026);
+  beaconA.group.position.set(0.082, 0.014, 0);
+  g.add(beaconA.group);
+  const beaconB = _satLight(0xff4444, SAT_GLOW.red, 0.026);
+  beaconB.group.position.set(-0.082, 0.014, 0);
+  g.add(beaconB.group);
+  return { group: g, anim: {
+    arrays: arrays,
+    arraySpeed: 0.13,
+    strobes: [
+      { sprite: strobeA.halo, bulb: strobeA.bulb, freq: 0.65, phase: 0, duty: 0.1 },
+      { sprite: strobeB.halo, bulb: strobeB.bulb, freq: 0.65, phase: 0.5, duty: 0.1 },
+      { sprite: beaconA.halo, bulb: beaconA.bulb, freq: 0.45, phase: 0.2, duty: 0.45 },
+      { sprite: beaconB.halo, bulb: beaconB.bulb, freq: 0.45, phase: 0.65, duty: 0.45 },
+    ] } };
+}
+
 function buildShips() {
   shipGroup = new THREE.Group();
-  const dartGeo = new THREE.ConeGeometry(0.031, 0.105, 6);
-  dartGeo.rotateX(Math.PI / 2);              // nose points along +Z
-  const dartMat = new THREE.MeshBasicMaterial({ color: 0xe4f6ff });
   for (const d of SHIP_ORBITS) {
     const pivot = new THREE.Group();
     pivot.rotation.x = d.incl;
-    let ship;
-    if (d.kind === 'station') {
-      ship = new THREE.Group();
-      const hull = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.024, 0.024, 0.11, 10),
-        new THREE.MeshPhongMaterial({ color: 0xcfd9df, shininess: 60 }));
-      hull.rotation.z = Math.PI / 2;
-      ship.add(hull);
-      const panelMat = new THREE.MeshPhongMaterial({ color: 0x2a4d8f, shininess: 80, specular: 0x88aaff });
-      for (const s of [-1, 1]) {
-        const wing = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.007, 0.04), panelMat);
-        wing.position.x = s * 0.1;
-        ship.add(wing);
-      }
-    } else {
-      ship = new THREE.Mesh(dartGeo, dartMat);
-    }
-    ship.userData = d;
-    ship.raycast = () => {};      // never intercept plot picking
-    ship.frustumCulled = false;
+    let built;
+    if (d.kind === 'station')      built = _makeStation();
+    else if (d.kind === 'patrol')  built = _makePatrolShip();
+    else if (d.kind === 'relay')   built = _makeRelaySat();
+    else if (d.kind === 'survey')  built = _makeSurveySat();
+    else                           built = _makeCommSat(d.phase > 3);
+    const ship = built.group;
+    ship.rotation.order = 'YZX';   // yaw (orbit) first, then body roll
+    ship.userData = { r: d.r, speed: d.speed, incl: d.incl, phase: d.phase, kind: d.kind, anim: built.anim };
+    ship.traverse(o => { o.raycast = () => {}; o.frustumCulled = false; });  // never intercept plot picking
     pivot.userData = d;
     pivot.add(ship);
     shipGroup.add(pivot);
@@ -4970,6 +5348,31 @@ function updateShips(now) {
     const ship = pivot.children[0];
     ship.position.set(Math.cos(a) * d.r, 0, Math.sin(a) * d.r);
     ship.rotation.y = -a;         // nose (+Z) along travel direction
+    const anim = ship.userData.anim;
+    if (!anim) continue;
+    // gentle roll so solar wings sweep through the sunlight
+    if (anim.roll !== undefined) {
+      ship.rotation.z = anim.roll + (anim.rollAmp || 0.25) * Math.sin(t * (anim.rollSpeed || 0.22) + (anim.rollPhase || 0));
+    }
+    // station arrays slowly gimbal to track the sun
+    if (anim.arrays) {
+      for (const gim of anim.arrays) gim.rotation.x = t * anim.arraySpeed + (gim.userData.ph || 0);
+    }
+    // relay dish sweeps back and forth
+    if (anim.dishScan) anim.dishScan.rotation.x = Math.sin(t * 0.3) * 0.35;
+    // blinking nav lights and beacons
+    if (anim.strobes) {
+      for (const s of anim.strobes) {
+        const on = (((t * s.freq + s.phase) % 1) + 1) % 1 < s.duty;
+        s.sprite.visible = on;
+        if (s.bulb) s.bulb.visible = on;
+      }
+    }
+    // engine plume flicker on patrol craft
+    if (anim.engine) {
+      const f = 1 + 0.16 * Math.sin(t * 23 + a * 3);
+      anim.engine.scale.set(0.062 * f, 0.026 * f, 1);
+    }
   }
 }
 
