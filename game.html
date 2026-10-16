@@ -1270,8 +1270,8 @@ const STATE = {
   lastProductionTime: 0,        // timestamp of last production tick
   marketUpdateInterval: 15 * 60 * 1000,  // 15 minutes in ms (v1.4 slow pacing)
   radius: 1.0,                // Earth radius in scene units
-  zoomMin: 1.22,              // closest (just above surface — safe for rendering)
-  zoomMax: 6.0,               // farthest (space view)
+  zoomMin: 1.15,              // closest (just above surface — safe for rendering)
+  zoomMax: 4.5,               // farthest (keeps the world big on screen)
   plotRevealDist: 3.2,        // camera distance at which plots begin to appear
   plotFullDist: 1.8,          // camera distance at which plots are fully visible
   // Convert scene units to km for display. Earth radius ≈ 6371 km.
@@ -4020,7 +4020,7 @@ function initScene() {
   scene = new THREE.Scene();
 
   camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
-  camera.position.set(0, 0, 2.8);
+  camera.position.set(0, 0, 1.8);   // start zoomed in close — plots fully visible
 
   const q = QUALITY_LEVELS[getEffectiveQuality()];
   renderer = new THREE.WebGLRenderer({ antialias: q.antialias, alpha: false, powerPreference: 'high-performance' });
@@ -4175,7 +4175,9 @@ function buildStarField() {
   // Mars glow
   const marsGlowGeo = new THREE.SphereGeometry(3.2, 24, 24);
   const marsGlowMat = new THREE.MeshBasicMaterial({ color: 0x4a1a08, transparent: true, opacity: 0.15, side: THREE.BackSide });
-  scene.add(new THREE.Mesh(marsGlowGeo, marsGlowMat)).position.copy(mars.position);
+  const marsGlow = new THREE.Mesh(marsGlowGeo, marsGlowMat);
+  marsGlow.position.copy(mars.position);
+  scene.add(marsGlow);
 
   // Luna (gray, lower left)
   const lunaGeo = new THREE.SphereGeometry(1.2, 16, 16);
@@ -4187,7 +4189,9 @@ function buildStarField() {
   // Luna glow
   const lunaGlowGeo = new THREE.SphereGeometry(1.7, 16, 16);
   const lunaGlowMat = new THREE.MeshBasicMaterial({ color: 0x444444, transparent: true, opacity: 0.08, side: THREE.BackSide });
-  scene.add(new THREE.Mesh(lunaGlowGeo, lunaGlowMat)).position.copy(luna.position);
+  const lunaGlow = new THREE.Mesh(lunaGlowGeo, lunaGlowMat);
+  lunaGlow.position.copy(luna.position);
+  scene.add(lunaGlow);
 
   // Oceanus (blue-green, far right, small)
   const oceGeo = new THREE.SphereGeometry(0.8, 16, 16);
