@@ -3290,11 +3290,7 @@ function applyCloudWorldUpdates() {
       STATE.multiSelect.delete(p.userData.id);   // and it can't stay in a multi-buy selection
       // Remove my businesses from it (meshes + state)
       for (const entry of p.userData.businesses || []) {
-        if (entry.mesh) {
-          earth.remove(entry.mesh);
-          entry.mesh.geometry.dispose();
-          entry.mesh.material.dispose();
-        }
+        disposeBusinessMesh(entry.mesh);
       }
       p.userData.businesses = [];
       const pair = ownedPlotColorsFor(owner);
@@ -3505,7 +3501,7 @@ function getBusinessOffset(index, total, plotSizeA) {
 // Add a business to a plot at the given index, build its 3D mesh, recolor plot
 function addBusinessToPlot(plot, bt, index) {
   const total = (plot.userData.businesses || []).length + 1;
-  const bizScale = Math.max(0.012, Math.min(0.03, plot.userData.areaMultiplier * 0.016));
+  const bizScale = Math.max(0.013, Math.min(0.032, plot.userData.areaMultiplier * 0.017));
   const bizMesh = buildBusinessMesh(bt, bizScale);
 
   // Compute position: centroid + offset in tangent plane
@@ -3543,8 +3539,12 @@ function addBusinessToPlot(plot, bt, index) {
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.14';
+const GAME_VERSION = 'v1.15';
 const RELEASE_NOTES = [
+  { v: 'v1.15', items: [
+    '🏗 <b>Businesses rebuilt as detailed miniatures</b> — every building you place is now a hand-assembled model: colonnaded banks with gold domes, casinos in neon light, farms with barns and silos, offshore rigs with living flare stacks, warships fitting out in the naval yard. All standing upright on illuminated plinths.',
+    '💡 <b>Buildings light up the night side</b> — warm windows, neon marquees, pulsing tickers and blinking aviation beacons — sharing the same PBR finishes as the orbital fleet so everything glints in the sun.'
+  ]},
   { v: 'v1.14', items: [
     '🛰 <b>Satellites got a realism pass</b> — crinkled gold-foil insulation, gridded solar cells and machined hull plating that catch real sun glints as the fleet orbits. The station now glows with viewport windows and has a ferry capsule docked at its port.',
     '🎛 <b>Zoom truly fixed</b> — momentum wheel flicks and trackpad scrolls can no longer rocket the camera across the zoom range. Every input now glides a notch at a time, on any mouse or trackpad.',
@@ -4162,46 +4162,606 @@ function buildTerrainRule(b, plot) {
   return !plot.userData.isWater ? { ok: true } : { ok: false, reason: 'Land only' };
 }
 
-// Build the 3D mesh for a business type at a given scale.
-// Returns a THREE.Mesh positioned at origin (caller positions it).
+// Build the 3D installation for a business type at a given scale.
+// Returns a THREE.Group at the origin — the caller positions + orients it
+// (after lookAt the group's +Z points away from the globe). Every part is
+// authored in a Y-up frame that is rotated into that +Z, so buildings
+// STAND UPRIGHT on the plot surface.
+//
+// Each business is a hand-assembled miniature: multi-part PBR models
+// wearing the same machined-plate / gold-foil / solar-cell finishes as
+// the orbital fleet, mounted on a neat landing-pad plinth, with lit
+// windows, neon marquees, flare stacks and blinking beacons. Plots read
+// as deliberate installations instead of floating primitives.
+//
+// Perf: every material is SHARED (BIZ_MAT / SAT_MAT — a handful of GPU
+// state changes for hundreds of buildings); only geometries are
+// per-instance and get disposed on demolish (disposeBusinessMesh).
+// Animated accents live in the mesh's userData.fx and are ticked by
+// updateBizFx() once per frame.
+let BIZ_MAT = null;
+
+// Deterministic little PRNG so identical businesses get identical
+// micro-detail (crates, boulders) instead of per-instance noise.
+function _bizRng(seed) {
+  let t = seed + 0x6d2b79f5;
+  return function () {
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Crop-field texture: green rows for the farm paddock.
+function _bizFieldTex() {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 128;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#5d8f3c';
+  ctx.fillRect(0, 0, 128, 128);
+  for (let y = 4; y < 128; y += 8) {          // ploughed crop rows
+    ctx.fillStyle = (y / 8) % 2 ? '#54823a' : '#699a45';
+    ctx.fillRect(0, y, 128, 5);
+    ctx.fillStyle = 'rgba(255,255,255,.08)';
+    ctx.fillRect(0, y, 128, 1);
+  }
+  for (let i = 0; i < 90; i++) {              // scattered foliage sparkle
+    ctx.fillStyle = 'rgba(174,213,110,' + (0.15 + Math.random() * 0.35).toFixed(2) + ')';
+    ctx.fillRect(Math.random() * 128, Math.random() * 128, 2, 2);
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+// Build the shared business material set (once). Reuses the fleet's PBR
+// finishes where possible so buildings and satellites glint alike, and
+// adds the architectural + accent finishes unique to buildings.
+function _buildBizMaterials() {
+  if (BIZ_MAT) return BIZ_MAT;
+  if (!SAT_MAT) _buildSatMaterials();         // fleet finishes (env map etc.)
+  const env = SAT_MAT.gold.envMap;
+  const hullTex = SAT_MAT.hull.map;
+  const M = THREE.MeshStandardMaterial;
+  const B = THREE.MeshBasicMaterial;
+  BIZ_MAT = {
+    // — fleet finishes (shared with the satellites) —
+    gold: SAT_MAT.gold, silver: SAT_MAT.silver, dark: SAT_MAT.dark,
+    white: SAT_MAT.white, hull: SAT_MAT.hull, glass: SAT_MAT.glass,
+    panel: SAT_MAT.panel, foil: SAT_MAT.gold,
+    // — architectural finishes —
+    concrete: new M({ color: 0xb8b1a3, roughness: 0.88, metalness: 0.04, envMap: env, envMapIntensity: 0.3 }),
+    plaster:  new M({ color: 0xece6d8, roughness: 0.72, metalness: 0.02, envMap: env, envMapIntensity: 0.4 }),
+    roofSlate:new M({ color: 0x39434e, roughness: 0.62, metalness: 0.25, envMap: env, envMapIntensity: 0.5 }),
+    brick:    new M({ color: 0xa8503c, map: hullTex, roughness: 0.82, metalness: 0.06, envMap: env, envMapIntensity: 0.35 }),
+    olive:    new M({ color: 0x5c6b41, roughness: 0.8, metalness: 0.1, envMap: env, envMapIntensity: 0.35 }),
+    rust:     new M({ color: 0x8a5a30, roughness: 0.7, metalness: 0.35, envMap: env, envMapIntensity: 0.5 }),
+    earthmover:new M({ color: 0x6e5a44, roughness: 0.95, metalness: 0.02 }),
+    field:    new M({ color: 0xffffff, map: _bizFieldTex(), roughness: 0.95, metalness: 0 }),
+    water:    new B({ color: 0x2fc4e6, transparent: true, opacity: 0.85 }),
+    tarmac:   new M({ color: 0x2b3239, roughness: 0.92, metalness: 0.05 }),
+    domeShell:new M({ color: 0xcfe6dd, roughness: 0.22, metalness: 0.15, envMap: env, envMapIntensity: 0.9,
+                transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false }),
+    // — lit accents (MeshBasic — they read at night too) —
+    winWarm:  new B({ color: 0xffd9a0 }),
+    winCool:  new B({ color: 0x9fdcff }),
+    neonPink: new B({ color: 0xff4f9e, transparent: true, opacity: 0.9 }),
+    neonCyan: new B({ color: 0x39e0ff, transparent: true, opacity: 0.9 }),
+    neonGold: new B({ color: 0xffc46b, transparent: true, opacity: 0.95 }),
+    ticker:   new B({ color: 0x2bff9d, transparent: true, opacity: 0.8 }),
+    domeGlow: new B({ color: 0x6fe89a, transparent: true, opacity: 0.7 }),
+    heliGlow: new B({ color: 0xd7ff5e, transparent: true, opacity: 0.85 }),
+    beaconRed:new B({ color: 0xff5252 }),
+    // — glow sprite textures for flames / halos —
+    flameTex: _satGlowTex(255, 150, 60),
+    pinkTex:  _satGlowTex(255, 100, 170),
+    goldTex:  _satGlowTex(255, 205, 120),
+  };
+  return BIZ_MAT;
+}
+
+// Tiny mesh factory: position (in s-multiplied units) + optional rotation/scale.
+function _P(parent, geo, mat, x, y, z, o) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z);
+  if (o) {
+    if (o.rx) m.rotation.x = o.rx;
+    if (o.ry) m.rotation.y = o.ry;
+    if (o.rz) m.rotation.z = o.rz;
+    if (o.s !== undefined) m.scale.setScalar(o.s);
+    if (o.sx || o.sy || o.sz) m.scale.set(o.sx || 1, o.sy || 1, o.sz || 1);
+  }
+  parent.add(m);
+  return m;
+}
+
+// Cached accent-ring materials — one shared instance per business color
+// instead of a fresh material on every plinth.
+const _BIZ_ACCENT_MATS = new Map();
+function _bizAccentMat(color) {
+  if (!_BIZ_ACCENT_MATS.has(color)) {
+    _BIZ_ACCENT_MATS.set(color, new THREE.MeshBasicMaterial({ color: color }));
+  }
+  return _BIZ_ACCENT_MATS.get(color);
+}
+
+// Landing-pad plinth every business stands on: dark platform disc, thin
+// accent rim in the business color, and (for military sites) a red ring.
+function _bizPad(s, accent, military) {
+  const g = new THREE.Group();
+  _P(g, new THREE.CylinderGeometry(s * 1.06, s * 1.12, s * 0.09, 22), BIZ_MAT.dark, 0, s * 0.045, 0);
+  _P(g, new THREE.TorusGeometry(s * 1.085, s * 0.022, 5, 26),
+     _bizAccentMat(accent), 0, s * 0.1, 0, { rx: Math.PI / 2 });
+  if (military) {
+    _P(g, new THREE.TorusGeometry(s * 1.24, s * 0.03, 5, 28), BIZ_MAT.beaconRed, 0, s * 0.05, 0, { rx: Math.PI / 2 });
+  }
+  return g;
+}
+
+// Soft additive halo sprite (flames, beacons, neon bloom). The sprite's
+// material is per-instance — marked so disposeBusinessMesh() frees it.
+function _bizGlow(tex, w, h, color, bottom) {
+  const mat = new THREE.SpriteMaterial({
+    map: tex, color: color || 0xffffff, transparent: true,
+    blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.9 });
+  mat.userData._bizInstance = true;
+  const spr = new THREE.Sprite(mat);
+  spr.scale.set(w, h, 1);
+  if (bottom) spr.center.set(0.5, 0);         // grows upward from its anchor
+  return spr;
+}
+
+// Blinking aviation beacon: red halo registered into the building's fx
+// list so updateBizFx() strobes it (fleet-style nav light).
+function _bizBeacon(parent, fx, x, y, z, size, phase) {
+  const spr = _bizGlow(SAT_GLOW.red, size, size, 0xff6b5e);
+  spr.position.set(x, y, z);
+  parent.add(spr);
+  if (fx) fx.strobes.push({ spr: spr, freq: 0.85, ph: phase || 0, duty: 0.14 });
+  return spr;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PER-TYPE BUILDERS — every part authored Y-up, base at y ≈ 0.09s
+// (on top of the plinth). Footprints stay within ±1.05s so neighbors
+// on a shared plot never collide.
+// ══════════════════════════════════════════════════════════════════
+
+// 🌾 FARM — crop paddock, red gambrel barn, grain silo, farmhouse
+function _bizFarm(s, fx) {
+  const g = new THREE.Group();
+  const rnd = _bizRng(3);
+  // striped paddock
+  _P(g, new THREE.BoxGeometry(s * 1.15, s * 0.05, s * 0.8), BIZ_MAT.field, -s * 0.22, s * 0.12, s * 0.24, { ry: 0.25 });
+  // barn + roof
+  _P(g, new THREE.BoxGeometry(s * 0.62, s * 0.4, s * 0.48), BIZ_MAT.brick, s * 0.48, s * 0.29, -s * 0.3);
+  const barnRoof = new THREE.ConeGeometry(s * 0.46, s * 0.34, 4);
+  _P(g, barnRoof, BIZ_MAT.roofSlate, s * 0.48, s * 0.66, -s * 0.3, { ry: Math.PI / 4 });
+  // silo + cap + vent pipe
+  _P(g, new THREE.CylinderGeometry(s * 0.14, s * 0.14, s * 0.78, 10), BIZ_MAT.silver, s * 1.02, s * 0.48, -s * 0.44);
+  _P(g, new THREE.SphereGeometry(s * 0.14, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), BIZ_MAT.white, s * 1.02, s * 0.87, -s * 0.44);
+  _P(g, new THREE.CylinderGeometry(s * 0.015, s * 0.015, s * 0.22, 5), BIZ_MAT.dark, s * 1.02, s * 1.02, -s * 0.44);
+  // farmhouse with a warm window
+  _P(g, new THREE.BoxGeometry(s * 0.32, s * 0.22, s * 0.26), BIZ_MAT.plaster, -s * 0.62, s * 0.2, -s * 0.42);
+  _P(g, new THREE.ConeGeometry(s * 0.25, s * 0.16, 4), BIZ_MAT.roofSlate, -s * 0.62, s * 0.39, -s * 0.42, { ry: Math.PI / 4 });
+  _P(g, new THREE.BoxGeometry(s * 0.17, s * 0.07, s * 0.015), BIZ_MAT.winWarm, -s * 0.62, s * 0.21, -s * 0.29);
+  // hay bales
+  for (let i = 0; i < 3; i++) {
+    _P(g, new THREE.CylinderGeometry(s * 0.05, s * 0.05, s * 0.09, 7), BIZ_MAT.field,
+       -s * (0.75 + rnd() * 0.2), s * 0.13, s * (0.55 + rnd() * 0.2), { rx: Math.PI / 2, ry: rnd() * 3 });
+  }
+  return g;
+}
+
+// ⛏️ MINE — waste mound, headframe tower, winding wheel, conveyor, ore bins
+function _bizMine(s, fx) {
+  const g = new THREE.Group();
+  _P(g, new THREE.SphereGeometry(s * 0.52, 10, 7), BIZ_MAT.earthmover, -s * 0.55, s * 0.12, s * 0.3, { sy: 0.45 });
+  _P(g, new THREE.SphereGeometry(s * 0.2, 8, 6), BIZ_MAT.earthmover, -s * 0.25, s * 0.11, s * 0.6, { sy: 0.55 });
+  // headframe
+  _P(g, new THREE.CylinderGeometry(s * 0.08, s * 0.2, s * 1.15, 4), BIZ_MAT.rust, s * 0.38, s * 0.66, -s * 0.32, { ry: Math.PI / 4 });
+  _P(g, new THREE.TorusGeometry(s * 0.16, s * 0.026, 6, 16), BIZ_MAT.dark, s * 0.38, s * 1.3, -s * 0.32, { ry: Math.PI / 2 });
+  _P(g, new THREE.CylinderGeometry(s * 0.012, s * 0.012, s * 0.3, 5), BIZ_MAT.silver, s * 0.38, s * 1.18, -s * 0.32);
+  // winding house + ore bins
+  _P(g, new THREE.BoxGeometry(s * 0.44, s * 0.3, s * 0.34), BIZ_MAT.concrete, s * 0.38, s * 0.24, -s * 0.82);
+  _P(g, new THREE.BoxGeometry(s * 0.3, s * 0.24, s * 0.3), BIZ_MAT.rust, s * 0.84, s * 0.21, s * 0.38);
+  _P(g, new THREE.BoxGeometry(s * 0.24, s * 0.1, s * 0.24), BIZ_MAT.earthmover, s * 0.84, s * 0.38, s * 0.38);
+  // conveyor up from the mound
+  _P(g, new THREE.BoxGeometry(s * 0.09, s * 0.03, s * 0.9), BIZ_MAT.dark, -s * 0.12, s * 0.28, s * 0.1, { rx: 0.5 });
+  _bizBeacon(g, fx, s * 0.38, s * 1.45, -s * 0.32, s * 0.32, 0.2);
+  return g;
+}
+
+// 🏭 FACTORY — production hall with sawtooth skylights, twin chimneys, tank
+function _bizFactory(s, fx) {
+  const g = new THREE.Group();
+  _P(g, new THREE.BoxGeometry(s * 1.05, s * 0.42, s * 0.68), BIZ_MAT.concrete, -s * 0.12, s * 0.3, 0);
+  for (let i = 0; i < 3; i++) {
+    _P(g, new THREE.BoxGeometry(s * 0.26, s * 0.15, s * 0.58), BIZ_MAT.glass, -s * 0.44 + i * s * 0.32, s * 0.55, 0, { rx: 0.5 });
+  }
+  _P(g, new THREE.BoxGeometry(s * 0.84, s * 0.055, s * 0.012), BIZ_MAT.winWarm, -s * 0.12, s * 0.3, s * 0.35);
+  for (const [x, h] of [[s * 0.52, s * 1.15], [s * 0.74, s * 0.9]]) {
+    _P(g, new THREE.CylinderGeometry(s * 0.055, s * 0.075, h, 8), BIZ_MAT.dark, x, s * 0.09 + h / 2, -s * 0.3);
+    _P(g, new THREE.CylinderGeometry(s * 0.062, s * 0.062, s * 0.09, 8), BIZ_MAT.beaconRed, x, s * 0.09 + h - s * 0.1, -s * 0.3);
+    _bizBeacon(g, fx, x, s * 0.09 + h + s * 0.05, -s * 0.3, s * 0.28, x);
+  }
+  // tank farm annex
+  _P(g, new THREE.CylinderGeometry(s * 0.17, s * 0.17, s * 0.4, 12), BIZ_MAT.white, -s * 0.76, s * 0.29, -s * 0.32);
+  _P(g, new THREE.SphereGeometry(s * 0.17, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), BIZ_MAT.silver, -s * 0.76, s * 0.49, -s * 0.32);
+  _P(g, new THREE.BoxGeometry(s * 0.38, s * 0.2, s * 0.3), BIZ_MAT.brick, -s * 0.76, s * 0.19, s * 0.34);
+  return g;
+}
+
+// 🏖️ RESORT — palm court, glowing pool, white dome villa
+function _bizResort(s, fx) {
+  const g = new THREE.Group();
+  const rnd = _bizRng(7);
+  // pool deck + water
+  _P(g, new THREE.BoxGeometry(s * 1.12, s * 0.06, s * 0.74), BIZ_MAT.plaster, s * 0.08, s * 0.12, s * 0.34);
+  _P(g, new THREE.BoxGeometry(s * 0.82, s * 0.028, s * 0.46), BIZ_MAT.water, s * 0.08, s * 0.16, s * 0.34);
+  const palm = (x, z) => {
+    const h = s * (0.42 + rnd() * 0.16);
+    _P(g, new THREE.CylinderGeometry(s * 0.018, s * 0.03, h, 5), BIZ_MAT.rust, x, s * 0.09 + h / 2, z, { rz: (rnd() - 0.5) * 0.3 });
+    for (let k = 0; k < 5; k++) {
+      const a = k / 5 * Math.PI * 2 + rnd() * 0.6;
+      _P(g, new THREE.BoxGeometry(s * 0.24, s * 0.016, s * 0.055), BIZ_MAT.olive,
+         x + Math.cos(a) * s * 0.1, s * 0.09 + h, z + Math.sin(a) * s * 0.1, { ry: -a, rz: 0.42 });
+    }
+  };
+  palm(-s * 0.62, s * 0.08); palm(-s * 0.46, s * 0.58); palm(s * 0.66, s * 0.55);
+  // glazed drum + dome villa + gold finial
+  _P(g, new THREE.CylinderGeometry(s * 0.53, s * 0.56, s * 0.1, 18), BIZ_MAT.glass, -s * 0.06, s * 0.15, -s * 0.34);
+  _P(g, new THREE.SphereGeometry(s * 0.52, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), BIZ_MAT.plaster, -s * 0.06, s * 0.2, -s * 0.34);
+  _P(g, new THREE.CylinderGeometry(s * 0.02, s * 0.02, s * 0.14, 5), BIZ_MAT.silver, -s * 0.06, s * 0.72, -s * 0.34);
+  _P(g, new THREE.SphereGeometry(s * 0.05, 8, 6), BIZ_MAT.gold, -s * 0.06, s * 0.8, -s * 0.34);
+  // glowing porch
+  _P(g, new THREE.BoxGeometry(s * 0.3, s * 0.17, s * 0.09), BIZ_MAT.winWarm, -s * 0.06, s * 0.17, s * 0.04);
+  return g;
+}
+
+// 🛢️ OIL RIG — jack-up legs, deck, derrick, crane, burning flare stack
+function _bizOilrig(s, fx) {
+  const g = new THREE.Group();
+  for (const [lx, lz] of [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]]) {
+    _P(g, new THREE.CylinderGeometry(s * 0.05, s * 0.075, s * 0.58, 6), BIZ_MAT.rust, lx * s, s * 0.36, lz * s);
+  }
+  _P(g, new THREE.BoxGeometry(s * 1.34, s * 0.09, s * 1.34), BIZ_MAT.dark, 0, s * 0.65, 0);
+  // derrick
+  _P(g, new THREE.CylinderGeometry(s * 0.05, s * 0.2, s * 1.0, 4), BIZ_MAT.gold, -s * 0.12, s * 1.19, -s * 0.18, { ry: Math.PI / 4 });
+  _P(g, new THREE.BoxGeometry(s * 0.34, s * 0.03, s * 0.03), BIZ_MAT.gold, -s * 0.12, s * 1.0, -s * 0.18, { rz: 0.5 });
+  // tanks + crane
+  _P(g, new THREE.CylinderGeometry(s * 0.16, s * 0.16, s * 0.26, 10), BIZ_MAT.white, s * 0.44, s * 0.82, s * 0.34);
+  _P(g, new THREE.CylinderGeometry(s * 0.16, s * 0.16, s * 0.26, 10), BIZ_MAT.white, s * 0.44, s * 0.82, -s * 0.34);
+  _P(g, new THREE.BoxGeometry(s * 0.05, s * 0.5, s * 0.05), BIZ_MAT.gold, -s * 0.54, s * 0.94, s * 0.36);
+  _P(g, new THREE.BoxGeometry(s * 0.55, s * 0.035, s * 0.05), BIZ_MAT.gold, -s * 0.32, s * 1.18, s * 0.36);
+  // flare stack + living flame
+  _P(g, new THREE.CylinderGeometry(s * 0.022, s * 0.04, s * 0.92, 6), BIZ_MAT.rust, s * 0.64, s * 1.08, -s * 0.46);
+  const flame = _bizGlow(BIZ_MAT.flameTex, s * 0.3, s * 0.46, 0xffb46b, true);
+  flame.position.set(s * 0.64, s * 1.5, -s * 0.46);
+  g.add(flame);
+  fx.flames.push({ spr: flame, w: s * 0.3, h: s * 0.46, ph: 0.7 });
+  _bizBeacon(g, fx, -s * 0.54, s * 1.24, s * 0.36, s * 0.3, 0.5);
+  return g;
+}
+
+// 🎰 CASINO — glassy tower with lit bands, neon marquee, rooftop gold orb
+function _bizCasino(s, fx) {
+  const g = new THREE.Group();
+  _P(g, new THREE.BoxGeometry(s * 1.16, s * 0.1, s * 0.82), BIZ_MAT.concrete, 0, s * 0.14, 0);
+  _P(g, new THREE.BoxGeometry(s * 0.56, s * 1.5, s * 0.56), BIZ_MAT.glass, -s * 0.14, s * 0.94, -s * 0.08);
+  for (let i = 0; i < 4; i++) {
+    _P(g, new THREE.BoxGeometry(s * 0.62, s * 0.045, s * 0.62), BIZ_MAT.neonGold, -s * 0.14, s * (0.52 + i * 0.34), -s * 0.08);
+  }
+  _P(g, new THREE.BoxGeometry(s * 0.04, s * 1.5, s * 0.04), BIZ_MAT.neonCyan, s * 0.19, s * 0.94, s * 0.23);
+  _P(g, new THREE.BoxGeometry(s * 0.04, s * 1.5, s * 0.04), BIZ_MAT.neonCyan, -s * 0.47, s * 0.94, s * 0.23);
+  // marquee
+  _P(g, new THREE.BoxGeometry(s * 0.66, s * 0.28, s * 0.14), BIZ_MAT.dark, -s * 0.14, s * 0.33, s * 0.42);
+  _P(g, new THREE.BoxGeometry(s * 0.56, s * 0.18, s * 0.04), BIZ_MAT.neonPink, -s * 0.14, s * 0.35, s * 0.5);
+  // rooftop orb
+  _P(g, new THREE.CylinderGeometry(s * 0.08, s * 0.12, s * 0.12, 8), BIZ_MAT.silver, -s * 0.14, s * 1.74, -s * 0.08);
+  _P(g, new THREE.SphereGeometry(s * 0.16, 12, 8), BIZ_MAT.gold, -s * 0.14, s * 1.88, -s * 0.08);
+  const halo = _bizGlow(BIZ_MAT.pinkTex, s * 0.75, s * 0.75, 0xff6fbe);
+  halo.position.set(-s * 0.14, s * 1.92, -s * 0.08);
+  halo.material.opacity = 0.32;
+  g.add(halo);
+  _bizBeacon(g, fx, -s * 0.14, s * 2.1, -s * 0.08, s * 0.3, 0.9);
+  return g;
+}
+
+// 🏦 BANK — colonnaded temple: stylobate, columns, pediment, gold dome
+function _bizBank(s, fx) {
+  const g = new THREE.Group();
+  _P(g, new THREE.BoxGeometry(s * 1.22, s * 0.08, s * 0.92), BIZ_MAT.concrete, 0, s * 0.13, 0);
+  _P(g, new THREE.BoxGeometry(s * 1.06, s * 0.08, s * 0.8), BIZ_MAT.concrete, 0, s * 0.2, 0);
+  // cella
+  _P(g, new THREE.BoxGeometry(s * 0.72, s * 0.52, s * 0.6), BIZ_MAT.plaster, 0, s * 0.5, -s * 0.08);
+  for (let i = 0; i < 6; i++) {
+    _P(g, new THREE.CylinderGeometry(s * 0.042, s * 0.05, s * 0.44, 8), BIZ_MAT.plaster, -s * 0.44 + i * s * 0.176, s * 0.46, s * 0.31);
+  }
+  // entablature + pediment crown
+  _P(g, new THREE.BoxGeometry(s * 1.02, s * 0.09, s * 0.74), BIZ_MAT.plaster, 0, s * 0.78, s * 0.05);
+  const ped = new THREE.ConeGeometry(s * 0.5, s * 0.2, 4);
+  ped.scale(1, 1, 0.72);
+  _P(g, ped, BIZ_MAT.plaster, 0, s * 0.92, s * 0.07, { ry: Math.PI / 4 });
+  // gold dome + lantern
+  _P(g, new THREE.SphereGeometry(s * 0.29, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), BIZ_MAT.gold, 0, s * 0.74, -s * 0.14);
+  _P(g, new THREE.CylinderGeometry(s * 0.045, s * 0.045, s * 0.13, 6), BIZ_MAT.gold, 0, s * 1.07, -s * 0.14);
+  // lit doorway
+  _P(g, new THREE.BoxGeometry(s * 0.3, s * 0.22, s * 0.025), BIZ_MAT.neonGold, 0, s * 0.31, s * 0.31);
+  return g;
+}
+
+// 💻 TECH HUB — glass tower, spinning sensor halo, beacon mast
+function _bizTechhub(s, fx) {
+  const g = new THREE.Group();
+  _P(g, new THREE.BoxGeometry(s * 1.0, s * 0.15, s * 0.82), BIZ_MAT.dark, 0, s * 0.16, 0);
+  _P(g, new THREE.BoxGeometry(s * 1.02, s * 0.026, s * 0.84), BIZ_MAT.neonCyan, 0, s * 0.24, 0);
+  _P(g, new THREE.BoxGeometry(s * 0.5, s * 1.7, s * 0.5), BIZ_MAT.glass, 0, s * 1.07, 0);
+  for (let i = 0; i < 5; i++) {
+    _P(g, new THREE.BoxGeometry(s * 0.54, s * 0.04, s * 0.54), BIZ_MAT.winCool, 0, s * (0.58 + i * 0.29), 0);
+  }
+  // precessing sensor ring with a gold rider bead
+  const holder = new THREE.Group();
+  const ring = _P(holder, new THREE.TorusGeometry(s * 0.36, s * 0.024, 6, 22), BIZ_MAT.silver, 0, s * 1.68, 0, { rx: Math.PI / 2 + 0.32 });
+  const bead = new THREE.Mesh(new THREE.SphereGeometry(s * 0.045, 8, 6), BIZ_MAT.gold);
+  bead.position.set(s * 0.36, 0, 0);
+  ring.add(bead);
+  g.add(holder);
+  fx.spins.push({ o: holder, v: 0.65, ph: 0 });
+  _P(g, new THREE.CylinderGeometry(s * 0.016, s * 0.016, s * 0.52, 5), BIZ_MAT.silver, 0, s * 2.06, 0);
+  _bizBeacon(g, fx, 0, s * 2.36, 0, s * 0.3, 0.3);
+  return g;
+}
+
+// ⚔️ BARRACKS — Quonset huts, parade flag, watchtower with strobe
+function _bizBarracks(s, fx) {
+  const g = new THREE.Group();
+  const hut = (x, z, len) => {
+    _P(g, new THREE.CylinderGeometry(s * 0.24, s * 0.24, len, 12, 1, false, 0, Math.PI), BIZ_MAT.olive, x, s * 0.09, z, { rz: Math.PI / 2 });
+  };
+  hut(-s * 0.3, -s * 0.3, s * 0.85);
+  hut(-s * 0.3, s * 0.26, s * 0.85);
+  // parade ground + flag
+  _P(g, new THREE.CylinderGeometry(s * 0.23, s * 0.23, s * 0.02, 14), BIZ_MAT.concrete, s * 0.52, s * 0.1, 0);
+  _P(g, new THREE.CylinderGeometry(s * 0.013, s * 0.013, s * 0.82, 5), BIZ_MAT.silver, s * 0.52, s * 0.5, 0);
+  _P(g, new THREE.BoxGeometry(s * 0.22, s * 0.12, s * 0.012), BIZ_MAT.beaconRed, s * 0.63, s * 0.78, 0);
+  // watchtower
+  const tx = s * 0.78, tz = -s * 0.52;
+  for (const [dx, dz] of [[-0.08, -0.08], [0.08, -0.08], [-0.08, 0.08], [0.08, 0.08]]) {
+    _P(g, new THREE.CylinderGeometry(s * 0.015, s * 0.02, s * 0.62, 5), BIZ_MAT.dark, tx + dx * s, s * 0.4, tz + dz * s, { rx: dz * 0.16, rz: -dx * 0.16 });
+  }
+  _P(g, new THREE.BoxGeometry(s * 0.26, s * 0.2, s * 0.26), BIZ_MAT.olive, tx, s * 0.78, tz);
+  _P(g, new THREE.ConeGeometry(s * 0.2, s * 0.12, 4), BIZ_MAT.dark, tx, s * 0.94, tz, { ry: Math.PI / 4 });
+  _bizBeacon(g, fx, tx, s * 1.04, tz, s * 0.3, 0.1);
+  return g;
+}
+
+// ⚓ NAVAL YARD — graving dock with a fitting-out warship, crane, containers
+function _bizNavalyard(s, fx) {
+  const g = new THREE.Group();
+  const rnd = _bizRng(11);
+  _P(g, new THREE.BoxGeometry(s * 1.36, s * 0.1, s * 0.92), BIZ_MAT.concrete, 0, s * 0.13, s * 0.04);
+  _P(g, new THREE.BoxGeometry(s * 1.0, s * 0.05, s * 0.5), BIZ_MAT.water, 0, s * 0.17, -s * 0.12);
+  // warship: hull, bow, superstructure, mast
+  _P(g, new THREE.BoxGeometry(s * 0.8, s * 0.15, s * 0.2), BIZ_MAT.hull, 0, s * 0.25, -s * 0.12);
+  _P(g, new THREE.ConeGeometry(s * 0.1, s * 0.2, 4), BIZ_MAT.hull, s * 0.48, s * 0.25, -s * 0.12, { rz: -Math.PI / 2 });
+  _P(g, new THREE.BoxGeometry(s * 0.34, s * 0.13, s * 0.13), BIZ_MAT.white, -s * 0.12, s * 0.39, -s * 0.12);
+  _P(g, new THREE.CylinderGeometry(s * 0.011, s * 0.011, s * 0.24, 5), BIZ_MAT.silver, -s * 0.12, s * 0.56, -s * 0.12);
+  // hammerhead crane
+  _P(g, new THREE.BoxGeometry(s * 0.07, s * 0.88, s * 0.07), BIZ_MAT.gold, -s * 0.64, s * 0.57, s * 0.3);
+  _P(g, new THREE.BoxGeometry(s * 0.74, s * 0.045, s * 0.055), BIZ_MAT.gold, -s * 0.36, s * 1.0, s * 0.3);
+  _P(g, new THREE.BoxGeometry(s * 0.18, s * 0.045, s * 0.055), BIZ_MAT.gold, -s * 0.8, s * 1.0, s * 0.3);
+  // container stacks
+  for (let i = 0; i < 5; i++) {
+    _P(g, new THREE.BoxGeometry(s * 0.14, s * 0.09, s * 0.09),
+       [BIZ_MAT.rust, BIZ_MAT.olive, BIZ_MAT.silver, BIZ_MAT.brick][i % 4],
+       s * (0.34 + rnd() * 0.34), s * 0.22, s * (0.32 + rnd() * 0.12));
+  }
+  _bizBeacon(g, fx, -s * 0.64, s * 1.1, s * 0.3, s * 0.3, 0.6);
+  return g;
+}
+
+// ✈️ AIRFIELD — striped runway, hangar, control tower, parked aircraft
+function _bizAirfield(s, fx) {
+  const g = new THREE.Group();
+  _P(g, new THREE.BoxGeometry(s * 2.3, s * 0.04, s * 0.42), BIZ_MAT.tarmac, 0, s * 0.11, -s * 0.16);
+  for (let i = 0; i < 7; i++) {
+    _P(g, new THREE.BoxGeometry(s * 0.15, s * 0.012, s * 0.032), BIZ_MAT.white, -s * 0.9 + i * s * 0.3, s * 0.13, -s * 0.16);
+  }
+  _P(g, new THREE.BoxGeometry(s * 0.05, s * 0.012, s * 0.34), BIZ_MAT.neonCyan, -s * 1.06, s * 0.13, -s * 0.16);
+  _P(g, new THREE.BoxGeometry(s * 0.05, s * 0.012, s * 0.34), BIZ_MAT.neonCyan, s * 1.06, s * 0.13, -s * 0.16);
+  // hangar
+  _P(g, new THREE.CylinderGeometry(s * 0.3, s * 0.3, s * 0.55, 12, 1, false, 0, Math.PI), BIZ_MAT.hull, s * 0.35, s * 0.12, s * 0.4, { rz: Math.PI / 2 });
+  // control tower
+  _P(g, new THREE.BoxGeometry(s * 0.14, s * 0.62, s * 0.14), BIZ_MAT.white, -s * 0.58, s * 0.46, s * 0.42);
+  _P(g, new THREE.BoxGeometry(s * 0.24, s * 0.13, s * 0.24), BIZ_MAT.glass, -s * 0.58, s * 0.82, s * 0.42);
+  _P(g, new THREE.BoxGeometry(s * 0.27, s * 0.02, s * 0.27), BIZ_MAT.dark, -s * 0.58, s * 0.9, s * 0.42);
+  _bizBeacon(g, fx, -s * 0.58, s * 1.0, s * 0.42, s * 0.32, 0.4);
+  // parked aircraft
+  const px = -s * 0.08, pz = s * 0.42;
+  _P(g, new THREE.CylinderGeometry(s * 0.042, s * 0.042, s * 0.32, 8), BIZ_MAT.white, px, s * 0.18, pz, { rz: Math.PI / 2 });
+  _P(g, new THREE.BoxGeometry(s * 0.05, s * 0.012, s * 0.38), BIZ_MAT.white, px - s * 0.03, s * 0.18, pz);
+  _P(g, new THREE.BoxGeometry(s * 0.012, s * 0.11, s * 0.09), BIZ_MAT.white, px - s * 0.15, s * 0.22, pz);
+  return g;
+}
+
+// 📈 STOCK EXCHANGE — gold-mullioned tower, spinning trading ring, ticker
+function _bizStockexchange(s, fx) {
+  const g = new THREE.Group();
+  _P(g, new THREE.BoxGeometry(s * 0.92, s * 0.09, s * 0.92), BIZ_MAT.concrete, 0, s * 0.13, 0);
+  _P(g, new THREE.BoxGeometry(s * 0.62, s * 1.8, s * 0.62), BIZ_MAT.glass, 0, s * 1.08, 0);
+  for (let i = 0; i < 4; i++) {
+    _P(g, new THREE.BoxGeometry(s * 0.68, s * 0.04, s * 0.68), BIZ_MAT.gold, 0, s * (0.52 + i * 0.42), 0);
+  }
+  // precessing gold trading ring with rider bead
+  const holder = new THREE.Group();
+  const ring = _P(holder, new THREE.TorusGeometry(s * 0.52, s * 0.028, 6, 24), BIZ_MAT.gold, 0, s * 1.56, 0, { rx: Math.PI / 2 + 0.3 });
+  const bead = new THREE.Mesh(new THREE.SphereGeometry(s * 0.05, 8, 6), BIZ_MAT.neonGold);
+  bead.position.set(s * 0.52, 0, 0);
+  ring.add(bead);
+  g.add(holder);
+  fx.spins.push({ o: holder, v: 0.5, ph: 0.8 });
+  // ticker band
+  _P(g, new THREE.BoxGeometry(s * 0.74, s * 0.05, s * 0.74), BIZ_MAT.ticker, 0, s * 0.24, 0);
+  _P(g, new THREE.CylinderGeometry(s * 0.015, s * 0.015, s * 0.4, 5), BIZ_MAT.silver, 0, s * 2.2, 0);
+  _bizBeacon(g, fx, 0, s * 2.44, 0, s * 0.3, 0.2);
+  return g;
+}
+
+// ⚛️ HELIUM-3 EXTRACTOR — twin tanks, reactor column, glowing vent, arrays
+function _bizHelium3(s, fx) {
+  const g = new THREE.Group();
+  for (const sx of [-1, 1]) {
+    _P(g, new THREE.CylinderGeometry(s * 0.16, s * 0.2, s * 0.18, 10), BIZ_MAT.dark, sx * s * 0.42, s * 0.18, s * 0.26);
+    _P(g, new THREE.SphereGeometry(s * 0.29, 14, 10), BIZ_MAT.white, sx * s * 0.42, s * 0.48, s * 0.26);
+    _P(g, new THREE.CylinderGeometry(s * 0.025, s * 0.025, s * 0.28, 6), BIZ_MAT.silver, sx * s * 0.42, s * 0.78, s * 0.26, { rx: 0.6 });
+  }
+  // reactor + gold band + vent
+  _P(g, new THREE.CylinderGeometry(s * 0.14, s * 0.18, s * 1.05, 8), BIZ_MAT.silver, 0, s * 0.61, -s * 0.34);
+  _P(g, new THREE.CylinderGeometry(s * 0.15, s * 0.15, s * 0.07, 8), BIZ_MAT.gold, 0, s * 0.92, -s * 0.34);
+  _P(g, new THREE.SphereGeometry(s * 0.065, 8, 6), BIZ_MAT.heliGlow, 0, s * 1.18, -s * 0.34);
+  const vent = _bizGlow(BIZ_MAT.goldTex, s * 0.5, s * 0.5, 0xd7ff5e);
+  vent.position.set(0, s * 1.2, -s * 0.34);
+  vent.material.opacity = 0.4;
+  g.add(vent);
+  // pipe run + tilted solar arrays
+  _P(g, new THREE.CylinderGeometry(s * 0.02, s * 0.02, s * 0.8, 6), BIZ_MAT.dark, 0, s * 0.3, s * 0.26, { rz: Math.PI / 2 });
+  for (const sx of [-1, 1]) {
+    _P(g, new THREE.BoxGeometry(s * 0.34, s * 0.014, s * 0.22), BIZ_MAT.panel, sx * s * 0.56, s * 0.2, -s * 0.44, { rx: -0.5 });
+  }
+  _bizBeacon(g, fx, 0, s * 1.32, -s * 0.34, s * 0.3, 0.7);
+  return g;
+}
+
+// 🌱 BIODOME — faceted translucent shell over a glowing garden, airlock
+function _bizBiodome(s, fx) {
+  const g = new THREE.Group();
+  _P(g, new THREE.SphereGeometry(s * 0.74, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), BIZ_MAT.domeShell, 0, s * 0.1, 0);
+  _P(g, new THREE.SphereGeometry(s * 0.61, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), BIZ_MAT.domeGlow, 0, s * 0.11, 0);
+  // airlock porch + warm light
+  _P(g, new THREE.BoxGeometry(s * 0.28, s * 0.16, s * 0.2), BIZ_MAT.white, 0, s * 0.17, s * 0.8);
+  _P(g, new THREE.BoxGeometry(s * 0.2, s * 0.09, s * 0.015), BIZ_MAT.winWarm, 0, s * 0.17, s * 0.91);
+  for (const sx of [-1, 1]) {
+    _P(g, new THREE.BoxGeometry(s * 0.3, s * 0.012, s * 0.18), BIZ_MAT.panel, sx * s * 0.63, s * 0.16, -s * 0.22, { rx: -0.5 });
+  }
+  return g;
+}
+
+// 🌊 WAVE FARM — floating column turbines, service platform, waterline glow
+function _bizWavefarm(s, fx) {
+  const g = new THREE.Group();
+  for (let i = -1; i <= 1; i++) {
+    _P(g, new THREE.CylinderGeometry(s * 0.17, s * 0.2, s * 0.4, 10), BIZ_MAT.white, i * s * 0.55, s * 0.28, 0);
+    _P(g, new THREE.CylinderGeometry(s * 0.08, s * 0.08, s * 0.13, 8), BIZ_MAT.dark, i * s * 0.55, s * 0.53, 0);
+    const hub = _P(g, new THREE.BoxGeometry(s * 0.1, s * 0.02, s * 0.022), BIZ_MAT.silver, i * s * 0.55, s * 0.6, 0);
+    fx.spins.push({ o: hub, v: 2.1 + i * 0.5, ph: i * 0.7 });
+  }
+  _P(g, new THREE.BoxGeometry(s * 0.4, s * 0.08, s * 0.4), BIZ_MAT.dark, s * 0.78, s * 0.33, -s * 0.52);
+  _P(g, new THREE.CylinderGeometry(s * 0.012, s * 0.012, s * 0.55, 5), BIZ_MAT.silver, s * 0.78, s * 0.64, -s * 0.52);
+  _bizBeacon(g, fx, s * 0.78, s * 0.94, -s * 0.52, s * 0.28, 0.3);
+  _P(g, new THREE.TorusGeometry(s * 0.21, s * 0.014, 5, 18), BIZ_MAT.neonCyan, 0, s * 0.12, 0, { rx: Math.PI / 2 });
+  return g;
+}
+
+// Fallback for unknown types
+function _bizGeneric(s, fx) {
+  const g = new THREE.Group();
+  _P(g, new THREE.BoxGeometry(s * 0.9, s * 0.85, s * 0.9), BIZ_MAT.concrete, 0, s * 0.51, 0);
+  _P(g, new THREE.ConeGeometry(s * 0.72, s * 0.36, 4), BIZ_MAT.roofSlate, 0, s * 1.12, 0, { ry: Math.PI / 4 });
+  _P(g, new THREE.BoxGeometry(s * 0.5, s * 0.06, s * 0.015), BIZ_MAT.winWarm, 0, s * 0.45, s * 0.46);
+  return g;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// MAIN ENTRY + FX + DISPOSAL
+// ══════════════════════════════════════════════════════════════════
 function buildBusinessMesh(businessType, scale) {
+  _buildBizMaterials();
   const s = scale;
-  let geo;
-  switch (businessType.shape) {
-    case 'cone':       geo = new THREE.ConeGeometry(s * 0.6, s * 1.4, 8); break;
-    case 'cylinder':   geo = new THREE.CylinderGeometry(s * 0.5, s * 0.6, s * 1.2, 12); break;
-    case 'box':        geo = new THREE.BoxGeometry(s, s, s); break;
-    case 'dome':       geo = new THREE.SphereGeometry(s * 0.7, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2); break;
-    case 'pyramid':    geo = new THREE.ConeGeometry(s * 0.8, s * 1.4, 4); break;
-    case 'sphere':     geo = new THREE.SphereGeometry(s * 0.7, 16, 12); break;
-    case 'octahedron': geo = new THREE.OctahedronGeometry(s * 0.8, 0); break;
-    case 'barracks':   geo = new THREE.CylinderGeometry(s * 0.75, s * 0.85, s * 0.7, 6); break;
-    case 'navalyard':  geo = new THREE.CylinderGeometry(s * 1.1, s * 1.2, s * 0.35, 8); break;
-    case 'airfield':   geo = new THREE.BoxGeometry(s * 1.8, s * 0.12, s * 0.35); break;
-    default:           geo = new THREE.BoxGeometry(s, s, s);
+  const fx = { flames: [], strobes: [], spins: [] };
+  let body;
+  switch (businessType.id) {
+    case 'farm':          body = _bizFarm(s, fx); break;
+    case 'mine':          body = _bizMine(s, fx); break;
+    case 'factory':       body = _bizFactory(s, fx); break;
+    case 'resort':        body = _bizResort(s, fx); break;
+    case 'oilrig':        body = _bizOilrig(s, fx); break;
+    case 'casino':        body = _bizCasino(s, fx); break;
+    case 'bank':          body = _bizBank(s, fx); break;
+    case 'techhub':       body = _bizTechhub(s, fx); break;
+    case 'barracks':      body = _bizBarracks(s, fx); break;
+    case 'navalyard':     body = _bizNavalyard(s, fx); break;
+    case 'airfield':      body = _bizAirfield(s, fx); break;
+    case 'stockexchange': body = _bizStockexchange(s, fx); break;
+    case 'helium3':       body = _bizHelium3(s, fx); break;
+    case 'biodome':       body = _bizBiodome(s, fx); break;
+    case 'wavefarm':      body = _bizWavefarm(s, fx); break;
+    default:              body = _bizGeneric(s, fx); break;
   }
-  const mat = new THREE.MeshBasicMaterial({
-    color: businessType.color,
-    transparent: true,
-    opacity: 0.8,
-    side: THREE.DoubleSide,
-    depthWrite: false
+  // The caller's lookAt swings the returned group's +Z away from the
+  // globe, so stand the Y-up authored body upright inside a wrapper.
+  const root = new THREE.Group();
+  const up = new THREE.Group();
+  up.rotation.x = Math.PI / 2;      // authored +Y → root +Z (skyward)
+  up.add(body);
+  root.add(up);
+  // Plinth — oil rigs & wave farms sit straight on the water instead
+  if (businessType.id !== 'oilrig' && businessType.id !== 'wavefarm') {
+    up.add(_bizPad(s, businessType.color, !!businessType.military));
+  }
+  root.userData.fx = fx;
+  root.userData.businessId = businessType.id;
+  return root;
+}
+
+// One tick per frame: shared accent materials breathe together (a single
+// write animates every building on the globe), then per-instance flames,
+// strobes and spinning accents. Iteration walks the claimed-plot list —
+// the same set updatePlotVisibility() uses — so dead buildings drop out
+// automatically when plots are demolished or lost.
+function updateBizFx(now) {
+  if (!BIZ_MAT || !STATE.claimedPlots) return;
+  const t = now * 0.001;
+  BIZ_MAT.neonPink.opacity = 0.66 + 0.3 * Math.sin(t * 2.2);
+  BIZ_MAT.neonCyan.opacity = 0.62 + 0.33 * Math.sin(t * 2.9 + 1.7);
+  BIZ_MAT.neonGold.opacity = 0.8 + 0.2 * Math.sin(t * 1.6 + 0.4);
+  BIZ_MAT.ticker.opacity = 0.55 + 0.4 * Math.sin(t * 6.1);
+  BIZ_MAT.domeGlow.opacity = 0.55 + 0.18 * Math.sin(t * 0.8);
+  BIZ_MAT.heliGlow.opacity = 0.6 + 0.3 * Math.sin(t * 3.3 + 0.8);
+  for (const p of STATE.claimedPlots) {
+    const businesses = p.userData.businesses;
+    if (!businesses) continue;
+    for (const entry of businesses) {
+      const fx = entry.mesh && entry.mesh.userData && entry.mesh.userData.fx;
+      if (!fx) continue;
+      for (const f of fx.flames) {
+        const k = 1 + 0.26 * Math.sin(t * 11 + f.ph) + 0.12 * Math.sin(t * 23 + f.ph * 2);
+        f.spr.scale.set(f.w * k, f.h * (1.55 - k * 0.32), 1);
+      }
+      for (const st of fx.strobes) {
+        st.spr.visible = (((t * st.freq + st.ph) % 1) + 1) % 1 < st.duty;
+      }
+      for (const sp of fx.spins) {
+        sp.o.rotation.y = t * sp.v + sp.ph;
+      }
+    }
+  }
+}
+
+// Safely detach and dispose a business installation. Materials are
+// SHARED across every building (BIZ_MAT / SAT_MAT) so they are never
+// disposed here — only per-instance geometries and the marked
+// per-instance sprite materials are freed.
+function disposeBusinessMesh(mesh) {
+  if (!mesh) return;
+  if (mesh.parent) mesh.parent.remove(mesh);
+  mesh.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material && o.material.userData && o.material.userData._bizInstance) {
+      o.material.dispose();
+    }
   });
-  const mesh = new THREE.Mesh(geo, mat);
-  // Military buildings get a red base ring so armed sites read as distinct
-  // from businesses at a glance on the globe
-  if (businessType.military) {
-    const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(s * 1.05, s * 0.12, 6, 20),
-      new THREE.MeshBasicMaterial({ color: 0xff5252, transparent: true, opacity: 0.9, depthWrite: false })
-    );
-    ring.rotation.x = Math.PI / 2;
-    mesh.add(ring);
-  }
-  // Lift so base sits on the surface (roughly) — low-profile military
-  // shapes (dock platform, runway) sit closer to the ground
-  mesh.position.y = (businessType.shape === 'navalyard' || businessType.shape === 'airfield') ? s * 0.12 : s * 0.6;
-  return mesh;
 }
 
 // ====================================================================
@@ -6825,11 +7385,7 @@ window.travelTo = function(planetId) {
   // Tear down the current planet: business meshes + plot pools
   for (const p of STATE.plots) {
     for (const entry of (p.userData.businesses || [])) {
-      if (entry.mesh) {
-        earth.remove(entry.mesh);
-        entry.mesh.geometry.dispose();
-        entry.mesh.material.dispose();
-      }
+      disposeBusinessMesh(entry.mesh);
     }
   }
   if (plotGroupRef) {
@@ -7396,9 +7952,7 @@ window.demolishBusiness = function(businessIndex) {
   const bt = getBusinessType(entry.type);
   // Remove business mesh
   if (entry.mesh) {
-    earth.remove(entry.mesh);
-    entry.mesh.geometry.dispose();
-    entry.mesh.material.dispose();
+    disposeBusinessMesh(entry.mesh);
   }
   p.userData.businesses.splice(businessIndex, 1);
   // Drop it from the all-planet registry too
@@ -8809,6 +9363,7 @@ function animate() {
   if (clouds) { clouds.visible = STATE.planet === 'earth'; clouds.rotation.y += 0.00055; }
   if (orbitalGroup) orbitalGroup.rotation.y += 0.00028;
   updateShips(now);
+  updateBizFx(now);      // business accents: neon breathing, flares, strobes
   updatePlotVisibility();
   if (now - _lastZoomDom > 100) {
     _lastZoomDom = now;
