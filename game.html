@@ -899,7 +899,7 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 .sf-radar-time{display:flex;justify-content:center;gap:6px;align-items:baseline;font-size:10px;color:#5e86a3}
 .sf-radar-time b{color:#d7ecff;font-size:12px;letter-spacing:1.5px}
 
-/* — bottom-right contact log + LAUNCH — */
+/* — bottom-right contact log — */
 .sf-launchpad{right:14px;bottom:14px;width:254px;display:flex;flex-direction:column}
 .sf-contact{display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:1.2px;color:#a8c8e2;
   padding:5px 2px;text-transform:uppercase}
@@ -909,15 +909,6 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 @keyframes sfPulse{0%,100%{opacity:1}50%{opacity:.35}}
 @keyframes sfFlash{0%{background:rgba(0,229,255,.22)}100%{background:transparent}}
 .sf-contact.flash{animation:sfFlash .9s ease-out}
-.sf-launch{margin-top:10px;font-family:'Orbitron',sans-serif;font-size:17px;font-weight:900;letter-spacing:6px;
-  color:#ffc46b;background:linear-gradient(180deg, rgba(70,34,4,.75), rgba(40,20,4,.85));
-  border:1px solid #ff9a2e;border-radius:6px;padding:13px 10px;cursor:pointer;text-transform:uppercase;
-  box-shadow:0 0 22px rgba(255,154,46,.35), inset 0 0 14px rgba(255,154,46,.14);transition:all .18s}
-.sf-launch:hover{color:#fff;border-color:#ffc46b;
-  box-shadow:0 0 30px rgba(255,170,60,.6), inset 0 0 18px rgba(255,170,60,.25)}
-.sf-launch:active{transform:translateY(1px)}
-.sf-launch.launching{color:#fff;border-color:#00e5ff;box-shadow:0 0 30px rgba(0,229,255,.7);
-  animation:sfPulse .5s infinite}
 
 /* — bottom center strip: controls + quality — */
 .sf-bottom{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:21;
@@ -948,7 +939,6 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 @media (max-width: 1100px){
   .sf-right{width:196px}
   .sf-launchpad{width:220px}
-  .sf-launch{font-size:14px;letter-spacing:4px;padding:11px 8px}
 }
 @media (max-width: 900px){
   .sf-right{top:54px;width:168px}
@@ -1133,12 +1123,11 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
       </div>
     </aside>
 
-    <!-- ══ BOTTOM RIGHT — CONTACT LOG + LAUNCH ══ -->
+    <!-- ══ BOTTOM RIGHT — CONTACT LOG ══ -->
     <aside class="sf-panel sf-launchpad">
       <div class="sf-panel-head">CONTACT LOG</div>
       <div class="sf-contact" id="sf-contact-1"><i class="dot"></i><span>CLAN KAEL IRAHMANTE IN SECTOR 7</span></div>
       <div class="sf-contact" id="sf-contact-2"><i class="dot dot-warn"></i><span>PATROL WING DELTA — SECTOR 3</span></div>
-      <button class="sf-launch" id="sf-launch-btn" onclick="sfLaunch()">LAUNCH</button>
     </aside>
 
     <!-- ══ BOTTOM CENTER — controls + quality ══ -->
@@ -1464,7 +1453,7 @@ const STATE = {
   radius: 1.0,                // Earth radius in scene units
   zoomMin: 1.12,              // closest zoom — low orbit over the surface (wide zoom range now)
   zoomMax: 7.5,               // farthest — full orbital sector view with rings and ships
-  zoomTarget: 2.9,            // where wheel-zoom is heading (eased toward every frame)
+  zoomTarget: 2.2,             // matches the default camera distance (low orbit)
   plotRevealDist: 3.3,        // camera distance at which plots begin to appear
   plotFullDist: 2.0,          // camera distance at which plots are fully visible
   // Convert scene units to km for display. Earth radius ≈ 6371 km.
@@ -3554,15 +3543,21 @@ function addBusinessToPlot(plot, bt, index) {
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.13';
+const GAME_VERSION = 'v1.14';
 const RELEASE_NOTES = [
+  { v: 'v1.14', items: [
+    '🛰 <b>Satellites got a realism pass</b> — crinkled gold-foil insulation, gridded solar cells and machined hull plating that catch real sun glints as the fleet orbits. The station now glows with viewport windows and has a ferry capsule docked at its port.',
+    '🎛 <b>Zoom truly fixed</b> — momentum wheel flicks and trackpad scrolls can no longer rocket the camera across the zoom range. Every input now glides a notch at a time, on any mouse or trackpad.',
+    '🔭 <b>Closer default view</b> — you start lower over the planet, with plots already in sight.',
+    '🚀 <b>LAUNCH button removed</b> — the bottom-right corner is now just the clean contact log; the view is fully under your control.'
+  ]},
   { v: 'v1.13', items: [
     '🛰 <b>Satellites rebuilt</b> — every orbiter is now a detailed spacecraft: gold-foil buses, segmented solar wings, nadir dishes and a survey telescope, with blinking nav lights that glint in the sunlight.',
     '🛰 <b>Patrol craft & station upgraded</b> — sleek ships with engine plumes and running lights; the station grew a truss, habitat modules, radiators and four solar arrays that slowly gimbal to track the sun.'
   ]},
   { v: 'v1.12', items: [
     '🛰 <b>Orbital Command view</b> — the world now opens as a live sector scan: Earth front and center with city lights on the night side, a drifting cloud deck, glowing orbital rings and patrol ships.',
-    '📡 <b>Space-command HUD</b> — top command bar, COMMS / NAVIGATION panels, a sweeping radar with live contacts, and a big LAUNCH button that dives you down to low orbit.',
+    '📡 <b>Space-command HUD</b> — top command bar, COMMS / NAVIGATION panels, a sweeping radar with live contacts, and a clean contact log.',
     '🎛 <b>Gentler zoom</b> — the scroll wheel now steps softly through a much wider zoom range, from surface detail all the way out to the full orbital view. No more slamming to max zoom.'
   ]},
   { v: 'v1.11', items: [
@@ -4228,7 +4223,7 @@ function initScene() {
   scene = new THREE.Scene();
 
   camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.01, 1000);
-  camera.position.set(0, 0.15, 2.9);   // orbital view — Earth framed big, rings & ships visible
+  camera.position.set(0, 0.15, 2.2);   // low-orbit default — globe big, plots in sight
 
   const q = QUALITY_LEVELS[getEffectiveQuality()];
   renderer = new THREE.WebGLRenderer({ antialias: q.antialias, alpha: false, powerPreference: 'high-performance' });
@@ -4266,15 +4261,21 @@ function initScene() {
   controls.addEventListener('start', () => { controls._isInteracting = true; });
   controls.addEventListener('end',   () => { controls._isInteracting = false; });
 
-  // ---- Smooth wheel zoom (fix: one scroll used to slam to max zoom) ----
+  // ---- Smooth wheel zoom (fix: a single flick used to slam to max zoom) ----
   // three r160 OrbitControls applies a fixed distance step to EVERY wheel
-  // event (scaled by raw deltaY / pixel ratio). Smooth-scroll wheels and
-  // trackpads fire dozens of events per gesture, so a single flick sent the
-  // camera all the way to the closest zoom. We intercept the wheel before
-  // OrbitControls ever sees it and instead ease toward a target distance:
-  // small clamped steps per event, capped zoom speed per second — zooming
-  // feels the same on every mouse, wheel, trackpad and screen.
+  // event. Smooth-scroll wheels, free-spin wheels and trackpad momentum
+  // fire dozens-to-hundreds of events per gesture, so even clamping each
+  // event still let one flick carry the zoom all the way to the limit.
+  // We intercept the wheel before OrbitControls ever sees it and ease
+  // toward a target distance instead — with a token-bucket limiter so the
+  // target can only move a bounded number of steps per second NO MATTER
+  // how many events arrive. Zooming feels the same on every mouse, wheel,
+  // trackpad and screen: a flick glides one notch, never rockets.
   STATE.zoomTarget = camera.position.distanceTo(controls.target);
+  const ZOOM_STEP = 0.055;            // distance change per wheel step (gentle, gradual)
+  const ZOOM_STEPS_PER_SEC = 8.0;     // sustained-scroll speed cap
+  let _wheelBucket = 2.0;             // burst allowance — one flick ≈ 2 steps
+  let _wheelLastT = performance.now();
   window.addEventListener('wheel', (e) => {
     // Only when scrolling over the 3D canvas — menus and modals scroll normally
     if (e.target !== renderer.domElement) return;
@@ -4285,13 +4286,23 @@ function initScene() {
     else if (e.deltaMode === 2) dy *= 100; // "pages" -> px-ish
     // One classic wheel tick ~= 100px. Clamp each event's contribution so a
     // single bursty event can never jump the zoom far on its own.
-    const steps = THREE.MathUtils.clamp(dy / 100, -0.8, 0.8);
-    const ZOOM_STEP = 0.045;               // distance change per wheel tick (gentle, gradual)
-    const factor = steps < 0
-      ? Math.pow(1 - ZOOM_STEP, -steps)         // scroll up  -> zoom in
-      : Math.pow(1 / (1 - ZOOM_STEP), steps);   // scroll down -> zoom out
-    STATE.zoomTarget = THREE.MathUtils.clamp(
-      STATE.zoomTarget * factor, STATE.zoomMin, STATE.zoomMax);
+    let steps = THREE.MathUtils.clamp(dy / 100, -0.8, 0.8);
+    // Token bucket: refills with time, spent per step. A momentum flick that
+    // sprays 60 events in a second still only moves a handful of steps in
+    // total, so the view glides a notch instead of slamming to the limit.
+    const nowT = performance.now();
+    _wheelBucket = Math.min(2.0,
+      _wheelBucket + Math.max(0, nowT - _wheelLastT) / 1000 * ZOOM_STEPS_PER_SEC);
+    _wheelLastT = nowT;
+    steps = THREE.MathUtils.clamp(steps, -_wheelBucket, _wheelBucket);
+    _wheelBucket -= Math.abs(steps);
+    if (steps !== 0) {
+      const factor = steps < 0
+        ? Math.pow(1 - ZOOM_STEP, -steps)         // scroll up  -> zoom in
+        : Math.pow(1 / (1 - ZOOM_STEP), steps);   // scroll down -> zoom out
+      STATE.zoomTarget = THREE.MathUtils.clamp(
+        STATE.zoomTarget * factor, STATE.zoomMin, STATE.zoomMax);
+    }
     lastInteractionTime = performance.now();    // pause auto-rotate while zooming
   }, { passive: false, capture: true });
 
@@ -4932,21 +4943,183 @@ function buildOrbitalRings() {
 
 // ──────────────────────────────────────────────────────────────────
 // CRAFT FACTORY — detailed satellites, patrol craft and the station.
-// Every craft is an assembly of Phong-shaded parts so the sun glints
-// off solar wings and gold foil as they cross the terminator.
+// Every craft is an assembly of PBR (MeshStandardMaterial) parts wearing
+// procedural textures — crinkled gold-foil MLI, gridded solar cells,
+// machined hull plating — plus a tiny space environment map so metal
+// glints realistically as the craft cross the terminator.
 // Local frame while orbiting: +Z = travel direction (prograde),
 // +X = away from Earth (zenith), -X = nadir (points at the globe).
 // ──────────────────────────────────────────────────────────────────
-const SAT_MAT = {
-  gold:   new THREE.MeshPhongMaterial({ color: 0xcfa23a, specular: 0xffe6a3, shininess: 80 }),
-  panel:  new THREE.MeshPhongMaterial({ color: 0x12306e, specular: 0xa8ccff, shininess: 120 }),
-  silver: new THREE.MeshPhongMaterial({ color: 0xd4dbe2, specular: 0xffffff, shininess: 70 }),
-  dark:   new THREE.MeshPhongMaterial({ color: 0x3a434e, specular: 0x778899, shininess: 25 }),
-  white:  new THREE.MeshPhongMaterial({ color: 0xeef1f4, specular: 0xdde3e8, shininess: 40 }),
-  hull:   new THREE.MeshPhongMaterial({ color: 0xaebfd0, specular: 0xffffff, shininess: 90 }),
-  glass:  new THREE.MeshPhongMaterial({ color: 0x2e5f8a, specular: 0xbfe6ff, shininess: 160 }),
-  dish:   new THREE.MeshPhongMaterial({ color: 0xe8ecef, specular: 0xffffff, shininess: 55, side: THREE.DoubleSide }),
-};
+
+// — procedural textures (canvas → CanvasTexture, no downloads needed) —
+
+// Gold MLI blanket: crinkled multi-layer insulation. Random faceted
+// flakes at varying gold lightness — catches light like real foil.
+function _satGoldTex() {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 128;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#c79b36';
+  ctx.fillRect(0, 0, 128, 128);
+  for (let i = 0; i < 300; i++) {
+    const x = Math.random() * 128, y = Math.random() * 128;
+    const w = 4 + Math.random() * 14, h = 3 + Math.random() * 10;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(Math.random() * Math.PI);
+    ctx.fillStyle = 'hsl(43,60%,' + (38 + Math.random() * 52).toFixed(0) + '%)';
+    ctx.fillRect(-w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+  for (let i = 0; i < 40; i++) {          // sparse bright glints
+    ctx.fillStyle = 'rgba(255,240,190,' + (0.25 + Math.random() * 0.5).toFixed(2) + ')';
+    ctx.fillRect(Math.random() * 128, Math.random() * 128, 2, 2);
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+// Solar array: deep-blue cells with silver busbars in a grid, like
+// real gallium-arsenide panels on modern spacecraft.
+function _satPanelTex() {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 128;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#0b1733';              // gap / frame color
+  ctx.fillRect(0, 0, 128, 128);
+  const cols = 6, rows = 4, cw = 128 / cols, ch = 128 / rows;
+  for (let c = 0; c < cols; c++) {
+    for (let r = 0; r < rows; r++) {
+      const x = c * cw + 1.5, y = r * ch + 1.5, w = cw - 3, h = ch - 3;
+      const g = ctx.createLinearGradient(x, y, x + w, y + h);
+      g.addColorStop(0, '#2e5ad0');
+      g.addColorStop(0.5, '#1e3d94');
+      g.addColorStop(1, '#16307a');
+      ctx.fillStyle = g;
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = 'rgba(205,222,244,.65)';
+      ctx.lineWidth = 0.8;
+      for (let k = 1; k <= 2; k++) {      // thin busbar fingers
+        ctx.beginPath();
+        ctx.moveTo(x, y + h * k / 3);
+        ctx.lineTo(x + w, y + h * k / 3);
+        ctx.stroke();
+      }
+    }
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+// Machined hull plating: light metal with panel seams, rivets, vents
+// and a brushed finish — reads as a real spacecraft bus.
+function _satHullTex() {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 128;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#d3d9df';
+  ctx.fillRect(0, 0, 128, 128);
+  ctx.strokeStyle = 'rgba(88,98,110,.7)'; // panel seams
+  ctx.lineWidth = 1.2;
+  ctx.strokeRect(4, 4, 56, 56); ctx.strokeRect(68, 4, 56, 56);
+  ctx.strokeRect(4, 68, 56, 56); ctx.strokeRect(68, 68, 56, 56);
+  for (let i = 0; i < 900; i++) {         // brushed-metal noise
+    ctx.fillStyle = 'rgba(255,255,255,' + (Math.random() * 0.05).toFixed(3) + ')';
+    ctx.fillRect(Math.random() * 128, Math.random() * 128, 3, 1);
+    ctx.fillStyle = 'rgba(70,78,88,' + (Math.random() * 0.06).toFixed(3) + ')';
+    ctx.fillRect(Math.random() * 128, Math.random() * 128, 3, 1);
+  }
+  for (let i = 0; i < 26; i++) {          // rivets
+    ctx.fillStyle = 'rgba(78,88,100,.8)';
+    ctx.beginPath();
+    ctx.arc(8 + Math.random() * 112, 8 + Math.random() * 112, 1.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  for (let i = 0; i < 8; i++) {           // vents / grilles
+    ctx.fillStyle = 'rgba(52,60,70,.75)';
+    ctx.fillRect(12 + Math.random() * 100, 12 + Math.random() * 100, 10, 3);
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+// Tiny procedural space environment for PBR reflections: deep space with
+// one hot sun disk and a cool rim, so foil and panels glint as they orbit.
+// Needs the renderer → built lazily inside buildShips().
+function _satEnvMap() {
+  const envScene = new THREE.Scene();
+  const cv = document.createElement('canvas');
+  cv.width = 64; cv.height = 64;
+  const ctx = cv.getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 0, 64);
+  grad.addColorStop(0, '#0e1626');
+  grad.addColorStop(0.5, '#04060c');
+  grad.addColorStop(1, '#000106');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 64, 64);
+  const bgTex = new THREE.CanvasTexture(cv);
+  bgTex.colorSpace = THREE.SRGBColorSpace;
+  envScene.background = bgTex;
+  const sunBall = new THREE.Mesh(
+    new THREE.SphereGeometry(0.5, 16, 16),
+    new THREE.MeshBasicMaterial({ color: 0xfff1cf }));
+  sunBall.position.set(3, 2.2, 2);
+  envScene.add(sunBall);
+  const rim = new THREE.Mesh(
+    new THREE.SphereGeometry(0.6, 16, 16),
+    new THREE.MeshBasicMaterial({ color: 0x24406b }));
+  rim.position.set(-3, -1.6, 1.2);
+  envScene.add(rim);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const rt = pmrem.fromScene(envScene, 0.035);
+  pmrem.dispose();
+  bgTex.dispose();
+  return rt.texture;
+}
+
+// Built once when the fleet is created (needs the renderer for the env
+// map). All craft factories read from this shared material set.
+let SAT_MAT = null;
+function _buildSatMaterials() {
+  const env = _satEnvMap();
+  const goldTex = _satGoldTex();
+  const panelTex = _satPanelTex();
+  const hullTex = _satHullTex();
+  SAT_MAT = {
+    // crinkled gold MLI foil — the signature satellite look
+    gold:   new THREE.MeshStandardMaterial({ color: 0xffd27a, map: goldTex, bumpMap: goldTex, bumpScale: 0.0006,
+              metalness: 0.9, roughness: 0.34, envMap: env, envMapIntensity: 1.25 }),
+    // solar cell grid on the wings
+    panel:  new THREE.MeshStandardMaterial({ color: 0xffffff, map: panelTex, bumpMap: panelTex, bumpScale: 0.0002,
+              metalness: 0.6, roughness: 0.26, envMap: env, envMapIntensity: 1.3 }),
+    // bright machined plating
+    silver: new THREE.MeshStandardMaterial({ color: 0xe7edf3, map: hullTex,
+              metalness: 0.85, roughness: 0.22, envMap: env, envMapIntensity: 1.15 }),
+    // dark structure / truss / nozzles
+    dark:   new THREE.MeshStandardMaterial({ color: 0x535e6b, map: hullTex,
+              metalness: 0.7, roughness: 0.5, envMap: env, envMapIntensity: 0.7 }),
+    // matte white radiators / shrouds
+    white:  new THREE.MeshStandardMaterial({ color: 0xf0f3f6, map: hullTex,
+              metalness: 0.45, roughness: 0.42, envMap: env, envMapIntensity: 0.85 }),
+    // light hull gray
+    hull:   new THREE.MeshStandardMaterial({ color: 0xc3cedb, map: hullTex,
+              metalness: 0.8, roughness: 0.3, envMap: env, envMapIntensity: 1.05 }),
+    // canopy / sensor glass
+    glass:  new THREE.MeshStandardMaterial({ color: 0x2e5f8a,
+              metalness: 0.95, roughness: 0.06, envMap: env, envMapIntensity: 1.6 }),
+    // reflective dish surface
+    dish:   new THREE.MeshStandardMaterial({ color: 0xeceff2, map: hullTex,
+              metalness: 0.8, roughness: 0.2, envMap: env, envMapIntensity: 1.1, side: THREE.DoubleSide }),
+    // warm lit windows on the station (always glowing)
+    window: new THREE.MeshBasicMaterial({ color: 0xffd9a0 }),
+  };
+}
 
 // soft radial glow texture for engine plumes, strobes and beacons
 function _satGlowTex(r, g, b) {
@@ -4985,16 +5158,26 @@ function _satLight(color, tex, size) {
   return { group: g, bulb: bulb, halo: halo };
 }
 
-// segmented solar wing extending along local +Z (cells face +Y)
+// segmented solar wing extending along local +Z (cells face +Y).
+// Each wing clones the panel texture with its own repeat so the cell
+// grid stays near-square no matter the wing's proportions.
 function _satPanelWing(len, wid, segs) {
   const wing = new THREE.Group();
   const seg = len / segs;
+  const mat = SAT_MAT.panel.clone();
+  mat.map = SAT_MAT.panel.map.clone();
+  mat.map.wrapS = mat.map.wrapT = THREE.RepeatWrapping;
+  // the baked texture holds a 6x4 cell grid — resample it to ~8mm cells
+  const cellsAcross = Math.max(3, Math.round(wid / 0.008));
+  const cellsAlong  = Math.max(2, Math.round(seg / 0.008));
+  mat.map.repeat.set(cellsAcross / 6, cellsAlong / 4);
+  mat.map.needsUpdate = true;
   for (let i = 0; i < segs; i++) {
     const z = seg * (i + 0.5);
     const frame = new THREE.Mesh(new THREE.BoxGeometry(wid * 1.05, 0.0035, seg * 0.92), SAT_MAT.dark);
     frame.position.z = z;
     wing.add(frame);
-    const cells = new THREE.Mesh(new THREE.BoxGeometry(wid * 0.92, 0.003, seg * 0.84), SAT_MAT.panel);
+    const cells = new THREE.Mesh(new THREE.BoxGeometry(wid * 0.92, 0.003, seg * 0.84), mat);
     cells.position.set(0, 0.0032, z);
     wing.add(cells);
   }
@@ -5085,6 +5268,24 @@ function _makeCommSat(variant) {
     whip.rotation.z = -0.3 * s;
     g.add(whip);
   }
+  // apogee thruster nozzle on the zenith end
+  const nozzle = new THREE.Mesh(new THREE.ConeGeometry(0.011, 0.018, 10), SAT_MAT.dark);
+  nozzle.rotation.z = -Math.PI / 2;          // bell points away from the globe
+  nozzle.position.set(0.031, 0, 0);
+  g.add(nozzle);
+  // RCS thruster quads on the bus corners
+  for (const sx of [-1, 1]) {
+    for (const sy of [-1, 1]) {
+      const rcs = new THREE.Mesh(new THREE.BoxGeometry(0.007, 0.007, 0.007), SAT_MAT.dark);
+      rcs.position.set(sx * 0.024, sy * 0.024, -0.024);
+      g.add(rcs);
+    }
+  }
+  // strut bracing the high-gain dish
+  const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.0018, 0.0018, 0.03, 5), SAT_MAT.silver);
+  strut.rotation.z = Math.PI / 2 - 0.5;
+  strut.position.set(-0.043, 0.014, 0);
+  g.add(strut);
   // solar wings fore & aft
   for (const s of [-1, 1]) {
     const yoke = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.028, 6), SAT_MAT.dark);
@@ -5143,6 +5344,18 @@ function _makeRelaySat() {
   dishG.position.x = -0.048;
   dishG.rotation.z = 0.4;                 // boresight tilted off nadir
   g.add(dishG);
+  // gimbal collar where the dish meets the bus
+  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.012, 10), SAT_MAT.dark);
+  collar.rotation.z = Math.PI / 2;
+  collar.position.set(-0.03, 0, 0);
+  g.add(collar);
+  // nadir thruster pair for station-keeping
+  for (const s of [-1, 1]) {
+    const tk = new THREE.Mesh(new THREE.ConeGeometry(0.006, 0.01, 8), SAT_MAT.dark);
+    tk.rotation.z = Math.PI / 2;
+    tk.position.set(-0.016, s * 0.02, 0.03);
+    g.add(tk);
+  }
   // shorter solar wings
   for (const s of [-1, 1]) {
     const yoke = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.024, 6), SAT_MAT.dark);
@@ -5191,6 +5404,15 @@ function _makeSurveySat() {
   lens.rotation.z = Math.PI / 2;
   lens.position.x = -0.092;
   g.add(lens);
+  // star-tracker navigation baffle on the zenith corner
+  const tracker = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.0075, 0.016, 10), SAT_MAT.dark);
+  tracker.rotation.z = 0.9;
+  tracker.position.set(0.04, 0.026, -0.014);
+  g.add(tracker);
+  const trackerEye = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.002, 10), SAT_MAT.glass);
+  trackerEye.rotation.z = 0.9;
+  trackerEye.position.set(0.047, 0.032, -0.014);
+  g.add(trackerEye);
   // wide solar wings
   for (const s of [-1, 1]) {
     const yoke = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.008, 0.02), SAT_MAT.dark);
@@ -5250,7 +5472,31 @@ function _makeStation() {
       cap.position.set(0, 0.033, m.z + s * m.len / 2);
       g.add(cap);
     }
+    // glowing viewport rows along each habitat
+    for (let i = 0; i < 7; i++) {
+      const wz = m.z + (i - 3) * 0.0095;
+      for (const wa of [-0.6, 0.6]) {
+        const win = new THREE.Mesh(new THREE.BoxGeometry(0.0016, 0.0028, 0.005), SAT_MAT.window);
+        win.position.set(Math.sin(wa) * 0.0205, 0.033 + Math.cos(wa) * 0.0205, wz);
+        win.rotation.z = -wa;
+        g.add(win);
+      }
+    }
   }
+  // a ferry capsule docked at the +X radial port
+  const ferry = new THREE.Group();
+  const fbody = new THREE.Mesh(new THREE.CylinderGeometry(0.0075, 0.0075, 0.02, 10), SAT_MAT.silver);
+  fbody.rotation.z = Math.PI / 2;
+  ferry.add(fbody);
+  const fnose = new THREE.Mesh(new THREE.SphereGeometry(0.0075, 10, 8), SAT_MAT.hull);
+  fnose.position.x = 0.01;
+  ferry.add(fnose);
+  const fsrv = new THREE.Mesh(new THREE.CylinderGeometry(0.0088, 0.0088, 0.006, 10), SAT_MAT.gold);
+  fsrv.rotation.z = Math.PI / 2;
+  fsrv.position.x = -0.012;
+  ferry.add(fsrv);
+  ferry.position.set(0.046, 0.033, 0);
+  g.add(ferry);
   // docking node with radial ports
   const node = new THREE.Mesh(new THREE.SphereGeometry(0.017, 12, 10), SAT_MAT.silver);
   node.position.set(0, 0.033, 0);
@@ -5318,6 +5564,7 @@ function _makeStation() {
 }
 
 function buildShips() {
+  _buildSatMaterials();          // PBR materials + procedural textures + env glints
   shipGroup = new THREE.Group();
   for (const d of SHIP_ORBITS) {
     const pivot = new THREE.Group();
@@ -5503,24 +5750,6 @@ function updateSpaceHud(now) {
     }
   }
 }
-
-// LAUNCH — dive from the orbital view down to low orbit with a boosted
-// (but still capped) glide. Feels like dropping from the sector scan
-// into atmosphere-skimming range without ever slamming the camera.
-window.sfLaunch = function () {
-  STATE.zoomTarget = Math.max(STATE.zoomMin + 0.05, 1.35);
-  sfLaunchTime = performance.now();
-  lastInteractionTime = performance.now();
-  const btn = document.getElementById('sf-launch-btn');
-  if (btn) {
-    btn.classList.add('launching');
-    btn.textContent = 'LAUNCHING';
-    setTimeout(() => {
-      btn.classList.remove('launching');
-      btn.textContent = 'LAUNCH';
-    }, 2500);
-  }
-};
 
 function hideLoader() {
   // Called on first texture load (or error). Hide loader after a short beat.
@@ -8515,7 +8744,6 @@ let earthAutoRotate = true;
 let lastInteractionTime = 0;
 let _zoomLastT = 0;     // timestamp of the last zoom-glide frame (smooth zoom)
 let _lastZoomDom = 0;   // throttle zoom-meter DOM writes (~10/s)
-let sfLaunchTime = -1e9;    // LAUNCH-button boost window (faster glide while diving)
 let _lastRadarDraw = 0;     // throttle radar canvas redraws (~25 fps)
 let _contactSwapT = 0;      // rotate the contacts feed every 9 s
 let _contactIdx = 0;
@@ -8562,8 +8790,7 @@ function animate() {
     const _curDist = camera.position.distanceTo(controls.target);
     if (Math.abs(STATE.zoomTarget - _curDist) > 0.0005) {
       const _dt = Math.min(Math.max((now - _zoomLastT) / 1000, 0.001), 0.1);
-      const _boost = (now - sfLaunchTime < 2600) ? 1.15 : 0.32;   // LAUNCH dives faster
-      const _maxRatio = Math.exp(_boost * _dt);
+      const _maxRatio = Math.exp(0.32 * _dt);   // capped glide speed (~38%/s)
       const _ratio = THREE.MathUtils.clamp(STATE.zoomTarget / _curDist, 1 / _maxRatio, _maxRatio);
       camera.position.sub(controls.target).setLength(_curDist * _ratio).add(controls.target);
     }
