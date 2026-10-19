@@ -899,16 +899,17 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 .sf-radar-time{display:flex;justify-content:center;gap:6px;align-items:baseline;font-size:10px;color:#5e86a3}
 .sf-radar-time b{color:#d7ecff;font-size:12px;letter-spacing:1.5px}
 
-/* — bottom-right contact log — */
-.sf-launchpad{right:14px;bottom:14px;width:254px;display:flex;flex-direction:column}
-.sf-contact{display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:1.2px;color:#a8c8e2;
-  padding:5px 2px;text-transform:uppercase}
-.sf-contact .dot{width:7px;height:7px;border-radius:50%;background:#39e0ff;flex-shrink:0;
-  box-shadow:0 0 9px rgba(57,224,255,.9);animation:sfPulse 2.2s infinite}
-.sf-contact .dot-warn{background:#ffb02e;box-shadow:0 0 9px rgba(255,176,46,.9)}
-@keyframes sfPulse{0%,100%{opacity:1}50%{opacity:.35}}
-@keyframes sfFlash{0%{background:rgba(0,229,255,.22)}100%{background:transparent}}
-.sf-contact.flash{animation:sfFlash .9s ease-out}
+/* — planets & my-land panels: capped height with a scrollable list, so
+     every world and holding stays reachable — header and Close stay
+     pinned while the rows scroll under them — */
+#planets-modal .plot-card,#myplots-modal .plot-card{max-height:min(680px,92vh);display:flex;flex-direction:column;overflow:hidden}
+#planets-modal .plot-card>*,#myplots-modal .plot-card>*{flex-shrink:0}
+#planets-modal .panel-scroll,#myplots-modal .panel-scroll{flex:1 1 auto;min-height:0}
+.panel-scroll{overflow-y:auto;margin:6px 0 14px;padding-right:8px}
+.panel-scroll::-webkit-scrollbar{width:8px}
+.panel-scroll::-webkit-scrollbar-thumb{background:#2c4a55;border-radius:4px}
+.panel-scroll::-webkit-scrollbar-track{background:transparent}
+.panel-scroll .planet-row:last-child,.panel-scroll .myplot-row:last-child{margin-bottom:0}
 
 /* — bottom center strip: controls + quality — */
 .sf-bottom{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:21;
@@ -938,7 +939,6 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 /* — responsive — */
 @media (max-width: 1100px){
   .sf-right{width:196px}
-  .sf-launchpad{width:220px}
 }
 @media (max-width: 900px){
   .sf-right{top:54px;width:168px}
@@ -946,8 +946,6 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
   .sf-radar{width:172px;bottom:104px}
   #sf-radar-canvas{width:148px;height:148px}
   .sf-radar-scan{letter-spacing:1.6px;font-size:8.5px}
-  .sf-launchpad{width:186px;bottom:104px}
-  .sf-contact{font-size:9px}
   .sf-bottom{bottom:12px;padding:6px 12px;gap:10px}
   #game .controls-hint span:nth-child(3){display:none}
   .sf-fx{opacity:.4}
@@ -1121,13 +1119,6 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
         <div class="sf-radar-scan">SECTOR SCAN — ORBITAL VIEW</div>
         <div class="sf-radar-time"><b id="sf-clock">00:00:00</b><span>UTC</span></div>
       </div>
-    </aside>
-
-    <!-- ══ BOTTOM RIGHT — CONTACT LOG ══ -->
-    <aside class="sf-panel sf-launchpad">
-      <div class="sf-panel-head">CONTACT LOG</div>
-      <div class="sf-contact" id="sf-contact-1"><i class="dot"></i><span>CLAN KAEL IRAHMANTE IN SECTOR 7</span></div>
-      <div class="sf-contact" id="sf-contact-2"><i class="dot dot-warn"></i><span>PATROL WING DELTA — SECTOR 3</span></div>
     </aside>
 
     <!-- ══ BOTTOM CENTER — controls + quality ══ -->
@@ -3539,8 +3530,12 @@ function addBusinessToPlot(plot, bt, index) {
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.15';
+const GAME_VERSION = 'v1.16';
 const RELEASE_NOTES = [
+  { v: 'v1.16', items: [
+    '📜 <b>Planets & My Land now scroll</b> — both panels cap their height to your screen and glide through every world and holding. The header and Close button stay pinned while you browse, so nothing ever runs off the edge again.',
+    '🧹 <b>Contact log removed</b> — the bottom-right corner is gone entirely, leaving a clean, unobstructed view of your world.'
+  ]},
   { v: 'v1.15', items: [
     '🏗 <b>Businesses rebuilt as detailed miniatures</b> — every building you place is now a hand-assembled model: colonnaded banks with gold domes, casinos in neon light, farms with barns and silos, offshore rigs with living flare stacks, warships fitting out in the naval yard. All standing upright on illuminated plinths.',
     '💡 <b>Buildings light up the night side</b> — warm windows, neon marquees, pulsing tickers and blinking aviation beacons — sharing the same PBR finishes as the orbital fleet so everything glints in the sun.'
@@ -5466,17 +5461,6 @@ const SHIP_ORBITS = [
   { r: 1.50, speed: 0.05, incl: 0.06,  phase: 3.3, kind: 'station' },
 ];
 
-const SF_CONTACTS = [
-  'CLAN KAEL IRAHMANTE IN SECTOR 7',
-  'PATROL WING DELTA — SECTOR 3 CLEAR',
-  'UNKNOWN CONTACT — SECTOR 9 · TRACKING',
-  'TRADE CONVOY INBOUND — DOCK 4',
-  'SURVEY SAT ARRAY DEPLOYED — SECTOR 5',
-  'ION STORM ADVISORY — SECTOR 11',
-  'SIGNAL LOST · PROBE 7 REACQUIRED',
-  'ORBITAL GUARD RELIEF — SECTOR 2',
-];
-
 function buildOrbitalRings() {
   orbitalGroup = new THREE.Group();
   // Solid glowing tori (thin additive cyan tubes) — reads as bright orbital
@@ -6288,27 +6272,6 @@ function updateSpaceHud(now) {
   const rankEl = document.getElementById('sf-rank');
   if (lvlEl) lvlEl.textContent = String(100 + owned * 2 + Math.floor(army / 400));
   if (rankEl) rankEl.textContent = String(Math.max(1, 64 - Math.floor(owned / 8)));
-  // rotate the contacts feed every 9 s
-  if (now - _contactSwapT > 9000) {
-    _contactSwapT = now;
-    const c1 = document.getElementById('sf-contact-1');
-    const c2 = document.getElementById('sf-contact-2');
-    const s1 = c1 && c1.querySelector('span');
-    const s2 = c2 && c2.querySelector('span');
-    if (s1 && s2) {
-      const a = SF_CONTACTS[_contactIdx % SF_CONTACTS.length];
-      const b = SF_CONTACTS[(_contactIdx + 3) % SF_CONTACTS.length];
-      _contactIdx++;
-      if (s1.textContent !== a) {
-        s1.textContent = a;
-        c1.classList.remove('flash'); void c1.offsetWidth; c1.classList.add('flash');
-      }
-      if (s2.textContent !== b) {
-        s2.textContent = b;
-        c2.classList.remove('flash'); void c2.offsetWidth; c2.classList.add('flash');
-      }
-    }
-  }
 }
 
 function hideLoader() {
@@ -7342,7 +7305,7 @@ function renderPlanetsPanel() {
     <h2>Buy Into New Worlds</h2>
     <div class="coords">EACH WORLD HAS ITS OWN PLOT GRID · YOUR FIRST PLOT ON A NEW PLANET GOES ANYWHERE ON IT</div>
     <div class="desc" style="margin-bottom:14px">Buying into a planet is a one-time purchase — after that, travel freely and claim land on it. The border rule applies <b>per planet</b>: your Luna empire and your Earth empire grow separately.</div>
-    ${rows}
+    <div class="panel-scroll">${rows}</div>
     <div class="actions"><button class="btn" onclick="closePlanets()">Close</button></div>
   `;
 }
@@ -7560,7 +7523,7 @@ function renderMyPlotsPanel() {
     <h2>Your Holdings</h2>
     <div class="coords">${ids.length} PLOT${ids.length > 1 ? 'S' : ''} ACROSS ${[...new Set(ids.map(id => planetOfPlotId(id).id))].length} PLANET${[...new Set(ids.map(id => planetOfPlotId(id).id))].length > 1 ? 'S' : ''}</div>
     <div class="desc" style="margin-bottom:14px">Selling refunds <b>${Math.round(SELL_REFUND_RATE * 100)}% of the plot's value</b> and frees the land for anyone to claim. Demolish a plot's businesses before selling it.</div>
-    ${rows}
+    <div class="panel-scroll">${rows}</div>
     <div class="actions"><button class="btn" onclick="closeMyPlots()">Close</button></div>
   `;
 }
@@ -9299,8 +9262,6 @@ let lastInteractionTime = 0;
 let _zoomLastT = 0;     // timestamp of the last zoom-glide frame (smooth zoom)
 let _lastZoomDom = 0;   // throttle zoom-meter DOM writes (~10/s)
 let _lastRadarDraw = 0;     // throttle radar canvas redraws (~25 fps)
-let _contactSwapT = 0;      // rotate the contacts feed every 9 s
-let _contactIdx = 0;
 const _sunSph = new THREE.Spherical();   // reused for the off-axis sun position
 let _pointerDownPos = null;   // where the current drag started (rotation vs click)
 function animate() {
