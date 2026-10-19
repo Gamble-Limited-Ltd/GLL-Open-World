@@ -872,6 +872,12 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 .sf-pill-util{font-size:9px;padding:6px 10px;color:#7fd4c0;border-color:rgba(60,190,160,.4)}
 .sf-pill.active{color:#7fffd4 !important;border-color:#7fffd4 !important;
   background:rgba(20,80,70,.55) !important;box-shadow:0 0 14px rgba(127,255,212,.4) !important}
+/* — WAR button attention pulse while forces are on the march (v1.18) — */
+@keyframes sfWarAttn{
+  0%,100%{box-shadow:0 0 0 0 rgba(255,86,70,0);color:#ffb6ab;border-color:rgba(255,90,74,.55)}
+  50%{box-shadow:0 0 13px 3px rgba(255,86,70,.7);color:#ffe1da;border-color:rgba(255,120,100,.9)}
+}
+.sf-pill.attn{animation:sfWarAttn 1.5s ease-in-out infinite}
 
 /* — right column: COMMS + NAVIGATION — */
 .sf-right{position:absolute;top:64px;right:14px;z-index:21;display:flex;flex-direction:column;
@@ -2653,6 +2659,11 @@ const Wars = (() => {
     const claims = getClaims();
     const ownerNow = claims[m.plotId] || null;
     const defSave = getSave(m.def);
+    const atkSave = getSave(m.atk);   // v1.18 fix: hoisted — the fizzle path
+                                        // referenced it before its old in-else
+                                        // declaration, throwing ReferenceError
+                                        // and leaving fizzled marches stuck
+                                        // unresolved (and blocking the poll loop)
     let outcome;
     if (!defSave || ownerNow !== m.def || (truces[m.plotId] || 0) > m.launchedAt) {
       // target changed hands / defender deleted / truce rose mid-march
@@ -2669,7 +2680,6 @@ const Wars = (() => {
     } else {
       const defender = Math.floor((defSave.inventory && defSave.inventory[m.kind]) || 0);
       const defAir = airBonus((defSave.inventory && defSave.inventory.planes) || 0);
-      const atkSave = getSave(m.atk);
       const atkAir = airBonus((atkSave && atkSave.inventory && atkSave.inventory.planes) || 0);
       const rng = mulberry32((m.seed || 1) >>> 0);
       const atkRoll = m.committed * (1 + atkAir) * (0.85 + rng() * 0.3);
@@ -2740,6 +2750,7 @@ const Wars = (() => {
     m.outcome = outcome;
     m.rev = (m.rev || 0) + 1;
     toastedOutcome.add(m.id + '@' + m.rev);
+    try { WarFx.onResolve(m); } catch (e) { /* fx are cosmetic */ }
     reportToast(m);          // the resolving device hears the battle first
     return outcome;
   }
@@ -2801,6 +2812,8 @@ const Wars = (() => {
             const kIcon = m.kind === 'ships' ? '⚓' : '⚔️';
             if (m.atk === CURRENT_USER) showToast(`${kIcon} ${m.committed.toLocaleString()} ${m.kind} marching to ${m.plotName} — arrives in ${fmtEta(m.arriveAt - Date.now())}`, true);
             else showToast(`⚠️ ${m.atk} is marching ${m.committed.toLocaleString()} ${kIcon} toward ${m.plotName} — arrives in ${fmtEta(m.arriveAt - Date.now())}. Reinforce!`, false);
+            // v1.18 — the incoming force appears on the globe right away
+            try { WarFx.onLaunch(m, m.atk === CURRENT_USER); } catch (e) {}
           }
         }
         // outcomes arriving from OTHER devices (our own resolutions
@@ -3800,13 +3813,540 @@ function handlePlacementClick(hit) {
 }
 
 // ====================================================================
+// WAR MARCH FX (v1.18) — armies you send to take another plot now
+// actually march across the globe. Every march involving you gets:
+//   • a LAUNCH cinematic — a gold departure pulse where your force
+//     lifts off, a runway of light linking your land to the target,
+//     and a red beacon igniting on the enemy plot
+//   • a LIVE CONVOY — a formation of dropships (troops) or warships
+//     (ships) that travels a great-circle arc, its position synced to
+//     the REAL march ETA, so watching it cross the world tells you how
+//     close the battle is
+//   • a BATTLE MOMENT on arrival — flash, shockwave ring, sparks and a
+//     brief camera shake; recalls/fizzles fade the force home instead
+// Everything lives in earth-local space (children of `earth`), so it
+// stays glued to the plots as the globe auto-rotates. One-shot bursts
+// (departure pulse, battle flash) ride a tiny generic burst manager.
+// The WAR HUD button pulses while any force of yours is en route or
+// any enemy force is inbound.
+// ====================================================================
+const WarFx = (() => {
+  const fxByMarchId = new Map();   // march.id -> fx record
+  const bursts = [];               // one-shot effects {group, t0, dur, tick(k), mats, geos}
+  let lastSync = 0;
+  let lastBtnT = 0;
+
+  // Camera shake that OrbitControls can never see: jitter is applied
+  // AFTER controls.update() and restored at the top of the next frame,
+  // so the controls' internal state stays pristine.
+  const shake = { t: 0, dur: 0, amp: 0 };
+  let shakeRestore = null;
+  let shakeActive = false;
+
+  // ---------- shared lazily-built resources ----------
+  const _GEO = {};                // shared unit geometries (never disposed)
+  const _dotTex = { c: null };
+  const _v1 = { a: null, b: null, c: null, d: null, e: null, f: null };   // scratch vectors
+
+  function geo(key, make) { if (!_GEO[key]) _GEO[key] = make(); return _GEO[key]; }
+  function dotTexture() {
+    if (_dotTex.c) return _dotTex.c;
+    const cv = document.createElement('canvas'); cv.width = cv.height = 32;
+    const g = cv.getContext('2d');
+    // solid hot core (55% of radius) + quick soft rim — reads clearly on
+    // any terrain at runway sizes (a soft-only glow washes into the ground)
+    const grd = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+    grd.addColorStop(0, 'rgba(255,255,255,1)');
+    grd.addColorStop(0.55, 'rgba(255,255,255,1)');
+    grd.addColorStop(0.7, 'rgba(255,255,255,.55)');
+    grd.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grd; g.fillRect(0, 0, 32, 32);
+    _dotTex.c = new THREE.CanvasTexture(cv);
+    return _dotTex.c;
+  }
+  function baseMat(hex, opts) {
+    return new THREE.MeshBasicMaterial(Object.assign({
+      color: hex, transparent: true, opacity: 1, depthWrite: false,
+      blending: THREE.AdditiveBlending, side: THREE.DoubleSide
+    }, opts || {}));
+  }
+
+  // ---------- great-circle arc (earth-local) ----------
+  // slerp between two unit vectors, then lifted along the altitude
+  // profile: hug the surface at both ends, crest mid-route.
+  function arcDir(o, t, u, out) {
+    let d = Math.min(1, Math.max(-1, o.dot(t)));
+    if (d > 0.9995) return out.copy(o).lerp(t, u).normalize();
+    if (d < -0.9995) {           // antipodal — pick any perpendicular axis
+      const ref = Math.abs(o.y) < 0.9 ? _axisA.set(0, 1, 0) : _axisA.set(1, 0, 0);
+      const perp = _axisB.crossVectors(o, ref).normalize();
+      const th = u * Math.PI;
+      return out.copy(o).multiplyScalar(Math.cos(th)).addScaledVector(perp, Math.sin(th));
+    }
+    const th = Math.acos(d), s = Math.sin(th);
+    return out.copy(o).multiplyScalar(Math.sin((1 - u) * th) / s)
+      .addScaledVector(t, Math.sin(u * th) / s);
+  }
+  function arcAlt(u) { return 0.012 + 0.052 * Math.sin(Math.PI * u); }
+  function arcPoint(o, t, u, out) { return arcDir(o, t, u, out).multiplyScalar(EARTH_RADIUS + arcAlt(u)); }
+  const _axisA = new THREE.Vector3(), _axisB = new THREE.Vector3();
+
+  // ---------- origin: the attacker's nearest plot on this world ----------
+  function nearestPlotDirFor(ownerName, targetDir) {
+    try {
+      const claims = getClaims();
+      let best = null, bestDot = -2;
+      for (const p of STATE.plots) {
+        const mine = ownerName === CURRENT_USER
+          ? STATE.owned.has(p.userData.id)
+          : claims[p.userData.id] === ownerName;
+        if (!mine) continue;
+        const d = p.userData.localDir.dot(targetDir);
+        if (d > bestDot) { bestDot = d; best = p; }
+      }
+      if (best) return best.userData.localDir;
+    } catch (e) { /* fall through to horizon origin */ }
+    // No land here (or attack from off-world): the force crests the
+    // horizon — synthesize a direction ~40 degrees off the target.
+    const t = targetDir;
+    const ref = Math.abs(t.y) < 0.9 ? _axisA.set(0, 1, 0) : _axisA.set(1, 0, 0);
+    return _axisB.crossVectors(t, ref).normalize()
+      .multiplyScalar(Math.cos(0.7)).addScaledVector(t, Math.sin(0.7)).normalize().clone();
+  }
+
+  // ---------- convoy meshes ----------
+  function buildConvoy(kind) {
+    const grp = new THREE.Group();
+    const col = kind === 'ships' ? 0x39e0ff : 0xf5cc74;
+    const hullMat = new THREE.MeshPhongMaterial({ color: kind === 'ships' ? 0xdfe8ef : 0x39424e, shininess: 60, transparent: true, opacity: 1 });
+    const accMat = baseMat(col);
+    const engineMat = baseMat(col, { opacity: 0.9 });
+    const units = [];
+    if (kind === 'ships') {
+      // naval squadron: 3 warships in a wedge
+      const spots = [[0, 0], [-1.15, 1.5], [1.15, 1.5]];
+      for (const [s, b] of spots) {
+        const u = new THREE.Group();
+        const hull = new THREE.Mesh(geo('shipHull', () => new THREE.BoxGeometry(0.02, 0.005, 0.0075)), hullMat);
+        const bow = new THREE.Mesh(geo('shipBow', () => new THREE.ConeGeometry(0.0037, 0.008, 5)), hullMat);
+        bow.rotation.x = Math.PI / 2; bow.position.z = 0.013;
+        const sup = new THREE.Mesh(geo('shipSup', () => new THREE.BoxGeometry(0.005, 0.004, 0.009)), hullMat);
+        sup.position.set(0, 0.004, -0.001);
+        const stripe = new THREE.Mesh(geo('shipStripe', () => new THREE.BoxGeometry(0.0205, 0.0012, 0.0032)), accMat);
+        stripe.position.y = 0.002;
+        const wake = new THREE.Mesh(geo('shipWake', () => new THREE.SphereGeometry(0.0035, 8, 6)), engineMat);
+        wake.position.z = -0.012;
+        u.add(hull, bow, sup, stripe, wake);
+        u.position.set(s * 0.021, 0, b * 0.021);
+        u.userData._eng = wake;
+        grp.add(u); units.push(u);
+      }
+    } else {
+      // troop dropships: 5 darts in a V formation
+      const spots = [[0, 0], [-1, 0.9], [1, 0.9], [-2, 1.8], [2, 1.8]];
+      for (const [s, b] of spots) {
+        const u = new THREE.Group();
+        const body = new THREE.Mesh(geo('dartBody', () => new THREE.CapsuleGeometry(0.0028, 0.011, 3, 8)), hullMat);
+        body.rotation.x = Math.PI / 2;   // capsule Y-axis → group +Z (forward)
+        const nose = new THREE.Mesh(geo('dartNose', () => new THREE.ConeGeometry(0.0028, 0.006, 8)), accMat);
+        nose.rotation.x = Math.PI / 2; nose.position.z = 0.0085;
+        const fin = new THREE.Mesh(geo('dartFin', () => new THREE.BoxGeometry(0.009, 0.0009, 0.003)), accMat);
+        fin.position.z = -0.004;
+        const eng = new THREE.Mesh(geo('dartEng', () => new THREE.SphereGeometry(0.0022, 8, 6)), engineMat);
+        eng.position.z = -0.007;
+        u.add(body, nose, fin, eng);
+        u.position.set(s * 0.011, 0, b * 0.013);
+        u.userData._eng = eng;
+        grp.add(u); units.push(u);
+      }
+    }
+    grp.userData._units = units;
+    grp.userData._mats = [hullMat, accMat, engineMat];
+    return grp;
+  }
+
+  // ---------- runway of light: points along the arc, pulsing toward target ----------
+  // Normal blending + the glow texture's own alpha — the dots read as
+  // solid gold over ANY background (bright plots included); additive
+  // would wash to white over light fills.
+  const RUNWAY_N = 46;
+  function buildRunway(o, t, colHex) {
+    const pos = new Float32Array(RUNWAY_N * 3);
+    const col = new Float32Array(RUNWAY_N * 3);
+    const v = new THREE.Vector3();
+    for (let i = 0; i < RUNWAY_N; i++) {
+      arcPoint(o, t, i / (RUNWAY_N - 1), v);
+      pos[i * 3] = v.x; pos[i * 3 + 1] = v.y; pos[i * 3 + 2] = v.z;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const m = new THREE.PointsMaterial({
+      size: 0.03, map: dotTexture(), vertexColors: true, transparent: true,
+      opacity: 0.96, depthWrite: false, blending: THREE.NormalBlending, sizeAttenuation: true
+    });
+    const pts = new THREE.Points(g, m);
+    pts.renderOrder = 996;
+    pts.userData._base = new THREE.Color(colHex);
+    return pts;
+  }
+
+  // ---------- trail: fading ribbon behind the convoy ----------
+  const TRAIL_N = 34;
+  function buildTrail(colHex) {
+    const pos = new Float32Array(TRAIL_N * 3);
+    const col = new Float32Array(TRAIL_N * 3);
+    const base = new THREE.Color(colHex);
+    for (let i = 0; i < TRAIL_N; i++) {
+      const k = 1 - i / (TRAIL_N - 1);          // 1 at head → 0 at tail
+      col[i * 3] = base.r * k; col[i * 3 + 1] = base.g * k; col[i * 3 + 2] = base.b * k;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const m = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+    const line = new THREE.Line(g, m);
+    line.frustumCulled = false;
+    line.userData._pts = [];
+    return line;
+  }
+
+  // ---------- target beacon: pulsing red ring + beam + rotating ticks ----------
+  // Normal-blended RED — an alert must read as red over gold, purple or
+  // white plots (additive red + bright fill = white). It hovers at
+  // radius 1.012, clear of the plot fills and selection ring (1.004).
+  const BEACON_ALT = 1.012;
+  function buildBeacon(plot) {
+    const grp = new THREE.Group();
+    const ringMat = baseMat(0xff3d3d, { opacity: 0.85, blending: THREE.NormalBlending });
+    const ring = new THREE.Mesh(geo('bcRing', () => new THREE.RingGeometry(0.55, 0.8, 40)), ringMat);
+    const beamMat = baseMat(0xff5252, { opacity: 0.5 });
+    const beam = new THREE.Mesh(geo('bcBeam', () => new THREE.CylinderGeometry(0.006, 0.006, 0.5, 8, 1, true)), beamMat);
+    beam.rotation.x = Math.PI / 2;   // cylinder Y-axis → group +Z (skyward)
+    beam.position.z = 0.25;
+    const ticks = new THREE.Group();
+    const tickMat = baseMat(0xff6659, { opacity: 0.9, blending: THREE.NormalBlending });
+    for (let i = 0; i < 4; i++) {
+      const tk = new THREE.Mesh(geo('bcTick', () => new THREE.BoxGeometry(0.06, 0.13, 0.02)), tickMat);
+      const a = i * Math.PI / 2;
+      tk.position.set(Math.cos(a) * 0.92, Math.sin(a) * 0.92, 0.01);
+      tk.rotation.z = a;
+      ticks.add(tk);
+    }
+    grp.add(ring, beam, ticks);
+    const s = Math.max(0.028, (plot.userData.sizeA || 0.05) * 1.25);
+    grp.scale.setScalar(s);
+    grp.userData._ticks = ticks;
+    grp.userData._mats = [ringMat, beamMat, tickMat];
+    grp.userData._baseS = s;
+    grp.renderOrder = 997;
+    return grp;
+  }
+  function placeOnSurface(obj, dir) { obj.quaternion.setFromUnitVectors(_PLACE_Z, dir); }
+
+  // ---------- one-shot bursts ----------
+  function addBurst(group, dur, tick, mats, geos) {
+    earth.add(group);
+    bursts.push({ group, t0: performance.now(), dur, tick, mats: mats || [], geos: geos || [] });
+  }
+  function departurePulse(dir, colHex) {
+    const grp = new THREE.Group();
+    const mat = baseMat(colHex, { opacity: 0.9 });
+    const ring = new THREE.Mesh(geo('dpRing', () => new THREE.RingGeometry(0.8, 1, 44)), mat);
+    grp.add(ring);
+    grp.quaternion.setFromUnitVectors(_PLACE_Z, dir);
+    grp.scale.setScalar(0.02);
+    grp.renderOrder = 996;
+    addBurst(grp, 1400, (k, g) => {
+      g.scale.setScalar(0.02 + 0.075 * k);
+      mat.opacity = 0.9 * (1 - k) * (1 - k);
+    }, [mat], []);
+    return grp;
+  }
+  function battleFlash(plotOrDir, win) {
+    const dir = (plotOrDir && plotOrDir.userData && plotOrDir.userData.localDir) ? plotOrDir.userData.localDir : plotOrDir;
+    if (!dir) return;
+    const colHex = win ? 0xffd76b : 0xff5252;
+    const grp = new THREE.Group();
+    grp.quaternion.setFromUnitVectors(_PLACE_Z, dir);
+    grp.renderOrder = 999;
+    const flashMat = baseMat(win ? 0xfff3c8 : 0xffb0a6, { opacity: 0.95 });
+    const flash = new THREE.Mesh(geo('btFlash', () => new THREE.SphereGeometry(0.012, 14, 10)), flashMat);
+    const waveMat = baseMat(colHex, { opacity: 0.9 });
+    const wave = new THREE.Mesh(geo('btWave', () => new THREE.RingGeometry(0.8, 1, 48)), waveMat);
+    grp.add(flash, wave);
+    grp.position.copy(dir).multiplyScalar(EARTH_RADIUS * 1.004);
+    // sparks — a spray of glowing embers flying off the impact
+    const N = 26;
+    const spos = new Float32Array(N * 3);
+    const vel = [];
+    const v = new THREE.Vector3();
+    for (let i = 0; i < N; i++) {
+      v.set(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 0.35)
+        .normalize().multiplyScalar(0.03 + Math.random() * 0.06);
+      vel.push(v.clone());
+      spos[i * 3] = 0; spos[i * 3 + 1] = 0; spos[i * 3 + 2] = 0;
+    }
+    const sg = new THREE.BufferGeometry();
+    sg.setAttribute('position', new THREE.BufferAttribute(spos, 3));
+    const sm = new THREE.PointsMaterial({
+      size: 0.009, map: dotTexture(), color: colHex, transparent: true,
+      opacity: 1, depthWrite: false, blending: THREE.AdditiveBlending
+    });
+    const sparks = new THREE.Points(sg, sm);
+    sparks.frustumCulled = false;
+    grp.add(sparks);
+    addBurst(grp, 2000, (k, g) => {
+      flash.scale.setScalar(1 + 13 * k);
+      flashMat.opacity = 0.95 * Math.max(0, 1 - k * 2.2);
+      wave.scale.setScalar(0.02 + 0.16 * k);
+      waveMat.opacity = 0.9 * (1 - k) * (1 - k);
+      const pa = sg.attributes.position;
+      for (let i = 0; i < N; i++) {
+        const p = vel[i];
+        pa.setXYZ(i, p.x * k, p.y * k, Math.max(0, p.z * k - 0.05 * k * k));
+      }
+      pa.needsUpdate = true;
+      sm.opacity = 1 - k * k;
+    }, [flashMat, waveMat, sm], [sg]);
+    return grp;
+  }
+
+  // ---------- per-march fx record ----------
+  function createFx(m, mine) {
+    const target = ACTIVE_PLOT_BY_ID.get(m.plotId);
+    if (!target || m.planet !== STATE.planet) return null;
+    const colHex = m.kind === 'ships' ? 0x39e0ff : 0xf5cc74;
+    const originDir = nearestPlotDirFor(m.atk, target.userData.localDir).clone();
+    const fx = {
+      m, mine, colHex, originDir, targetDir: target.userData.localDir.clone(),
+      convoy: null, trail: null, runway: null, beacon: null,
+      finished: false, retreat: null, fade: 1
+    };
+    fx.convoy = buildConvoy(m.kind);
+    fx.trail = buildTrail(colHex);
+    fx.runway = buildRunway(fx.originDir, fx.targetDir, colHex);
+    fx.beacon = buildBeacon(target);
+    placeOnSurface(fx.beacon, fx.targetDir);
+    fx.beacon.position.copy(fx.targetDir).multiplyScalar(EARTH_RADIUS * BEACON_ALT);
+    earth.add(fx.convoy, fx.trail, fx.runway, fx.beacon);
+    fxByMarchId.set(m.id, fx);
+    return fx;
+  }
+  function disposeFx(fx) {
+    for (const obj of [fx.convoy, fx.trail, fx.runway, fx.beacon]) {
+      if (!obj) continue;
+      earth.remove(obj);
+      obj.traverse(o => { if (o.geometry && !_GEO_has(o.geometry)) o.geometry.dispose(); });
+      const mats = [];
+      obj.traverse(o => { if (o.material) mats.push(o.material); });
+      for (const mt of mats) mt.dispose();
+    }
+    fxByMarchId.delete(fx.m.id);
+  }
+  function _GEO_has(g) { for (const k in _GEO) if (_GEO[k] === g) return true; return false; }
+
+  // ---------- orientation of the convoy along the arc ----------
+  const _mBasis = new THREE.Matrix4();
+  function orientConvoy(grp, pos, fwd) {
+    const up = _v1.a || (_v1.a = new THREE.Vector3()); up.copy(pos).normalize();
+    const right = _v1.b || (_v1.b = new THREE.Vector3()); right.crossVectors(up, fwd).normalize();
+    const fw = _v1.c || (_v1.c = new THREE.Vector3()); fw.crossVectors(right, up).normalize();
+    _mBasis.makeBasis(right, up, fw);
+    grp.quaternion.setFromRotationMatrix(_mBasis);
+  }
+
+  // ---------- public events ----------
+  function onLaunch(m, mine) {
+    try {
+      if (!gameInitialized || document.getElementById('game').classList.contains('hidden')) return;
+      if (fxByMarchId.has(m.id)) return;
+      const fx = createFx(m, mine);
+      if (!fx) return;
+      departurePulse(fx.originDir, fx.colHex);
+    } catch (e) { /* fx must never break the war logic */ }
+  }
+  function onResolve(m) {
+    try {
+      const fx = fxByMarchId.get(m.id);
+      if (!fx || fx.finished) return;
+      fx.finished = true;
+      const o = m.outcome || {};
+      if (o.recalled || o.fizzled) {
+        fx.retreat = { from: fx.lastU || 0, t0: performance.now() };   // fade home
+      } else {
+        const visible = gameInitialized && !document.getElementById('game').classList.contains('hidden');
+        if (visible) {
+          battleFlash(ACTIVE_PLOT_BY_ID.get(m.plotId) || fx.targetDir, !!o.win);
+          armShake(fx.targetDir);
+        }
+        disposeFx(fx);
+      }
+    } catch (e) { /* fx must never break the war logic */ }
+  }
+  function armShake(targetDir) {
+    try {
+      if (!camera || !controls) return;
+      const wp = new THREE.Vector3().copy(targetDir).applyQuaternion(earth.quaternion);
+      const camDir = camera.position.clone().sub(controls.target).normalize();
+      if (wp.dot(camDir) < 0.1) return;    // battle is over the horizon — no shake
+      shake.dur = 650; shake.t = performance.now(); shake.amp = 0.011;
+    } catch (e) {}
+  }
+  function reset() {
+    for (const fx of Array.from(fxByMarchId.values())) disposeFx(fx);
+    fxByMarchId.clear();
+  }
+
+  // ---------- per-frame upkeep (called from animate) ----------
+  function update(now) {
+    // 1) one-shot bursts
+    for (let i = bursts.length - 1; i >= 0; i--) {
+      const b = bursts[i];
+      const k = (now - b.t0) / b.dur;
+      if (k >= 1) {
+        earth.remove(b.group);
+        b.group.traverse(o => { if (o.geometry && !_GEO_has(o.geometry)) o.geometry.dispose(); });
+        for (const mt of b.mats) mt.dispose();
+        for (const g of b.geos) g.dispose();
+        bursts.splice(i, 1);
+      } else {
+        b.tick(k, b.group);
+      }
+    }
+    // 2) camera shake — restore first (done in restoreShake before
+    // controls.update), re-arm after: jitter here, render sees it.
+    if (shake.t && now - shake.t < shake.dur) {
+      const k = 1 - (now - shake.t) / shake.dur;
+      const t = now * 0.03;
+      shakeRestore = camera.position.clone();
+      camera.position.x += Math.sin(t * 1.7) * shake.amp * k;
+      camera.position.y += Math.sin(t * 2.3 + 1.1) * shake.amp * k;
+      camera.position.z += Math.cos(t * 1.9 + 0.6) * shake.amp * k;
+      shakeActive = true;
+    } else if (shakeActive) {
+      shake.t = 0;
+    }
+    // 3) per-march live fx
+    const ts = Date.now();
+    for (const fx of Array.from(fxByMarchId.values())) {
+      const m = fx.m;
+      let u;
+      if (fx.retreat) {
+        const k = Math.min(1, (now - fx.retreat.t0) / 1300);
+        u = fx.retreat.from * (1 - k);
+        fx.fade = 1 - k;
+        if (k >= 1) { disposeFx(fx); continue; }
+      } else {
+        u = Math.min(0.995, Math.max(0, (ts - m.launchedAt) / Math.max(1, m.arriveAt - m.launchedAt)));
+      }
+      fx.lastU = u;
+      // convoy
+      if (!_v1.d) for (const kk of 'def') _v1[kk] = new THREE.Vector3();
+      const pos = arcPoint(fx.originDir, fx.targetDir, u, _v1.d);
+      const bob = 0.0016 * Math.sin(now * 0.003 + u * 20);
+      const fwd = arcPoint(fx.originDir, fx.targetDir, Math.min(u + 0.01, 1), _v1.e).sub(pos).normalize();
+      orientConvoy(fx.convoy, pos, fwd);
+      fx.convoy.position.copy(pos).addScaledVector(_v1.f.copy(pos).normalize(), bob);
+      // engine pulse + fade
+      const pulse = 0.65 + 0.35 * (0.5 + 0.5 * Math.sin(now * 0.008));
+      for (const un of fx.convoy.userData._units) {
+        if (un.userData._eng) un.userData._eng.scale.setScalar(0.8 + 0.5 * pulse);
+      }
+      fx.convoy.userData._mats[1].opacity = 0.85 * fx.fade;
+      fx.convoy.userData._mats[2].opacity = 0.9 * pulse * fx.fade;
+      fx.convoy.userData._mats[0].opacity = fx.fade;
+      // trail — head at the convoy, tail fading behind
+      const tp = fx.trail.userData._pts;
+      tp.unshift(fx.convoy.position.clone());
+      if (tp.length > TRAIL_N) tp.length = TRAIL_N;
+      const ta = fx.trail.geometry.attributes.position;
+      for (let i = 0; i < TRAIL_N; i++) {
+        const p = tp[Math.min(i, tp.length - 1)] || fx.convoy.position;
+        ta.setXYZ(i, p.x, p.y, p.z);
+      }
+      ta.needsUpdate = true;
+      fx.trail.material.opacity = fx.fade;
+      // runway light wave flowing toward the target
+      const ca = fx.runway.geometry.attributes.color;
+      const base = fx.runway.userData._base;
+      const wt = now * 0.0022;
+      for (let i = 0; i < RUNWAY_N; i++) {
+        const uu = i / (RUNWAY_N - 1);
+        const w = 0.45 + 0.55 * Math.pow(0.5 + 0.5 * Math.sin(uu * 20 - wt), 3);
+        const k = fx.fade * w;
+        ca.setXYZ(i, base.r * k, base.g * k, base.b * k);
+      }
+      ca.needsUpdate = true;
+      // beacon pulse
+      const bp = 0.5 + 0.5 * Math.sin(now * 0.006);
+      fx.beacon.userData._mats[0].opacity = (0.45 + 0.5 * bp) * fx.fade;
+      fx.beacon.userData._mats[1].opacity = (0.25 + 0.35 * bp) * fx.fade;
+      fx.beacon.userData._mats[2].opacity = (0.5 + 0.4 * bp) * fx.fade;
+      fx.beacon.userData._ticks.rotation.z += 0.02;
+      const bs = fx.beacon.userData._baseS * (1 + 0.1 * bp);
+      fx.beacon.scale.setScalar(bs);
+    }
+    // 4) sync (1 Hz): create fx for marches that appeared (login, poll,
+    //    travel back), finish fx whose march is resolved or pruned
+    if (now - lastSync > 1000) {
+      lastSync = now;
+      const live = new Set();
+      for (const m of Wars.marches) {
+        if (m.resolved || !CURRENT_USER) continue;
+        if (m.atk !== CURRENT_USER && m.def !== CURRENT_USER) continue;
+        live.add(m.id);
+        if (!fxByMarchId.has(m.id)) {
+          const fx = createFx(m, m.atk === CURRENT_USER);
+          if (fx && ts - m.launchedAt < 12000) departurePulse(fx.originDir, fx.colHex);
+        }
+      }
+      for (const fx of Array.from(fxByMarchId.values())) {
+        if (fx.finished) continue;
+        if (!live.has(fx.m.id)) {
+          // march vanished (pruned / resolved elsewhere while hidden)
+          const m = Wars.marches.find(x => x.id === fx.m.id);
+          if (m && m.resolved) onResolve(m);
+          else disposeFx(fx);
+        }
+      }
+    }
+    // 5) WAR button attention pulse (1 Hz)
+    if (now - lastBtnT > 1000) {
+      lastBtnT = now;
+      const btn = document.getElementById('wars-btn');
+      if (btn) {
+        const hot = CURRENT_USER && (Wars.activeByAttacker(CURRENT_USER).length > 0 || Wars.incomingFor(CURRENT_USER).length > 0);
+        btn.classList.toggle('attn', !!hot);
+      }
+    }
+  }
+  // restore camera before controls.update() sees any shake jitter
+  function restoreShake() {
+    if (shakeActive && shakeRestore) {
+      camera.position.copy(shakeRestore);
+      shakeActive = false;
+    }
+  }
+
+  return { onLaunch, onResolve, reset, update, restoreShake, get count() { return fxByMarchId.size; } };
+})();
+window.WarFx = WarFx;
+
+// ====================================================================
 // GAME VERSION + RELEASE NOTES — the "What's New" popup after login.
 // Bump GAME_VERSION and add a section at the TOP of RELEASE_NOTES with
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.17';
+const GAME_VERSION = 'v1.18';
 const RELEASE_NOTES = [
+  { v: 'v1.18', items: [
+    '⚔️ <b>Armies march across the globe</b> — when you send a force to take a plot, watch it happen: a golden pulse lifts off your land, a runway of light traces the route, and your dropships or warships physically travel the arc to the enemy plot — their position on the road is the real march timer.',
+    '🎯 <b>Red alert beacons</b> — every march paints a pulsing target beacon on the plot being invaded, with incoming threats visible the moment an enemy launches at you. The WAR button pulses while any force is on the move.',
+    '💥 <b>Battles you can see</b> — when a force lands, the plot erupts: flash, shockwave ring and sparks, with a camera shake if you\'re watching. Recalled or fizzled marches visibly turn back and fade home.',
+    '🔧 <b>Stuck-march fix</b> — marches whose target changed hands mid-flight could previously get stuck unresolved forever, silently blocking other battles from resolving too. Fizzled forces now return home (80%) as designed.'
+  ]},
   { v: 'v1.17', items: [
     '📍 <b>Build anywhere on your land</b> — choosing a business or military building no longer snaps it to a preset grid. Click any spot inside the plot and that is exactly where it stands, with a glowing marker previewing the position. Esc or right-click cancels.',
     '↔ <b>Move existing buildings</b> — every business card now has a Move button, so you can reposition your whole empire freely. Chosen spots are saved and survive reloads and interplanetary travel.'
@@ -7681,6 +8221,7 @@ window.travelTo = function(planetId) {
   STATE.plots = [];
   STATE.claimedPlots = [];
   plotFillMesh = plotOwnedMesh = plotOutlineMesh = plotOwnedOutlineMesh = null;
+  WarFx.reset();   // v1.18 — march fx belong to the world you're leaving
 
   // Swap the world
   earth.material = planetMaterial(planet);
@@ -8879,7 +9420,7 @@ window.attackPlot = function() {
   const now = Date.now();
   const cross = p.userData.planet !== STATE.planet;
   const secs = Wars.marchSeconds(cross);
-  Wars.launch({
+  const march = {
     id: now.toString(36) + Math.random().toString(36).slice(2, 8),
     atk: CURRENT_USER,
     def: owner,
@@ -8894,7 +9435,9 @@ window.attackPlot = function() {
     arriveAt: now + secs * 1000,
     resolved: false,
     rev: 1
-  });
+  };
+  Wars.launch(march);
+  WarFx.onLaunch(march, true);   // v1.18 — the force lifts off across the globe
   showToast(`${kIcon} ${committed.toLocaleString()} ${kind} are marching to ${p.userData.name} — arrive in ${Wars.fmtEta(secs * 1000)}. ${owner} will see it coming.`, true);
   saveGame();
   openPlotModal(p);  // re-render — the panel now shows the march banner
@@ -9618,6 +10161,7 @@ function animate() {
   // the canvas isn't visible, so frame rendering is pure waste.
   if (document.getElementById('game').classList.contains('hidden')) return;
   const now = performance.now();
+  WarFx.restoreShake();   // v1.18 — undo last frame's battle jitter before controls see it
   tickAdaptiveQuality(now);
   // Slow auto-rotate, paused while user is interacting OR hovering the canvas
   // (so they can reliably click plots without the world drifting).
@@ -9673,6 +10217,7 @@ function animate() {
   if (orbitalGroup) orbitalGroup.rotation.y += 0.00028;
   updateShips(now);
   updateBizFx(now);      // business accents: neon breathing, flares, strobes
+  WarFx.update(now);     // v1.18 — war marches: convoys, runways, beacons, bursts, shake
   updatePlotVisibility();
   if (now - _lastZoomDom > 100) {
     _lastZoomDom = now;
