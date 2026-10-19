@@ -669,6 +669,16 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 .multibuy-bar .btn.primary:disabled{opacity:.4;cursor:not-allowed}
 .market-btn.active{border-color:#f5cc74 !important;color:#f5cc74 !important;background:rgba(245,204,116,.14) !important}
 
+/* — free placement (v1.17): hint bar while a build/move spot is armed — */
+#place-banner{position:fixed;left:50%;bottom:130px;transform:translateX(-50%);z-index:22;
+  display:flex;align-items:center;gap:8px;padding:10px 18px;border-radius:12px;
+  border:1px solid #6b5320;background:rgba(24,18,6,.92);backdrop-filter:blur(8px);
+  box-shadow:0 6px 24px rgba(0,0,0,.55);font-family:Arial,sans-serif;font-size:12px;
+  color:#e8d9a8;letter-spacing:.5px;pointer-events:none;white-space:nowrap}
+#place-banner b{color:#f5cc74}
+#place-banner .pb-key{border:1px solid #6b5320;border-radius:4px;padding:1px 7px;
+  font-size:10px;color:#d9b96a;text-transform:uppercase;letter-spacing:1px}
+
 /* What's New popup — scrollable body, capped height */
 #update-modal .plot-card{max-height:min(680px,90vh);display:flex;flex-direction:column;overflow:hidden}
 .update-body{flex:1;min-height:0;overflow-y:auto;margin:8px 0 18px;padding-right:8px}
@@ -1249,6 +1259,10 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
   </div>
 </div>
 
+<!-- Free placement (v1.17) — persistent hint bar while a build/move spot
+     is being chosen. pointer-events:none so it never blocks canvas clicks. -->
+<div id="place-banner" style="display:none"></div>
+
 <!-- Supabase SDK (optional — used only when cloud saving keys are set in the game code) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -1457,7 +1471,9 @@ const STATE = {
   // MULTI-BUY — session-only selection mode (never saved)
   multiBuy: false,
   multiSell: false,  // mirror of multiBuy for selling owned plots
-  multiSelect: new Set()
+  multiSelect: new Set(),
+  // FREE PLACEMENT — session-only pending build/move (never saved)
+  placing: null
 };
 
 const EARTH_RADIUS = STATE.radius;
@@ -1513,6 +1529,12 @@ const PLANET_META = {};   // planetId → Map(plotId → { areaMultiplier, regio
 const BUSINESS_REGISTRY = new Map();
 // Active planet's plotId → plot mesh lookup (O(1) instead of .find scans)
 const ACTIVE_PLOT_BY_ID = new Map();
+// BIZ_POS — plotId → [ {u,w} | null ] tangent-plane positions for the
+// businesses on that plot, index-aligned with BUSINESS_REGISTRY's arrays.
+// Free placement (v1.17): buildings keep the spot you clicked across
+// saves, reloads and interplanetary travel. null entries (and older
+// saves without positions) fall back to the classic grid layout.
+const BIZ_POS = new Map();
 
 // ====================================================================
 // PERSISTENCE — save/load to localStorage
@@ -2676,12 +2698,18 @@ const Wars = (() => {
           captured = cap.length;
           if (cap.length) {
             atkSave.businesses = atkSave.businesses || [];
-            for (const b of cap) if (!atkSave.businesses.some(x => x.plotId === b.plotId && x.type === b.type)) atkSave.businesses.push({ plotId: b.plotId, type: b.type });
+            for (const b of cap) {
+              if (!atkSave.businesses.some(x => x.plotId === b.plotId && x.type === b.type)) {
+                atkSave.businesses.push({ plotId: b.plotId, type: b.type, ...(typeof b.u === 'number' && typeof b.w === 'number' ? { u: b.u, w: b.w } : {}) });
+              }
+            }
             // saveGame serializes businesses from this registry — keep the
             // attacker's LIVE registry in sync or the next autosave
             // resurrects the plots for the old owner
             if (CURRENT_USER === m.atk) {
-              BUSINESS_REGISTRY.set(m.plotId, cap.map(b => b.type).filter(t => getBusinessType(t)));
+              const capValid = cap.filter(b => getBusinessType(b.type));
+              BUSINESS_REGISTRY.set(m.plotId, capValid.map(b => b.type));
+              BIZ_POS.set(m.plotId, capValid.map(b => (typeof b.u === 'number' && typeof b.w === 'number') ? { u: b.u, w: b.w } : null));
               STATE.owned.add(m.plotId);
             }
           }
@@ -2723,15 +2751,17 @@ const Wars = (() => {
       if (!p) return;
       const bt = getBusinessType;
       const atkSave = getSave(m.atk) || {};
-      const capTypes = (atkSave.businesses || []).filter(b => b.plotId === m.plotId).map(b => b.type).filter(t => getBusinessType(t));
+      // captured records keep their placed positions when they ride along
+      const capRecs = (atkSave.businesses || []).filter(b => b.plotId === m.plotId && getBusinessType(b.type));
       claimPlot(m.plotId);
       p.userData.owned = true;
       p.userData.ownedByOther = false;
       p.userData.ownerName = null;
       STATE.owned.add(m.plotId);
       p.userData.businesses = [];
-      BUSINESS_REGISTRY.set(m.plotId, capTypes);
-      capTypes.forEach((type, idx) => addBusinessToPlot(p, getBusinessType(type), idx));
+      BUSINESS_REGISTRY.set(m.plotId, capRecs.map(b => b.type));
+      BIZ_POS.set(m.plotId, capRecs.map(b => (typeof b.u === 'number' && typeof b.w === 'number') ? { u: b.u, w: b.w } : null));
+      capRecs.forEach((b, idx) => addBusinessToPlot(p, getBusinessType(b.type), idx));
       if (!p.userData.businesses.length) {
         const pair = ownedPlotColorsFor(CURRENT_USER);
         setPlotColors(p, pair[0], pair[1]);
@@ -3278,6 +3308,7 @@ function applyCloudWorldUpdates() {
       p.userData._selected = false;
       STATE.owned.delete(p.userData.id);
       BUSINESS_REGISTRY.delete(p.userData.id);   // those businesses now belong to the conqueror
+      BIZ_POS.delete(p.userData.id);
       STATE.multiSelect.delete(p.userData.id);   // and it can't stay in a multi-buy selection
       // Remove my businesses from it (meshes + state)
       for (const entry of p.userData.businesses || []) {
@@ -3379,7 +3410,16 @@ function saveGame() {
     businesses: (() => {
       const out = [];
       for (const [plotId, types] of BUSINESS_REGISTRY) {
-        for (const t of types) out.push({ plotId, type: t });
+        const pos = BIZ_POS.get(plotId) || [];
+        for (let i = 0; i < types.length; i++) {
+          const rec = { plotId, type: types[i] };
+          const pp = pos[i];
+          if (pp && typeof pp.u === 'number' && isFinite(pp.u) && typeof pp.w === 'number' && isFinite(pp.w)) {
+            rec.u = +pp.u.toFixed(4);
+            rec.w = +pp.w.toFixed(4);
+          }
+          out.push(rec);
+        }
       }
       return out;
     })(),
@@ -3423,8 +3463,16 @@ function loadGame(username) {
   BUSINESS_REGISTRY.clear();
   for (const b of (save.businesses || [])) {
     if (!BUSINESS_REGISTRY.has(b.plotId)) BUSINESS_REGISTRY.set(b.plotId, []);
-    const arr = BUSINESS_REGISTRY.get(b.plotId);
-    if (!arr.includes(b.type)) arr.push(b.type);
+    BUSINESS_REGISTRY.get(b.plotId).push(b.type);
+  }
+  // Free placement (v1.17): restore per-business positions, index-aligned
+  // with the registry arrays above (same per-plot order as save.businesses)
+  BIZ_POS.clear();
+  for (const b of (save.businesses || [])) {
+    if (!BIZ_POS.has(b.plotId)) BIZ_POS.set(b.plotId, []);
+    BIZ_POS.get(b.plotId).push(
+      (typeof b.u === 'number' && isFinite(b.u) && typeof b.w === 'number' && isFinite(b.w))
+        ? { u: b.u, w: b.w } : null);
   }
 
   // Ensure all materials have entries
@@ -3489,14 +3537,21 @@ function getBusinessOffset(index, total, plotSizeA) {
   return { u: s, w: -s };
 }
 
-// Add a business to a plot at the given index, build its 3D mesh, recolor plot
-function addBusinessToPlot(plot, bt, index) {
+// Add a business to a plot at the given index, build its 3D mesh, recolor plot.
+// Position priority (v1.17 free placement): the clicked spot (customPos) →
+// the saved spot (BIZ_POS, index-aligned with the registry) → the classic
+// auto-grid layout for legacy saves and captures without positions.
+function addBusinessToPlot(plot, bt, index, customPos) {
   const total = (plot.userData.businesses || []).length + 1;
   const bizScale = Math.max(0.013, Math.min(0.032, plot.userData.areaMultiplier * 0.017));
   const bizMesh = buildBusinessMesh(bt, bizScale);
 
-  // Compute position: centroid + offset in tangent plane
-  const offset = getBusinessOffset(index, Math.max(total, plot.userData.maxBusinesses), plot.userData.sizeA);
+  const stored = BIZ_POS.get(plot.userData.id);
+  const saved = stored ? stored[index] : null;
+  const posSrc = customPos || saved;
+  const offset = (posSrc && typeof posSrc.u === 'number' && isFinite(posSrc.u) && typeof posSrc.w === 'number' && isFinite(posSrc.w))
+    ? clampUWToPlot(plot, posSrc.u, posSrc.w, 0)
+    : getBusinessOffset(index, Math.max(total, plot.userData.maxBusinesses), plot.userData.sizeA);
   const centroidPos = plot.userData.localDir.clone().multiplyScalar(EARTH_RADIUS * 1.006);
   // Build tangent basis at plot location
   const p_i = plot.userData.localDir;
@@ -3513,7 +3568,7 @@ function addBusinessToPlot(plot, bt, index) {
   bizMesh.updateMatrix();
   bizMesh.matrixAutoUpdate = false;
 
-  const entry = { type: bt.id, builtAt: Date.now(), mesh: bizMesh };
+  const entry = { type: bt.id, builtAt: Date.now(), mesh: bizMesh, pos: { u: offset.u, w: offset.w } };
   if (!plot.userData.businesses) plot.userData.businesses = [];
   plot.userData.businesses.push(entry);
   earth.add(bizMesh);
@@ -3525,13 +3580,237 @@ function addBusinessToPlot(plot, bt, index) {
 }
 
 // ====================================================================
+// FREE PLACEMENT (v1.17) — build or move a business by clicking any
+// spot inside its plot. Choosing Build/Move arms placement mode: a
+// glowing ring previews the exact spot under the pointer, the click
+// confirms, Esc / right-click cancels. Positions are tangent-plane
+// (u,w) offsets from the plot centroid, saved with the business and
+// restored on load and interplanetary travel.
+// ====================================================================
+const _PLACE_Z = new THREE.Vector3(0, 0, 1);
+let placeGhost = null;
+
+function plotTangentBasis(plot) {
+  const p_i = plot.userData.localDir;
+  const ref = Math.abs(p_i.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+  const uAxis = new THREE.Vector3().crossVectors(p_i, ref).normalize();
+  const wAxis = new THREE.Vector3().crossVectors(p_i, uAxis).normalize();
+  return { uAxis, wAxis };
+}
+
+// World-space point (a raycast hit) → tangent-plane (u,w) on the plot
+function worldPointToPlotUW(plot, worldPoint) {
+  const { uAxis, wAxis } = plotTangentBasis(plot);
+  const local = earth.worldToLocal(worldPoint.clone()).normalize();
+  return { u: local.dot(uAxis), w: local.dot(wAxis) };
+}
+
+// Point-in-polygon on the plot's tangent-plane cell (ray-cast method)
+function pointInPlotPolygon(plot, u, w) {
+  const poly = plot.userData.polyUW;
+  if (!poly || poly.length < 3) return true;   // no polygon → radial clamp only
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const ui = poly[i].u, wi = poly[i].w, uj = poly[j].u, wj = poly[j].w;
+    if (((wi > w) !== (wj > w)) && (u < (uj - ui) * (w - wi) / (wj - wi) + ui)) inside = !inside;
+  }
+  return inside;
+}
+
+// Keep a desired spot inside the plot: radial safety clamp, then polygon
+// test with a pull-to-centroid fallback. `inset` nudges the final point
+// toward the centroid so a building's footprint clears the border.
+function clampUWToPlot(plot, u, w, inset) {
+  inset = inset || 0;
+  const maxR = (plot.userData.sizeA || 0.05) * 0.72;
+  let r = Math.hypot(u, w);
+  if (r > maxR) { u = u / r * maxR; w = w / r * maxR; r = maxR; }
+  if (r === 0) return { u: 0, w: 0 };
+  if (!pointInPlotPolygon(plot, u, w)) {
+    // outside the cell (or an edge hit) — walk toward the centroid
+    let t = 0.5;
+    for (let k = 0; k < 7; k++) {
+      if (pointInPlotPolygon(plot, u * t, w * t)) { u *= t; w *= t; break; }
+      t *= 0.5;
+    }
+    if (!pointInPlotPolygon(plot, u, w)) { u = 0; w = 0; }
+  }
+  const k = 1 - inset;
+  return { u: u * k, w: w * k };
+}
+
+// Tangent-plane (u,w) → the earth-local 3D position buildings/ghosts sit at
+function plotUWToWorld(plot, u, w) {
+  const { uAxis, wAxis } = plotTangentBasis(plot);
+  return plot.userData.localDir.clone().multiplyScalar(EARTH_RADIUS * 1.006)
+    .addScaledVector(uAxis, u).addScaledVector(wAxis, w);
+}
+
+// Stand an object upright on the globe at an earth-local position (the
+// same orientation addBusinessToPlot gives meshes — parent-safe)
+function orientToSurface(obj, localPos) {
+  obj.quaternion.setFromUnitVectors(_PLACE_Z, localPos.clone().normalize());
+}
+
+// --- ghost marker: pulsing ring + beam showing the pending spot ---
+function buildPlaceGhost() {
+  placeGhost = new THREE.Group();
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0xf5cc74, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.85, 44), ringMat);
+  const dotMat = new THREE.MeshBasicMaterial({ color: 0xf5cc74, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false });
+  const dot = new THREE.Mesh(new THREE.CircleGeometry(0.16, 20), dotMat);
+  const beamMat = new THREE.MeshBasicMaterial({ color: 0xf5cc74, transparent: true, opacity: 0.55, depthWrite: false });
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 1.6, 10, 1, true), beamMat);
+  beam.rotation.x = Math.PI / 2;     // cylinder Y-axis → group +Z (skyward)
+  beam.position.z = 0.8;
+  placeGhost.add(ring, dot, beam);
+  placeGhost.renderOrder = 998;
+  placeGhost.visible = false;
+  placeGhost.userData._mats = [ringMat, dotMat, beamMat];
+  placeGhost.userData._base = 0.02;
+  for (const m of placeGhost.userData._mats) m.userData._base = m.opacity;
+  earth.add(placeGhost);
+}
+
+function setPlaceGhostColor(hex) {
+  if (!placeGhost) buildPlaceGhost();
+  for (const m of placeGhost.userData._mats) m.color.setHex(hex);
+}
+
+function positionPlaceGhost(plot, uw) {
+  if (!placeGhost) buildPlaceGhost();
+  const pos = plotUWToWorld(plot, uw.u, uw.w);
+  placeGhost.position.copy(pos);
+  orientToSurface(placeGhost, pos);
+  const bizScale = Math.max(0.013, Math.min(0.032, plot.userData.areaMultiplier * 0.017));
+  placeGhost.userData._base = bizScale * 1.15;   // ring ≈ the building's footprint
+  placeGhost.scale.setScalar(placeGhost.userData._base);
+  placeGhost.visible = true;
+}
+
+function hidePlaceGhost() {
+  if (placeGhost) placeGhost.visible = false;
+}
+
+// --- placement session ---
+function beginPlacement(opts) {
+  STATE.placing = { plotId: opts.plotId, type: opts.type || null, mode: opts.mode, index: (opts.index === undefined ? null : opts.index) };
+  setPlaceGhostColor(opts.mode === 'move' ? 0x39e0ff : 0xf5cc74);
+  // Too far out to see the plots? Glide in so the placement click can land
+  const dist = camera.position.distanceTo(controls.target);
+  if (dist > STATE.plotRevealDist) STATE.zoomTarget = STATE.plotFullDist;
+  updatePlaceBanner();
+  renderer.domElement.style.cursor = 'crosshair';
+}
+
+function cancelPlacement(silent) {
+  if (!STATE.placing) return;
+  STATE.placing = null;
+  hidePlaceGhost();
+  updatePlaceBanner();
+  renderer.domElement.style.cursor = 'grab';
+  if (!silent) showToast('Placement cancelled', false);
+}
+
+function updatePlaceBanner() {
+  const el = document.getElementById('place-banner');
+  if (!el) return;
+  const placing = STATE.placing;
+  if (!placing || !gameInitialized) { el.style.display = 'none'; return; }
+  const plot = ACTIVE_PLOT_BY_ID.get(placing.plotId);
+  const bt = placing.type ? getBusinessType(placing.type) : null;
+  const label = placing.mode === 'move' ? '↔ Moving' : '📍 Placing';
+  el.innerHTML = `${label} <b>${bt ? bt.name : 'building'}</b> — click any spot inside <b>${plot ? plot.userData.name : 'your plot'}</b>&ensp;<span class="pb-key">Esc</span> <span class="pb-key">right-click</span> cancel`;
+  el.style.display = 'flex';
+}
+
+// A placement-armed click on the canvas: place / move at the clicked spot
+function handlePlacementClick(hit) {
+  const placing = STATE.placing;
+  const plot = ACTIVE_PLOT_BY_ID.get(placing.plotId);
+  if (!plot) { cancelPlacement(); return; }
+  if (!plot.userData.owned) {   // conquered mid-placement
+    cancelPlacement(true);
+    showToast('You no longer own this plot', false);
+    return;
+  }
+  if (!hit || hit.plot !== plot) {
+    showToast(`Click inside ${plot.userData.name} to place it — Esc or right-click cancels`, false);
+    return;
+  }
+  const raw = worldPointToPlotUW(plot, hit.point);
+  const uw = clampUWToPlot(plot, raw.u, raw.w, 0.06);
+
+  if (placing.mode === 'move') {
+    const entry = plot.userData.businesses[placing.index];
+    if (entry && entry.mesh) {
+      const pos = plotUWToWorld(plot, uw.u, uw.w);
+      entry.mesh.position.copy(pos);
+      orientToSurface(entry.mesh, pos);
+      entry.mesh.updateMatrix();          // business meshes are matrix-frozen
+      entry.pos = { u: uw.u, w: uw.w };
+      let arr = BIZ_POS.get(placing.plotId);
+      if (!arr) { arr = []; BIZ_POS.set(placing.plotId, arr); }
+      while (arr.length < placing.index) arr.push(null);
+      arr[placing.index] = { u: uw.u, w: uw.w };
+      const mbt = getBusinessType(entry.type);
+      showToast(`Moved ${mbt ? mbt.name : 'building'} to its new spot`, true);
+      saveGame();
+    }
+    cancelPlacement(true);
+    openPlotModal(plot);
+    return;
+  }
+
+  // build mode — re-validate, then build at the chosen spot
+  const bt = getBusinessType(placing.type);
+  if (!bt) { cancelPlacement(); return; }
+  const existing = plot.userData.businesses || [];
+  if (existing.length >= plot.userData.maxBusinesses) {
+    showToast(`Plot is at max capacity (${plot.userData.maxBusinesses} businesses)`, false);
+    cancelPlacement(true); openPlotModal(plot); return;
+  }
+  if (bt.planets && !bt.planets.includes(plot.userData.planet)) {
+    showToast(`${bt.name} can't be built on this planet`, false);
+    cancelPlacement(true); openPlotModal(plot); return;
+  }
+  const rule = buildTerrainRule(bt, plot);
+  if (!rule.ok) { showToast(`${bt.name}: ${rule.reason}`, false); cancelPlacement(true); openPlotModal(plot); return; }
+  const effCost = Math.round(bt.buildCost * plot.userData.areaMultiplier);
+  if (STATE.money < effCost) {
+    showToast(`Need $${effCost.toLocaleString()} to build ${bt.name}`, false);
+    cancelPlacement(true); openPlotModal(plot); return;
+  }
+  STATE.money -= effCost;
+  addBusinessToPlot(plot, bt, existing.length, uw);
+  const _reg = BUSINESS_REGISTRY.get(plot.userData.id) || [];
+  _reg.push(bt.id);
+  BUSINESS_REGISTRY.set(plot.userData.id, _reg);
+  const _pos = BIZ_POS.get(plot.userData.id) || [];
+  _pos.push({ u: uw.u, w: uw.w });
+  BIZ_POS.set(plot.userData.id, _pos);
+
+  updateHUD();
+  cancelPlacement(true);
+  openPlotModal(plot);
+  const rate = bt.rate * plot.userData.areaMultiplier;
+  const mat = getMaterial(bt.produces);
+  showToast(`Built ${bt.name} — producing ${rate.toFixed(1)} ${mat.icon}/s`, true);
+  saveGame();
+}
+
+// ====================================================================
 // GAME VERSION + RELEASE NOTES — the "What's New" popup after login.
 // Bump GAME_VERSION and add a section at the TOP of RELEASE_NOTES with
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.16';
+const GAME_VERSION = 'v1.17';
 const RELEASE_NOTES = [
+  { v: 'v1.17', items: [
+    '📍 <b>Build anywhere on your land</b> — choosing a business or military building no longer snaps it to a preset grid. Click any spot inside the plot and that is exactly where it stands, with a glowing marker previewing the position. Esc or right-click cancels.',
+    '↔ <b>Move existing buildings</b> — every business card now has a Move button, so you can reposition your whole empire freely. Chosen spots are saved and survive reloads and interplanetary travel.'
+  ]},
   { v: 'v1.16', items: [
     '📜 <b>Planets & My Land now scroll</b> — both panels cap their height to your screen and glide through every world and holding. The header and Close button stay pinned while you browse, so nothing ever runs off the edge again.',
     '🧹 <b>Contact log removed</b> — the bottom-right corner is gone entirely, leaving a clean, unobstructed view of your world.'
@@ -4880,6 +5159,17 @@ function initScene() {
   renderer.domElement.addEventListener('pointermove', onPointerMove);
   renderer.domElement.addEventListener('pointerdown', (e) => { _pointerDownPos = { x: e.clientX, y: e.clientY }; });
   renderer.domElement.addEventListener('click', onPointerClick);
+  // Free placement (v1.17): Esc or right-click cancels an armed build/move;
+  // the ghost hides when the pointer leaves the canvas
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && STATE.placing) cancelPlacement();
+  });
+  renderer.domElement.addEventListener('contextmenu', (e) => {
+    if (STATE.placing) { e.preventDefault(); cancelPlacement(); }
+  });
+  renderer.domElement.addEventListener('pointerleave', () => {
+    if (STATE.placing) hidePlaceGhost();
+  });
 
   const qbtn = document.getElementById('quality-btn');
   if (qbtn) qbtn.innerHTML = qualityButtonLabel();
@@ -6703,6 +6993,7 @@ function generatePlots(planet, opts = {}) {
       isWater, isCoastal, region,
       baseColor: baseColor.getHex(),
       sizeA: Math.sqrt(area),   // linear plot size (business layout on plot)
+      polyUW: cell.map(v => ({ u: v.u, w: v.w })),  // tangent-plane polygon — free-placement clamp
       _tris: tris,              // fill triangles, planet-local coords
       _edges: edges,            // outline segments, planet-local coords
       _fillHex: baseColor.getHex(),
@@ -6864,8 +7155,9 @@ function updatePlotVisibility() {
 }
 
 // Raycast pick against the merged plot pools. Maps the hit triangle
-// back to its logical plot via the triangle→plot lookup tables.
-function pickPlot() {
+// back to its logical plot via the triangle→plot lookup tables, and
+// returns the intersection point too (free placement needs the spot).
+function pickPlotHit() {
   if (!plotFillMesh) return null;
   const targets = [];
   if (plotFillMesh.visible && plotFillMesh.material.opacity > 0.05) targets.push(plotFillMesh);
@@ -6876,9 +7168,13 @@ function pickPlot() {
     const map = (h.object === plotFillMesh) ? fillTriToPlot : ownedTriToPlot;
     if (!map || h.faceIndex === undefined || h.faceIndex >= map.length) continue;
     const p = STATE.plots[map[h.faceIndex]];
-    if (p) return p;
+    if (p) return { plot: p, point: h.point };
   }
   return null;
+}
+function pickPlot() {
+  const h = pickPlotHit();
+  return h ? h.plot : null;
 }
 
 // ====================================================================
@@ -6895,12 +7191,26 @@ function onPointerMove(e) {
 
   // Pick against the merged plot pools (triangle lookup → logical plot)
   raycaster.setFromCamera(pointer, camera);
-  const hitPlot = pickPlot();
+  const _mvHit = pickPlotHit();
+  const hitPlot = _mvHit ? _mvHit.plot : null;
+
+  // Free placement: the ghost ring tracks the pending spot on the target
+  // plot wherever the pointer roams inside it
+  if (STATE.placing) {
+    const _target = ACTIVE_PLOT_BY_ID.get(STATE.placing.plotId);
+    if (_mvHit && _target && _mvHit.plot === _target) {
+      const _raw = worldPointToPlotUW(_target, _mvHit.point);
+      positionPlaceGhost(_target, clampUWToPlot(_target, _raw.u, _raw.w, 0.06));
+    } else {
+      hidePlaceGhost();
+    }
+  }
 
   const tip = document.getElementById('plot-tip');
   if (hitPlot) {
     STATE.hoveredPlot = hitPlot;
-    renderer.domElement.style.cursor = 'pointer';
+    const _placingHere = STATE.placing && _mvHit && _mvHit.plot === ACTIVE_PLOT_BY_ID.get(STATE.placing.plotId);
+    renderer.domElement.style.cursor = _placingHere ? 'crosshair' : 'pointer';
     tip.style.display = 'block';
     tip.style.left = e.clientX + 'px';
     tip.style.top = e.clientY + 'px';
@@ -6956,7 +7266,13 @@ function onPointerClick(e) {
   pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
   if (earth) earth.updateMatrixWorld(true);
   raycaster.setFromCamera(pointer, camera);
-  const hit = pickPlot();
+  const _clickHit = pickPlotHit();
+  const hit = _clickHit ? _clickHit.plot : null;
+  // Free placement: an armed click confirms the spot (or re-hints the plot)
+  if (STATE.placing) {
+    handlePlacementClick(_clickHit);
+    return;
+  }
   // Multi-buy mode: clicks toggle selection instead of opening the modal
   if (STATE.multiBuy) {
     const target = hit || STATE.hoveredPlot;
@@ -7052,7 +7368,10 @@ function openPlotModal(plot) {
             </div>
           </div>
           ${casinoPlayBtn}
-          <button class="btn demolish" style="margin-top:6px;padding:7px;font-size:11px" onclick="demolishBusiness(${idx})">Demolish ${bt.name}</button>
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <button class="btn" style="flex:1;padding:7px;font-size:11px" onclick="moveBusiness(${idx})" title="Reposition this building anywhere on the plot">📍 Move</button>
+            <button class="btn demolish" style="flex:1;padding:7px;font-size:11px" onclick="demolishBusiness(${idx})">Demolish</button>
+          </div>
         </div>
       `;
     }).join('');
@@ -7105,7 +7424,7 @@ function openPlotModal(plot) {
 
     businessPanel = `
       <div class="business-panel">
-        <div class="biz-hint">Region: <b style="color:${regionInfo.color}">${regionInfo.icon} ${regionInfo.name}</b> · Capacity: <b>${businesses.length}/${maxBiz}</b> businesses</div>
+        <div class="biz-hint">Region: <b style="color:${regionInfo.color}">${regionInfo.icon} ${regionInfo.name}</b> · Capacity: <b>${businesses.length}/${maxBiz}</b> businesses · <b style="color:#7fffd4">builds go where you click</b></div>
         ${bizCards}
         ${buildSection}
       </div>
@@ -7379,6 +7698,7 @@ window.travelTo = function(planetId) {
     if (STATE.owned.has(p.userData.id) && owner && owner !== CURRENT_USER) {
       STATE.owned.delete(p.userData.id);
       BUSINESS_REGISTRY.delete(p.userData.id);
+      BIZ_POS.delete(p.userData.id);
       stripped++;
     }
     if (STATE.owned.has(p.userData.id)) {
@@ -7874,13 +8194,13 @@ window.buildBusiness = function(businessId) {
   }
   const bt = BUSINESS_TYPES.find(b => b.id === businessId);
   if (!bt) return;
-  // Terrain restriction: oil rigs at sea, naval yards on coasts or oceans,
-  // everything else on land
   // Planet check — businesses are unique to specific planets
   if (bt.planets && !bt.planets.includes(p.userData.planet)) {
     showToast(`${bt.name} can't be built on this planet`, false);
     return;
   }
+  // Terrain restriction: oil rigs at sea, naval yards on coasts or oceans,
+  // everything else on land
   const rule = buildTerrainRule(bt, p);
   if (!rule.ok) {
     showToast(`${bt.name}: ${rule.reason}`, false);
@@ -7891,19 +8211,23 @@ window.buildBusiness = function(businessId) {
     showToast(`Need $${effCost.toLocaleString()} to build ${bt.name}`, false);
     return;
   }
-  STATE.money -= effCost;
-  addBusinessToPlot(p, bt, existing.length);
-  // Registry is the all-planet authority for saves and production
-  const _reg = BUSINESS_REGISTRY.get(p.userData.id) || [];
-  _reg.push(bt.id);
-  BUSINESS_REGISTRY.set(p.userData.id, _reg);
+  // Free placement (v1.17): arm placement mode — the next click inside this
+  // plot sets exactly where the building stands (ghost ring previews it)
+  closePlotModal();
+  beginPlacement({ plotId: p.userData.id, type: businessId, mode: 'build' });
+  showToast(`${bt.name} — click any spot inside ${p.userData.name} to place it`, true);
+};
 
-  updateHUD();
-  openPlotModal(p);
-  const rate = bt.rate * p.userData.areaMultiplier;
-  const mat = getMaterial(bt.produces);
-  showToast(`Built ${bt.name} — producing ${rate.toFixed(1)} ${mat.icon}/s`, true);
-  saveGame();
+// Free placement: reposition an existing business anywhere on its plot
+window.moveBusiness = function(businessIndex) {
+  const p = STATE.selectedPlot;
+  if (!p || !p.userData.owned || !p.userData.businesses) return;
+  const entry = p.userData.businesses[businessIndex];
+  if (!entry || !entry.mesh) return;
+  const bt = getBusinessType(entry.type);
+  closePlotModal();
+  beginPlacement({ plotId: p.userData.id, type: entry.type, mode: 'move', index: businessIndex });
+  showToast(`${bt ? bt.name : 'Building'} — click its new spot inside ${p.userData.name}`, true);
 };
 
 window.demolishBusiness = function(businessIndex) {
@@ -7922,8 +8246,16 @@ window.demolishBusiness = function(businessIndex) {
   const _regTypes = BUSINESS_REGISTRY.get(p.userData.id) || [];
   const _ri = _regTypes.indexOf(entry.type);
   if (_ri >= 0) _regTypes.splice(_ri, 1);
-  if (_regTypes.length) BUSINESS_REGISTRY.set(p.userData.id, _regTypes);
-  else BUSINESS_REGISTRY.delete(p.userData.id);
+  // Keep saved positions index-aligned with the registry (v1.17)
+  const _posArr = BIZ_POS.get(p.userData.id) || [];
+  if (_posArr.length > businessIndex) _posArr.splice(businessIndex, 1);
+  if (_regTypes.length) {
+    BUSINESS_REGISTRY.set(p.userData.id, _regTypes);
+    if (_posArr.length) BIZ_POS.set(p.userData.id, _posArr);
+  } else {
+    BUSINESS_REGISTRY.delete(p.userData.id);
+    BIZ_POS.delete(p.userData.id);
+  }
   // If no businesses left, restore the owner's plot color; otherwise
   // recolor to first remaining
   if (p.userData.businesses.length === 0) {
@@ -9312,6 +9644,22 @@ function animate() {
   }
   _zoomLastT = now;
   controls.update();
+  // Free placement upkeep: cancel when a modal/menu takes over, and pulse
+  // the ghost ring while the pending spot is armed
+  if (STATE.placing) {
+    if (document.getElementById('game').classList.contains('hidden') ||
+        document.querySelector('.plot-modal.show') || document.querySelector('.clans-overlay.show') ||
+        STATE.multiBuy || STATE.multiSell) {
+      cancelPlacement(true);
+    } else if (placeGhost && placeGhost.visible) {
+      const _pt = now * 0.001;
+      const _pk = 1 + 0.13 * Math.sin(_pt * 5.5);
+      placeGhost.scale.setScalar(placeGhost.userData._base * _pk);
+      for (const _m of placeGhost.userData._mats) {
+        _m.opacity = _m.userData._base * (0.72 + 0.28 * (0.5 + 0.5 * Math.sin(_pt * 5.5 + 1.2)));
+      }
+    }
+  }
   // Sun rides just off the camera's shoulder (rotated ~35 degrees right):
   // the globe always shows a day/night terminator like a real orbital view,
   // while the side you are looking at stays readable for gameplay.
