@@ -3794,7 +3794,17 @@ function handlePlacementClick(hit) {
     showToast(`Need $${effCost.toLocaleString()} to build ${bt.name}`, false);
     cancelPlacement(true); openPlotModal(plot); return;
   }
+  // v1.19 — re-check material requirements, then consume them with the credits
+  const req = scaledBuildReq(bt, plot.userData.areaMultiplier);
+  const missing = missingBuildReq(req);
+  if (Object.keys(missing).length) {
+    showToast(`${bt.name} needs ${missingReqText(missing)} — keep that stock instead of selling it`, false);
+    cancelPlacement(true); openPlotModal(plot); return;
+  }
   STATE.money -= effCost;
+  if (req) for (const id in req) {
+    STATE.inventory[id] = Math.max(0, (STATE.inventory[id] || 0) - req[id]);
+  }
   addBusinessToPlot(plot, bt, existing.length, uw);
   const _reg = BUSINESS_REGISTRY.get(plot.userData.id) || [];
   _reg.push(bt.id);
@@ -4339,8 +4349,13 @@ window.WarFx = WarFx;
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.18';
+const GAME_VERSION = 'v1.19';
 const RELEASE_NOTES = [
+  { v: 'v1.19', items: [
+    '🏗 <b>Buildings now need materials</b> — on top of the credit price, every business takes a bill of materials to raise: 🌾 Food feeds miners and soldiers, ⛏️ Ore and 📦 Goods become factories and fleets, ✈️ Tourism and 🛢️ Oil fund the grand late-game projects. Requirements scale with plot size, just like the price.',
+    '📦 <b>Produce or sell — your call</b> — materials your businesses make can be sold on the Market for credits or kept in storage to fund construction. The build menu shows exactly what each building needs and how much you hold; shortfalls glow red so you know exactly what to produce next.',
+    '🌱 <b>Farms stay free of requirements</b> — your first business still costs credits only, so every new empire can bootstrap itself from zero stock.'
+  ]},
   { v: 'v1.18', items: [
     '⚔️ <b>Armies march across the globe</b> — when you send a force to take a plot, watch it happen: a golden pulse lifts off your land, a runway of light traces the route, and your dropships or warships physically travel the arc to the enemy plot — their position on the road is the real march timer.',
     '🎯 <b>Red alert beacons</b> — every march paints a pulsing target beacon on the plot being invaded, with incoming threats visible the moment an enemy launches at you. The WAR button pulses while any force is on the move.',
@@ -4823,6 +4838,7 @@ const BUSINESS_TYPES = [
   {
     id: 'farm', name: 'Farm', icon: '🌾',
     buildCost: 16000, produces: 'food', rate: 0.5,
+    buildReq: null,  // bootstrap business — credits only, so every empire starts from zero
     color: 0x7cb342, shape: 'cone',
     desc: 'Grows food. Slow but steady production.',
     planets: ['earth'],
@@ -4830,6 +4846,7 @@ const BUSINESS_TYPES = [
   {
     id: 'mine', name: 'Mine', icon: '⛏️',
     buildCost: 40000, produces: 'ore', rate: 0.6,
+    buildReq: { food: 20 },
     color: 0x8d6e63, shape: 'cylinder',
     desc: 'Extracts ore from the earth.',
     planets: ['earth', 'luna', 'mars'],
@@ -4837,6 +4854,7 @@ const BUSINESS_TYPES = [
   {
     id: 'factory', name: 'Factory', icon: '🏭',
     buildCost: 120000, produces: 'goods', rate: 0.6,
+    buildReq: { ore: 25, food: 15 },
     color: 0x546e7a, shape: 'box',
     desc: 'Manufactures goods from raw materials.',
     planets: ['earth', 'luna', 'mars'],
@@ -4844,6 +4862,7 @@ const BUSINESS_TYPES = [
   {
     id: 'resort', name: 'Resort', icon: '🏖️',
     buildCost: 180000, produces: 'tourism', rate: 0.6,
+    buildReq: { goods: 20, food: 30 },
     color: 0x4dd0e1, shape: 'dome',
     desc: 'Generates tourism revenue from visitors.',
     planets: ['earth', 'mars', 'oceanus'],
@@ -4851,6 +4870,7 @@ const BUSINESS_TYPES = [
   {
     id: 'oilrig', name: 'Oil Rig', icon: '🛢️',
     buildCost: 280000, produces: 'oil', rate: 0.7,
+    buildReq: { goods: 30, ore: 20 },
     color: 0x37474f, shape: 'pyramid',
     desc: 'Pumps crude oil. High-value material.',
     planets: ['earth', 'oceanus'],
@@ -4858,6 +4878,7 @@ const BUSINESS_TYPES = [
   {
     id: 'casino', name: 'Casino', icon: '🎰',
     buildCost: 360000, produces: 'fun', rate: 0.7,
+    buildReq: { goods: 30, tourism: 15 },
     color: 0xd32f2f, shape: 'sphere',
     desc: 'Runs slot machines that produce Entertainment at a steady rate — and you can step up and spin them yourself. Every extra casino trims the bust chance at the tables.',
     planets: ['earth', 'oceanus'],
@@ -4865,6 +4886,7 @@ const BUSINESS_TYPES = [
   {
     id: 'bank', name: 'Bank', icon: '🏦',
     buildCost: 600000, produces: 'capital', rate: 0.7,
+    buildReq: { goods: 40, tourism: 20 },
     color: 0xf5cc74, shape: 'cylinder',
     desc: 'Generates financial capital services.',
     planets: ['earth', 'luna'],
@@ -4872,6 +4894,7 @@ const BUSINESS_TYPES = [
   {
     id: 'techhub', name: 'Tech Hub', icon: '💻',
     buildCost: 1200000, produces: 'tech', rate: 0.7,
+    buildReq: { goods: 50, oil: 25 },
     color: 0x7c4dff, shape: 'octahedron',
     desc: 'Produces cutting-edge electronics.',
     planets: ['earth', 'luna', 'mars', 'oceanus'],
@@ -4879,6 +4902,7 @@ const BUSINESS_TYPES = [
   {
     id: 'barracks', name: 'Barracks', icon: '⚔️',
     buildCost: 120000, produces: 'troops', rate: 0.4,
+    buildReq: { food: 25, goods: 15 },
     color: 0x9c3428, shape: 'barracks', military: true,
     desc: 'Trains troops. Each Barracks houses 500 troops — build more to raise your army cap. Deploy troops to conquer other commanders\' plots.',
     planets: ['earth', 'luna', 'mars'],
@@ -4886,6 +4910,7 @@ const BUSINESS_TYPES = [
   {
     id: 'navalyard', name: 'Naval Yard', icon: '⚓',
     buildCost: 180000, produces: 'ships', rate: 0.35,
+    buildReq: { goods: 35, ore: 15 },
     color: 0x2b5f75, shape: 'navalyard', military: true,
     desc: 'Builds warships on coasts and oceans. Ships fight naval invasions and defend sea plots.',
     planets: ['earth', 'oceanus'],
@@ -4893,6 +4918,7 @@ const BUSINESS_TYPES = [
   {
     id: 'airfield', name: 'Airfield', icon: '✈️',
     buildCost: 280000, produces: 'planes', rate: 0.25,
+    buildReq: { goods: 40, ore: 25 },
     color: 0x78909c, shape: 'airfield', military: true,
     desc: 'Operates an airstrip. Planes provide air support to every battle you fight.',
     planets: ['earth', 'luna', 'mars'],
@@ -4905,6 +4931,7 @@ const BUSINESS_TYPES = [
   {
     id: 'stockexchange', name: 'Stock Exchange', icon: '📈',
     buildCost: 5000000, produces: 'capital', rate: 1.4,
+    buildReq: { goods: 60, tourism: 40, oil: 30 },
     color: 0x00e676, shape: 'sphere',
     desc: 'A high-frequency trading hub at the heart of Earth\'s financial district. Produces capital at 2x the rate of a Bank. Earth-only — the Empire\'s financial center.',
     planets: ['earth'],
@@ -4912,6 +4939,7 @@ const BUSINESS_TYPES = [
   {
     id: 'helium3', name: 'Helium-3 Extractor', icon: '⚛️',
     buildCost: 8000000, produces: 'tech', rate: 1.4,
+    buildReq: { goods: 80, oil: 40 },
     color: 0xc0ca33, shape: 'octahedron',
     desc: 'Mines helium-3 from lunar regolith — the rare isotope that powers fusion reactors across the system. Produces tech at 2x the rate of a Tech Hub. Luna-only.',
     planets: ['luna'],
@@ -4919,6 +4947,7 @@ const BUSINESS_TYPES = [
   {
     id: 'biodome', name: 'Biodome', icon: '🌱',
     buildCost: 3000000, produces: 'food', rate: 1.0,
+    buildReq: { goods: 50, oil: 30, food: 40 },
     color: 0x66bb6a, shape: 'dome',
     desc: 'A sealed greenhouse complex for terraforming research. Produces food at 2x the rate of a Farm — and works on Mars where Farms cannot. Mars-only.',
     planets: ['mars'],
@@ -4926,6 +4955,7 @@ const BUSINESS_TYPES = [
   {
     id: 'wavefarm', name: 'Wave Farm', icon: '🌊',
     buildCost: 4000000, produces: 'oil', rate: 1.4,
+    buildReq: { goods: 60, oil: 25 },
     color: 0x26c6da, shape: 'cylinder',
     desc: 'Harvests energy from ocean waves and converts it to refined fuel. Produces oil at 2x the rate of an Oil Rig. Oceanus-only — works on water plots.',
     planets: ['oceanus'],
@@ -4940,6 +4970,47 @@ function getMaterial(id) {
 // Helper: get business type by id
 function getBusinessType(id) {
   return BUSINESS_TYPES.find(b => b.id === id);
+}
+
+// ====================================================================
+// BUILD REQUIREMENTS (v1.19) — businesses take a bill of materials on
+// top of their credit price. Base quantities live on each catalog entry
+// (buildReq) and scale with plot area exactly like the money cost, so
+// bigger plots need proportionally more materials. The Farm is
+// deliberately requirement-free — it is every empire's bootstrap
+// building (a new commander has zero stock to spend). Every requirement
+// material is producible by an earlier-tier business, so the chain
+// never dead-ends: farm → food, mine → ore, factory → goods,
+// resort → tourism, oil rig → oil. The Market only SELLS materials, so
+// holding back production becomes a real strategic choice.
+// ====================================================================
+function scaledBuildReq(bt, areaMultiplier) {
+  if (!bt || !bt.buildReq) return null;
+  const out = {};
+  for (const id in bt.buildReq) {
+    out[id] = Math.max(1, Math.round(bt.buildReq[id] * (areaMultiplier || 1)));
+  }
+  return out;
+}
+
+// Which requirement materials are short? Returns { materialId: {need,have} }
+// (float dust tolerance — production accrues fractional units)
+function missingBuildReq(req) {
+  const missing = {};
+  if (!req) return missing;
+  for (const id in req) {
+    const have = STATE.inventory[id] || 0;
+    if (have + 1e-6 < req[id]) missing[id] = { need: req[id], have: Math.max(0, Math.floor(have)) };
+  }
+  return missing;
+}
+
+// Human-readable shortfall for toasts: "🌾 20 Food (have 3), ⛏️ 25 Ore (have 0)"
+function missingReqText(missing) {
+  return Object.keys(missing).map(id => {
+    const m = getMaterial(id);
+    return `${m ? m.icon + ' ' : ''}${missing[id].need} ${m ? m.name : id} (have ${missing[id].have})`;
+  }).join(', ');
 }
 
 // ARMY HOUSING — the limit on troop counts. Every Barracks you own
@@ -7931,7 +8002,20 @@ function openPlotModal(plot) {
         const terr = buildTerrainRule(b, plot);
         const terrainOk = terr.ok;
         const terrainReason = terrainOk ? null : terr.reason;
-        const canBuild = canAfford && terrainOk;
+        // v1.19 — material bill of materials, scaled to plot area like the
+        // credits; shortfalls glow red with the stock you actually hold
+        const req = scaledBuildReq(b, plot.userData.areaMultiplier);
+        const missing = missingBuildReq(req);
+        const matsOk = Object.keys(missing).length === 0;
+        const reqChips = req ? Object.keys(req).map(id => {
+          const rm = getMaterial(id);
+          const have = STATE.inventory[id] || 0;
+          const short = have + 1e-6 < req[id];
+          return short
+            ? `<span style="color:#ff8080">${rm.icon} ${req[id]} ${rm.name} <i style="font-style:normal">(have ${Math.floor(Math.max(0, have))})</i></span>`
+            : `<span style="color:#9bb4bd">${rm.icon} ${req[id]} ${rm.name}</span>`;
+        }).join(' · ') : '';
+        const canBuild = canAfford && terrainOk && matsOk;
         const bonusPct = Math.round((regionBonus - 1) * 100);
         const bonusLabel = bonusPct > 0 ? `+${bonusPct}%` : (bonusPct < 0 ? `${bonusPct}%` : '');
         const bonusColor = bonusPct > 0 ? '#7fffd4' : (bonusPct < 0 ? '#ff8080' : '#9bb4bd');
@@ -7941,7 +8025,7 @@ function openPlotModal(plot) {
             <div class="biz-icon">${b.icon}</div>
             <div class="biz-info">
               <div class="biz-name">${b.name} <span style="color:#9bb4bd;font-size:11px">→ ${mat.icon} ${mat.name}</span></div>
-              <div class="biz-cost">$${effCost.toLocaleString()} build${terrainReason ? ` · <span style="color:#ff8080">${terrainReason}</span>` : ''}${bonusDisplay}</div>
+              <div class="biz-cost">$${effCost.toLocaleString()}${reqChips ? ` + ${reqChips}` : ''} build${terrainReason ? ` · <span style="color:#ff8080">${terrainReason}</span>` : ''}${bonusDisplay}</div>
             </div>
             <div class="biz-income">+${effRate.toFixed(1)}/s</div>
           </button>
@@ -8750,6 +8834,13 @@ window.buildBusiness = function(businessId) {
   const effCost = Math.round(bt.buildCost * p.userData.areaMultiplier);
   if (STATE.money < effCost) {
     showToast(`Need $${effCost.toLocaleString()} to build ${bt.name}`, false);
+    return;
+  }
+  // v1.19 — material requirements (scaled to plot area like the credits)
+  const _req = scaledBuildReq(bt, p.userData.areaMultiplier);
+  const _missing = missingBuildReq(_req);
+  if (Object.keys(_missing).length) {
+    showToast(`${bt.name} needs ${missingReqText(_missing)} — keep that stock instead of selling it`, false);
     return;
   }
   // Free placement (v1.17): arm placement mode — the next click inside this
