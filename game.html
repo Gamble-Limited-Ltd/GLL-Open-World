@@ -3236,17 +3236,24 @@ function getPlotOwner(plotId) {
 }
 
 // --------------------------------------------------------------------
-// OWNED-PLOT LOOK (v1.20) — bought plots keep their natural terrain
-// fill. Ownership reads as the border color (gold for your land, muted
-// purple for rivals) plus the higher-opacity owned render pool, which
-// stays visible from orbit. The per-player color picker is gone.
+// OWNED-PLOT LOOK (v1.22) — plots you buy look exactly like the rest
+// of the world: natural terrain fill, the standard teal outline (blue
+// on coasts) and the normal render pool at the world's own opacity.
+// Ownership is a fact in the save, not a paint job — find your land in
+// My Land, the hover tip ("OWNED — build ready") or the plot card.
+// Rival plots keep the purple border + brighter pool so enemy
+// territory stays readable for war.
 // --------------------------------------------------------------------
 function setOwnedPlotLook(p, mine) {
-  setPlotColors(p, p.userData.baseColor, mine ? OWNED_OUTLINE : OTHER_OUTLINE);
+  if (mine) {
+    setPlotColors(p, p.userData.baseColor, plotBaseOutline(p));
+  } else {
+    setPlotColors(p, p.userData.baseColor, OTHER_OUTLINE);
+  }
 }
 
 // Apply claim-based colors to all plots:
-//   - Claimed by current user → natural fill + gold border (set by loadGame)
+//   - Claimed by current user → normal world look (set by loadGame)
 //   - Claimed by other user → natural fill + purple border
 //   - Unclaimed → default green/teal (already the default)
 const OTHER_OUTLINE = 0x9a6aaa;     // purple border marks other players' land
@@ -3679,7 +3686,7 @@ function loadGame(username) {
     if (STATE.marketTrend[m.id] === undefined) STATE.marketTrend[m.id] = 'stable';
   }
 
-  // Restore owned plots (active planet meshes — natural fill, gold border)
+  // Restore owned plots (active planet meshes — normal world look)
   const ownedIds = STATE.owned;
   for (const p of STATE.plots) {
     if (ownedIds.has(p.userData.id)) {
@@ -4535,8 +4542,12 @@ window.WarFx = WarFx;
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.21';
+const GAME_VERSION = 'v1.22';
 const RELEASE_NOTES = [
+  { v: 'v1.22', items: [
+    '🌍 <b>Bought land looks like the normal world</b> — buying a plot no longer changes how it looks. Your plots keep the exact terrain, outlines and brightness of the land around them: no gold border, no highlight, no glowing from orbit. What you see is just the world. Ownership shows in My Land, the hover tip and the plot card.',
+    '🏴 <b>Rival land stays marked</b> — enemy plots keep their purple border so invasion targets are still easy to spot, and war beacons / capture flashes still light battles up as they happen.'
+  ]},
   { v: 'v1.21', items: [
     '🗺 <b>More, smaller plots</b> — every world was re-parceled from 2,200 to 6,000 plots, so parcels are smaller and there is far more land to claim on the map. Prices and production still scale with acreage — same economy, finer carve.',
     '🏠 <b>Your empire stayed put</b> — owned plots and every building were automatically carried onto the new grid at the same spots on the globe. Each old plot became its smaller successors, so you keep all of your territory.',
@@ -6361,8 +6372,9 @@ function classifyPlotsByTerrain() {
     p.userData.region = classifyRegion(p);
     p.userData.isCoastal = isCoastalPlot(p);
     // Coastal land plots get a bluer outline so naval-build spots are
-    // visible at a glance (unowned only — owned colors are set later)
-    if (p.userData.isCoastal && !p.userData.owned && !p.userData.ownedByOther) {
+    // visible at a glance (rival plots keep their purple border; your
+    // own land uses the same standard outlines as open world, v1.22)
+    if (p.userData.isCoastal && !p.userData.ownedByOther) {
       setPlotColors(p, p.userData._fillHex, COASTAL_OUTLINE);
     }
     // Keep the off-planet production meta in sync (businesses on Earth
@@ -7422,15 +7434,17 @@ function mulberry32(seed) {
 }
 
 // --------------------------------------------------------------------
-// PLOT RENDER POOLS — all 2,200 cells are drawn with 4 merged objects
-// (unowned fills, owned fills, unowned outlines, owned outlines) using
+// PLOT RENDER POOLS — all cells are drawn with 4 merged objects
+// (world fills, rival fills, world outlines, rival outlines) using
 // per-vertex colors, instead of one Mesh + one LineSegments per plot
 // (~4,400 draw calls plus per-frame sorting — unusable on Chromebooks).
 // Back-side cells are hidden by the depth test against the globe.
+// v1.22: the "owned" pools carry only RIVAL plots (purple border,
+// brighter fill, visible from orbit). Your own land sits in the normal
+// pools and is visually indistinguishable from open world.
 // --------------------------------------------------------------------
 const PLOT_UNOWNED_OUTLINE = 0x2a8b6f;
 const COASTAL_OUTLINE = 0x3f8fb0;   // bluer outline marks coastal land (Naval Yard sites)
-const OWNED_OUTLINE = 0xf5cc74;     // gold border marks YOUR land (fill stays natural terrain, v1.20)
 const _PLOT_SHELL_GEO = new THREE.BufferGeometry();   // shared dummy — shells are never rendered
 const _PLOT_SHELL_MAT = new THREE.MeshBasicMaterial();
 
@@ -7458,7 +7472,7 @@ function rebuildPlotPools() {
   let unV = 0, owV = 0, unE = 0, owE = 0, unT = 0, owT = 0;
   for (let i = 0; i < plots.length; i++) {
     const ud = plots[i].userData;
-    const owned = ud.owned || ud.ownedByOther;
+    const owned = ud.ownedByOther;   // v1.22: only rival plots use the bright owned pool — your land renders in the normal world pool
     const nv = ud._tris.length / 3;
     const ne = ud._edges.length / 3;
     if (owned) { owV += nv; owT += nv / 3; owE += ne; }
@@ -7475,7 +7489,7 @@ function rebuildPlotPools() {
   let vu = 0, vo = 0, eu = 0, eo = 0, tu = 0, to = 0;
   for (let i = 0; i < plots.length; i++) {
     const ud = plots[i].userData;
-    const owned = ud.owned || ud.ownedByOther;
+    const owned = ud.ownedByOther;   // v1.22: only rival plots use the bright owned pool — your land renders in the normal world pool
     // Selected-for-multibuy plots lift slightly off the surface so the
     // selection reads clearly in 3D (temporary — the flag is cleared on
     // deselect/buy, and owned plots themselves stay flush)
@@ -7934,18 +7948,21 @@ function updatePlotVisibility() {
   const baseOpacity = t;
   const showAny = t > 0.02;
   const hasClaims = STATE.claimedPlots.length > 0;
+  // v1.22: the bright always-visible pool is for RIVAL land only
+  const hasRivals = STATE.claimedPlots.some(q => q.userData.ownedByOther);
 
   // Only update opacity when bucket changes (20 buckets across the zoom range)
   const bucket = Math.round(t * 20);
   const opacityChanged = bucket !== _lastOpacityBucket;
   if (opacityChanged) _lastOpacityBucket = bucket;
 
-  // Unowned cells only appear when zoomed in; owned/claimed cells
-  // (yours + other players') stay visible from space.
+  // World cells — yours included (v1.22) — appear when zoomed in and
+  // fade with the terrain like everything else; only rival-claimed
+  // cells stay visible from space.
   plotFillMesh.visible = showAny;
   plotOutlineMesh.visible = showAny;
-  plotOwnedMesh.visible = hasClaims;
-  plotOwnedOutlineMesh.visible = hasClaims;
+  plotOwnedMesh.visible = hasRivals;
+  plotOwnedOutlineMesh.visible = hasRivals;
 
   if (opacityChanged) {
     plotFillMesh.material.opacity = baseOpacity * 0.6;
@@ -8605,8 +8622,8 @@ function sellPlotCore(plotId) {
     p.userData.ownedByOther = false;
     p.userData.ownerName = null;
     p.userData.businesses = [];
-    // Restore the original terrain tint (the gold ownership fill is gone)
-    setPlotColors(p, p.userData.baseColor, PLOT_UNOWNED_OUTLINE);
+    // Back to open land — normal terrain + standard outline
+    setPlotColors(p, p.userData.baseColor, plotBaseOutline(p));
     const ci = STATE.claimedPlots.indexOf(p);
     if (ci >= 0) STATE.claimedPlots.splice(ci, 1);
     flushPlotPools();
@@ -8847,7 +8864,7 @@ window.multiSellAll = function() {
     p.userData._selected = false;
     STATE.owned.delete(id);
     delete claims[id];
-    setPlotColors(p, p.userData.baseColor, PLOT_UNOWNED_OUTLINE);
+    setPlotColors(p, p.userData.baseColor, plotBaseOutline(p));
     const ci = STATE.claimedPlots.indexOf(p);
     if (ci >= 0) STATE.claimedPlots.splice(ci, 1);
     STATE.multiSelect.delete(id);
@@ -8874,7 +8891,7 @@ function clearMultiSelect() {
     if (!p) continue;
     p.userData._selected = false;
     if (p.userData.owned) {
-      // Restore the owned look — natural fill + gold border (multi-sell selection)
+      // Restore the owned look — normal world appearance (multi-sell selection)
       setOwnedPlotLook(p, true);
     } else if (!p.userData.ownedByOther) {
       // Restore the unowned terrain tint (multi-buy selection)
@@ -9009,8 +9026,8 @@ window.buySelectedPlot = function() {
   STATE.owned.add(p.userData.id);
   claimPlot(p.userData.id);  // register in global claims
   registerClaimedPlot(p);
-  // Natural terrain fill with a gold border in the merged pool (slight
-  // lift is handled by the rebuild)
+  // Bought plots look like the normal world (v1.22) — ownership lives
+  // in the save data and the My Land list, not in the terrain
   setOwnedPlotLook(p, true);
   flushPlotPools();
 
