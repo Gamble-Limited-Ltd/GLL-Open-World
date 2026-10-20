@@ -188,6 +188,36 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 .market-card .market-sub{font-family:Arial,sans-serif;font-size:12px;color:#7fa0ab;margin-bottom:16px;letter-spacing:.5px}
 .market-card .market-sub b{color:#f5cc74}
 .market-card .market-countdown{color:#7fffd4}
+/* Player Market (v1.23) */
+.mk-tabs{display:flex;gap:6px;margin-bottom:12px}
+.mk-tab{flex:1;padding:7px 10px;border:1px solid #1a3340;border-radius:8px;background:rgba(10,26,38,.6);
+  font-family:Arial,sans-serif;font-size:10px;color:#7fa0ab;cursor:pointer;letter-spacing:.4px;text-align:left}
+.mk-tab b{display:block;font-size:12px;color:#9bb4bd;letter-spacing:.6px;margin-bottom:2px}
+.mk-tab.active{border-color:#2c4a55;background:rgba(29,74,87,.7)}
+.mk-tab.active b{color:#f5cc74}
+.mk-sub{font-family:Arial,sans-serif;font-size:11px;color:#7fa0ab;margin-bottom:10px;letter-spacing:.4px;line-height:1.5}
+.mk-sub b{color:#f5cc74}
+.mk-form{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;border:1px dashed #1a3340;border-radius:8px;padding:8px;margin-bottom:10px}
+.mk-field{display:flex;flex-direction:column;gap:2px}
+.mk-field label{font-family:Arial,sans-serif;font-size:9px;color:#7fa0ab;letter-spacing:1px}
+.mk-field select,.mk-field input{background:rgba(8,24,44,.9);border:1px solid #1a3340;border-radius:6px;color:#e8eef0;
+  font-family:Arial,sans-serif;font-size:12px;padding:5px 7px;width:150px}
+.mk-field input{width:96px}
+.mk-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid #1a3340;border-radius:8px;margin-bottom:5px;background:rgba(20,50,60,.25)}
+.mk-row.own{border-color:#3d5a2a;background:rgba(40,70,30,.18)}
+.mk-ico{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+.mk-main{flex:1;min-width:0}
+.mk-name{font-family:Arial,sans-serif;font-size:12px;color:#e8eef0;font-weight:600}
+.mk-meta{font-family:Arial,sans-serif;font-size:10px;color:#9bb4bd;margin-top:1px}
+.mk-meta b{color:#f5cc74}
+.mk-meta .mk-seller{color:#7fffd4}
+.mk-amt{width:64px;background:rgba(8,24,44,.9);border:1px solid #1a3340;border-radius:6px;color:#e8eef0;font-family:Arial,sans-serif;font-size:11px;padding:4px 6px;flex-shrink:0}
+.mk-buy{padding:5px 10px;border-radius:6px;border:1px solid #2c6e49;background:rgba(24,80,50,.5);color:#7fffd4;font-family:Arial,sans-serif;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.mk-buy:hover{background:rgba(24,80,50,.8)}
+.mk-cancel{padding:5px 10px;border-radius:6px;border:1px solid #6e2c2c;background:rgba(90,30,30,.4);color:#ff8080;font-family:Arial,sans-serif;font-size:11px;cursor:pointer;flex-shrink:0}
+.mk-cancel:hover{background:rgba(90,30,30,.7)}
+.mk-empty{font-family:Arial,sans-serif;font-size:11px;color:#7fa0ab;padding:10px;text-align:center;border:1px dashed #1a3340;border-radius:8px;margin-bottom:8px;line-height:1.5}
+.mk-title{font-family:Arial,sans-serif;font-size:10px;color:#7fa0ab;letter-spacing:1.5px;margin:10px 0 5px;text-transform:uppercase}
 /* Casino slots minigame */
 .gamble-card{width:min(520px,92vw);max-height:88vh;overflow-y:auto}
 .gamble-card h2{margin:0 0 4px;color:#f5cc74;font-size:24px}
@@ -1466,7 +1496,13 @@ const STATE = {
   multiSell: false,  // mirror of multiBuy for selling owned plots
   multiSelect: new Set(),
   // FREE PLACEMENT — session-only pending build/move (never saved)
-  placing: null
+  placing: null,
+  // PLAYER MARKET (v1.23) — cross-player trade bookkeeping. Earned and
+  // reclaimed markers are persisted so payouts / material returns are
+  // applied exactly once, across reloads and devices.
+  marketEarnedApplied: 0,   // lifetime player-market credits already banked
+  marketReclaimedIds: [],   // dead listings whose stock was already returned
+  marketRefundedBuys: []    // my purchases already reversed after a race refund
 };
 
 const EARTH_RADIUS = STATE.radius;
@@ -3626,6 +3662,10 @@ function saveGame() {
     marketPrices: { ...STATE.marketPrices },
     marketTrend: { ...STATE.marketTrend },
     lastMarketUpdate: STATE.lastMarketUpdate,
+    // Player Market (v1.23) bookkeeping — see STATE comments
+    marketEarnedApplied: +STATE.marketEarnedApplied || 0,
+    marketReclaimedIds: Array.isArray(STATE.marketReclaimedIds) ? STATE.marketReclaimedIds.slice() : [],
+    marketRefundedBuys: Array.isArray(STATE.marketRefundedBuys) ? STATE.marketRefundedBuys.slice() : [],
     lastProductionTime: 0  // don't save; reset on load
   };
   try {
@@ -3653,6 +3693,10 @@ function loadGame(username) {
   STATE.marketTrend = save.marketTrend || {};
   STATE.lastMarketUpdate = save.lastMarketUpdate || Date.now();
   STATE.lastProductionTime = 0;
+  // Player Market (v1.23) bookkeeping — defaults keep old saves valid
+  STATE.marketEarnedApplied = +save.marketEarnedApplied || 0;
+  STATE.marketReclaimedIds = Array.isArray(save.marketReclaimedIds) ? save.marketReclaimedIds : [];
+  STATE.marketRefundedBuys = Array.isArray(save.marketRefundedBuys) ? save.marketRefundedBuys : [];
   // Planets: restore unlocks (default Earth-only for older saves) and make
   // the OWNED set global — it may contain plots on planets whose meshes
   // aren't loaded right now (you're only looking at one world at a time)
@@ -4542,8 +4586,14 @@ window.WarFx = WarFx;
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.22';
+const GAME_VERSION = 'v1.23';
 const RELEASE_NOTES = [
+  { v: 'v1.23', items: [
+    '🤝 <b>The Player Market is open</b> — commanders now trade directly with each other. List any material you produce at YOUR price; other players buy it (whole or partial) and the credits land in your account automatically. Short on a part for your next build? Buy it from a rival instead of waiting for your own production.',
+    '🧪 <b>Sixteen new materials</b> — Timber, Stone, Seafood, Glass, Steel, Chemicals, Plastic, Energy, Hydrogen, Crystals, Components, Data, Media, Research, Medicine and Luxuries join the economy. Every one has its own market price and can be produced, stockpiled, sold to the system Market — or flipped to other players at a markup.',
+    '🏗 <b>Sixteen new businesses</b> — Lumber Camps, Quarries and Fisheries up through Glassworks, Steel Mills, Chemical Plants, Fusion Plants, Crystal Extractors, Robotics Plants, Data Centers, Research Labs and Luxury Ateliers. A full production chain from timber to luxuries, each with its own hand-built miniature model on your land.',
+    '📈 <b>Two faces of the Market</b> — the system Market still buys anything instantly at fluctuating prices, while the new Player Market tab is where you set the price. Listed materials are held in escrow and return automatically if they don\'t sell within 3 days.'
+  ]},
   { v: 'v1.22', items: [
     '🌍 <b>Bought land looks like the normal world</b> — buying a plot no longer changes how it looks. Your plots keep the exact terrain, outlines and brightness of the land around them: no gold border, no highlight, no glowing from orbit. What you see is just the world. Ownership shows in My Land, the hover tip and the plot card.',
     '🏴 <b>Rival land stays marked</b> — enemy plots keep their purple border so invasion targets are still easy to spot, and war beacons / capture flashes still light battles up as they happen.'
@@ -4807,6 +4857,7 @@ window.loginSubmit = function() {
   updateMenuWelcome();
   try { Chat.onLogin(); } catch (e) {}   // show 💬 tab + start live chat polling
   try { Wars.onLogin(); } catch (e) {}   // start war-march polling (arrivals, warnings)
+  try { PlayerMarket.onLogin(); } catch (e) {}   // start player-market polling (listings, payouts)
   document.getElementById('login-screen').classList.add('hide');
   setTimeout(() => {
     document.getElementById('login-screen').style.display = 'none';
@@ -5013,15 +5064,39 @@ window.addEventListener('beforeunload', () => {
 // ====================================================================
 // Each material is produced by a specific business type.
 // basePrice is the reference price; actual market price fluctuates ±50%.
+// v1.23 — the catalog grew from 11 to 27 materials: a deep production
+// chain from Timber up to Luxuries. Everything civilian is tradable on
+// the Player Market; military stock (troops / ships / planes) never is.
 const MATERIALS = [
+  // — early industry —
   { id: 'food',     name: 'Food',          icon: '🌾', basePrice: 50,   color: 0x7cb342, producedBy: 'farm' },
+  { id: 'wood',     name: 'Timber',        icon: '🪵', basePrice: 90,   color: 0x8d6e4f, producedBy: 'lumbercamp' },
+  { id: 'stone',    name: 'Stone',         icon: '🧱', basePrice: 110,  color: 0x9e9e9e, producedBy: 'quarry' },
   { id: 'ore',      name: 'Ore',           icon: '⛏️', basePrice: 120,  color: 0x8d6e63, producedBy: 'mine' },
+  { id: 'seafood',  name: 'Seafood',       icon: '🐟', basePrice: 220,  color: 0x4fc3f7, producedBy: 'fishery' },
+  // — manufacturing —
   { id: 'goods',    name: 'Goods',         icon: '📦', basePrice: 400,  color: 0x546e7a, producedBy: 'factory' },
+  { id: 'glass',    name: 'Glass',         icon: '🪟', basePrice: 500,  color: 0x81d4fa, producedBy: 'glassworks' },
+  { id: 'steel',    name: 'Steel',         icon: '🔩', basePrice: 550,  color: 0x78909c, producedBy: 'steelmill' },
   { id: 'tourism',  name: 'Tourism',       icon: '✈️', basePrice: 600,  color: 0x4dd0e1, producedBy: 'resort' },
   { id: 'oil',      name: 'Oil',           icon: '🛢️', basePrice: 900,  color: 0x37474f, producedBy: 'oilrig' },
+  // — advanced industry —
+  { id: 'chem',     name: 'Chemicals',     icon: '🧪', basePrice: 1000, color: 0x9ccc65, producedBy: 'chemplant' },
+  { id: 'plastic',  name: 'Plastic',       icon: '🥤', basePrice: 1300, color: 0xf06292, producedBy: 'plastics' },
+  { id: 'energy',   name: 'Energy',        icon: '⚡', basePrice: 1600, color: 0xffee58, producedBy: 'fusion' },
+  { id: 'hydrogen', name: 'Hydrogen',      icon: '🧊', basePrice: 2200, color: 0x90caf9, producedBy: 'fuelrefinery' },
+  { id: 'crystal',  name: 'Crystals',      icon: '🔮', basePrice: 2800, color: 0xce93d8, producedBy: 'crystalextractor' },
   { id: 'fun',      name: 'Entertainment', icon: '🎰', basePrice: 1400, color: 0xd32f2f, producedBy: 'casino' },
   { id: 'capital',  name: 'Capital',       icon: '💼', basePrice: 2500, color: 0xf5cc74, producedBy: 'bank' },
+  // — high tech —
+  { id: 'comp',     name: 'Components',    icon: '🤖', basePrice: 2600, color: 0x4dd0e1, producedBy: 'robotics' },
+  { id: 'data',     name: 'Data',          icon: '💾', basePrice: 3200, color: 0x5c6bc0, producedBy: 'datacenter' },
+  { id: 'media',    name: 'Media',         icon: '🎬', basePrice: 3800, color: 0xff7043, producedBy: 'mediastudio' },
+  { id: 'research', name: 'Research',      icon: '🔬', basePrice: 5000, color: 0xba68c8, producedBy: 'researchlab' },
+  { id: 'med',      name: 'Medicine',      icon: '💊', basePrice: 5500, color: 0x4db6ac, producedBy: 'pharma' },
   { id: 'tech',     name: 'Electronics',   icon: '💻', basePrice: 6000, color: 0x7c4dff, producedBy: 'techhub' },
+  { id: 'lux',      name: 'Luxuries',      icon: '💎', basePrice: 7500, color: 0xf48fb1, producedBy: 'atelier' },
+  // — military (never tradable) —
   { id: 'troops',   name: 'Troops',        icon: '⚔️', basePrice: 500,  color: 0xc62828, producedBy: 'barracks', military: true },
   { id: 'ships',    name: 'Ships',         icon: '⚓', basePrice: 800,  color: 0x4a7a9b, producedBy: 'navalyard', military: true },
   { id: 'planes',   name: 'Planes',        icon: '✈️', basePrice: 2000, color: 0x90a4ae, producedBy: 'airfield', military: true },
@@ -5128,6 +5203,139 @@ const BUSINESS_TYPES = [
     color: 0x78909c, shape: 'airfield', military: true,
     desc: 'Operates an airstrip. Planes provide air support to every battle you fight.',
     planets: ['earth', 'luna', 'mars'],
+  },
+  // === EXPANDED INDUSTRY (v1.23) — 16 deeper-chain businesses ===
+  // A full production ladder from Timber to Luxuries. Every requirement
+  // is producible by an earlier tier (on Earth at least — off-world the
+  // shortages are deliberate: ship it between planets, or buy it from
+  // other commanders on the Player Market).
+  {
+    id: 'lumbercamp', name: 'Lumber Camp', icon: '🪵',
+    buildCost: 22000, produces: 'wood', rate: 0.55,
+    buildReq: { food: 15 },
+    color: 0x8d6e4f, shape: 'cone',
+    desc: 'Harvests standing timber into construction-grade Timber — the second rung of every young empire.',
+    planets: ['earth'],
+  },
+  {
+    id: 'quarry', name: 'Quarry', icon: '🧱',
+    buildCost: 34000, produces: 'stone', rate: 0.55,
+    buildReq: { wood: 20, food: 12 },
+    color: 0x9e9e9e, shape: 'box',
+    desc: 'Cuts dimension Stone for the building trades. Works on any rocky world.',
+    planets: ['earth', 'luna', 'mars'],
+  },
+  {
+    id: 'fishery', name: 'Fishery', icon: '🐟',
+    buildCost: 55000, produces: 'seafood', rate: 0.6,
+    buildReq: { food: 20 },
+    color: 0x4fc3f7, shape: 'cylinder',
+    desc: 'Working docks that land fresh Seafood — coast or ocean plots only.',
+    planets: ['earth', 'oceanus'],
+  },
+  {
+    id: 'glassworks', name: 'Glassworks', icon: '🪟',
+    buildCost: 140000, produces: 'glass', rate: 0.5,
+    buildReq: { stone: 30, ore: 15 },
+    color: 0x81d4fa, shape: 'dome',
+    desc: 'Hot furnaces that turn Stone into architectural Glass.',
+    planets: ['earth'],
+  },
+  {
+    id: 'steelmill', name: 'Steel Mill', icon: '🔩',
+    buildCost: 160000, produces: 'steel', rate: 0.55,
+    buildReq: { ore: 40, wood: 25 },
+    color: 0x78909c, shape: 'pyramid',
+    desc: 'Blast furnaces rolling raw Ore into structural Steel.',
+    planets: ['earth', 'mars'],
+  },
+  {
+    id: 'chemplant', name: 'Chemical Plant', icon: '🧪',
+    buildCost: 230000, produces: 'chem', rate: 0.5,
+    buildReq: { goods: 25, oil: 20 },
+    color: 0x9ccc65, shape: 'cylinder',
+    desc: 'Refines Oil into feedstock Chemicals for the advanced industries.',
+    planets: ['earth'],
+  },
+  {
+    id: 'plastics', name: 'Plastics Plant', icon: '🥤',
+    buildCost: 270000, produces: 'plastic', rate: 0.5,
+    buildReq: { chem: 30, oil: 25 },
+    color: 0xf06292, shape: 'box',
+    desc: 'Extrudes Chemicals into every kind of Plastic part.',
+    planets: ['earth', 'mars'],
+  },
+  {
+    id: 'fuelrefinery', name: 'Fuel Refinery', icon: '🧊',
+    buildCost: 360000, produces: 'hydrogen', rate: 0.45,
+    buildReq: { chem: 25, energy: 20 },
+    color: 0x90caf9, shape: 'pyramid',
+    desc: 'Cryo-separators that crack water and gas into lift-grade Hydrogen — the fuel of interplanetary trade.',
+    planets: ['luna', 'oceanus'],
+  },
+  {
+    id: 'fusion', name: 'Fusion Plant', icon: '⚡',
+    buildCost: 430000, produces: 'energy', rate: 0.5,
+    buildReq: { steel: 35, goods: 30 },
+    color: 0xffee58, shape: 'sphere',
+    desc: 'A tokamak selling clean Energy to every industry on the world. Works anywhere — land or sea.',
+    planets: ['earth', 'luna', 'mars', 'oceanus'],
+  },
+  {
+    id: 'crystalextractor', name: 'Crystal Extractor', icon: '🔮',
+    buildCost: 480000, produces: 'crystal', rate: 0.45,
+    buildReq: { ore: 30, goods: 20 },
+    color: 0xce93d8, shape: 'octahedron',
+    desc: 'Laser drills hunting rare Crystals that only form off-Earth.',
+    planets: ['luna', 'mars'],
+  },
+  {
+    id: 'robotics', name: 'Robotics Plant', icon: '🤖',
+    buildCost: 680000, produces: 'comp', rate: 0.5,
+    buildReq: { steel: 40, plastic: 30 },
+    color: 0x4dd0e1, shape: 'octahedron',
+    desc: 'Assembly lines that build precision machine Components.',
+    planets: ['earth', 'luna', 'mars'],
+  },
+  {
+    id: 'mediastudio', name: 'Media Studio', icon: '🎬',
+    buildCost: 760000, produces: 'media', rate: 0.5,
+    buildReq: { goods: 30, data: 15 },
+    color: 0xff7043, shape: 'sphere',
+    desc: 'A broadcast compound producing Media content for the whole system.',
+    planets: ['earth', 'luna'],
+  },
+  {
+    id: 'datacenter', name: 'Data Center', icon: '💾',
+    buildCost: 820000, produces: 'data', rate: 0.45,
+    buildReq: { comp: 25, goods: 20 },
+    color: 0x5c6bc0, shape: 'box',
+    desc: 'Server halls that refine raw computation into Data.',
+    planets: ['earth', 'luna', 'mars'],
+  },
+  {
+    id: 'pharma', name: 'Pharma Lab', icon: '💊',
+    buildCost: 900000, produces: 'med', rate: 0.45,
+    buildReq: { chem: 30, research: 20 },
+    color: 0x4db6ac, shape: 'cylinder',
+    desc: 'Clean rooms synthesizing Medicine from Chemicals and Research.',
+    planets: ['earth', 'mars'],
+  },
+  {
+    id: 'researchlab', name: 'Research Lab', icon: '🔬',
+    buildCost: 980000, produces: 'research', rate: 0.4,
+    buildReq: { comp: 30, data: 20 },
+    color: 0xba68c8, shape: 'dome',
+    desc: 'A pure-science campus that turns Components and Data into Research.',
+    planets: ['earth', 'luna', 'mars'],
+  },
+  {
+    id: 'atelier', name: 'Luxury Atelier', icon: '💎',
+    buildCost: 1600000, produces: 'lux', rate: 0.4,
+    buildReq: { goods: 40, data: 15 },
+    color: 0xf48fb1, shape: 'octahedron',
+    desc: 'Master craftsmen turning Goods and Data into sought-after Luxuries — the crown of the production chain.',
+    planets: ['earth', 'oceanus'],
   },
   // === PLANET-UNIQUE BUSINESSES ===
   // Each planet has one signature building that only works there. They're
@@ -5242,9 +5450,14 @@ function buildTerrainRule(b, plot) {
   if (b.id === 'oilrig' || b.id === 'wavefarm') {
     return plot.userData.isWater ? { ok: true } : { ok: false, reason: 'Ocean only' };
   }
-  if (b.id === 'navalyard') {
+  if (b.id === 'navalyard' || b.id === 'fishery') {
     return (plot.userData.isWater || plot.userData.isCoastal)
       ? { ok: true } : { ok: false, reason: 'Coast or ocean only' };
+  }
+  // v1.23 — fusion plants, fuel refineries and ateliers are sealed sites
+  // that work on land OR sea (they're the ocean-world's industrial base)
+  if (b.id === 'fusion' || b.id === 'fuelrefinery' || b.id === 'atelier') {
+    return { ok: true };
   }
   // Biodome works on land plots on Mars (no atmosphere needed — it's sealed)
   if (b.id === 'biodome') {
@@ -5755,6 +5968,320 @@ function _bizWavefarm(s, fx) {
   return g;
 }
 
+// ══════════════════════════════════════════════════════════════════
+// v1.23 EXPANDED INDUSTRY BUILDERS — 16 new miniatures, same rules:
+// Y-up, base at y ≈ 0.09s, footprint within ±1.05s, shared materials.
+// ══════════════════════════════════════════════════════════════════
+
+// 🪵 LUMBER CAMP — pine stand, log deck, saw shed, spinning blade
+function _bizLumbercamp(s, fx) {
+  const g = new THREE.Group();
+  const rnd = _bizRng(7);
+  for (let i = 0; i < 4; i++) {                       // pine stand
+    const x = -s * (0.55 + rnd() * 0.5), z = s * (0.15 + rnd() * 0.6);
+    _P(g, new THREE.CylinderGeometry(s * 0.028, s * 0.045, s * 0.3, 6), BIZ_MAT.olive, x, s * 0.24, z);
+    _P(g, new THREE.ConeGeometry(s * 0.17, s * 0.44, 7), BIZ_MAT.field, x, s * 0.58, z);
+  }
+  for (let r = 0; r < 3; r++) for (let i = 0; i < 3 - r; i++) {   // stacked log deck
+    _P(g, new THREE.CylinderGeometry(s * 0.055, s * 0.055, s * 0.6, 7), BIZ_MAT.rust,
+       s * (0.02 + i * 0.12), s * (0.16 + r * 0.1), s * 0.58, { rz: Math.PI / 2 });
+  }
+  _P(g, new THREE.BoxGeometry(s * 0.58, s * 0.3, s * 0.42), BIZ_MAT.rust, s * 0.42, s * 0.24, -s * 0.28);   // saw shed
+  _P(g, new THREE.BoxGeometry(s * 0.66, s * 0.05, s * 0.5), BIZ_MAT.roofSlate, s * 0.42, s * 0.42, -s * 0.28, { rz: 0.22 });
+  _P(g, new THREE.BoxGeometry(s * 0.14, s * 0.1, s * 0.02), BIZ_MAT.winWarm, s * 0.42, s * 0.22, -s * 0.07);  // lit doorway
+  const blade = _P(g, new THREE.CylinderGeometry(s * 0.16, s * 0.16, s * 0.015, 16), BIZ_MAT.silver,
+    s * 0.42, s * 0.52, -s * 0.28);                                                    // circular saw
+  fx.spins.push({ o: blade, v: 6.5, ph: 0 });
+  _bizBeacon(g, fx, s * 0.72, s * 0.5, -s * 0.28, s * 0.26, 0.4);
+  return g;
+}
+
+// 🧱 QUARRY — terraced pit, gantry crane, cut blocks, conveyor ramp
+function _bizQuarry(s, fx) {
+  const g = new THREE.Group();
+  _P(g, new THREE.CylinderGeometry(s * 0.78, s * 0.78, s * 0.1, 6), BIZ_MAT.earthmover, 0, s * 0.1, s * 0.12);
+  _P(g, new THREE.CylinderGeometry(s * 0.56, s * 0.56, s * 0.1, 6), BIZ_MAT.tarmac, 0, s * 0.18, s * 0.12);
+  _P(g, new THREE.CylinderGeometry(s * 0.34, s * 0.34, s * 0.1, 6), BIZ_MAT.earthmover, 0, s * 0.26, s * 0.12);
+  _P(g, new THREE.CylinderGeometry(s * 0.1, s * 0.14, s * 0.5, 6), BIZ_MAT.dark, 0, s * 0.42, s * 0.12);   // hoist
+  _P(g, new THREE.BoxGeometry(s * 1.0, s * 0.05, s * 0.05), BIZ_MAT.rust, -s * 0.1, s * 0.72, -s * 0.18);  // gantry beam
+  for (const x of [-s * 0.55, s * 0.35]) _P(g, new THREE.BoxGeometry(s * 0.05, s * 0.62, s * 0.05), BIZ_MAT.rust, x, s * 0.42, -s * 0.18);
+  const swing = new THREE.Group();                     // lifted block slewing on the crane
+  _P(swing, new THREE.BoxGeometry(s * 0.16, s * 0.12, s * 0.14), BIZ_MAT.concrete, 0, 0, 0);
+  swing.position.set(-s * 0.1, s * 0.62, -s * 0.18); g.add(swing);
+  fx.spins.push({ o: swing, v: 0.35, ph: 0 });
+  const rnd = _bizRng(11);
+  for (let i = 0; i < 4; i++) _P(g, new THREE.BoxGeometry(s * 0.14, s * 0.09, s * 0.11), BIZ_MAT.concrete,
+     s * (0.62 + rnd() * 0.25), s * 0.14, -s * (0.35 + rnd() * 0.4), { ry: rnd() * 1.5 });
+  _P(g, new THREE.BoxGeometry(s * 0.08, s * 0.03, s * 0.7), BIZ_MAT.dark, s * 0.35, s * 0.3, s * 0.35, { rx: -0.35, ry: 0.5 });
+  return g;
+}
+
+// 🐟 FISHERY — floating dock, market hall, net crane, moored boat
+function _bizFishery(s, fx) {
+  const g = new THREE.Group();
+  for (const [x, z] of [[-s * 0.5, s * 0.3], [s * 0.1, s * 0.3], [s * 0.6, s * 0.3], [-s * 0.5, s * 0.72], [s * 0.1, s * 0.72], [s * 0.6, s * 0.72]]) {
+    _P(g, new THREE.CylinderGeometry(s * 0.03, s * 0.03, s * 0.34, 6), BIZ_MAT.rust, x, s * 0.17, z);
+  }
+  _P(g, new THREE.BoxGeometry(s * 1.3, s * 0.05, s * 0.66), BIZ_MAT.tarmac, s * 0.05, s * 0.35, s * 0.5);  // deck
+  _P(g, new THREE.BoxGeometry(s * 0.5, s * 0.26, s * 0.34), BIZ_MAT.plaster, -s * 0.35, s * 0.5, s * 0.5); // market hall
+  _P(g, new THREE.ConeGeometry(s * 0.42, s * 0.18, 4), BIZ_MAT.roofSlate, -s * 0.35, s * 0.72, s * 0.5, { ry: Math.PI / 4 });
+  _P(g, new THREE.BoxGeometry(s * 0.2, s * 0.07, s * 0.02), BIZ_MAT.winWarm, -s * 0.35, s * 0.47, s * 0.68);
+  _P(g, new THREE.CylinderGeometry(s * 0.035, s * 0.05, s * 0.7, 6), BIZ_MAT.silver, s * 0.45, s * 0.7, s * 0.5);  // crane mast
+  _P(g, new THREE.BoxGeometry(s * 0.5, s * 0.04, s * 0.04), BIZ_MAT.silver, s * 0.3, s * 1.04, s * 0.5);            // crane jib
+  _P(g, new THREE.SphereGeometry(s * 0.14, 8, 6), BIZ_MAT.water, s * 0.3, s * 0.86, s * 0.5, { sy: 0.8 });           // catch hold
+  _P(g, new THREE.SphereGeometry(s * 0.2, 8, 6), BIZ_MAT.hull, s * 0.72, s * 0.32, s * 0.5, { sy: 0.5, sx: 1.6 });  // boat hull
+  _bizBeacon(g, fx, -s * 0.75, s * 0.12, s * 0.15, s * 0.2, 0.3);
+  return g;
+}
+
+// 🪟 GLASSWORKS — furnace hall, glowing tank, annealing lehr, sheet rack
+function _bizGlassworks(s, fx) {
+  const g = new THREE.Group();
+  _P(g, new THREE.BoxGeometry(s * 0.7, s * 0.4, s * 0.5), BIZ_MAT.brick, -s * 0.25, s * 0.29, 0);
+  _P(g, new THREE.CylinderGeometry(s * 0.12, s * 0.16, s * 0.62, 8), BIZ_MAT.rust, -s * 0.55, s * 0.4, 0);   // hot tank
+  const glow = _bizGlow(BIZ_MAT.flameTex, s * 0.2, s * 0.16, 0xffb066);
+  glow.position.set(-s * 0.55, s * 0.16, s * 0.2); g.add(glow);
+  fx.flames.push({ spr: glow, w: s * 0.2, h: s * 0.16, ph: 0 });
+  _P(g, new THREE.BoxGeometry(s * 0.92, s * 0.2, s * 0.32), BIZ_MAT.silver, s * 0.32, s * 0.19, -s * 0.34);  // lehr
+  for (let i = 0; i < 3; i++) _P(g, new THREE.BoxGeometry(s * 0.14, s * 0.05, s * 0.02), BIZ_MAT.winCool, s * (0.02 + i * 0.3), s * 0.2, -s * 0.18);
+  _P(g, new THREE.BoxGeometry(s * 0.5, s * 0.02, s * 0.06), BIZ_MAT.winWarm, s * 0.1, s * 0.31, 0, { ry: 0.4 }); // glowing ribbon
+  _P(g, new THREE.ConeGeometry(s * 0.16, s * 0.24, 8), BIZ_MAT.glass, -s * 0.05, s * 0.21, s * 0.55);             // cullet cone
+  for (let i = 0; i < 3; i++) _P(g, new THREE.BoxGeometry(s * 0.02, s * 0.5, s * 0.36), BIZ_MAT.glass, s * (0.78 + i * 0.05), s * 0.34, s * 0.3); // sheet rack
+  _P(g, new THREE.CylinderGeometry(s * 0.05, s * 0.06, s * 0.6, 7), BIZ_MAT.concrete, -s * 0.6, s * 0.7, -s * 0.25);
+  _bizBeacon(g, fx, -s * 0.6, s * 1.02, -s * 0.25, s * 0.22, 0.55);
+  return g;
+}
+
+// 🔩 STEEL MILL — blast furnace, pour stream, rolling hall, coil yard
+function _bizSteelmill(s, fx) {
+  const g = new THREE.Group();
+  _P(g, new THREE.CylinderGeometry(s * 0.2, s * 0.3, s * 1.05, 6), BIZ_MAT.rust, -s * 0.42, s * 0.61, -s * 0.1);
+  _P(g, new THREE.CylinderGeometry(s * 0.1, s * 0.16, s * 0.3, 6), BIZ_MAT.dark, -s * 0.42, s * 1.28, -s * 0.1);
+  const pour = _bizGlow(BIZ_MAT.flameTex, s * 0.1, s * 0.5, 0xffc46b, true);
+  pour.position.set(-s * 0.42, s * 0.25, s * 0.12); g.add(pour);
+  fx.flames.push({ spr: pour, w: s * 0.1, h: s * 0.5, ph: 1.3 });
+  _P(g, new THREE.CylinderGeometry(s * 0.14, s * 0.1, s * 0.12, 8), BIZ_MAT.silver, -s * 0.42, s * 0.15, s * 0.24);  // ladle
+  _P(g, new THREE.BoxGeometry(s * 0.85, s * 0.34, s * 0.55), BIZ_MAT.hull, s * 0.28, s * 0.26, s * 0.02);            // rolling hall
+  for (let i = 0; i < 3; i++) _P(g, new THREE.BoxGeometry(s * 0.12, s * 0.16, s * 0.02), BIZ_MAT.winWarm, s * (0 + i * 0.28), s * 0.42, s * 0.3);
+  for (const x of [s * 0.75, s * 0.95]) _P(g, new THREE.CylinderGeometry(s * 0.13, s * 0.17, s * 0.5, 10), BIZ_MAT.concrete, x, s * 0.34, -s * 0.45);
+  const rnd = _bizRng(19);
+  for (let i = 0; i < 3; i++) _P(g, new THREE.TorusGeometry(s * 0.09, s * 0.035, 6, 12), BIZ_MAT.silver, s * (0.45 + rnd() * 0.3), s * 0.14, s * 0.55 - rnd() * 0.3, { rx: Math.PI / 2 });
+  _bizBeacon(g, fx, -s * 0.42, s * 1.46, -s * 0.1, s * 0.3, 0.15);
+  return g;
+}
+
+// 🧪 CHEMICAL PLANT — distillation column, sphere tanks, pipe rack, flare
+function _bizChemplant(s, fx) {
+  const g = new THREE.Group();
+  _P(g, new THREE.CylinderGeometry(s * 0.14, s * 0.18, s * 1.1, 10), BIZ_MAT.silver, -s * 0.45, s * 0.64, -s * 0.05);
+  _P(g, new THREE.CylinderGeometry(s * 0.05, s * 0.05, s * 0.2, 6), BIZ_MAT.dark, -s * 0.45, s * 1.28, -s * 0.05);
+  for (const [x, z] of [[s * 0.5, -s * 0.35], [s * 0.85, -s * 0.1]]) {
+    _P(g, new THREE.SphereGeometry(s * 0.22, 10, 8), BIZ_MAT.white, x, s * 0.3, z);
+    _P(g, new THREE.CylinderGeometry(s * 0.16, s * 0.16, s * 0.1, 8), BIZ_MAT.concrete, x, s * 0.1, z);
+  }
+  for (let i = 0; i < 3; i++) _P(g, new THREE.CylinderGeometry(s * 0.022, s * 0.022, s * 0.9, 6), BIZ_MAT.silver, s * 0.1, s * (0.2 + i * 0.07), s * 0.25, { rz: Math.PI / 2 });
+  _P(g, new THREE.BoxGeometry(s * 0.34, s * 0.2, s * 0.26), BIZ_MAT.hull, -s * 0.15, s * 0.19, s * 0.62);   // control room
+  _P(g, new THREE.BoxGeometry(s * 0.24, s * 0.06, s * 0.02), BIZ_MAT.winCool, -s * 0.15, s * 0.23, s * 0.76);
+  _P(g, new THREE.CylinderGeometry(s * 0.035, s * 0.05, s * 1.3, 6), BIZ_MAT.dark, s * 0.35, s * 0.74, -s * 0.6);  // flare stack
+  const flare = _bizGlow(BIZ_MAT.flameTex, s * 0.22, s * 0.4, 0xff9d5c, true);
+  flare.position.set(s * 0.35, s * 1.32, -s * 0.6); g.add(flare);
+  fx.flames.push({ spr: flare, w: s * 0.22, h: s * 0.4, ph: 0.6 });
+  return g;
+}
+
+// 🥤 PLASTICS PLANT — pellet silos, extruder hall, spinning pallet turntable
+function _bizPlastics(s, fx) {
+  const g = new THREE.Group();
+  const silo = (x, z, h) => {
+    _P(g, new THREE.CylinderGeometry(s * 0.13, s * 0.13, h, 9), BIZ_MAT.white, x, s * 0.09 + h / 2, z);
+    _P(g, new THREE.ConeGeometry(s * 0.13, s * 0.09, 9), BIZ_MAT.hull, x, s * 0.09 + h + s * 0.045, z);
+  };
+  silo(-s * 0.55, -s * 0.18, s * 0.62); silo(-s * 0.24, -s * 0.4, s * 0.5); silo(-s * 0.55, s * 0.2, s * 0.44);
+  _P(g, new THREE.BoxGeometry(s * 0.82, s * 0.34, s * 0.5), BIZ_MAT.hull, s * 0.28, s * 0.26, s * 0.05);   // extruder hall
+  _P(g, new THREE.BoxGeometry(s * 0.84, s * 0.04, s * 0.52), BIZ_MAT.neonPink, s * 0.28, s * 0.45, s * 0.05);
+  for (let i = 0; i < 4; i++) _P(g, new THREE.BoxGeometry(s * 0.1, s * 0.12, s * 0.02), BIZ_MAT.winCool, s * (0 + i * 0.22), s * 0.28, s * 0.31);
+  const rnd = _bizRng(23);
+  for (let i = 0; i < 4; i++) _P(g, new THREE.BoxGeometry(s * 0.1, s * 0.1, s * 0.1), BIZ_MAT.silver, s * (0.15 + rnd() * 0.5), s * 0.14, -s * (0.3 + rnd() * 0.35), { ry: rnd() });
+  const turn = new THREE.Group();                     // pallet turntable
+  _P(turn, new THREE.CylinderGeometry(s * 0.18, s * 0.2, s * 0.04, 12), BIZ_MAT.dark, 0, s * 0.12, 0);
+  _P(turn, new THREE.BoxGeometry(s * 0.1, s * 0.09, s * 0.1), BIZ_MAT.white, -s * 0.06, s * 0.18, -s * 0.05);
+  _P(turn, new THREE.BoxGeometry(s * 0.08, s * 0.07, s * 0.09), BIZ_MAT.hull, s * 0.07, s * 0.17, s * 0.06);
+  turn.position.set(s * 0.75, 0, -s * 0.35); g.add(turn);
+  fx.spins.push({ o: turn, v: 1.2, ph: 0 });
+  return g;
+}
+
+// 🧊 FUEL REFINERY — cryo spheres, cold box, pipes, pale-blue flare
+function _bizFuelrefinery(s, fx) {
+  const g = new THREE.Group();
+  for (const [x, z, r] of [[-s * 0.45, -s * 0.15, s * 0.24], [-s * 0.45, s * 0.32, s * 0.18]]) {
+    _P(g, new THREE.SphereGeometry(r, 12, 9), BIZ_MAT.white, x, s * 0.1 + r, z);
+    _P(g, new THREE.CylinderGeometry(r * 0.7, r * 0.75, s * 0.08, 8), BIZ_MAT.concrete, x, s * 0.1, z);
+  }
+  _P(g, new THREE.BoxGeometry(s * 0.3, s * 0.85, s * 0.3), BIZ_MAT.silver, s * 0.2, s * 0.51, -s * 0.25);  // cold box
+  _P(g, new THREE.BoxGeometry(s * 0.32, s * 0.05, s * 0.02), BIZ_MAT.winCool, s * 0.2, s * 0.75, -s * 0.09);
+  for (let i = 0; i < 2; i++) _P(g, new THREE.CylinderGeometry(s * 0.02, s * 0.02, s * 0.8, 6), BIZ_MAT.silver, s * 0.2, s * (0.3 + i * 0.08), s * 0.2, { rz: Math.PI / 2 });
+  _P(g, new THREE.BoxGeometry(s * 0.34, s * 0.16, s * 0.26), BIZ_MAT.hull, s * 0.6, s * 0.17, s * 0.55);   // loading bay
+  _P(g, new THREE.CylinderGeometry(s * 0.07, s * 0.07, s * 0.3, 8), BIZ_MAT.white, s * 0.45, s * 0.3, s * 0.55, { rz: Math.PI / 2 }); // tanker tube
+  _P(g, new THREE.CylinderGeometry(s * 0.03, s * 0.04, s * 1.0, 6), BIZ_MAT.dark, s * 0.75, s * 0.59, -s * 0.5);
+  const flare = _bizGlow(BIZ_MAT.goldTex, s * 0.16, s * 0.3, 0x9fdcff, true);
+  flare.position.set(s * 0.75, s * 1.1, -s * 0.5); g.add(flare);
+  fx.flames.push({ spr: flare, w: s * 0.16, h: s * 0.3, ph: 0.9 });
+  _bizBeacon(g, fx, s * 0.2, s * 0.98, -s * 0.25, s * 0.22, 0.7);
+  return g;
+}
+
+// ⚡ FUSION PLANT — glowing tokamak torus, turbine hall, spinning flywheel
+function _bizFusion(s, fx) {
+  const g = new THREE.Group();
+  _P(g, new THREE.TorusGeometry(s * 0.42, s * 0.14, 12, 28), BIZ_MAT.hull, 0, s * 0.5, 0, { rx: Math.PI / 2 });
+  _P(g, new THREE.TorusGeometry(s * 0.42, s * 0.05, 8, 28), BIZ_MAT.neonCyan, 0, s * 0.5, 0, { rx: Math.PI / 2 });
+  _P(g, new THREE.CylinderGeometry(s * 0.09, s * 0.13, s * 0.56, 8), BIZ_MAT.dark, 0, s * 0.42, 0);   // central column
+  const core = _bizGlow(BIZ_MAT.goldTex, s * 0.3, s * 0.3, 0xfff2b0);
+  core.position.set(0, s * 0.5, 0); g.add(core);
+  for (const [x, z] of [[-s * 0.75, -s * 0.35], [-s * 0.75, s * 0.1]]) {   // transformer yard
+    _P(g, new THREE.BoxGeometry(s * 0.2, s * 0.22, s * 0.2), BIZ_MAT.silver, x, s * 0.2, z);
+    _P(g, new THREE.CylinderGeometry(s * 0.03, s * 0.03, s * 0.16, 5), BIZ_MAT.dark, x, s * 0.38, z);
+  }
+  for (const x of [s * 0.7, s * 0.95]) _P(g, new THREE.CylinderGeometry(s * 0.11, s * 0.15, s * 0.46, 10), BIZ_MAT.concrete, x, s * 0.32, -s * 0.4);
+  _P(g, new THREE.BoxGeometry(s * 0.56, s * 0.24, s * 0.4), BIZ_MAT.hull, s * 0.3, s * 0.21, s * 0.45);  // turbine hall
+  _P(g, new THREE.BoxGeometry(s * 0.4, s * 0.05, s * 0.02), BIZ_MAT.winCool, s * 0.3, s * 0.23, s * 0.66);
+  const fly = _P(g, new THREE.CylinderGeometry(s * 0.12, s * 0.12, s * 0.02, 10), BIZ_MAT.gold, s * 0.3, s * 0.36, s * 0.45);
+  fx.spins.push({ o: fly, v: 5, ph: 0 });
+  return g;
+}
+
+// 🔮 CRYSTAL EXTRACTOR — drill rig, laser emitters, glowing crystal clusters
+function _bizCrystalextractor(s, fx) {
+  const g = new THREE.Group();
+  _P(g, new THREE.CylinderGeometry(s * 0.06, s * 0.16, s * 1.2, 4), BIZ_MAT.hull, -s * 0.25, s * 0.69, -s * 0.15, { ry: Math.PI / 4 });
+  const drill = _P(g, new THREE.CylinderGeometry(s * 0.03, s * 0.03, s * 0.5, 6), BIZ_MAT.silver, -s * 0.25, s * 0.4, s * 0.05);
+  fx.spins.push({ o: drill, v: 9, ph: 0 });
+  for (const x of [s * 0.3, s * 0.62]) {              // laser emitters
+    _P(g, new THREE.BoxGeometry(s * 0.16, s * 0.12, s * 0.12), BIZ_MAT.dark, x, s * 0.3, s * 0.35);
+    _P(g, new THREE.SphereGeometry(s * 0.045, 6, 5), BIZ_MAT.neonCyan, x - s * 0.08, s * 0.26, s * 0.22);
+  }
+  const rnd = _bizRng(31);
+  for (let i = 0; i < 4; i++) {                       // glowing crystal clusters
+    const x = s * (-0.1 + rnd() * 0.9), z = -s * (0.1 + rnd() * 0.5), h = s * (0.18 + rnd() * 0.22);
+    _P(g, new THREE.OctahedronGeometry(h), BIZ_MAT.glass, x, s * 0.12 + h / 2, z, { ry: rnd() * 3 });
+    const halo = _bizGlow(BIZ_MAT.pinkTex, h * 2.2, h * 2.2, 0xd9a0ff);
+    halo.position.set(x, s * 0.12 + h / 2, z); g.add(halo);
+  }
+  _P(g, new THREE.BoxGeometry(s * 0.3, s * 0.18, s * 0.24), BIZ_MAT.hull, s * 0.75, s * 0.18, -s * 0.55);  // sorting hut
+  _bizBeacon(g, fx, -s * 0.25, s * 1.32, -s * 0.15, s * 0.26, 0.25);
+  return g;
+}
+
+// 🤖 ROBOTICS PLANT — assembly hall, two slewing robot arms, parts yard
+function _bizRobotics(s, fx) {
+  const g = new THREE.Group();
+  _P(g, new THREE.BoxGeometry(s * 0.9, s * 0.4, s * 0.55), BIZ_MAT.hull, -s * 0.1, s * 0.29, s * 0.1);
+  _P(g, new THREE.BoxGeometry(s * 0.92, s * 0.05, s * 0.57), BIZ_MAT.neonCyan, -s * 0.1, s * 0.52, s * 0.1);
+  for (let i = 0; i < 4; i++) _P(g, new THREE.BoxGeometry(s * 0.14, s * 0.1, s * 0.02), BIZ_MAT.winCool, -s * (0.4 - i * 0.2), s * 0.34, s * 0.39);
+  const arm = (x, z, sc, v, ph) => {
+    const a = new THREE.Group();
+    _P(a, new THREE.CylinderGeometry(s * 0.09 * sc, s * 0.12 * sc, s * 0.1 * sc, 8), BIZ_MAT.dark, 0, s * 0.14 * sc, 0);
+    _P(a, new THREE.BoxGeometry(s * 0.05 * sc, s * 0.4 * sc, s * 0.05 * sc), BIZ_MAT.silver, s * 0.02 * sc, s * 0.38 * sc, 0, { rz: -0.25 });
+    _P(a, new THREE.BoxGeometry(s * 0.3 * sc, s * 0.04 * sc, s * 0.04 * sc), BIZ_MAT.gold, s * 0.14 * sc, s * 0.56 * sc, 0, { rz: -0.5 });
+    a.position.set(x, 0, z); g.add(a);
+    fx.spins.push({ o: a, v: v, ph: ph });
+  };
+  arm(s * 0.6, -s * 0.3, 1, 0.8, 0);
+  arm(s * 0.22, -s * 0.62, 0.8, -0.6, 1.4);
+  const rnd = _bizRng(37);
+  for (let i = 0; i < 3; i++) _P(g, new THREE.BoxGeometry(s * 0.14, s * 0.03, s * 0.14), BIZ_MAT.tarmac, -s * (0.3 + rnd() * 0.5), s * 0.11, -s * (0.35 + rnd() * 0.3));
+  return g;
+}
+
+// 🎬 MEDIA STUDIO — studio dome, broadcast tower, flickering screen
+function _bizMediastudio(s, fx) {
+  const g = new THREE.Group();
+  _P(g, new THREE.CylinderGeometry(s * 0.4, s * 0.4, s * 0.06, 12), BIZ_MAT.concrete, -s * 0.35, s * 0.09, s * 0.15);
+  _P(g, new THREE.SphereGeometry(s * 0.4, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), BIZ_MAT.domeShell, -s * 0.35, s * 0.09, s * 0.15);
+  _P(g, new THREE.CylinderGeometry(s * 0.025, s * 0.09, s * 1.5, 5), BIZ_MAT.silver, s * 0.45, s * 0.84, -s * 0.3);  // tower
+  for (const dx of [-1, 1]) _P(g, new THREE.CylinderGeometry(s * 0.012, s * 0.02, s * 0.3, 4), BIZ_MAT.dark, s * 0.45 + dx * s * 0.08, s * 1.35, -s * 0.3);
+  _bizBeacon(g, fx, s * 0.45, s * 1.62, -s * 0.3, s * 0.28, 0);
+  _P(g, new THREE.BoxGeometry(s * 0.5, s * 0.3, s * 0.03), BIZ_MAT.dark, s * 0.05, s * 0.3, s * 0.62);   // billboard
+  _P(g, new THREE.BoxGeometry(s * 0.44, s * 0.24, s * 0.012), BIZ_MAT.ticker, s * 0.05, s * 0.3, s * 0.64);
+  for (const x of [-s * 0.16, s * 0.26]) _P(g, new THREE.BoxGeometry(s * 0.04, s * 0.16, s * 0.04), BIZ_MAT.dark, x, s * 0.17, s * 0.62);
+  _P(g, new THREE.BoxGeometry(s * 0.3, s * 0.16, s * 0.18), BIZ_MAT.hull, -s * 0.72, s * 0.17, -s * 0.5);  // trailer
+  return g;
+}
+
+// 💾 DATA CENTER — twin server halls, roof fan units, network spire
+function _bizDatacenter(s, fx) {
+  const g = new THREE.Group();
+  for (const [x, z, w] of [[-s * 0.3, s * 0.1, s * 0.62], [s * 0.35, -s * 0.25, s * 0.5]]) {
+    _P(g, new THREE.BoxGeometry(w, s * 0.3, s * 0.4), BIZ_MAT.hull, x, s * 0.24, z);
+    _P(g, new THREE.BoxGeometry(w * 0.9, s * 0.04, s * 0.02), BIZ_MAT.ticker, x, s * 0.3, z + s * 0.21);
+    _P(g, new THREE.BoxGeometry(w * 0.9, s * 0.03, s * 0.02), BIZ_MAT.neonCyan, x, s * 0.16, z + s * 0.21);
+  }
+  const fan = (x, z) => {                              // spinning roof fans
+    const f = new THREE.Group();
+    _P(f, new THREE.CylinderGeometry(s * 0.1, s * 0.1, s * 0.07, 10), BIZ_MAT.dark, 0, 0, 0);
+    _P(f, new THREE.BoxGeometry(s * 0.16, s * 0.012, s * 0.03), BIZ_MAT.silver, 0, s * 0.045, 0);
+    _P(f, new THREE.BoxGeometry(s * 0.03, s * 0.012, s * 0.16), BIZ_MAT.silver, 0, s * 0.045, 0);
+    f.position.set(x, s * 0.42, z); g.add(f);
+    fx.spins.push({ o: f, v: 7, ph: x });
+  };
+  fan(-s * 0.3, s * 0.1); fan(s * 0.35, -s * 0.25);
+  _P(g, new THREE.CylinderGeometry(s * 0.02, s * 0.05, s * 0.9, 5), BIZ_MAT.silver, s * 0.72, s * 0.54, s * 0.45);  // network spire
+  _bizBeacon(g, fx, s * 0.72, s * 1.0, s * 0.45, s * 0.22, 0.5);
+  _P(g, new THREE.CylinderGeometry(s * 0.12, s * 0.12, s * 0.24, 9), BIZ_MAT.white, -s * 0.75, s * 0.21, -s * 0.45); // generator
+  return g;
+}
+
+// 💊 PHARMA LAB — lab block, capsule silo, glowing greenhouses
+function _bizPharma(s, fx) {
+  const g = new THREE.Group();
+  _P(g, new THREE.BoxGeometry(s * 0.72, s * 0.36, s * 0.5), BIZ_MAT.plaster, -s * 0.2, s * 0.27, s * 0.08);
+  _P(g, new THREE.BoxGeometry(s * 0.74, s * 0.04, s * 0.52), BIZ_MAT.white, -s * 0.2, s * 0.47, s * 0.08);
+  for (let i = 0; i < 3; i++) _P(g, new THREE.BoxGeometry(s * 0.12, s * 0.1, s * 0.02), BIZ_MAT.winCool, -s * (0.4 - i * 0.2), s * 0.32, s * 0.34);
+  _P(g, new THREE.CylinderGeometry(s * 0.16, s * 0.16, s * 0.7, 12), BIZ_MAT.white, s * 0.55, s * 0.44, -s * 0.2);   // capsule silo
+  _P(g, new THREE.CylinderGeometry(s * 0.166, s * 0.166, s * 0.14, 12), BIZ_MAT.domeGlow, s * 0.55, s * 0.44, -s * 0.2);
+  _P(g, new THREE.SphereGeometry(s * 0.16, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), BIZ_MAT.white, s * 0.55, s * 0.79, -s * 0.2);
+  for (const [x, z] of [[s * 0.05, -s * 0.55], [s * 0.45, -s * 0.55]]) {   // greenhouses
+    _P(g, new THREE.BoxGeometry(s * 0.3, s * 0.14, s * 0.2), BIZ_MAT.glass, x, s * 0.16, z);
+    const gl = _bizGlow(BIZ_MAT.goldTex, s * 0.3, s * 0.12, 0x86e3a0);
+    gl.position.set(x, s * 0.24, z); g.add(gl);
+  }
+  _bizBeacon(g, fx, -s * 0.2, s * 0.52, s * 0.08, s * 0.2, 0.35);
+  return g;
+}
+
+// 🔬 RESEARCH LAB — dome, glowing test column, sweeping radio dish
+function _bizResearchlab(s, fx) {
+  const g = new THREE.Group();
+  _P(g, new THREE.CylinderGeometry(s * 0.44, s * 0.46, s * 0.08, 14), BIZ_MAT.concrete, -s * 0.2, s * 0.09, s * 0.1);
+  _P(g, new THREE.SphereGeometry(s * 0.44, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), BIZ_MAT.domeShell, -s * 0.2, s * 0.09, s * 0.1);
+  _P(g, new THREE.CylinderGeometry(s * 0.03, s * 0.03, s * 0.9, 6), BIZ_MAT.neonCyan, -s * 0.2, s * 0.6, s * 0.1);    // test column
+  const halo = _bizGlow(BIZ_MAT.goldTex, s * 0.24, s * 0.24, 0x9fdcff);
+  halo.position.set(-s * 0.2, s * 1.06, s * 0.1); g.add(halo);
+  const dish = _P(g, new THREE.SphereGeometry(s * 0.2, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2.6), BIZ_MAT.white, s * 0.55, s * 0.62, -s * 0.25, { rx: -0.9 });
+  fx.spins.push({ o: dish, v: 0.25, ph: 0 });
+  _P(g, new THREE.CylinderGeometry(s * 0.03, s * 0.05, s * 0.5, 6), BIZ_MAT.silver, s * 0.55, s * 0.34, -s * 0.25);
+  _P(g, new THREE.BoxGeometry(s * 0.36, s * 0.22, s * 0.3), BIZ_MAT.hull, s * 0.05, s * 0.2, -s * 0.6);   // annex
+  _P(g, new THREE.BoxGeometry(s * 0.3, s * 0.05, s * 0.02), BIZ_MAT.ticker, s * 0.05, s * 0.22, -s * 0.44);
+  return g;
+}
+
+// 💎 LUXURY ATELIER — gold-trimmed boutique, colonnade, rotating gem sign
+function _bizAtelier(s, fx) {
+  const g = new THREE.Group();
+  _P(g, new THREE.BoxGeometry(s * 0.8, s * 0.34, s * 0.5), BIZ_MAT.plaster, -s * 0.15, s * 0.26, s * 0.1);
+  _P(g, new THREE.BoxGeometry(s * 0.84, s * 0.04, s * 0.54), BIZ_MAT.gold, -s * 0.15, s * 0.45, s * 0.1);
+  for (let i = 0; i < 3; i++) _P(g, new THREE.BoxGeometry(s * 0.16, s * 0.14, s * 0.02), BIZ_MAT.winWarm, -s * (0.39 - i * 0.24), s * 0.28, s * 0.36);
+  for (let i = 0; i < 4; i++) _P(g, new THREE.CylinderGeometry(s * 0.025, s * 0.025, s * 0.3, 6), BIZ_MAT.white, -s * 0.48 + i * s * 0.22, s * 0.24, s * 0.48);
+  _P(g, new THREE.CylinderGeometry(s * 0.06, s * 0.09, s * 0.35, 8), BIZ_MAT.dark, s * 0.62, s * 0.26, -s * 0.3);     // gem plinth
+  const gem = _P(g, new THREE.OctahedronGeometry(s * 0.14), BIZ_MAT.glass, s * 0.62, s * 0.55, -s * 0.3);
+  fx.spins.push({ o: gem, v: 1.1, ph: 0 });
+  const halo = _bizGlow(BIZ_MAT.pinkTex, s * 0.34, s * 0.34, 0xffb3d9);
+  halo.position.set(s * 0.62, s * 0.55, -s * 0.3); g.add(halo);
+  for (let i = 0; i < 3; i++) _P(g, new THREE.CylinderGeometry(s * 0.012, s * 0.012, s * 0.14, 5), BIZ_MAT.gold, -s * (0.1 + i * 0.2), s * 0.16, s * 0.68);
+  return g;
+}
+
 // Fallback for unknown types
 function _bizGeneric(s, fx) {
   const g = new THREE.Group();
@@ -5788,6 +6315,23 @@ function buildBusinessMesh(businessType, scale) {
     case 'helium3':       body = _bizHelium3(s, fx); break;
     case 'biodome':       body = _bizBiodome(s, fx); break;
     case 'wavefarm':      body = _bizWavefarm(s, fx); break;
+    // v1.23 expanded industry
+    case 'lumbercamp':    body = _bizLumbercamp(s, fx); break;
+    case 'quarry':        body = _bizQuarry(s, fx); break;
+    case 'fishery':       body = _bizFishery(s, fx); break;
+    case 'glassworks':    body = _bizGlassworks(s, fx); break;
+    case 'steelmill':     body = _bizSteelmill(s, fx); break;
+    case 'chemplant':     body = _bizChemplant(s, fx); break;
+    case 'plastics':      body = _bizPlastics(s, fx); break;
+    case 'fuelrefinery':  body = _bizFuelrefinery(s, fx); break;
+    case 'fusion':        body = _bizFusion(s, fx); break;
+    case 'crystalextractor': body = _bizCrystalextractor(s, fx); break;
+    case 'robotics':      body = _bizRobotics(s, fx); break;
+    case 'mediastudio':   body = _bizMediastudio(s, fx); break;
+    case 'datacenter':    body = _bizDatacenter(s, fx); break;
+    case 'pharma':        body = _bizPharma(s, fx); break;
+    case 'researchlab':   body = _bizResearchlab(s, fx); break;
+    case 'atelier':       body = _bizAtelier(s, fx); break;
     default:              body = _bizGeneric(s, fx); break;
   }
   // The caller's lookAt swings the returned group's +Z away from the
@@ -9207,8 +9751,35 @@ function getMarketCountdown() {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-window.openMarketModal = function() {
+// v1.23 — the Market modal has two faces: the system Market (sell
+// instantly at fluctuating prices) and the Player Market (set your own
+// price, trade with other commanders). The active tab survives the
+// 15-minute system-price refresh re-renders.
+window.__mkTab = 'sell';
+window.openMarketModal = function(tab) {
+  if (tab === 'players' || tab === 'sell') window.__mkTab = tab;
+  renderMarketModal();
+  document.getElementById('market-modal').classList.add('show');
+  try { PlayerMarket.refresh(); } catch (e) {}
+};
+window.setMarketTab = function(t) {
+  window.__mkTab = t;
+  renderMarketModal();
+};
+function marketTabBar() {
+  return `
+    <div class="mk-tabs">
+      <button class="mk-tab ${window.__mkTab === 'sell' ? 'active' : ''}" onclick="setMarketTab('sell')"><b>🏪 System Market</b>sell instantly at today's prices</button>
+      <button class="mk-tab ${window.__mkTab === 'players' ? 'active' : ''}" onclick="setMarketTab('players')"><b>🤝 Player Market</b>trade with other commanders</button>
+    </div>`;
+}
+function renderMarketModal() {
   const card = document.getElementById('market-card');
+  if (!card) return;
+  if (window.__mkTab === 'players') { renderPlayerMarket(card); return; }
+  renderSystemMarket(card);
+}
+function renderSystemMarket(card) {
   const countdown = getMarketCountdown();
   const invValue = getInventoryValue();
 
@@ -9268,18 +9839,171 @@ window.openMarketModal = function() {
       Inventory value: <b>$${Math.round(invValue).toLocaleString()}</b> ·
       Next price update in: <b class="market-countdown">${countdown}</b>
     </div>
-    <div class="biz-hint" style="margin-bottom:14px">Set exactly how much of each material to sell — type an amount, tap − / +, or use the quick chips. Prices fluctuate every 15 minutes; sell when they're high for maximum profit.</div>
+    ${marketTabBar()}
+    <div class="biz-hint" style="margin-bottom:14px">Set exactly how much of each material to sell — type an amount, tap − / +, or use the quick chips. Prices fluctuate every 15 minutes; sell when they're high for maximum profit. To sell at <i>your own</i> price instead, open the Player Market tab.</div>
     ${rows}
     <div class="market-actions">
       <button class="btn" onclick="closeMarketModal()">Close</button>
       <button class="btn primary" onclick="sellAllMaterials()">Sell All Materials</button>
     </div>
   `;
-  document.getElementById('market-modal').classList.add('show');
-};
+}
 
 window.closeMarketModal = function() {
   document.getElementById('market-modal').classList.remove('show');
+};
+
+// ---------- PLAYER MARKET TAB (v1.23) ----------
+function renderPlayerMarket(card) {
+  if (!CURRENT_USER) {
+    card.innerHTML = '';
+    return;
+  }
+  const live = PlayerMarket.liveListings();
+  const mine = live.filter(l => l.seller === CURRENT_USER);
+  const others = live.filter(l => l.seller !== CURRENT_USER)
+    .sort((a, b) => (a.price - b.price) || (b.remaining - a.remaining));
+  const myEarned = PlayerMarket.totalEarnedBy(CURRENT_USER);
+  const st = PlayerMarket.status() === 'cloud'
+    ? '☁ live across every commander' : '💾 trading on this device';
+  const myRowsHtml = PlayerMarket.myListings();
+
+  // --- the listing form ---
+  const sellable = MATERIALS.filter(m => !m.military && (STATE.inventory[m.id] || 0) >= 1);
+  const sellOpts = sellable.map(m =>
+    `<option value="${m.id}">${m.icon} ${m.name} — hold ${fmtQty(Math.floor(STATE.inventory[m.id] || 0))}</option>`).join('');
+  const form = `
+    <div class="mk-title">List your materials</div>
+    ${sellable.length ? `
+    <div class="mk-form">
+      <div class="mk-field"><label>MATERIAL</label>
+        <select id="mk-sell-mat" onchange="mkSuggestPrice()">${sellOpts}</select></div>
+      <div class="mk-field"><label>AMOUNT</label>
+        <input id="mk-sell-qty" type="number" min="1" step="1" inputmode="numeric" placeholder="0" oninput="mkListPreview()"></div>
+      <div class="mk-field"><label>PRICE / UNIT ($)</label>
+        <input id="mk-sell-price" type="number" min="1" step="1" inputmode="numeric" placeholder="0" oninput="mkListPreview()"></div>
+      <div class="mk-field"><label>&nbsp;</label>
+        <button class="mk-buy" style="padding:6px 12px" onclick="mkCreateListing()">📋 List for sale</button></div>
+      <div class="mk-sub" style="flex-basis:100%;margin:0" id="mk-list-preview">Pick a material, an amount and your price — buyers pay what you ask.</div>
+    </div>` : `
+    <div class="mk-empty">Produce or buy some materials first — then list them here at your own price.</div>`}
+  `;
+
+  // --- offers from other commanders ---
+  const offers = others.map(l => {
+    const m = getMaterial(l.mat);
+    const total = l.remaining * l.price;
+    return `
+      <div class="mk-row">
+        <div class="mk-ico">${m.icon}</div>
+        <div class="mk-main">
+          <div class="mk-name">${l.remaining.toLocaleString()} ${m.name} <span style="color:#9bb4bd;font-weight:400">· $${l.price.toLocaleString()}/unit</span></div>
+          <div class="mk-meta">seller <span class="mk-seller">${l.seller}</span> · total <b>$${Math.round(total).toLocaleString()}</b> · ${PlayerMarket.fmtAge(l.listedAt)}</div>
+        </div>
+        <input class="mk-amt" id="mk-amt-${l.id}" type="number" min="1" max="${l.remaining}" step="1" value="${l.remaining}"
+               title="Amount to buy (of ${l.remaining})" oninput="mkBuyPreview('${l.id}')">
+        <button class="mk-buy" id="mk-buy-${l.id}" onclick="mkBuy('${l.id}')">Buy $${Math.round(total).toLocaleString()}</button>
+      </div>`;
+  }).join('') || '<div class="mk-empty">No open offers from other commanders right now — list yours and set the pace.</div>';
+
+  // --- my listings (includes recently ended ones awaiting payout) ---
+  const myRows = myRowsHtml.map(l => {
+    const m = getMaterial(l.mat);
+    const sold = l.sold;
+    const live2 = !l.cancelled && l.remaining > 0 && l.expiresAt > Date.now();
+    return `
+      <div class="mk-row own">
+        <div class="mk-ico">${m.icon}</div>
+        <div class="mk-main">
+          <div class="mk-name">${l.remaining.toLocaleString()}/${l.qty0.toLocaleString()} ${m.name} @ $${l.price.toLocaleString()}</div>
+          <div class="mk-meta">${live2 ? PlayerMarket.fmtLeft(l.expiresAt) : (l.cancelled ? 'cancelled' : (l.remaining > 0 ? 'sold out' : 'sold out'))} · sold <b>${sold.toLocaleString()}</b> · earned <b>$${Math.round(l.earned).toLocaleString()}</b></div>
+        </div>
+        ${live2 ? `<button class="mk-cancel" onclick="mkCancel('${l.id}')">✕ Cancel</button>` : ''}
+      </div>`;
+  }).join('') || '<div class="mk-empty">You have no listings. Materials you list are held in escrow and return automatically if they don\'t sell in 3 days.</div>';
+
+  card.innerHTML = `
+    <span class="badge available">market</span>
+    <h2>🤝 Player Market</h2>
+    <div class="market-sub">
+      ${st} · ${others.length} open offer${others.length === 1 ? '' : 's'} ·
+      lifetime sales <b>$${Math.round(myEarned).toLocaleString()}</b> ·
+      your credits <b>$${Math.floor(STATE.money).toLocaleString()}</b>
+    </div>
+    ${marketTabBar()}
+    ${form}
+    <div class="mk-title">Offers from other commanders</div>
+    ${offers}
+    <div class="mk-title">Your listings (${myRowsHtml.length})</div>
+    ${myRows}
+    <div class="market-actions">
+      <button class="btn" onclick="closeMarketModal()">Close</button>
+    </div>
+  `;
+  // pre-fill the suggested price once the form exists
+  try { mkSuggestPrice(true); } catch (e) {}
+}
+
+// Suggest a starting price (current system price) when the material changes
+window.mkSuggestPrice = function(force) {
+  const sel = document.getElementById('mk-sell-mat');
+  const price = document.getElementById('mk-sell-price');
+  if (!sel || !price) return;
+  if (force || !price.value) {
+    price.value = Math.max(1, Math.round(STATE.marketPrices[sel.value] || getMaterial(sel.value).basePrice));
+  }
+  mkListPreview();
+};
+
+// Live preview line under the listing form
+window.mkListPreview = function() {
+  const sel = document.getElementById('mk-sell-mat');
+  const qtyIn = document.getElementById('mk-sell-qty');
+  const priceIn = document.getElementById('mk-sell-price');
+  const out = document.getElementById('mk-list-preview');
+  if (!sel || !qtyIn || !priceIn || !out) return;
+  const m = getMaterial(sel.value);
+  if (!m) return;
+  const qty = Math.floor(+qtyIn.value || 0);
+  const price = Math.round(+priceIn.value || 0);
+  if (qty < 1 || price < 1) { out.textContent = 'Pick a material, an amount and your price — buyers pay what you ask.'; return; }
+  const hold = Math.floor(STATE.inventory[m.id] || 0);
+  if (qty > hold) { out.innerHTML = `<span style="color:#ff8080">You only hold ${hold} ${m.name}.</span>`; return; }
+  out.innerHTML = `Listing <b>${qty.toLocaleString()} ${m.icon} ${m.name}</b> at <b>$${price.toLocaleString()}</b>/unit — you receive <b style="color:#f5cc74">$${(qty * price).toLocaleString()}</b> when they sell. Held in escrow until sold or expired.`;
+};
+
+window.mkCreateListing = async function() {
+  const sel = document.getElementById('mk-sell-mat');
+  const qtyIn = document.getElementById('mk-sell-qty');
+  const priceIn = document.getElementById('mk-sell-price');
+  if (!sel || !qtyIn || !priceIn) return;
+  const r = await PlayerMarket.create(sel.value, parseInt(qtyIn.value, 10), parseInt(priceIn.value, 10));
+  showToast(r.msg, r.ok);
+  if (r.ok) { renderMarketModal(); }
+};
+
+// Keep the Buy button's price label in sync with the chosen amount
+window.mkBuyPreview = function(id) {
+  const inp = document.getElementById('mk-amt-' + id);
+  const btn = document.getElementById('mk-buy-' + id);
+  const l = PlayerMarket.byId(id);
+  if (!inp || !btn || !l) return;
+  const qty = Math.min(Math.max(1, Math.floor(+inp.value || 1)), l.remaining);
+  btn.textContent = 'Buy $' + (qty * l.price).toLocaleString();
+};
+
+window.mkBuy = async function(id) {
+  const inp = document.getElementById('mk-amt-' + id);
+  const amt = inp ? parseInt(inp.value, 10) : NaN;
+  const r = await PlayerMarket.buy(id, amt);
+  showToast(r.msg, r.ok);
+  renderMarketModal();
+};
+
+window.mkCancel = async function(id) {
+  const r = await PlayerMarket.cancel(id);
+  showToast(r.msg, r.ok);
+  if (r.ok) renderMarketModal();
 };
 
 // Format a sell quantity for the amount input — trims float dust to 1 decimal
@@ -9377,6 +10101,451 @@ window.sellAllMaterials = function() {
     showToast('No materials to sell', false);
   }
 };
+
+// ====================================================================
+// PLAYER MARKET (v1.23) — commanders trade materials with each other.
+// ====================================================================
+// Any commander can LIST materials they produced at a price they choose
+// (the stock leaves storage into escrow). Any other commander can BUY
+// those listings — whole or partial — paying the seller's price. Sellers
+// collect their credits automatically the next time their game syncs.
+//
+// Storage rides the same openworld_data row pattern as Chat and Wars:
+//   key 'openworld_market' → { listings: [...] }
+// plus a localStorage twin (same JSON under the same key) so trading
+// also works between accounts on the same machine with the cloud off.
+//
+// Concurrency (two buyers racing on one listing) is resolved
+// deterministically. A listing stores its original size (qty0) and an
+// append-only log of immutable buy records; every client derives
+//   sold     = Σ buys that are not refunded
+//   remaining= qty0 − sold
+// and audits buys in (at, id) order — demand beyond qty0 refunds the
+// LATEST buys, and the bounced buyer's own device reverses the charge.
+// Merging two row versions is monotone at every field (union of buys
+// with refunded=true preferred, cancelled OR-ed), so no write can
+// resurrect stock or silently drop a purchase.
+const PlayerMarket = (() => {
+  const KEY = 'openworld_market';
+  const MAX_LISTINGS = 300;                      // rows kept in the shared ledger
+  const LISTING_TTL = 3 * 24 * 60 * 60 * 1000;   // a listing lives 3 days
+  const DEAD_GRACE = 7 * 24 * 60 * 60 * 1000;    // dead rows kept 7 days so sellers can collect / reclaim
+  const POLL_MS = 12000;
+  const MAX_OWN_ACTIVE = 10;
+  const MAX_BUYS = 200;                          // per-listing buy log cap (audit guard)
+
+  let client = null;
+  if (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase) {
+    try { client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch (e) {}
+  }
+  // Cloud health: last time the shared row answered. While the cloud is
+  // unreachable the module degrades to the localStorage twin (same-machine
+  // trading keeps working) and quietly retries the cloud every 30s.
+  let lastCloudOk = client ? Date.now() : 0;
+  const CLOUD_RETRY_MS = 30000;
+  function status() {
+    return (client && Date.now() - lastCloudOk < 60000) ? 'cloud' : 'local';
+  }
+
+  let listings = [];        // the working copy of the shared ledger
+  let timer = null;
+  let writing = false;
+  let dirty = false;        // local changes not yet confirmed to the row
+
+  // ---------- row IO (cloud + localStorage twin) ----------
+  function readLocal() {
+    try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { return {}; }
+  }
+  function writeLocal(data) {
+    try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {}
+  }
+  async function fetchRow() {
+    if (!client) return readLocal();
+    try {
+      const { data, error } = await client.from('openworld_data').select('data').eq('key', KEY).maybeSingle();
+      if (error) throw error;
+      lastCloudOk = Date.now();
+      return (data && data.data) || {};
+    } catch (e) {
+      return readLocal();   // cloud unreachable — degrade to the twin
+    }
+  }
+  async function writeRow(data) {
+    writeLocal(data);   // twin first — same-machine trading always works
+    if (!client) return true;
+    if (Date.now() - lastCloudOk > CLOUD_RETRY_MS && Date.now() - lastCloudFail < CLOUD_RETRY_MS) return false; // backing off
+    try {
+      const { error } = await client.from('openworld_data')
+        .upsert({ key: KEY, data, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+      if (error) throw error;
+      lastCloudOk = Date.now();
+      lastCloudFail = 0;
+      return true;
+    } catch (e) {
+      lastCloudFail = Date.now();   // twin holds the data — retry later
+      return false;
+    }
+  }
+  let lastCloudFail = 0;
+
+  // ---------- listing model ----------
+  // Returns a clean listing record or null (garbage rows are dropped).
+  function sanitize(l) {
+    if (!l || typeof l.id !== 'string' || typeof l.seller !== 'string') return null;
+    const m = getMaterial(l.mat);
+    if (!m || m.military) return null;
+    const qty0 = Math.floor(+l.qty0), price = Math.round(+l.price);
+    if (!isFinite(qty0) || qty0 < 1 || qty0 > 1e6) return null;
+    if (!isFinite(price) || price < 1 || price > 999999) return null;
+    const buys = [];
+    if (Array.isArray(l.buys)) {
+      for (const b of l.buys) {
+        if (buys.length >= MAX_BUYS) break;
+        if (!b || typeof b.id !== 'string' || typeof b.buyer !== 'string') continue;
+        const q = Math.floor(+b.qty), c = Math.round(+b.cost);
+        if (!isFinite(q) || q < 1 || !isFinite(c) || c < 0) continue;
+        buys.push({ id: b.id, buyer: b.buyer, qty: q, cost: c, at: +b.at || 0, refunded: !!b.refunded });
+      }
+    }
+    return {
+      id: l.id, seller: l.seller, mat: l.mat, qty0: qty0, price: price,
+      listedAt: +l.listedAt || Date.now(),
+      expiresAt: +l.expiresAt || Date.now(),
+      cancelled: !!l.cancelled,
+      buys: buys,
+    };
+  }
+  function soldOf(l) {
+    let t = 0;
+    for (const b of l.buys) if (!b.refunded) t += b.qty;
+    return t;
+  }
+  function remainingOf(l) { return Math.max(0, l.qty0 - soldOf(l)); }
+  function earnedOf(l) {
+    let t = 0;
+    for (const b of l.buys) if (!b.refunded) t += b.cost;
+    return t;
+  }
+  function isLive(l, now) {
+    return !l.cancelled && (l.expiresAt || 0) > now && remainingOf(l) > 0;
+  }
+
+  // ---------- deterministic audit ----------
+  // Demand beyond the listing's original size refunds the LATEST buys
+  // (every client computes the same answer from the same row).
+  function auditListings(arr) {
+    let changed = false;
+    for (const l of arr) {
+      l.buys.sort((a, b) => (a.at - b.at) || String(a.id).localeCompare(String(b.id)));
+      let over = soldOf(l) - l.qty0;
+      if (over > 0) {
+        for (let i = l.buys.length - 1; i >= 0 && over > 0; i--) {
+          if (l.buys[i].refunded) continue;
+          l.buys[i].refunded = true;
+          over -= l.buys[i].qty;
+          changed = true;
+        }
+      }
+    }
+    return changed;
+  }
+
+  // ---------- monotone row merge ----------
+  function mergeRows(fresh, mine) {
+    const now = Date.now();
+    const byId = new Map();
+    for (const l of (fresh.listings || [])) { const s = sanitize(l); if (s) byId.set(s.id, s); }
+    for (const l of (mine.listings || [])) {
+      const s = sanitize(l); if (!s) continue;
+      const f = byId.get(s.id);
+      if (!f) {
+        // another writer may have pruned it — keep only inside its TTL + grace
+        if ((s.expiresAt || 0) + DEAD_GRACE > now) byId.set(s.id, s);
+        continue;
+      }
+      // union the buy logs; a refunded=true version always wins
+      const buyById = new Map();
+      for (const b of f.buys) buyById.set(b.id, b);
+      for (const b of s.buys) {
+        const fb = buyById.get(b.id);
+        if (!fb) buyById.set(b.id, b);
+        else if (b.refunded && !fb.refunded) buyById.set(b.id, b);
+        else if (fb.refunded && !b.refunded) buyById.set(b.id, fb);
+      }
+      f.buys = Array.from(buyById.values());
+      f.cancelled = f.cancelled || s.cancelled;
+      f.listedAt = Math.min(f.listedAt, s.listedAt);
+      f.expiresAt = Math.max(f.expiresAt, s.expiresAt);
+    }
+    return Array.from(byId.values());
+  }
+
+  // ---------- pruning ----------
+  function pruneListings(arr) {
+    const now = Date.now();
+    let out = arr.filter(l => (l.expiresAt || 0) + DEAD_GRACE > now);
+    if (out.length > MAX_LISTINGS) {
+      // drop the longest-dead rows first, then the oldest listings
+      out.sort((a, b) => (a.expiresAt - b.expiresAt) || (a.listedAt - b.listedAt));
+      out = out.slice(out.length - MAX_LISTINGS);
+    }
+    return out;
+  }
+
+  // ---------- write path (read-merge-write like Wars) ----------
+  async function persist() {
+    if (writing || !CURRENT_USER) return;
+    writing = true;
+    try {
+      const fresh = await fetchRow();
+      let merged = mergeRows({ listings: (fresh && fresh.listings) || [] }, { listings });
+      const auditChanged = auditListings(merged);
+      merged = pruneListings(merged);
+      listings = merged;
+      const reachedRow = await writeRow({ listings });
+      dirty = !reachedRow;   // stay dirty until the ledger actually lands
+      if (auditChanged) reconcile();   // refunds discovered during merge
+    } catch (e) { /* best-effort — the poll retries */ }
+    writing = false;
+  }
+
+  // ---------- seller / buyer reconciliation ----------
+  function reconcile() {
+    if (!CURRENT_USER) return;
+    // 1) payouts — bank the difference between lifetime earned and applied
+    let earned = 0;
+    for (const l of listings) {
+      if (l.seller === CURRENT_USER) earned += earnedOf(l);
+    }
+    const applied = +STATE.marketEarnedApplied || 0;
+    if (earned > applied) {
+      const payout = earned - applied;
+      STATE.marketEarnedApplied = earned;
+      STATE.money += payout;
+      updateHUD();
+      saveGame();
+      showToast(`🤝 Player Market: a sale paid out $${payout.toLocaleString()}`, true);
+    }
+    // 2) reclaim — dead listings hand their unsold stock back (once)
+    for (const l of listings) {
+      if (l.seller !== CURRENT_USER) continue;
+      if (STATE.marketReclaimedIds.includes(l.id)) continue;
+      const dead = l.cancelled || (l.expiresAt || 0) <= Date.now();
+      if (!dead) continue;
+      const rem = remainingOf(l);
+      STATE.marketReclaimedIds.push(l.id);
+      if (rem > 0) {
+        STATE.inventory[l.mat] = (STATE.inventory[l.mat] || 0) + rem;
+        const m = getMaterial(l.mat);
+        showToast(`📦 Expired listing — ${rem} ${m.icon} ${m.name} returned to storage`, true);
+      }
+      saveGame();
+    }
+    // 3) race refunds — a buy of mine that bounced after I already took
+    //    the goods: return the goods (if still held) and refund the credits
+    for (const l of listings) {
+      for (const b of l.buys) {
+        if (b.buyer !== CURRENT_USER || !b.refunded) continue;
+        if (STATE.marketRefundedBuys.includes(b.id)) continue;
+        STATE.marketRefundedBuys.push(b.id);
+        STATE.money += b.cost;
+        STATE.inventory[l.mat] = Math.max(0, (STATE.inventory[l.mat] || 0) - b.qty);
+        showToast(`↩️ A market purchase was outbid — $${b.cost.toLocaleString()} refunded`, true);
+        saveGame();
+      }
+    }
+    // keep the persisted marker arrays from growing forever
+    if (STATE.marketReclaimedIds.length > 400) STATE.marketReclaimedIds = STATE.marketReclaimedIds.slice(-200);
+    if (STATE.marketRefundedBuys.length > 400) STATE.marketRefundedBuys = STATE.marketRefundedBuys.slice(-200);
+  }
+
+  // ---------- polling ----------
+  async function poll() {
+    if (!CURRENT_USER) return;
+    try {
+      const row = await fetchRow();
+      listings = mergeRows(row, { listings });
+      const auditChanged = auditListings(listings);
+      listings = pruneListings(listings);
+      reconcile();
+      if (auditChanged || dirty) await persist();
+      if (document.getElementById('market-modal').classList.contains('show') && window.__mkTab === 'players') {
+        renderMarketModal();
+      }
+    } catch (e) { /* best-effort */ }
+  }
+  function onLogin() {
+    if (!timer) timer = setInterval(poll, POLL_MS);
+    poll();
+  }
+  function stop() { if (timer) { clearInterval(timer); timer = null; } }
+  function refresh() { return poll(); }
+
+  // ---------- actions ----------
+  async function create(mat, qty, price) {
+    if (!CURRENT_USER) return { ok: false, msg: 'Log in first' };
+    const m = getMaterial(mat);
+    if (!m || m.military) return { ok: false, msg: 'That material cannot be traded' };
+    qty = Math.floor(+qty); price = Math.round(+price);
+    if (!isFinite(qty) || qty < 1) return { ok: false, msg: 'Enter an amount to list' };
+    if (!isFinite(price) || price < 1) return { ok: false, msg: 'Enter a price per unit (at least $1)' };
+    if (price > 999999) return { ok: false, msg: 'Price too high — max $999,999 per unit' };
+    const stock = STATE.inventory[mat] || 0;
+    if (qty > stock) return { ok: false, msg: `You only hold ${fmtQty(stock)} ${m.name}` };
+    const now = Date.now();
+    const mineActive = listings.filter(l => l.seller === CURRENT_USER && isLive(l, now)).length;
+    if (mineActive >= MAX_OWN_ACTIVE) {
+      return { ok: false, msg: `Listing limit reached — ${MAX_OWN_ACTIVE} active offers max` };
+    }
+    // escrow the materials immediately (atomic with the local UI state)
+    STATE.inventory[mat] = stock - qty;
+    updateHUD();
+    listings.push({
+      id: 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+      seller: CURRENT_USER, mat: mat, qty0: qty, price: price,
+      listedAt: now, expiresAt: now + LISTING_TTL, cancelled: false, buys: [],
+    });
+    dirty = true;
+    try { await persist(); } catch (e) { /* twin + poll retry */ }
+    saveGame();
+    return { ok: true, msg: `Listed ${qty} ${m.icon} ${m.name} at $${price.toLocaleString()}/unit` };
+  }
+
+  async function cancel(id) {
+    if (!CURRENT_USER) return { ok: false, msg: 'Log in first' };
+    const l = listings.find(x => x.id === id);
+    if (!l || l.seller !== CURRENT_USER) return { ok: false, msg: 'Not your listing' };
+    if (l.cancelled) return { ok: false, msg: 'Already cancelled' };
+    l.cancelled = true;
+    dirty = true;
+    try { await persist(); } catch (e) { /* poll retry */ }
+    // hand the unsold stock back right away (mark reclaimed so the
+    // reconcile pass never double-returns it)
+    const rem = remainingOf(l);
+    if (!STATE.marketReclaimedIds.includes(l.id)) STATE.marketReclaimedIds.push(l.id);
+    if (rem > 0) {
+      STATE.inventory[l.mat] = (STATE.inventory[l.mat] || 0) + rem;
+      const m = getMaterial(l.mat);
+      updateHUD();
+      showToast(`📦 Cancelled — ${rem} ${m.icon} ${m.name} back in storage`, true);
+    }
+    saveGame();
+    return { ok: true, msg: 'Listing cancelled' };
+  }
+
+  async function buy(id, amount) {
+    if (!CURRENT_USER) return { ok: false, msg: 'Log in first' };
+    // adopt cloud truth first so the availability check is fresh
+    try {
+      const row = await fetchRow();
+      listings = mergeRows(row, { listings });
+      auditListings(listings);
+    } catch (e) { /* fall through to the local copy */ }
+    const l = listings.find(x => x.id === id);
+    if (!l) return { ok: false, msg: 'Listing not found — refreshed' };
+    if (l.seller === CURRENT_USER) return { ok: false, msg: 'That is your own listing' };
+    const now = Date.now();
+    if (!isLive(l, now)) return { ok: false, msg: 'That listing just closed' };
+    const avail = remainingOf(l);
+    const qty = Math.floor(+amount);
+    if (!isFinite(qty) || qty < 1) return { ok: false, msg: 'Enter an amount to buy' };
+    if (qty > avail) return { ok: false, msg: `Only ${avail} left on that listing` };
+    const total = qty * l.price;
+    if (STATE.money < total) {
+      return { ok: false, msg: `Not enough credits — $${total.toLocaleString()} needed` };
+    }
+    const buyRec = {
+      id: 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      buyer: CURRENT_USER, qty: qty, cost: total, at: Date.now(), refunded: false,
+    };
+    l.buys.push(buyRec);
+    dirty = true;
+    // strip a purchase that never made it to the shared row back out of
+    // the local copy so the UI can't show stock that was never sold
+    const stripPhantom = () => {
+      for (const x of listings) {
+        if (x.id !== id) continue;
+        const i = x.buys.findIndex(b => b.id === buyRec.id);
+        if (i >= 0) x.buys.splice(i, 1);
+      }
+    };
+    try {
+      await persist();
+      // verify our purchase survived any concurrent write
+      const verify = await fetchRow();
+      const vL = (verify.listings || []).find(x => x.id === id);
+      const vB = vL && vL.buys && vL.buys.find(b => b.id === buyRec.id);
+      listings = mergeRows(verify, { listings });
+      auditListings(listings);
+      if (!vB || vB.refunded) {
+        stripPhantom();
+        return { ok: false, msg: 'Someone bought it first — refreshed' };
+      }
+    } catch (e) {
+      stripPhantom();
+      return { ok: false, msg: 'Market sync failed — nothing was charged' };
+    }
+    // success — apply locally only now (charge + delivery)
+    const m = getMaterial(l.mat);
+    STATE.money -= total;
+    STATE.inventory[l.mat] = (STATE.inventory[l.mat] || 0) + qty;
+    updateHUD();
+    saveGame();
+    return { ok: true, msg: `Bought ${qty} ${m.icon} ${m.name} from ${l.seller} for $${total.toLocaleString()}` };
+  }
+
+  // ---------- queries for the UI ----------
+  function decorated(l) {
+    return {
+      id: l.id, seller: l.seller, mat: l.mat, price: l.price,
+      qty0: l.qty0, listedAt: l.listedAt, expiresAt: l.expiresAt,
+      cancelled: l.cancelled,
+      sold: soldOf(l), remaining: remainingOf(l), earned: earnedOf(l),
+    };
+  }
+  function liveListings() {
+    const now = Date.now();
+    return listings.filter(l => isLive(l, now)).map(decorated);
+  }
+  function myListings() {
+    const now = Date.now();
+    return listings.filter(l => l.seller === CURRENT_USER && !l.cancelled && (l.expiresAt || 0) + DEAD_GRACE > now)
+      .map(decorated).sort((a, b) => b.listedAt - a.listedAt);
+  }
+  function byId(id) {
+    const l = listings.find(x => x.id === id);
+    return l ? decorated(l) : null;
+  }
+  function totalEarnedBy(name) {
+    let t = 0;
+    for (const l of listings) if (l.seller === name) t += earnedOf(l);
+    return t;
+  }
+  function fmtAge(ts) {
+    const s = Math.max(1, Math.floor((Date.now() - ts) / 1000));
+    if (s < 60) return s + 's ago';
+    if (s < 3600) return Math.floor(s / 60) + 'm ago';
+    if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+    return Math.floor(s / 86400) + 'd ago';
+  }
+  function fmtLeft(expiresAt) {
+    const ms = expiresAt - Date.now();
+    if (ms <= 0) return 'expired';
+    const h = Math.floor(ms / 3600000);
+    if (h >= 1) return h + 'h left';
+    return Math.max(1, Math.ceil(ms / 60000)) + 'm left';
+  }
+
+  return {
+    status, onLogin, stop, refresh, poll,
+    create, cancel, buy,
+    liveListings, myListings, byId, totalEarnedBy,
+    fmtAge, fmtLeft,
+    MAX_OWN_ACTIVE, LISTING_TTL,
+    get listings() { return listings.map(decorated); },
+  };
+})();
+window.PlayerMarket = PlayerMarket;
 
 // ====================================================================
 // HUD UPDATES
