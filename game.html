@@ -2146,7 +2146,31 @@ const CloudSync = (() => {
     }
   }
 
-  return { status, pushSave, pushProfiles, pushClaims, deleteSave, pullAndMerge,
+  // v1.27 — targeted cloud fetch for cross-device login. Reads one save
+  // row straight from the cloud (with its deletion tombstone) so login
+  // never depends on the silent background sync having finished first.
+  async function fetchSave(username) {
+    if (!client || !username) return null;
+    try {
+      const { data } = await client.from(TABLE).select('data').eq('key', SAVE_PREFIX + username).maybeSingle();
+      const save = data && data.data;
+      if (!save || typeof save !== 'object' || !save.passwordHash) return null;
+      // Respect deletion tombstones: a deleted account stays deleted on
+      // new devices too (unless it was re-created after the deletion).
+      try {
+        const { data: delRow } = await client.from(TABLE).select('data').eq('key', 'openworld_deleted').maybeSingle();
+        const tomb = (delRow && delRow.data) || {};
+        const t = tomb[username] || 0;
+        if (t && !((save.created || 0) > t)) return null;
+      } catch (e) { /* tombstone row missing — treat as not deleted */ }
+      return save;
+    } catch (e) {
+      console.warn('[OpenWorld] Cloud fetch for login failed:', e);
+      return null;
+    }
+  }
+
+  return { status, pushSave, pushProfiles, pushClaims, deleteSave, pullAndMerge, fetchSave,
            noteAdminStamp, noteClaimStamp, noteDeletion, clearTombstone,
            consumeAdminAdoptions, getLocalClaimStamp };
 })();
@@ -5666,8 +5690,12 @@ window.WarFx = WarFx;
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.26';
+const GAME_VERSION = 'v1.27';
 const RELEASE_NOTES = [
+  { v: 'v1.27', items: [
+    '🌍 <b>Login from any device</b> — signing in no longer races the background cloud sync. If this browser doesn\'t hold your account yet, the login now fetches it <b>straight from the cloud</b>: enter your name and password anywhere in the world and your empire is right there — plots, businesses, credits and all.',
+    '⏳ <b>Clearer login feedback</b> — you\'ll see “Fetching your account from the cloud…” while it retrieves your empire, and if an account truly doesn\'t exist the message now tells you whether the cloud was checked (and reminds you names are case-sensitive).'
+  ]},
   { v: 'v1.26', items: [
     '🖥 <b>Capital Terminal theme</b> — the whole interface got the financial-terminal treatment, in the spirit of Capital Rift: near-black flat panels with hairline borders, tabular monospace digits on every credit, price and stat, a gold market accent, and the ticker reworked into a proper stock tape. Darker, cleaner, sharper.',
     '🏠 <b>Land is an investment now</b> — every plot has a LAND VALUE that grows with what you build on it: businesses (+8% each), variety of type (+4%), hired crews (+2% each), paved road tiles and garrisons all add worth, up to +150%. Selling now pays <b>50% of land value</b> — developed land resells far higher than the sticker price (businesses on it are demolished with the sale).',
@@ -5857,7 +5885,7 @@ window.focusNextInput = function() {
   }
 };
 
-window.loginSubmit = function() {
+window.loginSubmit = async function() {
   const nameInput = document.getElementById('login-name');
   const pwdInput = document.getElementById('login-pwd');
   const pwd2Input = document.getElementById('login-pwd2');
@@ -5937,9 +5965,27 @@ window.loginSubmit = function() {
     CloudSync.clearTombstone(name);
   } else {
     // === LOGIN ===
-    const existingSave = getSave(name);
+    let existingSave = getSave(name);
+    if (!existingSave && CloudSync.status() === 'cloud') {
+      // v1.27 — cross-device login: this browser may not hold the account
+      // yet (the load-time sync can still be in flight, or it failed on
+      // this network). Fetch THIS account straight from the cloud instead
+      // of rejecting the login — any device, same empire.
+      errEl.textContent = '⏳ Fetching your account from the cloud…';
+      let cloudSave = null;
+      try { cloudSave = await CloudSync.fetchSave(name); } catch (e) {}
+      if (cloudSave) {
+        try { migrateSaveToGridV2(cloudSave); } catch (e) {}
+        try { localStorage.setItem(SAVE_PREFIX + name, JSON.stringify(cloudSave)); } catch (e) {}
+        try { addProfile(name); } catch (e) {}
+        existingSave = cloudSave;
+      }
+      errEl.textContent = '';
+    }
     if (!existingSave) {
-      errEl.textContent = 'Account not found. Use Create Account to register.';
+      errEl.textContent = CloudSync.status() === 'cloud'
+        ? 'Account not found — not on this device and not in the cloud. Check the spelling (names are case-sensitive) or use Create Account.'
+        : 'Account not found — the cloud is unreachable from this browser, and accounts live on the device where they were created.';
       nameInput.select();
       return;
     }
