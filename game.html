@@ -930,6 +930,124 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
   .controls-hint{font-size:10px;gap:10px;flex-direction:column}
   .zoom-bar{width:120px}
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   v1.26 — CAPITAL TERMINAL THEME (Capital Rift-inspired reskin)
+   A darker, cleaner financial-terminal look: near-black neutral
+   panels, bold sans headings, tabular mono numbers, flat buttons,
+   sharp corners. Sits at the end of the sheet so later rules win.
+   ══════════════════════════════════════════════════════════════════ */
+:root{
+  --cr-bg:#05070b; --cr-panel:rgba(7,10,15,.9); --cr-line:#202a36;
+  --cr-text:#e6edf3; --cr-mut:#8b95a1; --cr-gold:#f2c14e;
+  --cr-up:#3ddc97; --cr-down:#ff7a7a; --cr-mono:ui-monospace,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace;
+}
+html,body{background:#05070b}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#dfe7ee}
+.screen{background:#05070b}
+/* — money & stat readouts: tabular mono, the terminal way — */
+.sf-row b,.sf-res b,.price-value,#money,#stocks-value,#stock-value,#networth-value,
+.lb-value,.menu-welcome-stat b,.tick-item b,.tick-item .tk-price,#we-online,#we-gdp,#we-net,
+.myplot-row b,.planet-info b,.prop-stat b,#sf-rank,#sf-lvl{
+  font-family:var(--cr-mono);font-variant-numeric:tabular-nums;letter-spacing:0}
+/* — soften the CRT scanlines (clean look) — */
+.sf-fx{opacity:.28}
+@media(max-width:860px){.sf-fx{opacity:.2}}
+/* — HUD panels: flat near-black, hairline border, no sci-fi brackets — */
+.sf-panel{background:var(--cr-panel);border:1px solid var(--cr-line);border-radius:4px;
+  box-shadow:0 6px 24px rgba(0,0,0,.5);backdrop-filter:blur(8px)}
+.sf-panel::before,.sf-panel::after{display:none}
+.sf-panel-head{font-family:inherit;font-weight:800;font-size:9.5px;letter-spacing:2.6px;color:#e6edf3;
+  border-bottom:1px solid var(--cr-line)}
+.sf-panel-head::before{display:none}
+.sf-row{color:var(--cr-mut);font-size:12px}
+.sf-row b{color:#fff;font-weight:700;text-shadow:none;font-size:11.5px}
+.sf-res{color:var(--cr-mut);font-size:12px;border-bottom:1px dashed rgba(32,42,54,.8)}
+.sf-res b{color:#fff;font-weight:700;text-shadow:none;font-size:11.5px}
+/* — top command bar: flat, neutral, sharp — */
+.sf-nav{background:linear-gradient(180deg,rgba(5,7,11,.94),rgba(5,7,11,.7) 80%,transparent);
+  border-bottom:1px solid var(--cr-line);backdrop-filter:blur(10px)}
+.sf-pill{font-family:inherit;font-weight:700;letter-spacing:1.4px;color:#c6d0da;border-radius:3px;
+  border:1px solid #2a3542;background:rgba(10,14,20,.72)}
+.sf-pill:hover{color:#fff;border-color:#3a4756;background:rgba(20,26,34,.85);box-shadow:none}
+.sf-pill-active{color:var(--cr-gold);border-color:rgba(242,193,78,.55);background:rgba(242,193,78,.1);
+  box-shadow:inset 0 0 0 1px rgba(242,193,78,.15)}
+.sf-pill-active:hover{color:var(--cr-gold);border-color:rgba(242,193,78,.55);background:rgba(242,193,78,.1)}
+.sf-pill-util{color:#9fb6c4;border-color:#2a3542}
+.sf-pill.active{color:var(--cr-up) !important;border-color:rgba(61,220,151,.55) !important;
+  background:rgba(61,220,151,.08) !important;box-shadow:none !important}
+/* — market ticker: financial tape — */
+.tick-strip{background:rgba(4,6,10,.96);border-top:1px solid var(--cr-line)}
+.tick-inner{font-family:var(--cr-mono)}
+.tick-item{color:var(--cr-mut);font-family:var(--cr-mono);letter-spacing:.4px}
+.tick-item b{color:#e6edf3}
+.tick-item .tk-price{color:var(--cr-gold);font-family:var(--cr-mono)}
+.tick-label{border:1px solid rgba(242,193,78,.45);border-radius:2px;background:rgba(242,193,78,.08);
+  color:var(--cr-gold);font-family:inherit;font-weight:800;letter-spacing:2px}
+/* — modal cards: dark, flat, sharp — */
+.plot-card{background:rgba(7,10,15,.97);border:1px solid #232d3a;border-radius:6px;
+  box-shadow:0 18px 60px rgba(0,0,0,.65)}
+.plot-card h2{font-family:inherit;font-weight:800;color:#f2f6fa;font-size:22px;letter-spacing:.4px;text-shadow:none}
+.plot-card .coords{color:var(--cr-mut);font-family:var(--cr-mono);font-size:11px}
+.plot-card .price-label{color:var(--cr-mut);letter-spacing:2px;font-weight:700;font-size:10.5px}
+.plot-card .price-value{font-family:var(--cr-mono);font-variant-numeric:tabular-nums;color:var(--cr-gold);font-size:26px;font-weight:700}
+.plot-card .price-value small{color:var(--cr-mut);font-size:11px;letter-spacing:1px}
+.plot-card .desc{color:#aab6c2}
+.plot-card .desc b{color:#dbe4ec}
+.plot-card .badge{border-radius:3px;font-weight:700;letter-spacing:1.5px}
+.plot-card .meta-chip{border:1px solid #232d3a;border-radius:3px;background:rgba(14,19,26,.7);
+  color:var(--cr-mut);font-weight:600}
+.plot-card .meta-chip b{color:var(--cr-gold)}
+/* — buttons: flat — */
+.plot-card .btn{border-radius:4px;border:1px solid #2a3542;background:rgba(14,19,26,.8);
+  color:#c6d0da;font-weight:700;letter-spacing:.8px}
+.plot-card .btn:hover{background:rgba(26,34,44,.9);color:#fff}
+.plot-card .btn.primary{background:var(--cr-gold);color:#0a0c10;border-color:var(--cr-gold);
+  font-weight:800;box-shadow:none}
+.plot-card .btn.primary:hover{filter:brightness(1.08)}
+.btn.demolish{background:rgba(90,26,26,.35)}
+/* — my land / planets rows — */
+.myplot-row,.planet-row{border:1px solid #232d3a;border-radius:4px;background:rgba(12,17,23,.8)}
+.myplot-row .planet-name,.planet-row .planet-name{color:#f2f6fa;font-weight:700}
+.myplot-row .planet-desc,.planet-row .planet-desc{color:var(--cr-mut)}
+/* — business cards & options — */
+.biz-card-multi{border:1px solid #232d3a !important;border-radius:4px !important;background:rgba(12,17,23,.75) !important}
+.biz-option{border-color:#232d3a !important}
+.biz-option .biz-name{color:#f2f6fa}
+.biz-option .biz-cost{font-family:var(--cr-mono);font-size:10px}
+.biz-income{font-family:var(--cr-mono)}
+.wk-row{border-color:rgba(139,149,161,.3) !important}
+/* — menu screen: bold white wordmark, flat amber CTA — */
+.menu-screen{background:radial-gradient(ellipse at 70% 40%,#0a0f16 0%,#05070b 60%,#020304 100%)}
+.menu-title{font-family:inherit;font-weight:900;color:#f2f6fa;letter-spacing:1px;text-shadow:none}
+.menu-subtitle{color:var(--cr-mut)}
+.menu-eyebrow{color:var(--cr-mut)}
+.menu-eyebrow::before{background:var(--cr-gold)}
+.menu-btn{background:var(--cr-gold);color:#0a0c10;font-family:inherit;font-weight:800;border-radius:4px;box-shadow:none}
+.menu-btn:hover{filter:brightness(1.07)}
+.menu-btn.secondary{background:rgba(16,22,30,.85);color:#c6d0da;border:1px solid #2a3542;border-radius:4px}
+.menu-welcome-name{font-family:inherit;font-weight:800;color:#f2f6fa}
+.brand{font-family:inherit;font-weight:800;color:#f2f6fa;letter-spacing:1.5px;text-shadow:none}
+/* — market modal rows — */
+.market-row .mk-price,.mk-cell b{font-family:var(--cr-mono)}
+/* — property section (v1.26) — */
+.prop-entry{border:1px solid #232d3a;border-radius:4px;background:rgba(12,17,23,.75);
+  padding:9px 11px;margin:8px 0 10px}
+.prop-stats{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:7px}
+.prop-stat{display:flex;flex-direction:column;gap:2px}
+.prop-stat i{font-style:normal;font-size:8.5px;letter-spacing:1.8px;color:var(--cr-mut);font-weight:700}
+.prop-stat b{font-size:12.5px;color:#e6edf3;font-weight:700}
+.prop-rent-btn{width:100%;padding:9px;border-radius:4px;border:1px solid rgba(61,220,151,.5);cursor:pointer;
+  background:rgba(61,220,151,.08);color:var(--cr-up);font-family:inherit;font-weight:800;font-size:11px;
+  letter-spacing:1.2px;text-transform:uppercase;transition:all .15s}
+.prop-rent-btn:hover{background:rgba(61,220,151,.16)}
+.prop-rent-btn.rented{border-color:rgba(242,193,78,.55);background:rgba(242,193,78,.1);color:var(--cr-gold)}
+.prop-rent-btn.rented:hover{background:rgba(242,193,78,.16)}
+.grade-chip{display:inline-block;font-family:var(--cr-mono);font-weight:700;font-size:10px;
+  border:1px solid currentColor;border-radius:3px;padding:0 5px;margin-left:6px;letter-spacing:.5px;vertical-align:middle}
+/* — toasts & inputs stay dark — */
+.toast{border-radius:4px}
+input,select,textarea{font-family:var(--cr-mono)}
 </style>
 <style id="sf-theme">
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap');
@@ -1206,11 +1324,11 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
       <button class="sf-pill sf-pill-active" title="You are here — the open world">OPEN WORLD</button>
       <button class="sf-pill" id="support-btn" onclick="openSupport()" title="Support — report a bug or share an idea with the world owner">SUPPORT</button>
       <button class="sf-pill" id="wars-btn" onclick="openWars()" title="Wars — your marches, incoming attacks and battle reports">WAR</button>
-      <button class="sf-pill" id="myland-btn" onclick="openMyPlots()" title="My Land — see your plots and sell the ones you don't want">HI-LAND</button>
+      <button class="sf-pill" id="myland-btn" onclick="openMyPlots()" title="Property — your land portfolio: land value, rent income and grades">PROPERTY</button>
       <button class="sf-pill" id="planets-btn" onclick="openPlanets()" title="Planets — buy into new worlds and travel between them">PLANETS</button>
       <button class="sf-pill" id="clans-btn" onclick="openClans()" title="Clans &amp; Alliances — team up with other commanders">UNIONS</button>
       <button class="sf-pill" onclick="openMarketModal()" title="Market — buy and sell materials">MARKET</button>
-      <button class="sf-pill sf-pill-util" id="multibuy-btn" onclick="toggleMultiBuy()" title="Multi-Buy — click several plots, then buy them all at once (each must border your land)">✚ MULTI</button>
+      <button class="sf-pill sf-pill-util" id="multibuy-btn" onclick="toggleMultiBuy()" title="Multi-Buy — or just hold Shift and click plots: each pick must border your land (or your earlier picks), then buy them all at once">✚ MULTI</button>
       <button class="sf-pill sf-pill-util" id="multisell-btn" onclick="toggleMultiSell()" title="Multi-Sell — click several of your plots, then sell them all at once (refunds 50% each)">✚ SELL</button>
       <button class="sf-pill sf-pill-util" id="gamble-btn" onclick="openGambling()" style="display:none" title="Play at your casinos">🎰 CASINO</button>
       <button class="sf-pill sf-pill-util" id="cook-btn" onclick="openCookQuick()" style="display:none" title="Street Kitchen — cook at your food carts for bonus credits">🍳 KITCHEN</button>
@@ -1225,21 +1343,21 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
         <div class="sf-res" title="Combined net worth of every commander in the world"><span>NET WORTH:</span><b id="we-net">—</b></div>
       </div>
       <div class="sf-panel">
-        <div class="sf-panel-head">COMMS</div>
+        <div class="sf-panel-head">COMPANY</div>
         <div class="sf-row"><span>COMMANDER:</span><b id="sf-commander">VALKYRIE</b></div>
-        <div class="sf-row"><span>RANK:</span><b id="sf-rank">64</b></div>
-        <div class="sf-row"><span>LVL:</span><b id="sf-lvl">166</b></div>
-        <div class="sf-tags"><i>CRIMINAL RISK</i><i>SPY CHAIN</i></div>
+        <div class="sf-row" title="Everything your company earned in the last 24 hours — sales, rent, cooking, trades"><span>GDP 24H:</span><b id="sf-rank">—</b></div>
+        <div class="sf-row" title="Businesses operating across all your plots, on every world"><span>BUSINESSES:</span><b id="sf-lvl">0</b></div>
       </div>
       <div class="sf-panel">
         <div class="sf-panel-head">NAVIGATION</div>
         <div class="sf-res" title="Your budget"><span>CREDITS:</span><b id="money">$100,000</b></div>
         <div class="sf-res sf-click" onclick="openMarketModal('stocks')" title="Value of your stock portfolio — click to open the Stock Exchange"><span>STOCKS:</span><b id="stocks-value">$0</b></div>
-        <div class="sf-res sf-click" onclick="openMarketModal()" title="Value of materials in stock — click to open the Market"><span>ALLOYS:</span><b id="stock-value">$0</b></div>
+        <div class="sf-res sf-click" onclick="openMarketModal()" title="Value of materials in stock — click to open the Market"><span>MATERIALS:</span><b id="stock-value">$0</b></div>
         <div class="sf-res" title="Your total net worth — credits + materials + stocks"><span>NET WORTH:</span><b id="networth-value">$0</b></div>
-        <div class="sf-res" title="Plots of land you own on this world"><span>ENERGY:</span><b id="owned-count">0</b></div>
+        <div class="sf-res" title="Plots of land you own across every world"><span>PLOTS:</span><b id="owned-count">0</b></div>
         <div class="sf-res" title="Worker wages paid per minute across your whole empire"><span>WAGES:</span><b id="wage-rate">$0/min</b></div>
-        <div class="sf-res" title="Your troops — each Barracks houses 500. Deploy them to take other commanders' plots."><span>ORE:</span><b id="army-count">0</b></div>
+        <div class="sf-res" title="Rent collected per minute from plots you rent out to tenants"><span>RENT:</span><b id="rent-rate">$0/min</b></div>
+        <div class="sf-res" title="Your troops — each Barracks houses 500. Deploy them to take other commanders' plots."><span>ARMY:</span><b id="army-count">0</b></div>
         <div class="sf-res-bar"><i id="zoom-fill"></i></div>
         <div class="sf-res-sub"><span>ALTITUDE</span><b id="altitude">— km</b></div>
       </div>
@@ -1633,7 +1751,11 @@ const STATE = {
   wageDebt: 0,           // session-only fractional wage accumulator
   stocks: {},            // { ticker: shares held }
   stocksAvg: {},         // { ticker: average cost per share }
-  incomeLog: []          // [{ t, amt }] income events, rolling 24h window
+  incomeLog: [],         // [{ t, amt }] income events, rolling 24h window
+  // PROPERTY (v1.26) — plots currently rented out to tenants (plot ids).
+  // Persisted in the save; rent accrues by the minute in tickProduction.
+  rented: new Set(),
+  rentDebt: 0            // session-only fractional rent accumulator
 };
 
 const EARTH_RADIUS = STATE.radius;
@@ -2949,6 +3071,7 @@ const Wars = (() => {
       if (CURRENT_USER === m.def) STATE.inventory[m.kind] = Math.max(0, (STATE.inventory[m.kind] || 0) - defLoss);
       if (win) {
         defSave.ownedPlotIds = (defSave.ownedPlotIds || []).filter(id => id !== m.plotId);
+        defSave.rentedPlotIds = (defSave.rentedPlotIds || []).filter(id => id !== m.plotId);   // v1.26 — tenants leave with the land
         defSave.businesses = (defSave.businesses || []).filter(b => b.plotId !== m.plotId);
         claims[m.plotId] = m.atk;
         saveClaims(claims);
@@ -3504,6 +3627,7 @@ function applyCloudWorldUpdates() {
       p.userData.ownerName = owner;
       p.userData._selected = false;
       STATE.owned.delete(p.userData.id);
+      STATE.rented.delete(p.userData.id);   // v1.26 — tenants leave with the land
       BUSINESS_REGISTRY.delete(p.userData.id);   // those businesses now belong to the conqueror
       BIZ_POS.delete(p.userData.id);
       BIZ_META.delete(p.userData.id);   // v1.25 — their workers/cuisine go with the land
@@ -3814,6 +3938,8 @@ function saveGame() {
     adminStamp: existing ? existing.adminStamp : undefined,
     money: STATE.money,
     ownedPlotIds: Array.from(STATE.owned),
+    // v1.26 — plots currently rented out (property income)
+    rentedPlotIds: Array.from(STATE.rented || []),
     // Planets: which world you're on and which ones you've bought into
     planet: STATE.planet,
     unlockedPlanets: [...STATE.unlockedPlanets],
@@ -3899,6 +4025,10 @@ function loadGame(username) {
     : ['earth'];
   if (!STATE.unlockedPlanets.includes('earth')) STATE.unlockedPlanets.unshift('earth');
   STATE.owned = new Set(save.ownedPlotIds || []);
+  // v1.26 — restore rented-out plots (kept only if they're still ours)
+  STATE.rented = new Set((Array.isArray(save.rentedPlotIds) ? save.rentedPlotIds : [])
+    .filter(id => STATE.owned.has(id)));
+  STATE.rentDebt = 0;
 
   // Rebuild the all-planet business registry from the save, then mirror
   // the active planet's businesses into meshes below
@@ -5536,8 +5666,15 @@ window.WarFx = WarFx;
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.25';
+const GAME_VERSION = 'v1.26';
 const RELEASE_NOTES = [
+  { v: 'v1.26', items: [
+    '🖥 <b>Capital Terminal theme</b> — the whole interface got the financial-terminal treatment, in the spirit of Capital Rift: near-black flat panels with hairline borders, tabular monospace digits on every credit, price and stat, a gold market accent, and the ticker reworked into a proper stock tape. Darker, cleaner, sharper.',
+    '🏠 <b>Land is an investment now</b> — every plot has a LAND VALUE that grows with what you build on it: businesses (+8% each), variety of type (+4%), hired crews (+2% each), paved road tiles and garrisons all add worth, up to +150%. Selling now pays <b>50% of land value</b> — developed land resells far higher than the sticker price (businesses on it are demolished with the sale).',
+    '💰 <b>Rent your land out</b> — any plot you own can be rented to tenants who pay <b>by the minute</b>, scaled by its DEVELOPMENT GRADE. The game now grades your layout from D up to S: grade-S land earns 3× the rent of a grade-D plot. Rent flows into your treasury and your Company GDP even while you\'re orbiting another world.',
+    '📊 <b>Company readouts</b> — the COMMS panel now tracks your <b>Company GDP</b> (your rolling 24-hour income) and your business count across every world, replacing the old rank/level flavor numbers — and a new RENT line shows what your tenants are paying.',
+    '🖱 <b>Shift-Click Multi-Buy</b> — grab a bunch of plots at once, the Capital Rift way: hold <b>Shift</b> and click parcels straight on the globe to queue them up, then Buy All. Each pick still has to border your land (or your earlier picks).'
+  ]},
   { v: 'v1.25', items: [
     '🌭 <b>Food Carts & the Street Kitchen</b> — a brand-new starter business at $5,000: pick one of seven cuisines (hot dog, burger, pizza, taco, sushi, donut, coffee), park it anywhere on your land, and hit 🍳 COOK to play the timing game — stop the marker in the gold for a PERFECT batch worth up to 3× payout. Carts grow 🌾 Food slowly; cooking turns it into credits at better-than-market rates. Every cart you own raises the payout.',
     '👷 <b>Hire workers</b> — every business card now has a crew: hire up to 5 workers for +35% output each, paid by the minute straight out of your credits (watch the new WAGES readout). Fully crewed buildings produce up to +175% — and crews ride along when a plot is conquered.',
@@ -9022,13 +9159,19 @@ function updateSpaceHud(now) {
     cx.textContent = (camera.position.x * STATE.unitToKm).toFixed(1);
     cy.textContent = (camera.position.y * STATE.unitToKm).toFixed(1);
   }
-  // RANK / LVL readouts derived from your empire
-  const owned = parseInt((document.getElementById('owned-count') || {}).textContent || '0', 10) || 0;
-  const army = parseInt((document.getElementById('army-count') || {}).textContent || '0', 10) || 0;
+  // v1.26 — COMPANY readouts: your personal GDP (24h income ledger) and
+  // total businesses across every world (replaces the old rank/lvl flavor)
   const lvlEl = document.getElementById('sf-lvl');
   const rankEl = document.getElementById('sf-rank');
-  if (lvlEl) lvlEl.textContent = String(100 + owned * 2 + Math.floor(army / 400));
-  if (rankEl) rankEl.textContent = String(Math.max(1, 64 - Math.floor(owned / 8)));
+  if (lvlEl) {
+    let bc = 0;
+    for (const [, t] of BUSINESS_REGISTRY) bc += (t && t.length) || 0;
+    lvlEl.textContent = String(bc);
+  }
+  if (rankEl) {
+    const g = myGdp24();
+    rankEl.textContent = g >= 1e6 ? '$' + (g / 1e6).toFixed(2) + 'M' : (g >= 1000 ? '$' + (g / 1000).toFixed(1) + 'k' : '$' + Math.round(g));
+  }
 }
 
 function hideLoader() {
@@ -9783,6 +9926,23 @@ function onPointerClick(e) {
     handlePlacementClick(_clickHit);
     return;
   }
+  // v1.26 — Capital Rift-style SHIFT-CLICK: hold Shift and click buyable
+  // plots straight on the globe to queue them for multi-buy — no need to
+  // arm the ✚ MULTI mode first. Each pick still has to border your land
+  // (or an earlier pick), same rules as armed multi-buy.
+  if (e.shiftKey && !STATE.multiSell) {
+    const target = hit || STATE.hoveredPlot;
+    if (target && !target.userData.owned && !target.userData.ownedByOther) {
+      if (!STATE.multiBuy) {
+        STATE.multiBuy = true;
+        const mb = document.getElementById('multibuy-btn');
+        if (mb) mb.classList.add('active');
+        showToast('Shift-Click Multi-Buy — keep Shift-clicking plots, then Buy All', true);
+      }
+      togglePlotSelection(target);
+      return;
+    }
+  }
   // Multi-buy mode: clicks toggle selection instead of opening the modal
   if (STATE.multiBuy) {
     const target = hit || STATE.hoveredPlot;
@@ -9836,6 +9996,26 @@ function openPlotModal(plot) {
     const maxBiz = plot.userData.maxBusinesses || 1;
     const regionInfo = REGION_INFO[plot.userData.region] || REGION_INFO['temperate'];
     const isWater = plot.userData.isWater;
+
+    // v1.26 — PROPERTY economics: land value, layout grade, rent status
+    const _lv = plotLandValue(plot.userData.id);
+    const _dev = _lv - (plot.userData.price || 0);
+    const _gi = plotGradeInfo(plot.userData.id);
+    const _rented = STATE.rented.has(plot.userData.id);
+    const _rate = plotRentRate(plot.userData.id);
+    const _factors = _gi.factors.length ? _gi.factors.join(' · ') : 'empty land';
+    const propertyEntry = `
+      <div class="prop-entry">
+        <div class="prop-stats">
+          <span class="prop-stat"><i>GRADE</i><b style="color:${_gi.tier.color}">${_gi.tier.g} · rent ×${_gi.tier.mult}</b></span>
+          <span class="prop-stat"><i>LAND VALUE</i><b>$${_lv.toLocaleString()}${_dev > 0 ? ` <span style="color:#3ddc97;font-size:10px">+$${_dev.toLocaleString()}</span>` : ''}</b></span>
+          <span class="prop-stat"><i>RENT/MIN</i><b style="color:${_rented ? '#3ddc97' : '#8b95a1'}">${_rented ? '$' + _rate.toLocaleString() : '$' + _rate.toLocaleString() + ' if rented'}</b></span>
+          <span class="prop-stat"><i>DEVELOPMENT</i><b>${_factors}</b></span>
+        </div>
+        <button class="prop-rent-btn ${_rented ? 'rented' : ''}" onclick="toggleRentPlot(${plot.userData.id})">${_rented ? 'RENTED — $' + _rate.toLocaleString() + '/MIN · STOP RENTING' : 'RENT OUT — EARN $' + _rate.toLocaleString() + '/MIN'}</button>
+        <div class="road-hint" style="margin-top:5px">Tenants pay by the minute, scaled by GRADE — businesses, variety, crews, roads and garrisons all raise it. Selling refunds <b>50% of land value</b>.</div>
+      </div>
+    `;
 
     // Render each existing business as a card
     const bizCards = businesses.map((entry, idx) => {
@@ -9983,6 +10163,7 @@ function openPlotModal(plot) {
     businessPanel = `
       <div class="business-panel">
         <div class="biz-hint">Region: <b style="color:${regionInfo.color}">${regionInfo.icon} ${regionInfo.name}</b> · Capacity: <b>${businesses.length}/${maxBiz}</b> businesses · <b style="color:#7fffd4">builds go where you click</b></div>
+        ${propertyEntry}
         ${bizCards}
         ${buildSection}
         ${roadEntry}
@@ -10091,16 +10272,14 @@ function openPlotModal(plot) {
             : 'Acquire this land to expand your Open World holdings. Owned plots shine gold across the globe.'))}`
     }</div>
     <div class="price-row">
-      <span class="price-label">${ownedByOther ? 'Owner' : (owned ? ((plot.userData.businesses && plot.userData.businesses.length > 0) ? `Producing (${plot.userData.businesses.length})` : 'Owned — Build Ready') : 'Asking Price')}</span>
-      <span class="price-value" style="${ownedByOther ? 'font-size:20px;color:#9a6aaa' : ''}">${ownedByOther ? ownerName + clanTagHtml(ownerName) : (owned ? ((plot.userData.businesses && plot.userData.businesses.length > 0) ? 'Active Plot' : 'Build Ready') : '$' + plot.userData.price.toLocaleString())}<small>${ownedByOther || owned ? '' : ' USD'}</small></span>
+      <span class="price-label">${ownedByOther ? 'Owner' : (owned ? 'Land Value' : 'Asking Price')}</span>
+      <span class="price-value" style="${ownedByOther ? 'font-size:20px;color:#9a6aaa' : ''}">${ownedByOther ? ownerName + clanTagHtml(ownerName) : (owned ? '$' + plotLandValue(plot.userData.id).toLocaleString() + `<small> · GRADE ${plotGradeInfo(plot.userData.id).tier.g}${plotLandValue(plot.userData.id) > (plot.userData.price || 0) ? ' · +' + (plotLandValue(plot.userData.id) - (plot.userData.price || 0)).toLocaleString() + ' dev' : ''}</small>` : '$' + plot.userData.price.toLocaleString())}<small>${ownedByOther || owned ? '' : ' USD'}</small></span>
     </div>
     ${businessPanel}
     ${warPanel}
     <div class="actions">
       <button class="btn" onclick="closePlotModal()">Cancel</button>
-      ${owned && !ownedByOther ? (owned && (plot.userData.businesses || []).length === 0
-        ? `<button class="btn demolish" onclick="sellSelectedPlot()">Sell Plot — +$${Math.round(plot.userData.price * 0.5).toLocaleString()}</button>`
-        : `<button class="btn demolish" disabled title="Demolish all businesses on this plot first">Sell — demolish first</button>`) : ''}
+      ${owned && !ownedByOther ? `<button class="btn demolish" onclick="sellSelectedPlot()">Sell — +$${plotSaleInfo(plot.userData.id).refund.toLocaleString()}</button>` : ''}
       ${actionBtn}
     </div>
   `;
@@ -10258,6 +10437,7 @@ window.travelTo = function(planetId) {
     const owner = claims[p.userData.id];
     if (STATE.owned.has(p.userData.id) && owner && owner !== CURRENT_USER) {
       STATE.owned.delete(p.userData.id);
+      STATE.rented.delete(p.userData.id);   // v1.26 — tenants leave with the land
       BUSINESS_REGISTRY.delete(p.userData.id);
       BIZ_POS.delete(p.userData.id);
       BIZ_META.delete(p.userData.id);
@@ -10283,13 +10463,136 @@ window.travelTo = function(planetId) {
 };
 
 // ====================================================================
-// MY LAND — see every plot you own (across all planets) and sell the
-// ones you no longer want. Selling refunds 50% of the plot's value and
-// frees the claim: the parcel becomes unclaimed land anyone can buy.
-// Plots with businesses on them must be demolished first, so you can
-// never accidentally sell a producing business.
+// PROPERTY (v1.26) — land as an investment, in the Capital Rift spirit.
+// Every plot has a LAND VALUE that grows with development: businesses,
+// variety, hired crews, paved roads and garrisons all add value. Any
+// plot can be RENTED OUT — tenants pay by the minute, scaled by the
+// plot's DEVELOPMENT GRADE, so the game grades your layout and
+// better-laid land commands better rent. Selling pays 50% of LAND
+// VALUE (not just the base price), so developed land resells higher;
+// businesses on it are demolished with the sale.
 // ====================================================================
 const SELL_REFUND_RATE = 0.5;
+
+// Rent tuning — rent/min = land value × rate × grade multiplier
+const RENT_RATE_PER_MIN = 0.0008;
+// Development → land-value bonus (capped at +150% total)
+const DEV_PCT_PER_BIZ = 0.08;        // +8% per business
+const DEV_PCT_PER_VARIETY = 0.04;    // +4% per distinct business type
+const DEV_PCT_PER_WORKER = 0.02;     // +2% per hired worker
+const DEV_PCT_PER_ROAD = 0.005;      // +0.5% per paved road tile (cap +40%)
+const DEV_PCT_PER_MIL = 0.10;        // +10% per military installation
+const DEV_PCT_CAP = 1.50;
+// Layout grades — score from development mix; multiplier applies to rent
+const GRADE_TIERS = [
+  { g: 'D',  min: 0,   mult: 0.6,  color: '#ff7a7a' },
+  { g: 'C',  min: 2.5, mult: 0.8,  color: '#ffb066' },
+  { g: 'B',  min: 6,   mult: 1.0,  color: '#9bb4bd' },
+  { g: 'A',  min: 10,  mult: 1.25, color: '#7fffd4' },
+  { g: 'A+', min: 15,  mult: 1.5,  color: '#f2c14e' },
+  { g: 'S',  min: 22,  mult: 1.8,  color: '#50f0da' }
+];
+
+// Base (undeveloped) price of a plot on ANY planet — live mesh userData
+// when the plot is on the active world, cached generation meta otherwise.
+function plotBasePrice(plotId) {
+  const active = ACTIVE_PLOT_BY_ID.get(plotId);
+  if (active) return active.userData.price || 0;
+  const planet = planetOfPlotId(plotId);
+  const meta = (PLANET_META[planet.id] || new Map()).get(plotId);
+  return meta ? (meta.price || 0) : 0;
+}
+
+// Development inventory for a plot (works across all planets)
+function plotDevStats(plotId) {
+  const types = BUSINESS_REGISTRY.get(plotId) || [];
+  const meta = BIZ_META.get(plotId) || [];
+  const variety = new Set();
+  let workers = 0, military = 0;
+  for (let i = 0; i < types.length; i++) {
+    const bt = getBusinessType(types[i]);
+    if (!bt) continue;
+    variety.add(bt.id);
+    if (bt.military) military++;
+    const mm = meta[i];
+    if (mm && mm.workers) workers += mm.workers;
+  }
+  let roadTiles = 0;
+  try {
+    const p = ACTIVE_PLOT_BY_ID.get(plotId);
+    if (p && typeof Roads !== 'undefined' && Roads.tilesOnPlot) roadTiles = Roads.tilesOnPlot(p) || 0;
+  } catch (e) { /* roads are optional flavor for the grade */ }
+  return { biz: types.length, variety: variety.size, workers, military, roadTiles };
+}
+
+// The layout grade: D → S. Businesses, variety, crews, roads and
+// garrisons all lift the score; the tier multiplies rent.
+function plotGradeInfo(plotId) {
+  const s = plotDevStats(plotId);
+  const score = s.biz * 2.5 + s.variety * 1.5 + s.workers * 0.5
+    + Math.min(10, s.roadTiles * 0.25) + s.military * 3;
+  let tier = GRADE_TIERS[0];
+  for (const t of GRADE_TIERS) if (score >= t.min) tier = t;
+  const factors = [];
+  if (s.biz) factors.push(`${s.biz} business${s.biz > 1 ? 'es' : ''}`);
+  if (s.variety > 1) factors.push(`${s.variety} types`);
+  if (s.workers) factors.push(`${s.workers} crew`);
+  if (s.roadTiles) factors.push(`${s.roadTiles} road tiles`);
+  if (s.military) factors.push('garrisoned');
+  return { ...s, score, tier, factors };
+}
+
+// LAND VALUE = base price × (1 + development bonus)
+function plotLandValue(plotId) {
+  const base = plotBasePrice(plotId);
+  if (!base) return 0;
+  const s = plotDevStats(plotId);
+  let pct = s.biz * DEV_PCT_PER_BIZ
+    + s.variety * DEV_PCT_PER_VARIETY
+    + s.workers * DEV_PCT_PER_WORKER
+    + Math.min(0.40, s.roadTiles * DEV_PCT_PER_ROAD)
+    + s.military * DEV_PCT_PER_MIL;
+  pct = Math.min(DEV_PCT_CAP, pct);
+  return Math.round(base * (1 + pct));
+}
+
+// Potential rent/min for a plot at its current grade (whether or not
+// it's actually rented out — the UI shows this on the RENT OUT button)
+function plotRentRate(plotId) {
+  const v = plotLandValue(plotId);
+  if (!v) return 0;
+  const gi = plotGradeInfo(plotId);
+  return Math.max(1, Math.round(v * RENT_RATE_PER_MIN * gi.tier.mult));
+}
+
+// What you actually collect per minute right now (rented plots only)
+function rentPerMinTotal() {
+  let t = 0;
+  if (STATE.rented) for (const id of STATE.rented) t += plotRentRate(id);
+  return t;
+}
+
+// Toggle a plot between "worked by you" and "rented to tenants"
+window.toggleRentPlot = function(plotId) {
+  if (!CURRENT_USER || !gameInitialized) { showToast('Enter the world first', false); return; }
+  if (!STATE.owned.has(plotId)) { showToast("You don't own this plot", false); return; }
+  if (STATE.rented.has(plotId)) {
+    STATE.rented.delete(plotId);
+    showToast('Tenants moved out — the land is yours to work again', true);
+  } else {
+    STATE.rented.add(plotId);
+    const r = plotRentRate(plotId);
+    showToast(`Rented out — tenants now pay $${r.toLocaleString()}/min straight into your account`, true);
+  }
+  updateHUD();
+  saveGame();
+  // Refresh whichever surface is open so the button flips instantly
+  if (document.getElementById('plot-modal').classList.contains('show')
+    && STATE.selectedPlot && STATE.selectedPlot.userData.id === plotId) {
+    openPlotModal(STATE.selectedPlot);
+  }
+  if (document.getElementById('myplots-modal').classList.contains('show')) renderMyPlotsPanel();
+};
 
 function plotSaleInfo(plotId) {
   const planet = planetOfPlotId(plotId);
@@ -10297,18 +10600,27 @@ function plotSaleInfo(plotId) {
   const meta = (PLANET_META[planet.id] || new Map()).get(plotId);
   const price = active ? active.userData.price : (meta ? meta.price : 0);
   const name = active ? active.userData.name : (meta ? meta.name : ('Plot #' + plotId));
-  return { planet, active, meta, price, name, refund: Math.round(price * SELL_REFUND_RATE) };
+  const landValue = plotLandValue(plotId);
+  return { planet, active, meta, price, name, landValue, refund: Math.round(landValue * SELL_REFUND_RATE) };
 }
 
 function sellPlotCore(plotId) {
   if (!CURRENT_USER || !gameInitialized) { showToast('Enter the world first', false); return false; }
   if (!STATE.owned.has(plotId)) { showToast("You don't own this plot", false); return false; }
-  const types = BUSINESS_REGISTRY.get(plotId) || [];
-  if (types.length) {
-    showToast('Demolish all businesses on this plot first', false);
-    return false;
-  }
   const info = plotSaleInfo(plotId);
+  // v1.26 — developed land sells at its LAND VALUE; the businesses on
+  // it are demolished with the sale (the buyer gets the land + roads).
+  if (info.active) {
+    for (const entry of info.active.userData.businesses || []) {
+      try { disposeBusinessMesh(entry.mesh); } catch (e) {}
+    }
+    info.active.userData.businesses = [];
+  }
+  BUSINESS_REGISTRY.delete(plotId);
+  BIZ_POS.delete(plotId);
+  BIZ_META.delete(plotId);
+  STATE.rented.delete(plotId);
+  STATE.multiSelect.delete(plotId);
   STATE.money += info.refund;
   STATE.owned.delete(plotId);
   // Free the global claim — the plot is open land again, buyable by anyone
@@ -10320,7 +10632,6 @@ function sellPlotCore(plotId) {
     p.userData.owned = false;
     p.userData.ownedByOther = false;
     p.userData.ownerName = null;
-    p.userData.businesses = [];
     // Back to open land — normal terrain + standard outline
     setPlotColors(p, p.userData.baseColor, plotBaseOutline(p));
     const ci = STATE.claimedPlots.indexOf(p);
@@ -10336,14 +10647,18 @@ function sellPlotCore(plotId) {
 window.sellSelectedPlot = function() {
   const p = STATE.selectedPlot;
   if (!p || !p.userData.owned) return;
-  const refund = Math.round(p.userData.price * SELL_REFUND_RATE);
-  if (!confirm(`Sell ${p.userData.name} for $${refund.toLocaleString()}? It becomes unclaimed land anyone can buy.`)) return;
-  sellPlotCore(p.userData.id);
+  const info = plotSaleInfo(p.userData.id);
+  const nb = (BUSINESS_REGISTRY.get(p.userData.id) || []).length;
+  const warn = nb ? ` Its ${nb} business${nb > 1 ? 'es' : ''} will be demolished with the sale.` : '';
+  if (!confirm(`Sell ${p.userData.name} for $${info.refund.toLocaleString()} (50% of land value)?${warn} It becomes unclaimed land anyone can buy.`)) return;
+  if (sellPlotCore(p.userData.id)) closePlotModal();
 };
 
 window.sellPlotById = function(plotId) {
   const info = plotSaleInfo(plotId);
-  if (!confirm(`Sell ${info.name} (${info.planet.icon} ${info.planet.name}) for $${info.refund.toLocaleString()}? It becomes unclaimed land anyone can buy.`)) return;
+  const nb = (BUSINESS_REGISTRY.get(plotId) || []).length;
+  const warn = nb ? ` Its ${nb} business${nb > 1 ? 'es' : ''} will be demolished with the sale.` : '';
+  if (!confirm(`Sell ${info.name} (${info.planet.icon} ${info.planet.name}) for $${info.refund.toLocaleString()} (50% of land value)?${warn} It becomes unclaimed land anyone can buy.`)) return;
   if (sellPlotCore(plotId)) renderMyPlotsPanel();
 };
 
@@ -10357,17 +10672,17 @@ window.closeMyPlots = function() {
 
 function renderMyPlotsPanel() {
   const card = document.getElementById('myplots-card');
-  const inGame = !document.getElementById('game').classList.contains('hidden');
   if (!STATE.owned.size) {
     card.innerHTML = `
-      <span class="badge available">🗺 my land</span>
+      <span class="badge available">🗺 property</span>
       <h2>Your Holdings</h2>
-      <div class="desc">You don't own any plots yet. Click any unclaimed parcel in the world to buy it — your first plot on each planet can go anywhere.</div>
+      <div class="desc">You don't own any plots yet. Click any unclaimed parcel in the world to buy it — your first plot on each planet can go anywhere. Every plot can be rented out for passive income, and development raises its grade, rent and resale value.</div>
       <div class="actions"><button class="btn" onclick="closeMyPlots()">Close</button></div>
     `;
     return;
   }
   const ids = [...STATE.owned].sort((a, b) => a - b);
+  let totalLandValue = 0, totalRent = 0;
   const rows = ids.map(id => {
     const info = plotSaleInfo(id);
     const types = BUSINESS_REGISTRY.get(id) || [];
@@ -10378,33 +10693,34 @@ function renderMyPlotsPanel() {
       const prod = plotProductionInfo(id);
       if (prod) income += bt.rate * prod.areaMultiplier * regionBonusById(bt.id, prod.region);
     }
+    const gi = plotGradeInfo(id);
+    const rented = STATE.rented.has(id);
+    const rate = plotRentRate(id);
+    totalLandValue += info.landValue;
+    if (rented) totalRent += rate;
     const bizLabel = types.length
       ? `${types.length} business${types.length > 1 ? 'es' : ''} · +${income.toFixed(1)}/s`
-      : 'no businesses — build ready';
-    const canSell = types.length === 0;
-    const action = canSell
-      ? `<button class="btn demolish" style="padding:9px 14px" onclick="sellPlotById(${id})">Sell +$${info.refund.toLocaleString()}</button>`
-      : `<button class="btn demolish" style="padding:9px 14px" disabled title="Demolish all businesses on this plot first">Sell</button>`;
+      : 'empty land — build or rent';
     return `
       <div class="myplot-row">
         <div class="planet-icon">${info.planet.icon}</div>
         <div class="planet-info">
-          <div class="planet-name" style="font-size:14px">${info.name}</div>
-          <div class="planet-desc">${bizLabel}</div>
+          <div class="planet-name" style="font-size:14px">${info.name}<span class="grade-chip" style="color:${gi.tier.color}">${gi.tier.g}</span></div>
+          <div class="planet-desc">${bizLabel} · land value <b style="color:#f2c14e">$${info.landValue.toLocaleString()}</b>${rented ? ' · <b style="color:#7fffd4">rented</b>' : ''}</div>
         </div>
-        <div class="planet-action">${action}</div>
+        <div class="planet-action" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+          <button class="wk-btn" style="${rented ? 'color:#7fffd4;border-color:rgba(127,255,212,.5)' : ''}" onclick="toggleRentPlot(${id})" title="Rent this plot out — tenants pay by the minute, scaled by its grade">${rented ? 'RENTED $' + rate.toLocaleString() + '/min' : 'RENT OUT'}</button>
+          <button class="btn demolish" style="padding:9px 14px" onclick="sellPlotById(${id})">Sell +$${info.refund.toLocaleString()}</button>
+        </div>
       </div>
     `;
   }).join('');
-  const totalRefund = ids.reduce((s, id) => {
-    const types = BUSINESS_REGISTRY.get(id) || [];
-    return s + (types.length ? 0 : Math.round(plotSaleInfo(id).price * SELL_REFUND_RATE));
-  }, 0);
+  const nPlanets = [...new Set(ids.map(id => planetOfPlotId(id).id))].length;
   card.innerHTML = `
-    <span class="badge available">🗺 my land</span>
+    <span class="badge available">🗺 property</span>
     <h2>Your Holdings</h2>
-    <div class="coords">${ids.length} PLOT${ids.length > 1 ? 'S' : ''} ACROSS ${[...new Set(ids.map(id => planetOfPlotId(id).id))].length} PLANET${[...new Set(ids.map(id => planetOfPlotId(id).id))].length > 1 ? 'S' : ''}</div>
-    <div class="desc" style="margin-bottom:14px">Selling refunds <b>${Math.round(SELL_REFUND_RATE * 100)}% of the plot's value</b> and frees the land for anyone to claim. Demolish a plot's businesses before selling it.</div>
+    <div class="coords">${ids.length} PLOT${ids.length > 1 ? 'S' : ''} ACROSS ${nPlanets} PLANET${nPlanets > 1 ? 'S' : ''}</div>
+    <div class="desc" style="margin-bottom:14px">Portfolio: <b style="color:#f2c14e">$${totalLandValue.toLocaleString()}</b> in land${totalRent ? ` · <b style="color:#7fffd4">$${totalRent.toLocaleString()}/min</b> rent collected` : ''}. Renting pays by the minute; businesses, crews, roads and garrisons raise every plot's grade, rent and resale value. Selling refunds <b>50% of land value</b> and frees the claim.</div>
     <div class="panel-scroll">${rows}</div>
     <div class="actions"><button class="btn" onclick="closeMyPlots()">Close</button></div>
   `;
@@ -10530,38 +10846,42 @@ window.toggleMultiSell = function() {
 window.multiSellAll = function() {
   if (!STATE.multiSelect.size) return;
   const ids = [...STATE.multiSelect];
-  // Validate all plots are still owned by user and have no businesses
+  // Validate all plots are still owned by user
   for (const id of ids) {
     const p = ACTIVE_PLOT_BY_ID.get(id);
     if (!p || !p.userData.owned) {
       showToast('⚠️ Your selection changed — a plot is no longer yours. Review and try again.', false);
       return;
     }
-    const types = (typeof BUSINESS_REGISTRY !== 'undefined' && BUSINESS_REGISTRY.get(id)) || [];
-    if (types.length) {
-      showToast('⚠️ Demolish all businesses on selected plots first', false);
-      return;
-    }
   }
-  // Compute total refund (50% of plot price each, mirroring single-sell logic)
-  let totalRefund = 0;
+  // v1.26 — refunds are 50% of LAND VALUE (base + development), matching
+  // single-sell; businesses on sold plots are demolished with the sale.
+  let totalRefund = 0, totalBiz = 0;
   for (const id of ids) {
-    const p = ACTIVE_PLOT_BY_ID.get(id);
-    totalRefund += Math.round(p.userData.price * (typeof SELL_REFUND_RATE !== 'undefined' ? SELL_REFUND_RATE : 0.5));
+    totalRefund += plotSaleInfo(id).refund;
+    totalBiz += (BUSINESS_REGISTRY.get(id) || []).length;
   }
   // Confirm with user
   const pluralS = ids.length > 1 ? 's' : '';
-  if (!confirm(`Sell ${ids.length} plot${pluralS} for $${totalRefund.toLocaleString()} total? They become unclaimed land anyone can buy.`)) return;
+  const warn = totalBiz ? ` Businesses on them (${totalBiz} total) will be demolished with the sale.` : '';
+  if (!confirm(`Sell ${ids.length} plot${pluralS} for $${totalRefund.toLocaleString()} total (50% of land value)?${warn} They become unclaimed land anyone can buy.`)) return;
   // All checks passed — sell them all in one transaction
   const claims = getClaims();
   for (const id of ids) {
     const p = ACTIVE_PLOT_BY_ID.get(id);
+    for (const entry of p.userData.businesses || []) {
+      try { disposeBusinessMesh(entry.mesh); } catch (e) {}
+    }
     p.userData.owned = false;
     p.userData.ownedByOther = false;
     p.userData.ownerName = null;
     p.userData.businesses = [];
     p.userData._selected = false;
     STATE.owned.delete(id);
+    STATE.rented.delete(id);
+    BUSINESS_REGISTRY.delete(id);
+    BIZ_POS.delete(id);
+    BIZ_META.delete(id);
     delete claims[id];
     setPlotColors(p, p.userData.baseColor, plotBaseOutline(p));
     const ci = STATE.claimedPlots.indexOf(p);
@@ -13225,6 +13545,12 @@ function updateHUD() {
     const ws = workerStats();
     wageEl.textContent = ws.wagePerMin > 0 ? ('$' + Math.round(ws.wagePerMin).toLocaleString() + '/min') : '$0/min';
   }
+  // v1.26 — property rent readout (rented-out plots)
+  const rentEl = document.getElementById('rent-rate');
+  if (rentEl) {
+    const rt = rentPerMinTotal();
+    rentEl.textContent = rt > 0 ? ('$' + rt.toLocaleString() + '/min') : '$0/min';
+  }
   try { WorldStats.paint(); } catch (e) {}
   const armyEl = document.getElementById('army-count');
   if (armyEl) {
@@ -13309,6 +13635,20 @@ function tickProduction() {
       const _due = Math.min(Math.floor(STATE.wageDebt), STATE.money);
       STATE.money -= _due;
       STATE.wageDebt -= _due;
+    }
+  }
+  // v1.26 — property rent: rented-out plots pay by the minute. Accrues
+  // fractionally like wages, lands in the treasury AND the GDP ledger
+  // (rent counts toward your Company GDP 24H and the world economy).
+  const _rent = rentPerMinTotal();
+  if (_rent > 0) {
+    STATE.rentDebt = (STATE.rentDebt || 0) + (_rent / 60) * dt;
+    if (STATE.rentDebt >= 1) {
+      const _got = Math.floor(STATE.rentDebt);
+      STATE.money += _got;
+      STATE.rentDebt -= _got;
+      recordIncome(_got);
+      updateHUD();
     }
   }
   STATE.lastProductionTime = now;
