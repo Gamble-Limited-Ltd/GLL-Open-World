@@ -713,6 +713,85 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 .road-hint{font-size:10px;color:#8fa9b2;margin-top:4px;line-height:1.55}
 .road-hint b{color:#cfe6dc}
 
+/* ============ v1.25 — ECONOMY UPDATE (ticker, carts, cooking, workers, stocks, world stats) ============ */
+/* Market ticker strip — bottom of the sector view */
+.tick-strip{position:absolute;left:0;right:0;bottom:0;height:24px;z-index:20;overflow:hidden;cursor:pointer;
+  background:linear-gradient(90deg,rgba(7,18,30,.92),rgba(9,24,40,.88),rgba(7,18,30,.92));
+  border-top:1px solid rgba(64,116,140,.45);display:flex;align-items:center}
+.tick-inner{display:flex;align-items:center;white-space:nowrap;will-change:transform;font-family:'Orbitron','Rajdhani',sans-serif}
+.tick-item{display:inline-flex;align-items:center;gap:4px;margin:0 14px;font-size:10.5px;letter-spacing:.8px;color:#9bb4bd}
+.tick-item b{color:#d7e7ee;font-weight:600}
+.tick-item .tk-price{color:#5fe8ff;font-family:'Orbitron',sans-serif;font-size:10px}
+.tick-item .up{color:#7fffd4;font-style:normal;font-size:9px}
+.tick-item .down{color:#ff8080;font-style:normal;font-size:9px}
+.tick-item .flat{color:#8fa9b2;font-style:normal;font-size:9px}
+.tick-label{display:inline-flex;align-items:center;margin:0 10px 0 0;padding:1px 8px;border:1px solid #6b5320;border-radius:3px;
+  background:rgba(245,204,116,.1);color:#f5cc74;font-size:9px;letter-spacing:2px;font-family:'Orbitron',sans-serif}
+@media (max-width:860px){.tick-strip{display:none}}
+
+/* World Economy panel (COMMS side) */
+.sf-worldecon .sf-res{font-size:11px}
+.sf-worldecon .sf-res b{font-size:11.5px}
+
+/* Cuisine picker (food-cart build flow) */
+.cui-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin:10px 0 4px}
+.cui-opt{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid #2c4a55;border-radius:8px;
+  background:rgba(20,50,60,.35);color:#cbd7dc;font-family:Arial,sans-serif;cursor:pointer;transition:all .15s;text-align:left}
+.cui-opt:hover{border-color:#f5cc74;background:rgba(245,204,116,.1)}
+.cui-opt .cui-ico{font-size:20px}
+.cui-opt b{display:block;font-size:12.5px;color:#e8eef0}
+.cui-opt span{font-size:10px;color:#8fa9b2}
+
+/* Cooking minigame */
+.cook-bar-wrap{position:relative;height:34px;margin:14px 0 8px;border:1px solid #2c4a55;border-radius:8px;
+  background:rgba(8,20,32,.9);overflow:hidden}
+.cook-zone{position:absolute;top:0;bottom:0;background:rgba(127,255,212,.14);border-left:1px solid rgba(127,255,212,.35);border-right:1px solid rgba(127,255,212,.35)}
+.cook-zone-gold{position:absolute;top:0;bottom:0;background:rgba(245,204,116,.2)}
+.cook-marker{position:absolute;top:-2px;bottom:-2px;width:4px;background:#ff9a2e;border-radius:2px;
+  box-shadow:0 0 8px rgba(255,154,46,.9)}
+.cook-btn{width:100%;padding:12px;font-size:16px;font-weight:bold;letter-spacing:2px;margin-top:8px;border:none;border-radius:9px;
+  background:linear-gradient(180deg,#f7d98d,#e0b455);color:#221a05;cursor:pointer;font-family:Arial,sans-serif}
+.cook-btn:hover{filter:brightness(1.08)}
+.cook-btn:disabled{opacity:.45;cursor:default;filter:none}
+.cook-result{min-height:22px;text-align:center;font-size:14px;font-weight:bold;margin-top:10px;font-family:Arial,sans-serif}
+.cook-sub{font-size:11px;color:#8fa9b2;line-height:1.6}
+
+/* Worker row on business cards */
+.wk-row{display:flex;align-items:center;gap:6px;margin-top:5px;padding:4px 6px;border:1px dashed rgba(155,180,189,.28);
+  border-radius:6px;background:rgba(12,30,40,.35);font-size:10px;color:#9bb4bd;font-family:Arial,sans-serif;flex-wrap:wrap}
+.wk-row b{color:#d7e7ee}
+.wk-btn{border:1px solid #2c4a55;border-radius:4px;background:rgba(32,54,64,.9);color:#cfe6dc;font-size:10px;
+  padding:2px 8px;cursor:pointer;font-family:inherit}
+.wk-btn:hover{border-color:#f5cc74;color:#f5cc74}
+.wk-btn:disabled{opacity:.4;cursor:default}
+
+/* Stock Exchange table */
+.stk-row{display:flex;align-items:center;gap:8px;padding:7px 9px;border:1px solid #1a3340;border-radius:8px;
+  margin-bottom:6px;background:rgba(20,50,60,.25);font-family:Arial,sans-serif}
+.stk-ico{font-size:19px;width:26px;text-align:center}
+.stk-main{flex:1;min-width:0}
+.stk-name{font-size:12.5px;color:#e8eef0}
+.stk-name b{color:#f5cc74;font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:1px;margin-right:5px}
+.stk-meta{font-size:10px;color:#8fa9b2;margin-top:1px}
+.stk-price{font-family:'Orbitron',sans-serif;font-size:12px;color:#5fe8ff;min-width:64px;text-align:right}
+.stk-chg{font-size:10px;text-align:right;min-width:64px}
+.stk-chg.up{color:#7fffd4}
+.stk-chg.down{color:#ff8080}
+.stk-ctrl{display:flex;gap:5px;align-items:center;margin-top:5px}
+.stk-amt{width:72px;background:#0a1420;border:1px solid #2c4a55;border-radius:6px;color:#e8f4ff;
+  font-size:11px;padding:4px 6px;outline:none;font-family:Arial,sans-serif}
+.stk-buy,.stk-sell{flex:1;padding:5px 8px;font-size:11px;border-radius:6px;border:none;cursor:pointer;font-family:Arial,sans-serif;font-weight:bold}
+.stk-buy{background:rgba(95,232,255,.16);color:#5fe8ff;border:1px solid #2c6a7a}
+.stk-buy:hover{background:rgba(95,232,255,.3)}
+.stk-sell{background:rgba(245,204,116,.14);color:#f5cc74;border:1px solid #6b5320}
+.stk-sell:hover{background:rgba(245,204,116,.3)}
+.stk-buy:disabled,.stk-sell:disabled{opacity:.4;cursor:default}
+.stk-hold{font-size:10px;color:#9bb4bd}
+.stk-hold b{color:#d7e7ee}
+.stk-summary{display:flex;justify-content:space-between;font-size:11.5px;color:#cbd7dc;font-family:Arial,sans-serif;
+  padding:8px 10px;border:1px solid #2c4a55;border-radius:8px;background:rgba(10,26,38,.6);margin-bottom:10px}
+.stk-summary b{color:#f5cc74}
+
 /* What's New popup — scrollable body, capped height */
 #update-modal .plot-card{max-height:min(680px,90vh);display:flex;flex-direction:column;overflow:hidden}
 /* v1.21 — the plot modal (with its business build menu) must fit the
@@ -965,7 +1044,7 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 .panel-scroll .planet-row:last-child,.panel-scroll .myplot-row:last-child{margin-bottom:0}
 
 /* — bottom center strip: controls + quality — */
-.sf-bottom{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:21;
+.sf-bottom{position:absolute;bottom:38px;left:50%;transform:translateX(-50%);z-index:21;
   display:flex;align-items:center;gap:16px;pointer-events:auto;
   background:linear-gradient(180deg, rgba(4,10,22,.55), rgba(4,10,22,.85));
   border:1px solid rgba(46,148,255,.4);border-radius:999px;padding:8px 18px;backdrop-filter:blur(7px);
@@ -1134,10 +1213,17 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
       <button class="sf-pill sf-pill-util" id="multibuy-btn" onclick="toggleMultiBuy()" title="Multi-Buy — click several plots, then buy them all at once (each must border your land)">✚ MULTI</button>
       <button class="sf-pill sf-pill-util" id="multisell-btn" onclick="toggleMultiSell()" title="Multi-Sell — click several of your plots, then sell them all at once (refunds 50% each)">✚ SELL</button>
       <button class="sf-pill sf-pill-util" id="gamble-btn" onclick="openGambling()" style="display:none" title="Play at your casinos">🎰 CASINO</button>
+      <button class="sf-pill sf-pill-util" id="cook-btn" onclick="openCookQuick()" style="display:none" title="Street Kitchen — cook at your food carts for bonus credits">🍳 KITCHEN</button>
     </nav>
 
     <!-- ══ RIGHT — COMMS (commander) + NAVIGATION (resources) ══ -->
     <aside class="sf-right">
+      <div class="sf-panel sf-worldecon">
+        <div class="sf-panel-head">WORLD ECONOMY</div>
+        <div class="sf-res" title="Commanders online right now across every world"><span>ONLINE:</span><b id="we-online">—</b></div>
+        <div class="sf-res" title="Total credits earned by every commander over the last 24 hours"><span>GDP 24H:</span><b id="we-gdp">—</b></div>
+        <div class="sf-res" title="Combined net worth of every commander in the world"><span>NET WORTH:</span><b id="we-net">—</b></div>
+      </div>
       <div class="sf-panel">
         <div class="sf-panel-head">COMMS</div>
         <div class="sf-row"><span>COMMANDER:</span><b id="sf-commander">VALKYRIE</b></div>
@@ -1148,8 +1234,11 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
       <div class="sf-panel">
         <div class="sf-panel-head">NAVIGATION</div>
         <div class="sf-res" title="Your budget"><span>CREDITS:</span><b id="money">$100,000</b></div>
+        <div class="sf-res sf-click" onclick="openMarketModal('stocks')" title="Value of your stock portfolio — click to open the Stock Exchange"><span>STOCKS:</span><b id="stocks-value">$0</b></div>
         <div class="sf-res sf-click" onclick="openMarketModal()" title="Value of materials in stock — click to open the Market"><span>ALLOYS:</span><b id="stock-value">$0</b></div>
+        <div class="sf-res" title="Your total net worth — credits + materials + stocks"><span>NET WORTH:</span><b id="networth-value">$0</b></div>
         <div class="sf-res" title="Plots of land you own on this world"><span>ENERGY:</span><b id="owned-count">0</b></div>
+        <div class="sf-res" title="Worker wages paid per minute across your whole empire"><span>WAGES:</span><b id="wage-rate">$0/min</b></div>
         <div class="sf-res" title="Your troops — each Barracks houses 500. Deploy them to take other commanders' plots."><span>ORE:</span><b id="army-count">0</b></div>
         <div class="sf-res-bar"><i id="zoom-fill"></i></div>
         <div class="sf-res-sub"><span>ALTITUDE</span><b id="altitude">— km</b></div>
@@ -1166,6 +1255,11 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
         <div class="sf-radar-time"><b id="sf-clock">00:00:00</b><span>UTC</span></div>
       </div>
     </aside>
+
+    <!-- ══ BOTTOM — market ticker (v1.25) ══ -->
+    <div class="tick-strip" id="tick-strip" title="Live market prices — click to open the Market" onclick="openMarketModal('stocks')">
+      <div class="tick-inner" id="tick-inner"></div>
+    </div>
 
     <!-- ══ BOTTOM CENTER — controls + quality ══ -->
     <div class="sf-bottom">
@@ -1205,6 +1299,20 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 
   <div class="plot-modal" id="gamble-modal">
     <div class="plot-card gamble-card" id="gamble-card">
+      <!-- filled dynamically -->
+    </div>
+  </div>
+
+  <!-- v1.25 — cuisine picker (food-cart build flow) -->
+  <div class="plot-modal" id="cuisine-modal">
+    <div class="plot-card" id="cuisine-card" style="max-width:430px">
+      <!-- filled dynamically -->
+    </div>
+  </div>
+
+  <!-- v1.25 — street kitchen cooking minigame -->
+  <div class="plot-modal" id="cook-modal">
+    <div class="plot-card" id="cook-card" style="max-width:430px">
       <!-- filled dynamically -->
     </div>
   </div>
@@ -1520,7 +1628,12 @@ const STATE = {
   // players (see the Roads module). roadMode/roadErase are session-only.
   roads: {},
   roadMode: false,
-  roadErase: false
+  roadErase: false,
+  // WORKERS + STOCKS + WORLD STATS (v1.25)
+  wageDebt: 0,           // session-only fractional wage accumulator
+  stocks: {},            // { ticker: shares held }
+  stocksAvg: {},         // { ticker: average cost per share }
+  incomeLog: []          // [{ t, amt }] income events, rolling 24h window
 };
 
 const EARTH_RADIUS = STATE.radius;
@@ -1603,6 +1716,22 @@ const ACTIVE_PLOT_BY_ID = new Map();
 // saves, reloads and interplanetary travel. null entries (and older
 // saves without positions) fall back to the classic grid layout.
 const BIZ_POS = new Map();
+// BIZ_META (v1.25) — plotId → [ { cuisine, workers, cookAt } | null ],
+// index-aligned with BUSINESS_REGISTRY / BIZ_POS. Carries the per-
+// building state the economy update adds: food-cart cuisine, hired
+// worker count and each cart's last cook timestamp.
+const BIZ_META = new Map();
+function bizMetaOf(plotId, idx) {
+  const arr = BIZ_META.get(plotId);
+  return (arr && arr[idx]) ? arr[idx] : null;
+}
+function ensureBizMeta(plotId, idx, init) {
+  let arr = BIZ_META.get(plotId);
+  if (!arr) { arr = []; BIZ_META.set(plotId, arr); }
+  while (arr.length < idx) arr.push(null);
+  if (!arr[idx] || typeof arr[idx] !== 'object') arr[idx] = init || {};
+  return arr[idx];
+}
 
 // ====================================================================
 // PERSISTENCE — save/load to localStorage
@@ -2786,7 +2915,11 @@ const Wars = (() => {
             atkSave.businesses = atkSave.businesses || [];
             for (const b of cap) {
               if (!atkSave.businesses.some(x => x.plotId === b.plotId && x.type === b.type)) {
-                atkSave.businesses.push({ plotId: b.plotId, type: b.type, ...(typeof b.u === 'number' && typeof b.w === 'number' ? { u: b.u, w: b.w } : {}) });
+                // v1.25 — cuisine / crew / cook clock ride along with the deed
+                atkSave.businesses.push({ plotId: b.plotId, type: b.type,
+                  ...(typeof b.u === 'number' && typeof b.w === 'number' ? { u: b.u, w: b.w } : {}),
+                  ...(typeof b.cz === 'string' ? { cz: b.cz } : {}),
+                  ...(b.wk ? { wk: b.wk } : {}), ...(b.ck ? { ck: b.ck } : {}) });
               }
             }
             // saveGame serializes businesses from this registry — keep the
@@ -2796,6 +2929,10 @@ const Wars = (() => {
               const capValid = cap.filter(b => getBusinessType(b.type));
               BUSINESS_REGISTRY.set(m.plotId, capValid.map(b => b.type));
               BIZ_POS.set(m.plotId, capValid.map(b => (typeof b.u === 'number' && typeof b.w === 'number') ? { u: b.u, w: b.w } : null));
+              BIZ_META.set(m.plotId, capValid.map(b => ({
+                cuisine: (typeof b.cz === 'string') ? b.cz : null,
+                workers: Math.max(0, Math.min(WORKER_MAX, Math.floor(+b.wk || 0))),
+                cookAt: +b.ck || 0 })));
               STATE.owned.add(m.plotId);
             }
           }
@@ -2848,6 +2985,10 @@ const Wars = (() => {
       p.userData.businesses = [];
       BUSINESS_REGISTRY.set(m.plotId, capRecs.map(b => b.type));
       BIZ_POS.set(m.plotId, capRecs.map(b => (typeof b.u === 'number' && typeof b.w === 'number') ? { u: b.u, w: b.w } : null));
+      BIZ_META.set(m.plotId, capRecs.map(b => ({
+        cuisine: (typeof b.cz === 'string') ? b.cz : null,
+        workers: Math.max(0, Math.min(WORKER_MAX, Math.floor(+b.wk || 0))),
+        cookAt: +b.ck || 0 })));
       capRecs.forEach((b, idx) => addBusinessToPlot(p, getBusinessType(b.type), idx));
       if (!p.userData.businesses.length) {
         setOwnedPlotLook(p, true);
@@ -3365,6 +3506,7 @@ function applyCloudWorldUpdates() {
       STATE.owned.delete(p.userData.id);
       BUSINESS_REGISTRY.delete(p.userData.id);   // those businesses now belong to the conqueror
       BIZ_POS.delete(p.userData.id);
+      BIZ_META.delete(p.userData.id);   // v1.25 — their workers/cuisine go with the land
       STATE.multiSelect.delete(p.userData.id);   // and it can't stay in a multi-buy selection
       // Remove my businesses from it (meshes + state)
       for (const entry of p.userData.businesses || []) {
@@ -3682,12 +3824,20 @@ function saveGame() {
       const out = [];
       for (const [plotId, types] of BUSINESS_REGISTRY) {
         const pos = BIZ_POS.get(plotId) || [];
+        const meta = BIZ_META.get(plotId) || [];
         for (let i = 0; i < types.length; i++) {
           const rec = { plotId, type: types[i] };
           const pp = pos[i];
           if (pp && typeof pp.u === 'number' && isFinite(pp.u) && typeof pp.w === 'number' && isFinite(pp.w)) {
             rec.u = +pp.u.toFixed(4);
             rec.w = +pp.w.toFixed(4);
+          }
+          // v1.25 — per-building economy meta (cuisine / crew / cook clock)
+          const mm = meta[i];
+          if (mm) {
+            if (mm.cuisine) rec.cz = mm.cuisine;
+            if (mm.workers) rec.wk = mm.workers;
+            if (mm.cookAt) rec.ck = mm.cookAt;
           }
           out.push(rec);
         }
@@ -3704,6 +3854,10 @@ function saveGame() {
     marketRefundedBuys: Array.isArray(STATE.marketRefundedBuys) ? STATE.marketRefundedBuys.slice() : [],
     // Roads (v1.24) — my paved tiles per planet: { planetId: [[latIdx, lonIdx], ...] }
     roads: roadsForSave(),
+    // Economy update (v1.25) — stock portfolio + rolling income ledger
+    stocks: { ...(STATE.stocks || {}) },
+    stocksAvg: { ...(STATE.stocksAvg || {}) },
+    incomeLog: Array.isArray(STATE.incomeLog) ? STATE.incomeLog.slice(-300) : [],
     lastProductionTime: 0  // don't save; reset on load
   };
   try {
@@ -3762,6 +3916,22 @@ function loadGame(username) {
       (typeof b.u === 'number' && isFinite(b.u) && typeof b.w === 'number' && isFinite(b.w))
         ? { u: b.u, w: b.w } : null);
   }
+  // Economy update (v1.25): restore per-building meta (cuisine / crew /
+  // cook clock), index-aligned the same way
+  BIZ_META.clear();
+  for (const b of (save.businesses || [])) {
+    if (!BIZ_META.has(b.plotId)) BIZ_META.set(b.plotId, []);
+    BIZ_META.get(b.plotId).push({
+      cuisine: (typeof b.cz === 'string') ? b.cz : null,
+      workers: Math.max(0, Math.min(WORKER_MAX, Math.floor(+b.wk || 0))),
+      cookAt: +b.ck || 0,
+    });
+  }
+  // Economy update (v1.25): stocks + income ledger (defaults keep old saves valid)
+  STATE.stocks = (save.stocks && typeof save.stocks === 'object') ? save.stocks : {};
+  STATE.stocksAvg = (save.stocksAvg && typeof save.stocksAvg === 'object') ? save.stocksAvg : {};
+  STATE.incomeLog = Array.isArray(save.incomeLog) ? save.incomeLog.filter(e => e && isFinite(e.t) && isFinite(e.amt)).slice(-300) : [];
+  STATE.wageDebt = 0;
 
   // Ensure all materials have entries
   for (const m of MATERIALS) {
@@ -3831,13 +4001,20 @@ function getBusinessOffset(index, total, plotSizeA) {
 // Position priority (v1.17 free placement): the clicked spot (customPos) →
 // the saved spot (BIZ_POS, index-aligned with the registry) → the classic
 // auto-grid layout for legacy saves and captures without positions.
-function addBusinessToPlot(plot, bt, index, customPos) {
+function addBusinessToPlot(plot, bt, index, customPos, opts) {
   const total = (plot.userData.businesses || []).length + 1;
   // v1.21: buildings sized for the smaller grid-v2 parcels (plots are
   // ~0.61× their old linear size; buildings follow, slightly tighter
   // still so the little plots read clearly)
   const bizScale = Math.max(0.0075, Math.min(0.019, plot.userData.areaMultiplier * 0.0095));
-  const bizMesh = buildBusinessMesh(bt, bizScale);
+  const _opts = opts || {};
+  // v1.25 — cuisine: explicit choice → the stored meta (reload/capture)
+  let _cuisine = _opts.cuisine || null;
+  if (!_cuisine && bt.id === 'foodcart') {
+    const _m = bizMetaOf(plot.userData.id, index);
+    if (_m && _m.cuisine) _cuisine = _m.cuisine;
+  }
+  const bizMesh = buildBusinessMesh(bt, bizScale, _cuisine);
 
   const stored = BIZ_POS.get(plot.userData.id);
   const saved = stored ? stored[index] : null;
@@ -3862,9 +4039,15 @@ function addBusinessToPlot(plot, bt, index, customPos) {
   bizMesh.matrixAutoUpdate = false;
 
   const entry = { type: bt.id, builtAt: Date.now(), mesh: bizMesh, pos: { u: offset.u, w: offset.w } };
+  if (bt.id === 'foodcart' && _cuisine) entry.cuisine = _cuisine;
   if (!plot.userData.businesses) plot.userData.businesses = [];
   plot.userData.businesses.push(entry);
   earth.add(bizMesh);
+  // v1.25 — per-building meta (cuisine / workers / cook cooldown),
+  // index-aligned with this building's slot (the `index` param — the
+  // registry may already be populated on the reload/capture paths)
+  ensureBizMeta(plot.userData.id, index,
+    bt.id === 'foodcart' ? { cuisine: _cuisine || null, workers: 0, cookAt: 0 } : { cuisine: null, workers: 0, cookAt: 0 });
 
   // Recolor plot to the FIRST business color (primary business)
   if (plot.userData.businesses.length === 1) {
@@ -3988,7 +4171,7 @@ function hidePlaceGhost() {
 // --- placement session ---
 function beginPlacement(opts) {
   if (STATE.roadMode) Roads.exit(true);   // v1.24 — the two click-modes are exclusive
-  STATE.placing = { plotId: opts.plotId, type: opts.type || null, mode: opts.mode, index: (opts.index === undefined ? null : opts.index) };
+  STATE.placing = { plotId: opts.plotId, type: opts.type || null, mode: opts.mode, index: (opts.index === undefined ? null : opts.index), cuisine: opts.cuisine || null };
   setPlaceGhostColor(opts.mode === 'move' ? 0x39e0ff : 0xf5cc74);
   // Too far out to see the plots? Glide in so the placement click can land
   const dist = camera.position.distanceTo(controls.target);
@@ -4087,7 +4270,7 @@ function handlePlacementClick(hit) {
   if (req) for (const id in req) {
     STATE.inventory[id] = Math.max(0, (STATE.inventory[id] || 0) - req[id]);
   }
-  addBusinessToPlot(plot, bt, existing.length, uw);
+  addBusinessToPlot(plot, bt, existing.length, uw, { cuisine: placing.cuisine });
   const _reg = BUSINESS_REGISTRY.get(plot.userData.id) || [];
   _reg.push(bt.id);
   BUSINESS_REGISTRY.set(plot.userData.id, _reg);
@@ -5353,8 +5536,15 @@ window.WarFx = WarFx;
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.24';
+const GAME_VERSION = 'v1.25';
 const RELEASE_NOTES = [
+  { v: 'v1.25', items: [
+    '🌭 <b>Food Carts & the Street Kitchen</b> — a brand-new starter business at $5,000: pick one of seven cuisines (hot dog, burger, pizza, taco, sushi, donut, coffee), park it anywhere on your land, and hit 🍳 COOK to play the timing game — stop the marker in the gold for a PERFECT batch worth up to 3× payout. Carts grow 🌾 Food slowly; cooking turns it into credits at better-than-market rates. Every cart you own raises the payout.',
+    '👷 <b>Hire workers</b> — every business card now has a crew: hire up to 5 workers for +35% output each, paid by the minute straight out of your credits (watch the new WAGES readout). Fully crewed buildings produce up to +175% — and crews ride along when a plot is conquered.',
+    '📈 <b>The Stock Exchange</b> — a third tab in the Market: ten listed corporations from Azure Farms to Nova Aerospace, their shares trading around the clock on prices locked to the world clock (the same tape for every commander). Buy the dips, sell the peaks, track your portfolio and P/L live.',
+    '💹 <b>Live market ticker</b> — a stock-tape strip now crawls along the bottom of your sector view: every material code (FOD, TIM, STN, ORE…) and all ten share prices, sweeping past with live trend arrows. Click it to jump straight into the Market.',
+    '🌍 <b>World Economy panel</b> — see the whole economy breathe: how many commanders are ONLINE right now, the world\'s GDP over the last 24 hours, and the combined NET WORTH of every player — plus your own full net worth (credits + materials + stocks) in the NAVIGATION readout.'
+  ]},
   { v: 'v1.24', items: [
     '🛣 <b>Roads!</b> — pave your own plots with real roads. Open any plot you own and hit Build Roads: click tile by tile, or click once and again further away — the whole line between them paves itself. Click an existing road to branch off it, and toggle Erase in the mode bar to remove your tiles. $150 + 1 Stone per tile.',
     '🌍 <b>Roads connect across borders</b> — every tile snaps to the same world-wide road grid, so a road you pave to the edge of your plot automatically joins up with roads other players pave in the plots next door. Straight runs, corners, T-junctions and crossroads all form by themselves, whoever owns the land.',
@@ -5631,6 +5821,8 @@ window.loginSubmit = function() {
   try { Wars.onLogin(); } catch (e) {}   // start war-march polling (arrivals, warnings)
   try { PlayerMarket.onLogin(); } catch (e) {}   // start player-market polling (listings, payouts)
   try { Roads.onLogin(); } catch (e) {}   // start road-ledger polling (v1.24 — everyone's tiles)
+  try { WorldStats.onLogin(); } catch (e) {}   // v1.25 — world-economy presence polling
+  try { Ticker.start(); } catch (e) {}   // v1.25 — live market ticker strip
   document.getElementById('login-screen').classList.add('hide');
   setTimeout(() => {
     document.getElementById('login-screen').style.display = 'none';
@@ -5840,40 +6032,118 @@ window.addEventListener('beforeunload', () => {
 // v1.23 — the catalog grew from 11 to 27 materials: a deep production
 // chain from Timber up to Luxuries. Everything civilian is tradable on
 // the Player Market; military stock (troops / ships / planes) never is.
+// v1.25 — every material carries a 3-letter ticker CODE for the new
+// live market strip along the bottom of the sector view.
 const MATERIALS = [
   // — early industry —
-  { id: 'food',     name: 'Food',          icon: '🌾', basePrice: 50,   color: 0x7cb342, producedBy: 'farm' },
-  { id: 'wood',     name: 'Timber',        icon: '🪵', basePrice: 90,   color: 0x8d6e4f, producedBy: 'lumbercamp' },
-  { id: 'stone',    name: 'Stone',         icon: '🧱', basePrice: 110,  color: 0x9e9e9e, producedBy: 'quarry' },
-  { id: 'ore',      name: 'Ore',           icon: '⛏️', basePrice: 120,  color: 0x8d6e63, producedBy: 'mine' },
-  { id: 'seafood',  name: 'Seafood',       icon: '🐟', basePrice: 220,  color: 0x4fc3f7, producedBy: 'fishery' },
+  { id: 'food',     name: 'Food',          icon: '🌾', code: 'FOD', basePrice: 50,   color: 0x7cb342, producedBy: 'farm' },
+  { id: 'wood',     name: 'Timber',        icon: '🪵', code: 'TIM', basePrice: 90,   color: 0x8d6e4f, producedBy: 'lumbercamp' },
+  { id: 'stone',    name: 'Stone',         icon: '🧱', code: 'STN', basePrice: 110,  color: 0x9e9e9e, producedBy: 'quarry' },
+  { id: 'ore',      name: 'Ore',           icon: '⛏️', code: 'ORE', basePrice: 120,  color: 0x8d6e63, producedBy: 'mine' },
+  { id: 'seafood',  name: 'Seafood',       icon: '🐟', code: 'SEA', basePrice: 220,  color: 0x4fc3f7, producedBy: 'fishery' },
   // — manufacturing —
-  { id: 'goods',    name: 'Goods',         icon: '📦', basePrice: 400,  color: 0x546e7a, producedBy: 'factory' },
-  { id: 'glass',    name: 'Glass',         icon: '🪟', basePrice: 500,  color: 0x81d4fa, producedBy: 'glassworks' },
-  { id: 'steel',    name: 'Steel',         icon: '🔩', basePrice: 550,  color: 0x78909c, producedBy: 'steelmill' },
-  { id: 'tourism',  name: 'Tourism',       icon: '✈️', basePrice: 600,  color: 0x4dd0e1, producedBy: 'resort' },
-  { id: 'oil',      name: 'Oil',           icon: '🛢️', basePrice: 900,  color: 0x37474f, producedBy: 'oilrig' },
+  { id: 'goods',    name: 'Goods',         icon: '📦', code: 'GDS', basePrice: 400,  color: 0x546e7a, producedBy: 'factory' },
+  { id: 'glass',    name: 'Glass',         icon: '🪟', code: 'GLS', basePrice: 500,  color: 0x81d4fa, producedBy: 'glassworks' },
+  { id: 'steel',    name: 'Steel',         icon: '🔩', code: 'STL', basePrice: 550,  color: 0x78909c, producedBy: 'steelmill' },
+  { id: 'tourism',  name: 'Tourism',       icon: '✈️', code: 'TRV', basePrice: 600,  color: 0x4dd0e1, producedBy: 'resort' },
+  { id: 'oil',      name: 'Oil',           icon: '🛢️', code: 'OIL', basePrice: 900,  color: 0x37474f, producedBy: 'oilrig' },
   // — advanced industry —
-  { id: 'chem',     name: 'Chemicals',     icon: '🧪', basePrice: 1000, color: 0x9ccc65, producedBy: 'chemplant' },
-  { id: 'plastic',  name: 'Plastic',       icon: '🥤', basePrice: 1300, color: 0xf06292, producedBy: 'plastics' },
-  { id: 'energy',   name: 'Energy',        icon: '⚡', basePrice: 1600, color: 0xffee58, producedBy: 'fusion' },
-  { id: 'hydrogen', name: 'Hydrogen',      icon: '🧊', basePrice: 2200, color: 0x90caf9, producedBy: 'fuelrefinery' },
-  { id: 'crystal',  name: 'Crystals',      icon: '🔮', basePrice: 2800, color: 0xce93d8, producedBy: 'crystalextractor' },
-  { id: 'fun',      name: 'Entertainment', icon: '🎰', basePrice: 1400, color: 0xd32f2f, producedBy: 'casino' },
-  { id: 'capital',  name: 'Capital',       icon: '💼', basePrice: 2500, color: 0xf5cc74, producedBy: 'bank' },
+  { id: 'chem',     name: 'Chemicals',     icon: '🧪', code: 'CHM', basePrice: 1000, color: 0x9ccc65, producedBy: 'chemplant' },
+  { id: 'plastic',  name: 'Plastic',       icon: '🥤', code: 'PLB', basePrice: 1300, color: 0xf06292, producedBy: 'plastics' },
+  { id: 'energy',   name: 'Energy',        icon: '⚡', code: 'NRG', basePrice: 1600, color: 0xffee58, producedBy: 'fusion' },
+  { id: 'hydrogen', name: 'Hydrogen',      icon: '🧊', code: 'HYD', basePrice: 2200, color: 0x90caf9, producedBy: 'fuelrefinery' },
+  { id: 'crystal',  name: 'Crystals',      icon: '🔮', code: 'CRT', basePrice: 2800, color: 0xce93d8, producedBy: 'crystalextractor' },
+  { id: 'fun',      name: 'Entertainment', icon: '🎰', code: 'ENT', basePrice: 1400, color: 0xd32f2f, producedBy: 'casino' },
+  { id: 'capital',  name: 'Capital',       icon: '💼', code: 'CAP', basePrice: 2500, color: 0xf5cc74, producedBy: 'bank' },
   // — high tech —
-  { id: 'comp',     name: 'Components',    icon: '🤖', basePrice: 2600, color: 0x4dd0e1, producedBy: 'robotics' },
-  { id: 'data',     name: 'Data',          icon: '💾', basePrice: 3200, color: 0x5c6bc0, producedBy: 'datacenter' },
-  { id: 'media',    name: 'Media',         icon: '🎬', basePrice: 3800, color: 0xff7043, producedBy: 'mediastudio' },
-  { id: 'research', name: 'Research',      icon: '🔬', basePrice: 5000, color: 0xba68c8, producedBy: 'researchlab' },
-  { id: 'med',      name: 'Medicine',      icon: '💊', basePrice: 5500, color: 0x4db6ac, producedBy: 'pharma' },
-  { id: 'tech',     name: 'Electronics',   icon: '💻', basePrice: 6000, color: 0x7c4dff, producedBy: 'techhub' },
-  { id: 'lux',      name: 'Luxuries',      icon: '💎', basePrice: 7500, color: 0xf48fb1, producedBy: 'atelier' },
+  { id: 'comp',     name: 'Components',    icon: '🤖', code: 'COM', basePrice: 2600, color: 0x4dd0e1, producedBy: 'robotics' },
+  { id: 'data',     name: 'Data',          icon: '💾', code: 'DAT', basePrice: 3200, color: 0x5c6bc0, producedBy: 'datacenter' },
+  { id: 'media',    name: 'Media',         icon: '🎬', code: 'MDA', basePrice: 3800, color: 0xff7043, producedBy: 'mediastudio' },
+  { id: 'research', name: 'Research',      icon: '🔬', code: 'RSH', basePrice: 5000, color: 0xba68c8, producedBy: 'researchlab' },
+  { id: 'med',      name: 'Medicine',      icon: '💊', code: 'MDC', basePrice: 5500, color: 0x4db6ac, producedBy: 'pharma' },
+  { id: 'tech',     name: 'Electronics',   icon: '💻', code: 'ELE', basePrice: 6000, color: 0x7c4dff, producedBy: 'techhub' },
+  { id: 'lux',      name: 'Luxuries',      icon: '💎', code: 'LUX', basePrice: 7500, color: 0xf48fb1, producedBy: 'atelier' },
   // — military (never tradable) —
-  { id: 'troops',   name: 'Troops',        icon: '⚔️', basePrice: 500,  color: 0xc62828, producedBy: 'barracks', military: true },
-  { id: 'ships',    name: 'Ships',         icon: '⚓', basePrice: 800,  color: 0x4a7a9b, producedBy: 'navalyard', military: true },
-  { id: 'planes',   name: 'Planes',        icon: '✈️', basePrice: 2000, color: 0x90a4ae, producedBy: 'airfield', military: true },
+  { id: 'troops',   name: 'Troops',        icon: '⚔️', code: 'TRP', basePrice: 500,  color: 0xc62828, producedBy: 'barracks', military: true },
+  { id: 'ships',    name: 'Ships',         icon: '⚓', code: 'SHP', basePrice: 800,  color: 0x4a7a9b, producedBy: 'navalyard', military: true },
+  { id: 'planes',   name: 'Planes',        icon: '✈️', code: 'PLN', basePrice: 2000, color: 0x90a4ae, producedBy: 'airfield', military: true },
 ];
+
+// ====================================================================
+// FOOD CARTS (v1.25) — the street-kitchen starter business.
+// Cheap to raise, produces Food slowly on its own… and every cart can
+// be COOKED at by hand: a quick timing game turns your Food stock into
+// credits at far better than market rates. Pick a cuisine when you
+// build — it colors the cart and its sign.
+// ====================================================================
+const CUISINES = [
+  { id: 'hotdog',  name: 'Hot Dog Cart',  icon: '🌭', color: 0xd84315, blurb: 'Franks on a roll — the classic curb classic.' },
+  { id: 'burger',  name: 'Burger Grill',  icon: '🍔', color: 0xf9a825, blurb: 'Flame-grilled, stacked high, smelled three plots away.' },
+  { id: 'pizza',   name: 'Pizza Wagon',   icon: '🍕', color: 0xef5350, blurb: 'Slices so hot the cheese pulls a meter.' },
+  { id: 'taco',    name: 'Taco Stand',    icon: '🌮', color: 0x66bb6a, blurb: 'Double-wrapped. Salsa optional but inevitable.' },
+  { id: 'sushi',   name: 'Sushi Bar',     icon: '🍣', color: 0x42a5f5, blurb: 'Rice rolled to order, knife work on display.' },
+  { id: 'donut',   name: 'Donut Wagon',   icon: '🍩', color: 0xf48fb1, blurb: 'Glaze in the morning, sprinkles all day.' },
+  { id: 'coffee',  name: 'Coffee Cart',   icon: '☕', color: 0x8d6e4f, blurb: 'Steam, crema and a queue before sunrise.' },
+];
+function getCuisine(id) { return CUISINES.find(c => c.id === id) || null; }
+
+// Cooking minigame tuning (v1.25)
+const COOK_FOOD_COST = 5;        // 🌾 Food consumed per cook
+const COOK_COOLDOWN_MS = 120000; // 2 minutes per cart
+const COOK_BASE_PAYOUT = 300;    // scales with cart count, see cookPayout()
+
+// ====================================================================
+// WORKERS (v1.25) — hire crews to run your businesses harder.
+// Up to 5 per building; every worker adds +35% output for a per-minute
+// wage. Hiring carries a one-time fee that scales with the building.
+// ====================================================================
+const WORKER_MAX = 5;
+const WORKER_OUTPUT = 0.35;   // +35% production per worker
+function workerHireFee(bt) { return Math.max(400, Math.round((bt.buildCost / 20) / 100) * 100); }
+function workerWagePerMin(bt) { return Math.max(6, Math.ceil(bt.buildCost / 40000) * 6); }
+
+// ====================================================================
+// STOCK EXCHANGE (v1.25) — ten listed corporations.
+// Prices are a pure function of wall-clock time (layered sine waves
+// with fixed phases) so every client on every device agrees on the
+// tape at every moment — no cloud row needed. Buy low, sell high.
+// ====================================================================
+const STOCK_CATALOG = [
+  { t: 'AZR', name: 'Azure Farms',        icon: '🌾', base: 28,  sector: 'Agriculture' },
+  { t: 'AQU', name: 'AquaPure Water',     icon: '💧', base: 38,  sector: 'Utilities' },
+  { t: 'VLT', name: 'Voltaic Energy',     icon: '⚡', base: 42,  sector: 'Energy' },
+  { t: 'HMC', name: 'Helios Mining',      icon: '⛏️', base: 64,  sector: 'Mining' },
+  { t: 'MYC', name: 'Mycelium Pharma',    icon: '💊', base: 74,  sector: 'Medicine' },
+  { t: 'TRB', name: 'TerraBank',          icon: '🏦', base: 88,  sector: 'Finance' },
+  { t: 'CRW', name: 'Crescent Robotics',  icon: '🤖', base: 96,  sector: 'Robotics' },
+  { t: 'PLX', name: 'Plexon Semiconductors', icon: '💾', base: 110, sector: 'Electronics' },
+  { t: 'ORB', name: 'Orbital Dynamics',   icon: '🛰️', base: 126, sector: 'Aerospace' },
+  { t: 'NVX', name: 'Nova Aerospace',     icon: '🚀', base: 152, sector: 'Aerospace' },
+];
+// Deterministic price: base × (1 + Σ aᵢ·sin(2πt/Pᵢ + φᵢ)), clamped to
+// ±32% of base. Periods span ~2h to ~3d so the tape always moves but
+// never whipsaws. Same numbers on every client, forever.
+const STOCK_WAVES = [
+  { a: 0.105, P: 2.6 * 3600 * 1000,  f: 0.00 },
+  { a: 0.075, P: 7.9 * 3600 * 1000,  f: 2.10 },
+  { a: 0.050, P: 26 * 3600 * 1000,   f: 4.40 },
+  { a: 0.036, P: 71 * 3600 * 1000,   f: 1.20 },
+];
+function stockPrice(st, at) {
+  const t = (at === undefined ? Date.now() : at);
+  let k = 0;
+  for (let i = 0; i < STOCK_WAVES.length; i++) {
+    const w = STOCK_WAVES[i];
+    k += w.a * Math.sin((2 * Math.PI * t) / w.P + w.f + st.t.charCodeAt(0) * 0.017);
+  }
+  k = Math.max(-0.32, Math.min(0.32, k));
+  return Math.max(1, Math.round(st.base * (1 + k)));
+}
+function stockChangePct(st) {
+  const now = stockPrice(st);
+  const ago = stockPrice(st, Date.now() - 24 * 3600 * 1000);
+  return ((now - ago) / ago) * 100;
+}
 
 // ====================================================================
 // BUSINESS CATALOG
@@ -5889,6 +6159,14 @@ const MATERIALS = [
 // The brake on armies is housing, not cost — each Barracks houses 500 troops
 // (see TROOPS_PER_BARRACKS below).
 const BUSINESS_TYPES = [
+  {
+    id: 'foodcart', name: 'Food Cart', icon: '🌭',
+    buildCost: 5000, produces: 'food', rate: 0.45,
+    buildReq: null,  // street-kitchen starter — credits only (v1.25)
+    color: 0xf5cc74, shape: 'box',
+    desc: 'A street kitchen on wheels. Slow Food output on its own — but hit 🍳 COOK to play the timing game and turn Food into credits at better-than-market rates. Pick your cuisine when you build; every cart you own raises the payout.',
+    planets: ['earth'],
+  },
   {
     id: 'farm', name: 'Farm', icon: '🌾',
     buildCost: 16000, produces: 'food', rate: 0.5,
@@ -6404,6 +6682,56 @@ function _bizBeacon(parent, fx, x, y, z, size, phase) {
 // (on top of the plinth). Footprints stay within ±1.05s so neighbors
 // on a shared plot never collide.
 // ══════════════════════════════════════════════════════════════════
+
+// 🌭 FOOD CART (v1.25) — street kitchen on wheels: white body with a
+// cuisine-colored band, striped awning, big spoked wheels, a glowing
+// serving window, a spinning roof sign and lazy steam off the grill.
+function _bizFoodcart(s, fx, cuisineId) {
+  const g = new THREE.Group();
+  const cui = getCuisine(cuisineId) || CUISINES[0];
+  const accent = _bizAccentMat(cui.color);
+  const B = s;  // shorthand
+  // — cart body —
+  _P(g, new THREE.BoxGeometry(B * 0.92, B * 0.5, B * 0.58), BIZ_MAT.plaster, 0, B * 0.34, 0);
+  _P(g, new THREE.BoxGeometry(B * 0.94, B * 0.14, B * 0.60), accent, 0, B * 0.40, 0);          // cuisine band
+  _P(g, new THREE.BoxGeometry(B * 0.98, B * 0.05, B * 0.64), BIZ_MAT.dark, 0, B * 0.60, 0);    // counter
+  // — serving window, warm-lit —
+  _P(g, new THREE.BoxGeometry(B * 0.55, B * 0.22, B * 0.03), BIZ_MAT.winWarm, 0, B * 0.36, B * 0.30);
+  // — chalkboard menu —
+  _P(g, new THREE.BoxGeometry(B * 0.22, B * 0.26, B * 0.02), BIZ_MAT.tarmac, -B * 0.62, B * 0.62, B * 0.18, { rz: -0.08 });
+  // — wheels (big wooden spoked look) —
+  const wheelGeo = new THREE.CylinderGeometry(B * 0.16, B * 0.16, B * 0.05, 14);
+  [[-B * 0.34, -B * 0.30], [B * 0.34, -B * 0.30], [-B * 0.34, B * 0.30], [B * 0.34, B * 0.30]].forEach(([x, z]) => {
+    _P(g, wheelGeo, BIZ_MAT.rust, x, B * 0.17, z, { rx: Math.PI / 2 });
+  });
+  // — striped awning —
+  _P(g, new THREE.BoxGeometry(B * 1.05, B * 0.045, B * 0.66), BIZ_MAT.plaster, 0, B * 0.97, B * 0.10);
+  for (let i = -2; i <= 2; i++) {
+    _P(g, new THREE.BoxGeometry(B * 0.13, B * 0.05, B * 0.68), accent, i * B * 0.21, B * 0.975, B * 0.10);
+  }
+  _P(g, new THREE.CylinderGeometry(B * 0.025, B * 0.025, B * 0.42, 8), BIZ_MAT.silver, -B * 0.46, B * 0.76, -B * 0.22, { rz: 0.28 });
+  _P(g, new THREE.CylinderGeometry(B * 0.025, B * 0.025, B * 0.42, 8), BIZ_MAT.silver, B * 0.46, B * 0.76, -B * 0.22, { rz: -0.28 });
+  // — spinning roof sign in the cuisine color —
+  const sign = new THREE.Group();
+  _P(sign, new THREE.CylinderGeometry(B * 0.022, B * 0.022, B * 0.3, 8), BIZ_MAT.silver, 0, -B * 0.14, 0);
+  _P(sign, new THREE.BoxGeometry(B * 0.34, B * 0.2, B * 0.04), accent, 0, B * 0.06, 0);
+  _P(sign, new THREE.BoxGeometry(B * 0.04, B * 0.2, B * 0.34), accent, 0, B * 0.06, 0);
+  sign.position.set(0, B * 1.24, -B * 0.05);
+  g.add(sign);
+  fx.spins.push({ o: sign, v: 1.6, ph: 0.3 });
+  // — grill steam —
+  const steam1 = _bizGlow(BIZ_MAT.flameTex, B * 0.22, B * 0.34, 0xdff3ff);
+  steam1.position.set(B * 0.28, B * 0.74, B * 0.02);
+  g.add(steam1);
+  fx.flames.push({ spr: steam1, w: B * 0.22, h: B * 0.34, ph: 1.1 });
+  const steam2 = _bizGlow(BIZ_MAT.flameTex, B * 0.16, B * 0.26, 0xeef8ff);
+  steam2.position.set(B * 0.40, B * 0.72, -B * 0.06);
+  g.add(steam2);
+  fx.flames.push({ spr: steam2, w: B * 0.16, h: B * 0.26, ph: 2.6 });
+  // — queue lamp strung to the awning —
+  _bizBeacon(g, fx, B * 0.5, B * 0.99, B * 0.1, B * 0.09, 0.5);
+  return g;
+}
 
 // 🌾 FARM — crop paddock, red gambrel barn, grain silo, farmhouse
 function _bizFarm(s, fx) {
@@ -7067,12 +7395,13 @@ function _bizGeneric(s, fx) {
 // ══════════════════════════════════════════════════════════════════
 // MAIN ENTRY + FX + DISPOSAL
 // ══════════════════════════════════════════════════════════════════
-function buildBusinessMesh(businessType, scale) {
+function buildBusinessMesh(businessType, scale, cuisineId) {
   _buildBizMaterials();
   const s = scale;
   const fx = { flames: [], strobes: [], spins: [] };
   let body;
   switch (businessType.id) {
+    case 'foodcart':      body = _bizFoodcart(s, fx, cuisineId); break;
     case 'farm':          body = _bizFarm(s, fx); break;
     case 'mine':          body = _bizMine(s, fx); break;
     case 'factory':       body = _bizFactory(s, fx); break;
@@ -9515,7 +9844,10 @@ function openPlotModal(plot) {
       const mat = getMaterial(bt.produces);
       const regionBonus = getRegionBonus(bt.id, plot);
       const baseRate = bt.rate * plot.userData.areaMultiplier;
-      const effectiveRate = baseRate * regionBonus;
+      // v1.25 — workers boost this building's output
+      const _wkMeta = bizMetaOf(plot.userData.id, idx);
+      const _wkBoost = 1 + WORKER_OUTPUT * ((_wkMeta && _wkMeta.workers) || 0);
+      const effectiveRate = baseRate * regionBonus * _wkBoost;
       const price = STATE.marketPrices[bt.produces] || mat.basePrice;
       const trend = STATE.marketTrend[bt.produces] || 'stable';
       const trendIcon = trend === 'up' ? '▲' : (trend === 'down' ? '▼' : '◆');
@@ -9531,13 +9863,33 @@ function openPlotModal(plot) {
         ? `<button class="gamble-play-btn" onclick="playAtSelectedCasino()">🎰 Play Slots Here</button>`
         : '';
 
+      // v1.25 — Food Cart: cuisine label + the cooking minigame
+      const _cui = bt.id === 'foodcart' ? (getCuisine(entry.cuisine) || CUISINES[0]) : null;
+      const _cd = bt.id === 'foodcart' ? cookCooldownLeft(plot.userData.id, idx) : 0;
+      const _foodOk = (STATE.inventory.food || 0) >= COOK_FOOD_COST;
+      const cookPlayBtn = bt.id === 'foodcart'
+        ? `<button class="gamble-play-btn" ${(_cd <= 0 && _foodOk) ? '' : 'disabled'} style="${(_cd > 0 || !_foodOk) ? 'opacity:.55' : ''}" onclick="openCookAt(STATE.selectedPlot, ${idx})" title="${_cd > 0 ? 'Resting — ' + Math.ceil(_cd / 1000) + 's' : (_foodOk ? 'Cook for credits' : 'Needs ' + COOK_FOOD_COST + ' Food')}">🍳 ${_cd > 0 ? 'COOK — resting ' + Math.ceil(_cd / 1000) + 's' : (_foodOk ? 'COOK — earn up to $' + Math.round(cookPayout() * 3).toLocaleString() : 'COOK — needs ' + COOK_FOOD_COST + ' 🌾')}</button>`
+        : '';
+
+      // v1.25 — worker crew row (every business)
+      const _wkN = (_wkMeta && _wkMeta.workers) || 0;
+      const _wkFee = workerHireFee(bt);
+      const _wkWage = workerWagePerMin(bt);
+      const workerRow = `
+        <div class="wk-row">
+          <span>👷 <b>${_wkN}</b>/${WORKER_MAX} · output <b style="color:#7fffd4">+${Math.round(_wkBoost * 100 - 100)}%</b> · $${_wkWage.toLocaleString()}/min</span>
+          <span style="flex:1"></span>
+          <button class="wk-btn" ${(_wkN < WORKER_MAX && STATE.money >= _wkFee) ? '' : 'disabled'} onclick="hireWorker(${plot.userData.id}, ${idx})" title="One-time hiring fee">+ Hire $${_wkFee.toLocaleString()}</button>
+          <button class="wk-btn" ${_wkN > 0 ? '' : 'disabled'} onclick="fireWorker(${plot.userData.id}, ${idx})">− Fire</button>
+        </div>`;
+
       const isMil = !!bt.military;
       return `
         <div class="biz-card-multi" style="border:1px solid ${isMil ? '#7a3535' : '#1a3340'};border-radius:7px;padding:6px 8px;margin-bottom:5px;background:${isMil ? 'rgba(80,20,20,.28)' : 'rgba(20,50,60,.3)'}">
           <div class="business-current">
             <div class="biz-icon">${bt.icon}</div>
             <div class="biz-info">
-              <div class="biz-name">${isMil ? '<span class="mil-badge">MILITARY</span>' : ''}${bt.name} <span style="color:#9bb4bd;font-size:10px">→ ${mat.icon} ${mat.name}</span></div>
+              <div class="biz-name">${isMil ? '<span class="mil-badge">MILITARY</span>' : ''}${bt.name}${_cui ? ` · <span style="color:#f5cc74">${_cui.icon} ${_cui.name}</span>` : ''} <span style="color:#9bb4bd;font-size:10px">→ ${mat.icon} ${mat.name}</span></div>
               <div class="biz-income" style="font-size:10px">${mat.military
                 ? (mat.id === 'troops'
                     ? `+${effectiveRate.toFixed(1)} ${mat.icon}/s to your army · ${troopCapacity() > 0
@@ -9549,6 +9901,8 @@ function openPlotModal(plot) {
             </div>
           </div>
           ${casinoPlayBtn}
+          ${cookPlayBtn}
+          ${workerRow}
           <div style="display:flex;gap:5px;margin-top:4px">
             <button class="btn" style="flex:1;padding:4px;font-size:10px" onclick="moveBusiness(${idx})" title="Reposition this building anywhere on the plot">📍 Move</button>
             <button class="btn demolish" style="flex:1;padding:4px;font-size:10px" onclick="demolishBusiness(${idx})">Demolish</button>
@@ -9906,6 +10260,7 @@ window.travelTo = function(planetId) {
       STATE.owned.delete(p.userData.id);
       BUSINESS_REGISTRY.delete(p.userData.id);
       BIZ_POS.delete(p.userData.id);
+      BIZ_META.delete(p.userData.id);
       stripped++;
     }
     if (STATE.owned.has(p.userData.id)) {
@@ -10421,6 +10776,12 @@ window.buildBusiness = function(businessId) {
     showToast(`${bt.name} needs ${missingReqText(_missing)} — keep that stock instead of selling it`, false);
     return;
   }
+  // v1.25 — food carts pick a cuisine before placement
+  if (businessId === 'foodcart') {
+    closePlotModal();
+    openCuisinePicker(p);
+    return;
+  }
   // Free placement (v1.17): arm placement mode — the next click inside this
   // plot sets exactly where the building stands (ghost ring previews it)
   closePlotModal();
@@ -10459,12 +10820,16 @@ window.demolishBusiness = function(businessIndex) {
   // Keep saved positions index-aligned with the registry (v1.17)
   const _posArr = BIZ_POS.get(p.userData.id) || [];
   if (_posArr.length > businessIndex) _posArr.splice(businessIndex, 1);
+  const _metaArr = BIZ_META.get(p.userData.id) || [];   // v1.25 — meta stays index-aligned
+  if (_metaArr.length > businessIndex) _metaArr.splice(businessIndex, 1);
   if (_regTypes.length) {
     BUSINESS_REGISTRY.set(p.userData.id, _regTypes);
     if (_posArr.length) BIZ_POS.set(p.userData.id, _posArr);
+    if (_metaArr.length) BIZ_META.set(p.userData.id, _metaArr);
   } else {
     BUSINESS_REGISTRY.delete(p.userData.id);
     BIZ_POS.delete(p.userData.id);
+    BIZ_META.delete(p.userData.id);
   }
   // If no businesses left, restore the natural owned look; otherwise
   // recolor to first remaining
@@ -10557,7 +10922,7 @@ function getMarketCountdown() {
 // 15-minute system-price refresh re-renders.
 window.__mkTab = 'sell';
 window.openMarketModal = function(tab) {
-  if (tab === 'players' || tab === 'sell') window.__mkTab = tab;
+  if (tab === 'players' || tab === 'sell' || tab === 'stocks') window.__mkTab = tab;
   renderMarketModal();
   document.getElementById('market-modal').classList.add('show');
   try { PlayerMarket.refresh(); } catch (e) {}
@@ -10571,12 +10936,14 @@ function marketTabBar() {
     <div class="mk-tabs">
       <button class="mk-tab ${window.__mkTab === 'sell' ? 'active' : ''}" onclick="setMarketTab('sell')"><b>🏪 System Market</b>sell instantly at today's prices</button>
       <button class="mk-tab ${window.__mkTab === 'players' ? 'active' : ''}" onclick="setMarketTab('players')"><b>🤝 Player Market</b>trade with other commanders</button>
+      <button class="mk-tab ${window.__mkTab === 'stocks' ? 'active' : ''}" onclick="setMarketTab('stocks')"><b>📈 Stock Exchange</b>buy the dips, sell the peaks</button>
     </div>`;
 }
 function renderMarketModal() {
   const card = document.getElementById('market-card');
   if (!card) return;
   if (window.__mkTab === 'players') { renderPlayerMarket(card); return; }
+  if (window.__mkTab === 'stocks') { renderStockMarket(card); return; }
   renderSystemMarket(card);
 }
 function renderSystemMarket(card) {
@@ -10867,6 +11234,7 @@ window.sellMaterial = function(materialId) {
   const remaining = stock - qty;
   STATE.inventory[materialId] = remaining < 0.01 ? 0 : remaining;
   STATE.money += revenue;
+  recordIncome(revenue);   // v1.25 — feeds the WORLD GDP 24H stat
   updateHUD();
   openMarketModal();  // refresh to show updated stock
   const left = STATE.inventory[materialId] > 0
@@ -10893,6 +11261,7 @@ window.sellAllMaterials = function() {
   }
   if (total > 0) {
     STATE.money += total;
+    recordIncome(total);   // v1.25 — feeds the WORLD GDP 24H stat
     updateHUD();
     openMarketModal();
     showToast(`Sold ${sold.join(', ')} for $${total.toLocaleString()}`, true);
@@ -10901,6 +11270,535 @@ window.sellAllMaterials = function() {
     showToast('No materials to sell', false);
   }
 };
+
+// ====================================================================
+// ECONOMY UPDATE (v1.25) — street kitchens, cooks, workers, the Stock
+// Exchange, the live ticker and the World Economy panel. Inspired by
+// the big player-run economy sims: the money game now has a pulse you
+// can watch (and play) between build orders.
+// ====================================================================
+
+// ---------- income ledger (feeds WORLD GDP 24H) ----------
+// Every credit EARNED — material sales, player-market payouts, street-
+// kitchen cooking — lands here. The rolling 24h sum is this player's
+// contribution to the world GDP stat.
+function recordIncome(amt) {
+  if (!amt || amt <= 0 || !isFinite(amt)) return;
+  const now = Date.now();
+  if (!Array.isArray(STATE.incomeLog)) STATE.incomeLog = [];
+  STATE.incomeLog.push({ t: now, amt: Math.round(amt) });
+  // prune: 24h window, hard cap so saves stay small
+  const cutoff = now - 24 * 3600 * 1000;
+  while (STATE.incomeLog.length > 300) STATE.incomeLog.shift();
+  while (STATE.incomeLog.length && STATE.incomeLog[0].t < cutoff) STATE.incomeLog.shift();
+}
+function myGdp24() {
+  if (!Array.isArray(STATE.incomeLog)) return 0;
+  const cutoff = Date.now() - 24 * 3600 * 1000;
+  let t = 0;
+  for (const e of STATE.incomeLog) if (e.t >= cutoff) t += e.amt;
+  return t;
+}
+function stockHoldingsValue() {
+  let t = 0;
+  if (!STATE.stocks) return 0;
+  for (const st of STOCK_CATALOG) {
+    const sh = STATE.stocks[st.t] || 0;
+    if (sh > 0) t += sh * stockPrice(st);
+  }
+  return t;
+}
+function myNetWorth() {
+  return STATE.money + getInventoryValue() + stockHoldingsValue();
+}
+
+// ---------- CUISINE PICKER (food-cart build flow) ----------
+let _cuiPlot = null;   // the plot awaiting a cuisine choice
+window.openCuisinePicker = function(plot) {
+  const card = document.getElementById('cuisine-card');
+  if (!card || !plot) return;
+  _cuiPlot = plot;
+  const opts = CUISINES.map(c => `
+    <button class="cui-opt" onclick="pickCuisine('${c.id}')">
+      <span class="cui-ico">${c.icon}</span>
+      <span><b>${c.name}</b><span>${c.blurb}</span></span>
+    </button>`).join('');
+  card.innerHTML = `
+    <span class="badge available">build</span>
+    <h2>🌭 Pick Your Cuisine</h2>
+    <div class="biz-hint" style="margin-bottom:2px">Food Cart — $${(Math.round(getBusinessType('foodcart').buildCost * plot.userData.areaMultiplier)).toLocaleString()} · then click any spot inside <b>${plot.userData.name}</b> to park it.</div>
+    <div class="cui-grid">${opts}</div>
+    <div class="cook-sub" style="margin-top:6px">Every cart produces 🌾 Food on its own — and gets a 🍳 COOK button: a timing game that turns Food into credits at better-than-market rates. Every cart you own raises the payout.</div>
+    <div class="actions" style="margin-top:10px"><button class="btn" onclick="closeCuisineModal()">Cancel</button></div>
+  `;
+  document.getElementById('cuisine-modal').classList.add('show');
+};
+window.closeCuisineModal = function() {
+  document.getElementById('cuisine-modal').classList.remove('show');
+};
+window.pickCuisine = function(cuisineId) {
+  const target = _cuiPlot || STATE.selectedPlot || (STATE.placing ? ACTIVE_PLOT_BY_ID.get(STATE.placing.plotId) : null);
+  window.closeCuisineModal();
+  _cuiPlot = null;
+  if (!target) { showToast('Plot not found — try building again', false); return; }
+  beginPlacement({ plotId: target.userData.id, type: 'foodcart', mode: 'build', cuisine: cuisineId });
+  const c = getCuisine(cuisineId);
+  showToast(`${c.icon} ${c.name} — click any spot inside ${target.userData.name} to park it`, true);
+};
+
+// ---------- STREET KITCHEN — the cooking minigame ----------
+// A marker sweeps a quality bar; stop it in the gold center for a
+// PERFECT cook. Payout scales with the number of carts you run and
+// consumes 5 🌾 Food — carts produce the Food, cooking turns it into
+// credits at a premium.
+const COOK = { plotId: null, idx: -1, running: false, frozen: false, pos: 0, raf: 0, t0: 0 };
+function cartCountAll() {
+  let n = 0;
+  for (const [, types] of BUSINESS_REGISTRY) {
+    for (const t of types) if (t === 'foodcart') n++;
+  }
+  return n;
+}
+function cookPayout() {
+  return COOK_BASE_PAYOUT + 60 * cartCountAll();
+}
+function cookCartMeta(plotId, idx) {
+  return ensureBizMeta(plotId, idx, { cuisine: null, workers: 0, cookAt: 0 });
+}
+function cookCooldownLeft(plotId, idx) {
+  const meta = bizMetaOf(plotId, idx);
+  if (!meta || !meta.cookAt) return 0;
+  return Math.max(0, COOK_COOLDOWN_MS - (Date.now() - meta.cookAt));
+}
+window.openCookAt = function(plot, idx) {
+  if (!plot || idx === undefined || idx < 0) return;
+  const entry = (plot.userData.businesses || [])[idx];
+  if (!entry || entry.type !== 'foodcart') { showToast('That cart has moved — reopen the plot', false); return; }
+  const left = cookCooldownLeft(plot.userData.id, idx);
+  COOK.plotId = plot.userData.id; COOK.idx = idx;
+  COOK.running = false; COOK.frozen = false; COOK.pos = 0;
+  renderCookModal(left > 0 ? left : 0);
+  document.getElementById('cook-modal').classList.add('show');
+  if (left <= 0) startCookSweep();
+};
+window.closeCookModal = function() {
+  if (COOK.raf) cancelAnimationFrame(COOK.raf);
+  COOK.raf = 0; COOK.running = false;
+  document.getElementById('cook-modal').classList.remove('show');
+};
+function renderCookModal(cooldownMs) {
+  const card = document.getElementById('cook-card');
+  if (!card) return;
+  const plot = ACTIVE_PLOT_BY_ID.get(COOK.plotId);
+  const entry = plot ? (plot.userData.businesses || [])[COOK.idx] : null;
+  const cui = entry ? (getCuisine(entry.cuisine) || CUISINES[0]) : CUISINES[0];
+  const food = Math.floor(STATE.inventory.food || 0);
+  const canCook = cooldownMs <= 0 && food >= COOK_FOOD_COST;
+  const payout = cookPayout();
+  card.innerHTML = `
+    <span class="badge available">street kitchen</span>
+    <h2>${cui.icon} ${cui.name}</h2>
+    <div class="cook-sub">Stop the marker in the <b style="color:#f5cc74">gold center</b> for a PERFECT batch. Payouts scale with the size of your street-kitchen empire (<b>${cartCountAll()}</b> cart${cartCountAll() === 1 ? '' : 's'}).</div>
+    <div class="cook-bar-wrap">
+      <div class="cook-zone" style="left:34%;width:32%"></div>
+      <div class="cook-zone-gold" style="left:45%;width:10%"></div>
+      <div class="cook-marker" id="cook-marker" style="left:0%"></div>
+    </div>
+    <button class="cook-btn" id="cook-fire-btn" ${canCook ? '' : 'disabled'} onclick="cookFire()">
+      ${cooldownMs > 0 ? '⏳ RESTING — ' + Math.ceil(cooldownMs / 1000) + 's' : (food >= COOK_FOOD_COST ? '🍳 COOK! — costs 5 🌾' : 'NEED 5 🌾 FOOD (have ' + food + ')')}
+    </button>
+    <div class="cook-result" id="cook-result"></div>
+    <div class="cook-sub">Base payout <b>$${payout.toLocaleString()}</b> · PERFECT ×3 · GREAT ×2 · GOOD ×1.25 · MISS ×0.4 · every cart cooks again after 2 minutes.</div>
+    <div class="actions" style="margin-top:12px"><button class="btn" onclick="closeCookModal()">Close</button></div>
+  `;
+}
+function startCookSweep() {
+  COOK.running = true; COOK.frozen = false; COOK.t0 = performance.now();
+  const step = () => {
+    if (!COOK.running) return;
+    const el = (performance.now() - COOK.t0) / 1400;   // full sweep 1.4s
+    const tri = 1 - Math.abs((el % 2) - 1);            // 0→1→0 triangle
+    COOK.pos = tri;
+    const mk = document.getElementById('cook-marker');
+    if (mk) mk.style.left = (tri * 100).toFixed(2) + '%';
+    COOK.raf = requestAnimationFrame(step);
+  };
+  if (COOK.raf) cancelAnimationFrame(COOK.raf);
+  COOK.raf = requestAnimationFrame(step);
+}
+window.cookFire = function() {
+  if (COOK.frozen || !COOK.running) return;
+  COOK.frozen = true; COOK.running = false;
+  if (COOK.raf) cancelAnimationFrame(COOK.raf);
+  // quality from the marker's distance to the center
+  const d = Math.abs(COOK.pos - 0.5);
+  let q, mult, color;
+  if (d <= 0.05)      { q = 'PERFECT! 🔥'; mult = 3;    color = '#f5cc74'; }
+  else if (d <= 0.16) { q = 'GREAT ✨';    mult = 2;    color = '#7fffd4'; }
+  else if (d <= 0.30) { q = 'GOOD 👍';     mult = 1.25; color = '#9fdcff'; }
+  else                { q = 'MISS 😵';     mult = 0.4;  color = '#ff8080'; }
+  const food = STATE.inventory.food || 0;
+  if (food < COOK_FOOD_COST) { renderCookModal(0); return; }
+  STATE.inventory.food = Math.max(0, food - COOK_FOOD_COST);
+  const payout = Math.round(cookPayout() * mult);
+  STATE.money += payout;
+  recordIncome(payout);
+  const meta = cookCartMeta(COOK.plotId, COOK.idx);
+  meta.cookAt = Date.now();
+  const res = document.getElementById('cook-result');
+  if (res) { res.innerHTML = `${q} — served a crowd, earned <b style="color:${color}">$${payout.toLocaleString()}</b>`; res.style.color = color; }
+  const btn = document.getElementById('cook-fire-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ RESTING — 120s'; }
+  updateHUD();
+  saveGame();
+  setTimeout(() => {
+    // refresh the resting timer if the modal is still open
+    if (document.getElementById('cook-modal').classList.contains('show')) {
+      renderCookModal(cookCooldownLeft(COOK.plotId, COOK.idx));
+      if (cookCooldownLeft(COOK.plotId, COOK.idx) <= 0) startCookSweep();
+    }
+  }, 1600);
+};
+// HUD quick button — visible the moment you own a food cart
+window.openCookQuick = function() {
+  for (const p of STATE.plots) {
+    if (!p.userData || !p.userData.owned) continue;
+    const bs = p.userData.businesses || [];
+    for (let i = 0; i < bs.length; i++) {
+      if (bs[i].type === 'foodcart') { window.openCookAt(p, i); return; }
+    }
+  }
+  // no cart on this planet's live meshes — check the off-world registry
+  for (const [plotId, types] of BUSINESS_REGISTRY) {
+    if (types && types.includes('foodcart')) {
+      showToast('Your carts are on another world — travel there to cook', false);
+      return;
+    }
+  }
+  showToast('Build a Food Cart first!', false);
+};
+
+// ---------- WORKERS ----------
+// Each hire adds +35% to that building's output for a per-minute wage.
+function workerStats() {
+  let wage = 0, count = 0;
+  for (const [plotId, types] of BUSINESS_REGISTRY) {
+    if (!types) continue;
+    for (let i = 0; i < types.length; i++) {
+      const meta = bizMetaOf(plotId, i);
+      const w = meta ? (meta.workers || 0) : 0;
+      if (w > 0) {
+        const bt = getBusinessType(types[i]);
+        if (bt) { wage += workerWagePerMin(bt) * w; count += w; }
+      }
+    }
+  }
+  return { wagePerMin: wage, count: count };
+}
+window.hireWorker = function(plotId, idx) {
+  const types = BUSINESS_REGISTRY.get(plotId);
+  const bt = types ? getBusinessType(types[idx]) : null;
+  if (!bt) return;
+  const meta = ensureBizMeta(plotId, idx, {});
+  if ((meta.workers || 0) >= WORKER_MAX) { showToast('That building is fully crewed', false); return; }
+  const fee = workerHireFee(bt);
+  if (STATE.money < fee) { showToast(`Hiring costs $${fee.toLocaleString()} — not enough credits`, false); return; }
+  STATE.money -= fee;
+  meta.workers = (meta.workers || 0) + 1;
+  const plot = ACTIVE_PLOT_BY_ID.get(plotId) || STATE.selectedPlot;
+  showToast(`👷 Crew of ${meta.workers} — ${bt.name} output +${Math.round(meta.workers * WORKER_OUTPUT * 100)}%`, true);
+  updateHUD(); saveGame();
+  if (plot && STATE.selectedPlot === plot) openPlotModal(plot);
+};
+window.fireWorker = function(plotId, idx) {
+  const types = BUSINESS_REGISTRY.get(plotId);
+  const bt = types ? getBusinessType(types[idx]) : null;
+  const meta = bizMetaOf(plotId, idx);
+  if (!bt || !meta || (meta.workers || 0) <= 0) return;
+  meta.workers = (meta.workers || 0) - 1;
+  showToast(`A worker left ${bt.name} — output +${Math.round((meta.workers || 0) * WORKER_OUTPUT * 100)}%`, false);
+  updateHUD(); saveGame();
+  const plot = ACTIVE_PLOT_BY_ID.get(plotId) || STATE.selectedPlot;
+  if (plot && STATE.selectedPlot === plot) openPlotModal(plot);
+};
+
+// ---------- STOCK EXCHANGE ----------
+window.stkBuy = function(t) {
+  const st = STOCK_CATALOG.find(s => s.t === t);
+  if (!st) return;
+  const inp = document.getElementById('stk-amt-' + t);
+  const qty = Math.floor(+((inp && inp.value) || 0));
+  if (qty <= 0) { showToast('Enter a number of shares to buy', false); return; }
+  const price = stockPrice(st);
+  const cost = qty * price;
+  if (cost > STATE.money) { showToast(`That order costs $${cost.toLocaleString()} — you hold $${Math.floor(STATE.money).toLocaleString()}`, false); return; }
+  STATE.money -= cost;
+  if (!STATE.stocks) STATE.stocks = {};
+  if (!STATE.stocksAvg) STATE.stocksAvg = {};
+  const had = STATE.stocks[t] || 0;
+  const avg = STATE.stocksAvg[t] || 0;
+  STATE.stocks[t] = had + qty;
+  STATE.stocksAvg[t] = had + qty > 0 ? ((had * avg) + cost) / (had + qty) : price;
+  showToast(`📈 Bought ${qty.toLocaleString()} ${st.t} @ $${price.toLocaleString()}`, true);
+  updateHUD(); saveGame();
+  renderMarketModal();
+};
+window.stkSell = function(t) {
+  const st = STOCK_CATALOG.find(s => s.t === t);
+  if (!st) return;
+  const inp = document.getElementById('stk-amt-' + t);
+  const qty = Math.floor(+((inp && inp.value) || 0));
+  if (qty <= 0) { showToast('Enter a number of shares to sell', false); return; }
+  const held = (STATE.stocks || {})[t] || 0;
+  if (qty > held) { showToast(`You hold ${held.toLocaleString()} ${st.t} shares`, false); return; }
+  const price = stockPrice(st);
+  const proceeds = qty * price;
+  const avg = (STATE.stocksAvg || {})[t] || price;
+  STATE.money += proceeds;
+  STATE.stocks[t] = held - qty;
+  if (STATE.stocks[t] <= 0) { delete STATE.stocks[t]; delete STATE.stocksAvg[t]; }
+  const pl = Math.round(qty * (price - avg));
+  recordIncome(Math.max(0, pl));   // realized gains feed GDP; losses just don't
+  showToast(`${pl >= 0 ? '💵 Sold' : '📉 Sold'} ${qty.toLocaleString()} ${st.t} @ $${price.toLocaleString()} — ${pl >= 0 ? '+' : ''}$${pl.toLocaleString()}`, pl >= 0);
+  updateHUD(); saveGame();
+  renderMarketModal();
+};
+function renderStockMarket(card) {
+  const rows = STOCK_CATALOG.map(st => {
+    const price = stockPrice(st);
+    const chg = stockChangePct(st);
+    const held = (STATE.stocks || {})[st.t] || 0;
+    const heldVal = held * price;
+    const avg = (STATE.stocksAvg || {})[st.t] || 0;
+    const pl = held > 0 ? Math.round(held * (price - avg)) : 0;
+    const chgCls = chg > 0.5 ? 'up' : (chg < -0.5 ? 'down' : '');
+    const chgSign = chg >= 0 ? '+' : '';
+    return `
+      <div class="stk-row">
+        <div class="stk-ico">${st.icon}</div>
+        <div class="stk-main">
+          <div class="stk-name"><b>${st.t}</b>${st.name}</div>
+          <div class="stk-meta">${st.sector}${held > 0 ? ` · holding <b style="color:#d7e7ee">${held.toLocaleString()}</b> sh @ avg $${Math.round(avg).toLocaleString()} · P/L <b style="color:${pl >= 0 ? '#7fffd4' : '#ff8080'}">${pl >= 0 ? '+' : ''}$${pl.toLocaleString()}</b>` : ''}</div>
+          <div class="stk-ctrl">
+            <input class="stk-amt" id="stk-amt-${st.t}" type="number" min="1" step="1" inputmode="numeric" placeholder="0" title="Shares to trade">
+            <button class="stk-buy" onclick="stkBuy('${st.t}')">Buy</button>
+            <button class="stk-sell" ${held > 0 ? '' : 'disabled'} onclick="stkSell('${st.t}')">Sell</button>
+          </div>
+        </div>
+        <div>
+          <div class="stk-price" id="stk-p-${st.t}">$${price.toLocaleString()}</div>
+          <div class="stk-chg ${chgCls}" id="stk-c-${st.t}">${chgSign}${chg.toFixed(1)}%</div>
+        </div>
+      </div>`;
+  }).join('');
+  const totalVal = stockHoldingsValue();
+  let totalCost = 0;
+  for (const st of STOCK_CATALOG) {
+    const held = (STATE.stocks || {})[st.t] || 0;
+    if (held > 0) totalCost += held * ((STATE.stocksAvg || {})[st.t] || 0);
+  }
+  const totalPl = Math.round(totalVal - totalCost);
+  card.innerHTML = `
+    <span class="badge available">exchange</span>
+    <h2>📈 Stock Exchange</h2>
+    <div class="market-sub">Ten listed corporations · prices move around the clock for every commander</div>
+    ${marketTabBar()}
+    <div class="stk-summary">
+      <span id="stk-sum">Portfolio: <b>$${Math.round(totalVal).toLocaleString()}</b>${totalVal > 0 ? ` · P/L <b style="color:${totalPl >= 0 ? '#7fffd4' : '#ff8080'}">${totalPl >= 0 ? '+' : ''}$${totalPl.toLocaleString()}</b>` : ''}</span>
+      <span>Credits: <b>$${Math.floor(STATE.money).toLocaleString()}</b></span>
+    </div>
+    ${rows}
+    <div class="biz-hint" style="margin:6px 0 12px">Shares of these corporations trade at prices fixed by the world clock — the same tape for every commander at every moment. Buy the dips, sell the peaks, bank the difference.</div>
+    <div class="market-actions">
+      <button class="btn" onclick="closeMarketModal()">Close</button>
+    </div>
+  `;
+}
+// Live tape refresh while the Stock Exchange tab is open — updates ONLY
+// the price cells (never the inputs, so what you're typing survives)
+function refreshStockPrices() {
+  if (window.__mkTab !== 'stocks') return;
+  if (!document.getElementById('market-modal').classList.contains('show')) return;
+  for (const st of STOCK_CATALOG) {
+    const pEl = document.getElementById('stk-p-' + st.t);
+    const cEl = document.getElementById('stk-c-' + st.t);
+    if (!pEl || !cEl) continue;
+    const price = stockPrice(st);
+    const chg = stockChangePct(st);
+    pEl.textContent = '$' + price.toLocaleString();
+    cEl.textContent = (chg >= 0 ? '+' : '') + chg.toFixed(1) + '%';
+    cEl.className = 'stk-chg ' + (chg > 0.5 ? 'up' : (chg < -0.5 ? 'down' : ''));
+  }
+  const sum = document.getElementById('stk-sum');
+  if (sum) {
+    const totalVal = stockHoldingsValue();
+    let totalCost = 0;
+    for (const st of STOCK_CATALOG) {
+      const held = (STATE.stocks || {})[st.t] || 0;
+      if (held > 0) totalCost += held * ((STATE.stocksAvg || {})[st.t] || 0);
+    }
+    const totalPl = Math.round(totalVal - totalCost);
+    sum.innerHTML = `Portfolio: <b>$${Math.round(totalVal).toLocaleString()}</b>${totalVal > 0 ? ` · P/L <b style="color:${totalPl >= 0 ? '#7fffd4' : '#ff8080'}">${totalPl >= 0 ? '+' : ''}$${totalPl.toLocaleString()}</b>` : ''}`;
+  }
+}
+
+// ---------- LIVE MARKET TICKER ----------
+// The strip along the bottom of the sector view: every tradable
+// material and all ten stocks, sweeping past in market-code form.
+const Ticker = (() => {
+  let started = false;
+  let x = 0;
+  let halfW = 1;
+  let lastFrame = 0;
+  let rebuildAt = 0;
+  function itemHTML(m) {
+    const price = STATE.marketPrices[m.id] || m.basePrice;
+    const trend = STATE.marketTrend[m.id] || 'stable';
+    const cls = trend === 'up' ? 'up' : (trend === 'down' ? 'down' : 'flat');
+    const arr = trend === 'up' ? '▲' : (trend === 'down' ? '▼' : '◆');
+    return `<span class="tick-item">${m.icon} <b>${m.code}</b> <span class="tk-price">$${Math.round(price).toLocaleString()}</span><i class="${cls}">${arr}</i></span>`;
+  }
+  function stockHTML(st) {
+    const chg = stockChangePct(st);
+    const cls = chg > 0.5 ? 'up' : (chg < -0.5 ? 'down' : 'flat');
+    const arr = chg > 0.5 ? '▲' : (chg < -0.5 ? '▼' : '◆');
+    return `<span class="tick-item">${st.icon} <b>${st.t}</b> <span class="tk-price">$${stockPrice(st).toLocaleString()}</span><i class="${cls}">${arr}</i></span>`;
+  }
+  function rebuild() {
+    const inner = document.getElementById('tick-inner');
+    if (!inner) return;
+    const parts = [];
+    parts.push('<span class="tick-label">LIVE MARKET</span>');
+    for (const m of MATERIALS) { if (!m.military) parts.push(itemHTML(m)); }
+    for (const st of STOCK_CATALOG) parts.push(stockHTML(st));
+    const one = parts.join('');
+    inner.innerHTML = one + one;   // duplicated for the seamless wrap
+    halfW = Math.max(1, inner.scrollWidth / 2);
+    rebuildAt = Date.now() + 30000;
+  }
+  function tick(nowMs) {
+    const inner = document.getElementById('tick-inner');
+    if (!inner) return;
+    if (Date.now() > rebuildAt) rebuild();
+    if (!lastFrame) lastFrame = nowMs;
+    const dt = Math.min(0.1, (nowMs - lastFrame) / 1000);
+    lastFrame = nowMs;
+    x -= 46 * dt;   // px per second — a calm crawl
+    if (-x >= halfW) x += halfW;
+    inner.style.transform = `translateX(${x.toFixed(1)}px)`;
+  }
+  function start() {
+    if (started) return;
+    started = true;
+    rebuild();
+  }
+  return { start: start, tick: tick, rebuild: rebuild };
+})();
+
+// ---------- WORLD ECONOMY (presence row) ----------
+// Every online client publishes { seenAt, netWorth, gdp24 } under its
+// commander name into the shared 'openworld_presence' row (same table
+// and twin-fallback pattern as Wars / Market / Roads). The WORLD
+// ECONOMY panel aggregates it: who's online, what the world earned in
+// the last 24 hours, and the combined net worth of every commander.
+const WorldStats = (() => {
+  const KEY = 'openworld_presence';
+  const POLL_MS = 45000;
+  const ONLINE_WINDOW = 3 * 60 * 1000;    // seen in the last 3 min = online
+  const KEEP_WINDOW = 7 * 24 * 60 * 60 * 1000;
+  let client = null;
+  if (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase) {
+    try { client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch (e) {}
+  }
+  let users = {};       // name → { seenAt, nw, g24 }
+  let timer = null;
+  let last = { online: 0, gdp: 0, net: 0, total: 0 };
+  function readLocal() {
+    try { return JSON.parse(localStorage.getItem(KEY) || '{}').users || {}; } catch (e) { return {}; }
+  }
+  function writeLocal(u) {
+    try { localStorage.setItem(KEY, JSON.stringify({ users: u })); } catch (e) {}
+  }
+  async function fetchRow() {
+    if (!client) return { users: readLocal() };
+    try {
+      const { data, error } = await client.from('openworld_data').select('data').eq('key', KEY).maybeSingle();
+      if (error) throw error;
+      return (data && data.data) || { users: {} };
+    } catch (e) {
+      return { users: readLocal() };
+    }
+  }
+  async function writeRow(u) {
+    writeLocal(u);
+    if (!client) return;
+    try {
+      await client.from('openworld_data')
+        .upsert({ key: KEY, data: { users: u }, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+    } catch (e) { /* twin holds it — next poll retries */ }
+  }
+  function myEntry() {
+    return {
+      seenAt: Date.now(),
+      nw: Math.round(myNetWorth()),
+      g24: Math.round(myGdp24()),
+    };
+  }
+  function mergeInto(usersIn, mine) {
+    const now = Date.now();
+    const out = {};
+    for (const name in usersIn) {
+      const e = usersIn[name];
+      if (!e || typeof e !== 'object') continue;
+      const seenAt = +e.seenAt || 0;
+      if (now - seenAt > KEEP_WINDOW) continue;   // week-stale entries pruned
+      out[name] = { seenAt: seenAt, nw: Math.max(0, +e.nw || 0), g24: Math.max(0, +e.g24 || 0) };
+    }
+    if (mine && CURRENT_USER) out[CURRENT_USER] = mine;
+    return out;
+  }
+  function recompute() {
+    const now = Date.now();
+    let online = 0, gdp = 0, net = 0, total = 0;
+    for (const name in users) {
+      const e = users[name];
+      total++;
+      if (now - e.seenAt < ONLINE_WINDOW) online++;
+      gdp += e.g24;
+      net += e.nw;
+    }
+    last = { online: online, gdp: gdp, net: net, total: total };
+    paint();
+  }
+  function paint() {
+    const on = document.getElementById('we-online');
+    if (on) on.textContent = String(last.online);
+    const gdp = document.getElementById('we-gdp');
+    if (gdp) gdp.textContent = fmtCompact(last.gdp);
+    const net = document.getElementById('we-net');
+    if (net) net.textContent = fmtCompact(last.net);
+  }
+  function fmtCompact(v) {
+    if (v >= 1e9) return '$' + (v / 1e9).toFixed(1) + 'B';
+    if (v >= 1e6) return '$' + (v / 1e6).toFixed(1) + 'M';
+    if (v >= 1e3) return '$' + (v / 1e3).toFixed(1) + 'K';
+    return '$' + Math.round(v).toLocaleString();
+  }
+  async function poll() {
+    if (!CURRENT_USER) return;
+    const row = await fetchRow();
+    users = mergeInto(row.users || {}, myEntry());
+    await writeRow(users);
+    recompute();
+  }
+  function onLogin() {
+    if (timer) clearInterval(timer);
+    poll();
+    timer = setInterval(poll, POLL_MS);
+  }
+  function status() { return client ? 'cloud' : 'local'; }
+  return { onLogin: onLogin, poll: poll, last: () => last, status: status, paint: paint };
+})();
 
 // ====================================================================
 // PLAYER MARKET (v1.23) — commanders trade materials with each other.
@@ -11122,6 +12020,7 @@ const PlayerMarket = (() => {
       const payout = earned - applied;
       STATE.marketEarnedApplied = earned;
       STATE.money += payout;
+      recordIncome(payout);   // v1.25 — player-market earnings feed WORLD GDP
       updateHUD();
       saveGame();
       showToast(`🤝 Player Market: a sale paid out $${payout.toLocaleString()}`, true);
@@ -12310,6 +13209,23 @@ function updateHUD() {
       stockEl.textContent = '$' + Math.round(val);
     }
   }
+  // v1.25 — economy update readouts
+  const stkEl = document.getElementById('stocks-value');
+  if (stkEl) {
+    const sv = stockHoldingsValue();
+    stkEl.textContent = sv >= 1000 ? '$' + (sv / 1000).toFixed(1) + 'k' : '$' + Math.round(sv);
+  }
+  const nwEl = document.getElementById('networth-value');
+  if (nwEl) {
+    const nw = myNetWorth();
+    nwEl.textContent = nw >= 1e6 ? '$' + (nw / 1e6).toFixed(2) + 'M' : (nw >= 1000 ? '$' + (nw / 1000).toFixed(1) + 'k' : '$' + Math.round(nw));
+  }
+  const wageEl = document.getElementById('wage-rate');
+  if (wageEl) {
+    const ws = workerStats();
+    wageEl.textContent = ws.wagePerMin > 0 ? ('$' + Math.round(ws.wagePerMin).toLocaleString() + '/min') : '$0/min';
+  }
+  try { WorldStats.paint(); } catch (e) {}
   const armyEl = document.getElementById('army-count');
   if (armyEl) {
     const troops = Math.floor(STATE.inventory.troops || 0);
@@ -12325,6 +13241,20 @@ function updateHUD() {
   }
   // Casino shortcut — visible when you own at least one casino
   updateGambleButton();
+  // v1.25 — street-kitchen shortcut — visible when you own a food cart
+  const cookBtn = document.getElementById('cook-btn');
+  if (cookBtn) {
+    let hasCart = false;
+    for (const p of STATE.plots) {
+      if (p.userData && p.userData.owned && (p.userData.businesses || []).some(b => b.type === 'foodcart')) { hasCart = true; break; }
+    }
+    if (!hasCart) {
+      for (const [, types] of BUSINESS_REGISTRY) {
+        if (types && types.includes('foodcart')) { hasCart = true; break; }
+      }
+    }
+    cookBtn.style.display = hasCart ? '' : 'none';
+  }
 }
 
 // Apply accumulated production since last tick (called from animate loop).
@@ -12343,13 +13273,17 @@ function tickProduction() {
     if (!types || !types.length) continue;
     const info = plotProductionInfo(plotId);
     if (!info) continue;
-    for (const type of types) {
+    for (let _bi = 0; _bi < types.length; _bi++) {
+      const type = types[_bi];
       const bt = getBusinessType(type);
       if (!bt) continue;
       // Steady production with region bonus (casinos included — the only
-      // gambling left in the game is the interactive slot machine)
+      // gambling left in the game is the interactive slot machine).
+      // v1.25 — hired crews boost this building's output.
+      const _meta = bizMetaOf(plotId, _bi);
+      const _wk = 1 + WORKER_OUTPUT * ((_meta && _meta.workers) || 0);
       const regionBonus = regionBonusById(bt.id, info.region);
-      let produced = bt.rate * info.areaMultiplier * regionBonus * dt;
+      let produced = bt.rate * info.areaMultiplier * regionBonus * _wk * dt;
       if (produced > 0) {
         // Troops are capped by barracks housing — training pauses when
         // every barracks is full (excess troops are never removed)
@@ -12363,6 +13297,18 @@ function tickProduction() {
           anyProduced = true;
         }
       }
+    }
+  }
+  // v1.25 — wages: crews are paid continuously out of credits. When
+  // the treasury runs dry the payroll pauses (workers stay on the
+  // books — top up and production picks back up).
+  const _wage = workerStats();
+  if (_wage.wagePerMin > 0) {
+    STATE.wageDebt = (STATE.wageDebt || 0) + (_wage.wagePerMin / 60) * dt;
+    if (STATE.wageDebt >= 1) {
+      const _due = Math.min(Math.floor(STATE.wageDebt), STATE.money);
+      STATE.money -= _due;
+      STATE.wageDebt -= _due;
     }
   }
   STATE.lastProductionTime = now;
@@ -12437,6 +13383,13 @@ function animate() {
   flushPlotPools();  // apply pending plot recolors (buy/build/demolish)
   tickProduction();  // accumulate materials from businesses
   updateMarket();    // update market prices every 5 minutes
+  try { Ticker.tick(performance.now()); } catch (e) {}   // v1.25 — live market strip crawl
+  // v1.25 — while the Stock Exchange tab is open, refresh its tape
+  animate._stkCounter = (animate._stkCounter || 0) + 1;
+  if (animate._stkCounter >= 240) {
+    animate._stkCounter = 0;
+    try { refreshStockPrices(); } catch (e) {}
+  }
   // Update market countdown if modal is open
   if (document.getElementById('market-modal').classList.contains('show')) {
     const cdEl = document.querySelector('.market-countdown');
@@ -12618,6 +13571,8 @@ window.addEventListener('keydown', (e) => {
     window.closePlotModal();
     window.closeMarketModal();
     window.closeGambling();
+    window.closeCookModal();
+    window.closeCuisineModal();
     window.closeAdmin();
     window.closeLeaderboard();
     window.closeSettings();
