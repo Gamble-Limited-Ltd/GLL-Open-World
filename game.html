@@ -700,6 +700,18 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 #place-banner b{color:#f5cc74}
 #place-banner .pb-key{border:1px solid #6b5320;border-radius:4px;padding:1px 7px;
   font-size:10px;color:#d9b96a;text-transform:uppercase;letter-spacing:1px}
+/* Roads (v1.24) — clickable toggle inside the (pointer-events:none) banner */
+#place-banner .pb-toggle{pointer-events:auto;border:1px solid #6b5320;border-radius:4px;padding:2px 9px;
+  background:rgba(245,204,116,.12);color:#f5cc74;font-size:11px;cursor:pointer;font-family:inherit}
+#place-banner .pb-toggle:hover{background:rgba(245,204,116,.28)}
+
+/* Roads (v1.24) — plot-modal entry */
+.road-entry{margin-top:9px;padding-top:9px;border-top:1px solid rgba(155,180,189,.18)}
+.road-btn{width:100%;padding:7px 10px;font-size:12px;background:rgba(32,42,48,.92);border:1px solid #2c4a55;
+  color:#cfe6dc;cursor:pointer;border-radius:6px;font-family:Arial,sans-serif;transition:all .15s}
+.road-btn:hover{background:rgba(44,74,85,.95);border-color:#f5cc74}
+.road-hint{font-size:10px;color:#8fa9b2;margin-top:4px;line-height:1.55}
+.road-hint b{color:#cfe6dc}
 
 /* What's New popup — scrollable body, capped height */
 #update-modal .plot-card{max-height:min(680px,90vh);display:flex;flex-direction:column;overflow:hidden}
@@ -1502,10 +1514,34 @@ const STATE = {
   // applied exactly once, across reloads and devices.
   marketEarnedApplied: 0,   // lifetime player-market credits already banked
   marketReclaimedIds: [],   // dead listings whose stock was already returned
-  marketRefundedBuys: []    // my purchases already reversed after a race refund
+  marketRefundedBuys: [],   // my purchases already reversed after a race refund
+  // ROADS (v1.24) — my paved tiles, keyed planetId → { "latIdx:lonIdx": 1 }.
+  // Persisted in my save; a shared cloud ledger carries them to other
+  // players (see the Roads module). roadMode/roadErase are session-only.
+  roads: {},
+  roadMode: false,
+  roadErase: false
 };
 
 const EARTH_RADIUS = STATE.radius;
+
+// ====================================================================
+// ROADS (v1.24) — the shared world road grid.
+// Every road tile snaps to a FIXED 1° latitude/longitude grid — the
+// same grid for every player and every planet — so a tile paved at the
+// edge of your plot meets a tile your neighbour paves in the plot next
+// door: one continuous road across the border, no snapping together
+// required. Tile keys are "latIdx:lonIdx" (0..179 : 0..359).
+// ====================================================================
+const ROAD_STEP_DEG = 1.0;                              // cell size in degrees — big enough to read at gameplay zoom
+const ROAD_LAT_CELLS = Math.round(180 / ROAD_STEP_DEG); // 180 lat bands
+const ROAD_LON_CELLS = Math.round(360 / ROAD_STEP_DEG); // 360 lon bands
+const ROAD_TILE_MONEY = 150;                            // $ per tile
+const ROAD_TILE_STONE = 1;                              // 🧱 Stone per tile
+const ROAD_WIDTH = 0.92;                                // road width vs cell size (near-full-cell ribbon — reads clearly from orbit)
+const ROAD_RADIUS_MULT = 1.0055;                        // render height: above plot fills (1.004), below buildings (1.006)
+const ROAD_MAX_CELLS = 4000;                            // per player per planet (ledger guard)
+const ROAD_KEY_RE = /^\d{1,3}:\d{1,3}$/;
 
 // ====================================================================
 // PLANETS — worlds you can buy into. Every planet has its own
@@ -3666,6 +3702,8 @@ function saveGame() {
     marketEarnedApplied: +STATE.marketEarnedApplied || 0,
     marketReclaimedIds: Array.isArray(STATE.marketReclaimedIds) ? STATE.marketReclaimedIds.slice() : [],
     marketRefundedBuys: Array.isArray(STATE.marketRefundedBuys) ? STATE.marketRefundedBuys.slice() : [],
+    // Roads (v1.24) — my paved tiles per planet: { planetId: [[latIdx, lonIdx], ...] }
+    roads: roadsForSave(),
     lastProductionTime: 0  // don't save; reset on load
   };
   try {
@@ -3697,6 +3735,8 @@ function loadGame(username) {
   STATE.marketEarnedApplied = +save.marketEarnedApplied || 0;
   STATE.marketReclaimedIds = Array.isArray(save.marketReclaimedIds) ? save.marketReclaimedIds : [];
   STATE.marketRefundedBuys = Array.isArray(save.marketRefundedBuys) ? save.marketRefundedBuys : [];
+  // Roads (v1.24) — my paved tiles (old saves: none — everyone starts roadless)
+  STATE.roads = roadsFromSave(save.roads);
   // Planets: restore unlocks (default Earth-only for older saves) and make
   // the OWNED set global — it may contain plots on planets whose meshes
   // aren't loaded right now (you're only looking at one world at a time)
@@ -3759,6 +3799,9 @@ function loadGame(username) {
       addBusinessToPlot(plot, bt, idx);
     });
   }
+
+  // Roads (v1.24) — prune to current ownership, render, fetch the world's
+  try { Roads.afterLoad(); } catch (e) { console.warn('[OpenWorld] Roads restore failed:', e); }
 
   return true;
 }
@@ -3944,6 +3987,7 @@ function hidePlaceGhost() {
 
 // --- placement session ---
 function beginPlacement(opts) {
+  if (STATE.roadMode) Roads.exit(true);   // v1.24 — the two click-modes are exclusive
   STATE.placing = { plotId: opts.plotId, type: opts.type || null, mode: opts.mode, index: (opts.index === undefined ? null : opts.index) };
   setPlaceGhostColor(opts.mode === 'move' ? 0x39e0ff : 0xf5cc74);
   // Too far out to see the plots? Glide in so the placement click can land
@@ -3965,6 +4009,7 @@ function cancelPlacement(silent) {
 function updatePlaceBanner() {
   const el = document.getElementById('place-banner');
   if (!el) return;
+  if (STATE.roadMode) { Roads.updateRoadBanner(); return; }   // v1.24 — road mode owns the banner
   const placing = STATE.placing;
   if (!placing || !gameInitialized) { el.style.display = 'none'; return; }
   const plot = ACTIVE_PLOT_BY_ID.get(placing.plotId);
@@ -4058,6 +4103,728 @@ function handlePlacementClick(hit) {
   showToast(`Built ${bt.name} — producing ${rate.toFixed(1)} ${mat.icon}/s`, true);
   saveGame();
 }
+
+// ====================================================================
+// ROADS (v1.24) — pave your plots; the whole world paves with you.
+//   • GRID: every tile snaps to a fixed 0.5° world grid (shared by all
+//     players and planets). A tile paved at the edge of your plot meets
+//     a tile your neighbour paves in the plot next door — one road,
+//     seamlessly across the border.
+//   • BUILD: "Build Roads" on any owned plot → click to pave. Clicks
+//     pave the line from your last tile; click an existing road to
+//     branch off it. $150 + 1 Stone per tile.
+//   • ERASE: toggle in the mode banner removes your own tiles.
+//   • LOOK: merged asphalt meshes with lane markings that read their
+//     4 neighbours — straight, corner, T and cross junctions form
+//     automatically, whatever drew them and whoever owns the land.
+//   • SYNC: my tiles persist in my save; a shared cloud ledger row
+//     ('openworld_roads', same openworld_data table as Wars / Market)
+//     carries everyone's tiles to every client, validated against
+//     live plot ownership — sell the plot and its roads vanish.
+// ====================================================================
+
+// ---- grid math (pure lat/lon — identical on every client) ----
+function dirToRoadCell(localDir) {
+  const lat = Math.asin(THREE.MathUtils.clamp(localDir.y, -1, 1)) * 180 / Math.PI;
+  const lon = Math.atan2(-localDir.z, localDir.x) * 180 / Math.PI;
+  const la = Math.min(ROAD_LAT_CELLS - 1, Math.max(0, Math.floor((lat + 90) / ROAD_STEP_DEG)));
+  const lo = ((Math.floor((lon + 180) / ROAD_STEP_DEG) % ROAD_LON_CELLS) + ROAD_LON_CELLS) % ROAD_LON_CELLS;
+  return { la, lo };
+}
+// Unit direction of a cell's centre (inverse of dirToRoadCell)
+function roadCellCenter(key) {
+  const ci = key.indexOf(':');
+  const la = +key.slice(0, ci), lo = +key.slice(ci + 1);
+  return latLonToDir((la + 0.5) * ROAD_STEP_DEG - 90, (lo + 0.5) * ROAD_STEP_DEG - 180);
+}
+// Neighbouring cell key in 'n' 's' 'e' 'w' (null at the poles)
+function roadNeighborKey(key, d) {
+  const ci = key.indexOf(':');
+  const la = +key.slice(0, ci), lo = +key.slice(ci + 1);
+  if (d === 'n') return la + 1 >= ROAD_LAT_CELLS ? null : (la + 1) + ':' + lo;
+  if (d === 's') return la - 1 < 0 ? null : (la - 1) + ':' + lo;
+  const lo2 = d === 'e' ? (lo + 1) % ROAD_LON_CELLS : (lo - 1 + ROAD_LON_CELLS) % ROAD_LON_CELLS;
+  return la + ':' + lo2;
+}
+// Path of cells between two keys. Sub-stepped + diagonal-filled so every
+// consecutive pair is an orthogonal (edge-sharing) neighbour — roads you
+// lay diagonally still render as connected roads, never corner-beads.
+function roadDDA(a, b) {
+  const ca = a.indexOf(':'), cb = b.indexOf(':');
+  const la1 = +a.slice(0, ca), lo1 = +a.slice(ca + 1);
+  const la2 = +b.slice(0, cb), lo2 = +b.slice(cb + 1);
+  let dlo = lo2 - lo1;
+  if (dlo > ROAD_LON_CELLS / 2) dlo -= ROAD_LON_CELLS;
+  else if (dlo < -ROAD_LON_CELLS / 2) dlo += ROAD_LON_CELLS;
+  const dla = la2 - la1;
+  const dist = Math.max(Math.abs(dla), Math.abs(dlo));
+  const out = [];
+  if (dist === 0) { out.push(a); return out; }
+  if (dist > 1200) {   // absurd span (half the planet) — clamp; cost gates the rest
+    const t = 1200 / dist;
+    return roadDDA(a, (Math.round(la1 + dla * t)) + ':' +
+      ((Math.round(lo1 + dlo * t) % ROAD_LON_CELLS) + ROAD_LON_CELLS) % ROAD_LON_CELLS);
+  }
+  const SUB = 4, n = dist * SUB;
+  let prev = null;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const la = Math.round(la1 + dla * t);
+    const lo = ((Math.round(lo1 + dlo * t) % ROAD_LON_CELLS) + ROAD_LON_CELLS) % ROAD_LON_CELLS;
+    const key = la + ':' + lo;
+    if (key === prev) continue;
+    if (prev !== null) {   // diagonal jump → insert the corner cell
+      const pc = prev.indexOf(':');
+      const pl = +prev.slice(0, pc);
+      if (pl !== la) {
+        const corner = pl + ':' + lo;
+        if (corner !== prev && corner !== key) out.push(corner);
+      }
+    }
+    out.push(key);
+    prev = key;
+  }
+  return out;
+}
+
+// ---- containment: which plot holds a direction? ----
+// Plot cells are true Voronoi regions of their seed centroids, so the
+// containing plot of any point is simply the nearest centroid. A 3°
+// bucket index over the active planet's 6,000 centroids keeps the
+// lookup at ~a dozen dot products.
+const _roadPlotIndex = { sig: '', buckets: null };
+const ROAD_PLOT_BUCKET = 3;
+function _roadPlotBuckets() {
+  const sig = STATE.planet + '#' + STATE.plots.length;
+  if (_roadPlotIndex.sig === sig && _roadPlotIndex.buckets) return _roadPlotIndex.buckets;
+  const NB_LAT = Math.ceil(180 / ROAD_PLOT_BUCKET), NB_LON = Math.ceil(360 / ROAD_PLOT_BUCKET);
+  const buckets = new Array(NB_LAT * NB_LON);
+  for (const p of STATE.plots) {
+    const la = Math.min(NB_LAT - 1, Math.max(0, Math.floor((p.userData.lat + 90) / ROAD_PLOT_BUCKET)));
+    const lo = Math.floor((p.userData.lon + 180) / ROAD_PLOT_BUCKET);
+    const bi = la * NB_LON + ((lo % NB_LON) + NB_LON) % NB_LON;
+    (buckets[bi] = buckets[bi] || []).push(p);
+  }
+  _roadPlotIndex.sig = sig;
+  _roadPlotIndex.buckets = buckets;
+  return buckets;
+}
+function plotAtDir(dir) {
+  if (!dir || !STATE.plots.length) return null;
+  const buckets = _roadPlotBuckets();
+  const NB_LAT = Math.ceil(180 / ROAD_PLOT_BUCKET), NB_LON = Math.ceil(360 / ROAD_PLOT_BUCKET);
+  const lat = Math.asin(THREE.MathUtils.clamp(dir.y, -1, 1)) * 180 / Math.PI;
+  const lon = Math.atan2(-dir.z, dir.x) * 180 / Math.PI;
+  const bi = Math.min(NB_LAT - 1, Math.max(0, Math.floor((lat + 90) / ROAD_PLOT_BUCKET)));
+  const bj = Math.floor((lon + 180) / ROAD_PLOT_BUCKET);
+  let best = null, bestDot = -Infinity;
+  for (let di = -1; di <= 1; di++) {
+    const ii = bi + di;
+    if (ii < 0 || ii >= NB_LAT) continue;
+    for (let dj = -1; dj <= 1; dj++) {
+      const jj = ((bj + dj) % NB_LON) + NB_LON;   // wrapped, never negative
+      const arr = buckets[ii * NB_LON + (jj % NB_LON)];
+      if (!arr) continue;
+      for (const p of arr) {
+        const d = p.userData.localDir.dot(dir);
+        if (d > bestDot) { bestDot = d; best = p; }
+      }
+    }
+  }
+  return best;
+}
+
+// ---- save serialization ----
+function roadsForSave() {
+  const out = {};
+  for (const pid in STATE.roads) {
+    if (!PLANET_BY_ID[pid]) continue;
+    const keys = Object.keys(STATE.roads[pid]);
+    if (keys.length) out[pid] = keys.map(k => {
+      const ci = k.indexOf(':');
+      return [+k.slice(0, ci), +k.slice(ci + 1)];
+    });
+  }
+  return out;
+}
+function roadsFromSave(obj) {
+  const out = {};
+  if (obj && typeof obj === 'object') {
+    for (const pid in obj) {
+      if (!PLANET_BY_ID[pid] || !Array.isArray(obj[pid])) continue;
+      const m = {};
+      for (const c of obj[pid]) {
+        if (!Array.isArray(c)) continue;
+        const la = +c[0], lo = +c[1];
+        if (Number.isInteger(la) && Number.isInteger(lo) &&
+            la >= 0 && la < ROAD_LAT_CELLS && lo >= 0 && lo < ROAD_LON_CELLS) m[la + ':' + lo] = 1;
+      }
+      if (Object.keys(m).length) out[pid] = m;
+    }
+  }
+  return out;
+}
+
+const Roads = (() => {
+  const KEY = 'openworld_roads';
+  const POLL_MS = 15000;
+
+  let client = null;
+  if (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase) {
+    try { client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch (e) {}
+  }
+  let lastCloudOk = client ? Date.now() : 0;
+  let lastCloudFail = 0;
+  const CLOUD_RETRY_MS = 30000;
+
+  let timer = null;
+  let dirty = false;         // local roads not yet in the shared ledger row
+  let writing = false;
+  let pushTimer = null;
+  let foreign = new Map();   // username → Set(cellKey) on the ACTIVE planet
+  let lastForeignSig = '';
+  let lastBuildSig = '';
+  let roadLast = null;       // last laid cell — clicks extend from here
+
+  // ---------- rendering: one merged asphalt mesh + one marking mesh ----------
+  let roadGroup = null, asphaltMat = null, markMat = null;
+  const _tilesByPlot = new Map();   // plotId → rendered tile count (modal hint)
+
+  function ensureGroup() {
+    if (roadGroup) return roadGroup;
+    asphaltMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });
+    markMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });
+    const asph = new THREE.Mesh(new THREE.BufferGeometry(), asphaltMat);
+    const mark = new THREE.Mesh(new THREE.BufferGeometry(), markMat);
+    asph.renderOrder = 6;
+    mark.renderOrder = 7;
+    asph.raycast = () => {};   // never intercept plot picking
+    mark.raycast = () => {};
+    roadGroup = new THREE.Group();
+    roadGroup.add(asph, mark);
+    roadGroup.userData.tileCount = 0;
+    earth.add(roadGroup);
+    return roadGroup;
+  }
+
+  function pruneMyRoads() {
+    const pm = STATE.roads[STATE.planet];
+    if (!pm) return;
+    let changed = false;
+    for (const key of Object.keys(pm)) {
+      const plot = plotAtDir(roadCellCenter(key));
+      if (!plot || !plot.userData.owned) { delete pm[key]; changed = true; }
+    }
+    if (changed) { saveGame(); markDirty(); }
+  }
+
+  // Every tile on the active planet: mine (from STATE, ownership-checked)
+  // plus foreign tiles (ledger, claims-checked). One union grid → tiles
+  // connect across owners exactly like tiles connect across plots.
+  function collectTiles() {
+    const tiles = new Map();
+    const claims = getClaims();
+    for (const key of Object.keys(STATE.roads[STATE.planet] || {})) tiles.set(key, null);
+    for (const [user, set] of foreign) {
+      for (const key of set) {
+        if (tiles.has(key)) continue;
+        const plot = plotAtDir(roadCellCenter(key));
+        if (!plot) continue;
+        if (claims[plot.userData.id] !== user) continue;   // sold / conquered → gone
+        tiles.set(key, user);
+      }
+    }
+    return tiles;
+  }
+
+  function _hash01(n) {
+    const x = Math.sin(n * 12.9898) * 43758.5453;
+    return x - Math.floor(x);
+  }
+  function _pushQuad(pos, col, rgb, p1, p2, p3, p4) {
+    pos.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, p3.x, p3.y, p3.z);
+    pos.push(p1.x, p1.y, p1.z, p3.x, p3.y, p3.z, p4.x, p4.y, p4.z);
+    for (let i = 0; i < 6; i++) col.push(rgb[0], rgb[1], rgb[2]);
+  }
+  // A road arm: the strip from the cell centre C to a shared edge midpoint
+  // E, `width` wide. Both cells touching that edge build their half at the
+  // same width, so arms butt into one continuous surface across the border.
+  // Bright edge lines along both sides make the ribbon read at every zoom.
+  function _arm(pos, col, rgb, mpos, mcol, mrgb, C, E, width) {
+    const side = new THREE.Vector3().crossVectors(C, E).normalize().multiplyScalar(width / 2);
+    _pushQuad(pos, col, rgb,
+      { x: C.x - side.x, y: C.y - side.y, z: C.z - side.z },
+      { x: C.x + side.x, y: C.y + side.y, z: C.z + side.z },
+      { x: E.x + side.x, y: E.y + side.y, z: E.z + side.z },
+      { x: E.x - side.x, y: E.y - side.y, z: E.z - side.z });
+    // lane-edge paint: same offset fractions on both cells sharing the
+    // edge, so the side lines join across plot borders exactly like the
+    // asphalt does. Wide bright shoulders keep the ribbon readable at
+    // gameplay zoom (the road itself is only a few pixels wide there)
+    const e1 = side.clone().multiplyScalar(0.30), e2 = side.clone().multiplyScalar(0.95);
+    _pushQuad(mpos, mcol, mrgb,
+      { x: C.x + e1.x, y: C.y + e1.y, z: C.z + e1.z },
+      { x: C.x + e2.x, y: C.y + e2.y, z: C.z + e2.z },
+      { x: E.x + e2.x, y: E.y + e2.y, z: E.z + e2.z },
+      { x: E.x + e1.x, y: E.y + e1.y, z: E.z + e1.z });
+    _pushQuad(mpos, mcol, mrgb,
+      { x: C.x - e1.x, y: C.y - e1.y, z: C.z - e1.z },
+      { x: C.x - e2.x, y: C.y - e2.y, z: C.z - e2.z },
+      { x: E.x - e2.x, y: E.y - e2.y, z: E.z - e2.z },
+      { x: E.x - e1.x, y: E.y - e1.y, z: E.z - e1.z });
+  }
+  // Centre-line dash — bright paint like the edge lines, running 62% along
+  // the arm; dashes meet at tile centres so straight runs form one line
+  function _dash(pos, col, rgb, mpos, mcol, mrgb, C, E, width) {
+    const D = new THREE.Vector3().lerpVectors(C, E, 0.62);
+    const side = new THREE.Vector3().crossVectors(C, D).normalize().multiplyScalar(width * 0.17 / 2);
+    _pushQuad(mpos, mcol, mrgb,
+      { x: C.x - side.x, y: C.y - side.y, z: C.z - side.z },
+      { x: C.x + side.x, y: C.y + side.y, z: C.z + side.z },
+      { x: D.x + side.x, y: D.y + side.y, z: D.z + side.z },
+      { x: D.x - side.x, y: D.y - side.y, z: D.z - side.z });
+  }
+
+  function rebuild() {
+    if (!gameInitialized || !earth || !plotFillMesh) return;
+    ensureGroup();
+    pruneMyRoads();
+    const tiles = collectTiles();
+    const sig = STATE.planet + '|' + tiles.size + '|' + lastForeignSig;
+    if (sig === lastBuildSig) { return; }
+    lastBuildSig = sig;
+
+    const stepRad = ROAD_STEP_DEG * Math.PI / 180;
+    const R = EARTH_RADIUS * ROAD_RADIUS_MULT;
+    const ASPH = [0.138, 0.152, 0.165];   // #232729 dark asphalt
+    const MARK = [0.871, 0.682, 0.404];   // #deae66 warm sand paint — pops against teal terrain at every zoom
+    const apos = [], acol = [], mpos = [], mcol = [];
+    _tilesByPlot.clear();
+
+    for (const [key] of tiles) {
+      const ci = key.indexOf(':');
+      const la = +key.slice(0, ci), lo = +key.slice(ci + 1);
+      const latC = (la + 0.5) * ROAD_STEP_DEG - 90;
+      const lonC = (lo + 0.5) * ROAD_STEP_DEG - 180;
+      const lon0 = lo * ROAD_STEP_DEG - 180, lon1 = (lo + 1) * ROAD_STEP_DEG - 180;
+      const lat0 = la * ROAD_STEP_DEG - 90, lat1 = (la + 1) * ROAD_STEP_DEG - 90;
+      const C = latLonToDir(latC, lonC).multiplyScalar(R);
+      const E = latLonToDir(latC, lon1).multiplyScalar(R);
+      const W = latLonToDir(latC, lon0).multiplyScalar(R);
+      const N = latLonToDir(lat1, lonC).multiplyScalar(R);
+      const S = latLonToDir(lat0, lonC).multiplyScalar(R);
+      const wEW = ROAD_WIDTH * stepRad * R;                                       // width across latitude
+      const wNS = ROAD_WIDTH * stepRad * Math.max(0.02, Math.cos(latC * Math.PI / 180)) * R;  // across longitude
+      const sh = 0.90 + 0.18 * _hash01(la * 719 + lo);
+      const rgb = [ASPH[0] * sh, ASPH[1] * sh, ASPH[2] * sh];
+
+      let arms = 0;
+      const nE = roadNeighborKey(key, 'e'), nW = roadNeighborKey(key, 'w');
+      const nN = roadNeighborKey(key, 'n'), nS = roadNeighborKey(key, 's');
+      if (nE && tiles.has(nE)) { _arm(apos, acol, rgb, mpos, mcol, MARK, C, E, wEW); _dash(apos, acol, rgb, mpos, mcol, MARK, C, E, wEW); arms++; }
+      if (nW && tiles.has(nW)) { _arm(apos, acol, rgb, mpos, mcol, MARK, C, W, wEW); _dash(apos, acol, rgb, mpos, mcol, MARK, C, W, wEW); arms++; }
+      if (nN && tiles.has(nN)) { _arm(apos, acol, rgb, mpos, mcol, MARK, C, N, wNS); _dash(apos, acol, rgb, mpos, mcol, MARK, C, N, wNS); arms++; }
+      if (nS && tiles.has(nS)) { _arm(apos, acol, rgb, mpos, mcol, MARK, C, S, wNS); _dash(apos, acol, rgb, mpos, mcol, MARK, C, S, wNS); arms++; }
+      if (arms === 0) {
+        // isolated stub — a small square at the cell centre
+        const a = new THREE.Vector3().subVectors(E, C).normalize().multiplyScalar(wNS / 2);
+        const b = new THREE.Vector3().subVectors(N, C).normalize().multiplyScalar(wEW / 2);
+        _pushQuad(apos, acol, rgb,
+          { x: C.x - a.x - b.x, y: C.y - a.y - b.y, z: C.z - a.z - b.z },
+          { x: C.x + a.x - b.x, y: C.y + a.y - b.y, z: C.z + a.z - b.z },
+          { x: C.x + a.x + b.x, y: C.y + a.y + b.y, z: C.z + a.z + b.z },
+          { x: C.x - a.x + b.x, y: C.y - a.y + b.y, z: C.z - a.z + b.z });
+      }
+      const plot = plotAtDir(roadCellCenter(key));
+      if (plot) _tilesByPlot.set(plot.userData.id, (_tilesByPlot.get(plot.userData.id) || 0) + 1);
+    }
+
+    const asph = roadGroup.children[0], mark = roadGroup.children[1];
+    asph.geometry.dispose();
+    const g1 = new THREE.BufferGeometry();
+    g1.setAttribute('position', new THREE.Float32BufferAttribute(apos, 3));
+    g1.setAttribute('color', new THREE.Float32BufferAttribute(acol, 3));
+    asph.geometry = g1;
+    mark.geometry.dispose();
+    const g2 = new THREE.BufferGeometry();
+    g2.setAttribute('position', new THREE.Float32BufferAttribute(mpos, 3));
+    g2.setAttribute('color', new THREE.Float32BufferAttribute(mcol, 3));
+    mark.geometry = g2;
+    roadGroup.userData.tileCount = tiles.size;
+
+    // apply the current zoom fade right away (updatePlotVisibility keeps it in sync)
+    const t = 1 - THREE.MathUtils.clamp((camera.position.length() - STATE.plotFullDist) /
+      (STATE.plotRevealDist - STATE.plotFullDist), 0, 1);
+    setOpacity(t, t > 0.02);
+  }
+
+  function setOpacity(t, showAny) {
+    if (!roadGroup) return;
+    roadGroup.visible = !!(showAny && roadGroup.userData.tileCount > 0);
+    // Roads keep a punchy floor while the plot layer is up — they're thin
+    // features and would wash out at the far end of the plot zoom band
+    if (asphaltMat) asphaltMat.opacity = Math.max(t * 0.96, 0.78);
+    if (markMat) markMat.opacity = Math.max(t * 0.9, 0.82);
+  }
+
+  function tilesOnPlot(plot) {
+    return _tilesByPlot.get(plot.userData.id) || 0;
+  }
+
+  // ---------- ghost: hovered cell + path preview ----------
+  let ghostGroup = null, ghostSig = '';
+  function ensureGhost() {
+    if (ghostGroup) return;
+    const prevMat = new THREE.MeshBasicMaterial({ color: 0x39e0ff, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false });
+    const fillMat = new THREE.MeshBasicMaterial({ color: 0xf5cc74, transparent: true, opacity: 0.40, side: THREE.DoubleSide, depthWrite: false });
+    const prev = new THREE.Mesh(new THREE.BufferGeometry(), prevMat);
+    const fill = new THREE.Mesh(new THREE.BufferGeometry(), fillMat);
+    prev.renderOrder = 8;
+    fill.renderOrder = 9;
+    prev.raycast = () => {};
+    fill.raycast = () => {};
+    ghostGroup = new THREE.Group();
+    ghostGroup.add(prev, fill);
+    ghostGroup.userData.meshes = [prev, fill];
+    ghostGroup.visible = false;
+    earth.add(ghostGroup);
+  }
+  function _cellCornersQuad(la, lo, R) {
+    const lat0 = la * ROAD_STEP_DEG - 90, lat1 = (la + 1) * ROAD_STEP_DEG - 90;
+    const lon0 = lo * ROAD_STEP_DEG - 180, lon1 = (lo + 1) * ROAD_STEP_DEG - 180;
+    return [
+      latLonToDir(lat0, lon0).multiplyScalar(R),
+      latLonToDir(lat0, lon1).multiplyScalar(R),
+      latLonToDir(lat1, lon1).multiplyScalar(R),
+      latLonToDir(lat1, lon0).multiplyScalar(R)
+    ];
+  }
+  function updateGhost(hit) {
+    if (!STATE.roadMode || !hit || !hit.point) { hideGhost(); return; }
+    ensureGhost();
+    const local = earth.worldToLocal(hit.point.clone()).normalize();
+    const cell = dirToRoadCell(local);
+    const key = cell.la + ':' + cell.lo;
+    const pm = STATE.roads[STATE.planet] || {};
+    const plot = plotAtDir(roadCellCenter(key));
+    const mine = !!pm[key];
+    const sig = key + '|' + (roadLast || '-') + '|' + (STATE.roadErase ? 'e' : 'p') +
+      '|' + (plot && plot.userData.owned ? 1 : 0) + '|' + (mine ? 1 : 0);
+    if (sig === ghostSig) return;
+    ghostSig = sig;
+
+    const R = EARTH_RADIUS * (ROAD_RADIUS_MULT + 0.0006);
+    const [prev, fill] = ghostGroup.userData.meshes;
+    // hovered cell (amber = yours to pave, cyan = your road, red = not your land)
+    const corners = _cellCornersQuad(cell.la, cell.lo, R);
+    const fpos = [];
+    _pushQuad(fpos, [], [1, 1, 1], corners[0], corners[1], corners[2], corners[3]);
+    fill.geometry.dispose();
+    const gf = new THREE.BufferGeometry();
+    gf.setAttribute('position', new THREE.Float32BufferAttribute(fpos, 3));
+    fill.geometry = gf;
+    fill.material.color.setHex(
+      STATE.roadErase ? (mine ? 0x39e0ff : 0xff7070)
+        : (mine ? 0x39e0ff : (plot && plot.userData.owned ? 0xf5cc74 : 0xff7070)));
+
+    // path preview: cells the next click would pave
+    const ppos = [];
+    if (!STATE.roadErase && roadLast && pm[roadLast] && !mine) {
+      for (const k2 of roadDDA(roadLast, key).slice(0, 220)) {
+        if (pm[k2]) continue;
+        const p2 = plotAtDir(roadCellCenter(k2));
+        if (!p2 || !p2.userData.owned) continue;
+        const ci2 = k2.indexOf(':');
+        const q = _cellCornersQuad(+k2.slice(0, ci2), +k2.slice(ci2 + 1), R);
+        _pushQuad(ppos, [], [1, 1, 1], q[0], q[1], q[2], q[3]);
+      }
+    }
+    prev.geometry.dispose();
+    const gp = new THREE.BufferGeometry();
+    gp.setAttribute('position', new THREE.Float32BufferAttribute(ppos, 3));
+    prev.geometry = gp;
+    prev.visible = ppos.length > 0;
+    ghostGroup.visible = true;
+  }
+  function hideGhost() {
+    if (ghostGroup) ghostGroup.visible = false;
+    ghostSig = '';
+  }
+
+  // ---------- interaction ----------
+  function enter() {
+    if (!gameInitialized || !CURRENT_USER) { showToast('Enter the world first', false); return; }
+    if (!STATE.owned.size) { showToast('Buy a plot first — roads go on your own land', false); return; }
+    if (STATE.placing) cancelPlacement(true);
+    STATE.roadMode = true;
+    STATE.roadErase = false;
+    roadLast = null;
+    closePlotModal();
+    const dist = camera.position.distanceTo(controls.target);
+    if (dist > STATE.plotRevealDist) STATE.zoomTarget = STATE.plotFullDist;
+    updateRoadBanner();
+    renderer.domElement.style.cursor = 'crosshair';
+    showToast('🛣 Road Mode — click inside your plots to pave; roads join across borders', true);
+  }
+  function exit(silent) {
+    if (!STATE.roadMode) return;
+    STATE.roadMode = false;
+    STATE.roadErase = false;
+    roadLast = null;
+    hideGhost();
+    updateRoadBanner();
+    renderer.domElement.style.cursor = 'grab';
+    if (!silent) showToast('Road Mode off', false);
+  }
+  function toggleErase() {
+    STATE.roadErase = !STATE.roadErase;
+    roadLast = null;
+    ghostSig = '';
+    updateRoadBanner();
+  }
+
+  function handleClick(hit) {
+    if (!gameInitialized || !hit || !hit.point) return;
+    const local = earth.worldToLocal(hit.point.clone()).normalize();
+    const cell = dirToRoadCell(local);
+    const key = cell.la + ':' + cell.lo;
+    if (STATE.roadErase) { eraseCell(key); return; }
+    const pm = STATE.roads[STATE.planet] || (STATE.roads[STATE.planet] = {});
+    if (pm[key]) {
+      roadLast = key;   // click an existing road → branch off it
+      showToast('Branching from this road — click where it goes next', true);
+      ghostSig = '';
+      updateGhost(hit);
+      return;
+    }
+    const from = (roadLast && pm[roadLast]) ? roadLast : null;
+    layCells(from ? roadDDA(from, key) : [key]);
+    if (pm[key]) roadLast = key;
+  }
+
+  function layCells(keys) {
+    if (!keys || !keys.length) return;
+    const pm = STATE.roads[STATE.planet] || (STATE.roads[STATE.planet] = {});
+    const fresh = [];
+    let skipped = 0;
+    for (const key of keys.slice(0, ROAD_MAX_CELLS)) {
+      if (pm[key]) continue;
+      const plot = plotAtDir(roadCellCenter(key));
+      if (!plot || !plot.userData.owned) { skipped++; continue; }
+      fresh.push(key);
+    }
+    if (!fresh.length) {
+      if (skipped) showToast('Roads must stay inside land you own', false);
+      return;
+    }
+    const cost = fresh.length * ROAD_TILE_MONEY;
+    const stone = fresh.length * ROAD_TILE_STONE;
+    if (STATE.money + 1e-6 < cost) {
+      showToast(`Paving ${fresh.length} tiles needs $${cost.toLocaleString()} — you have $${Math.floor(STATE.money).toLocaleString()}`, false);
+      return;
+    }
+    if ((STATE.inventory.stone || 0) + 1e-6 < stone) {
+      showToast(`Paving ${fresh.length} tiles needs 🧱 ${stone} Stone — you hold ${Math.floor(STATE.inventory.stone || 0)}. Quarries produce it, or buy some on the Player Market`, false);
+      return;
+    }
+    STATE.money -= cost;
+    STATE.inventory.stone = Math.max(0, (STATE.inventory.stone || 0) - stone);
+    for (const key of fresh) pm[key] = 1;
+    updateHUD();
+    rebuild();
+    markDirty();
+    saveGame();
+    showToast(`🛣 Paved ${fresh.length} tile${fresh.length > 1 ? 's' : ''}${skipped ? ` — ${skipped} skipped (not your land)` : ''}`, true);
+  }
+
+  function eraseCell(key) {
+    const pm = STATE.roads[STATE.planet];
+    if (!pm || !pm[key]) { showToast('No road of yours here', false); return; }
+    delete pm[key];
+    if (roadLast === key) roadLast = null;
+    ghostSig = '';
+    rebuild();
+    markDirty();
+    saveGame();
+    showToast('Road tile removed', true);
+  }
+
+  // ---------- mode banner (shares #place-banner with free placement) ----------
+  function updateRoadBanner() {
+    const el = document.getElementById('place-banner');
+    if (!el) return;
+    if (!STATE.roadMode || !gameInitialized || STATE.placing) {
+      if (!STATE.placing && !STATE.roadMode) el.style.display = 'none';
+      return;
+    }
+    if (STATE.roadErase) {
+      el.innerHTML = `🧹 <b>Road Erase</b> — click your road tiles to remove them&ensp;<button class="pb-toggle" onclick="Roads.toggleErase()">🛣 Back to paving</button>&ensp;<span class="pb-key">Esc</span> <span class="pb-key">right-click</span> exit`;
+    } else {
+      el.innerHTML = `🛣 <b>Road Mode</b> — click to pave <b>$${ROAD_TILE_MONEY} + 🧱${ROAD_TILE_STONE} Stone</b> per tile · click an existing road to branch&ensp;<button class="pb-toggle" onclick="Roads.toggleErase()">🧹 Erase</button>&ensp;<span class="pb-key">Esc</span> <span class="pb-key">right-click</span> exit`;
+    }
+    el.style.display = 'flex';
+  }
+
+  // ---------- cloud ledger (shared row, same pattern as Wars / Market) ----------
+  function readLocal() {
+    try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { return {}; }
+  }
+  function writeLocal(data) {
+    try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {}
+  }
+  async function fetchRow() {
+    if (!client) return readLocal();
+    try {
+      const { data, error } = await client.from('openworld_data').select('data').eq('key', KEY).maybeSingle();
+      if (error) throw error;
+      lastCloudOk = Date.now();
+      return (data && data.data && typeof data.data === 'object') ? data.data : {};
+    } catch (e) {
+      return readLocal();   // cloud unreachable — degrade to the twin
+    }
+  }
+  async function writeRow(data) {
+    writeLocal(data);   // twin first — same-machine roads always work
+    if (!client) return true;
+    if (Date.now() - lastCloudOk > CLOUD_RETRY_MS && Date.now() - lastCloudFail < CLOUD_RETRY_MS) return false;
+    try {
+      const { error } = await client.from('openworld_data')
+        .upsert({ key: KEY, data, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+      if (error) throw error;
+      lastCloudOk = Date.now();
+      lastCloudFail = 0;
+      return true;
+    } catch (e) {
+      lastCloudFail = Date.now();
+      return false;
+    }
+  }
+
+  function markDirty() {
+    dirty = true;
+    if (pushTimer) clearTimeout(pushTimer);
+    pushTimer = setTimeout(() => { pushTimer = null; pushLedger(); }, 2500);
+  }
+  async function pushLedger() {
+    if (!CURRENT_USER || !dirty || writing) return;
+    writing = true;
+    try {
+      const row = await fetchRow();
+      const entry = { t: Date.now(), p: {} };
+      for (const pid in STATE.roads) {
+        if (!PLANET_BY_ID[pid]) continue;
+        const keys = Object.keys(STATE.roads[pid]).slice(0, ROAD_MAX_CELLS);
+        if (keys.length) entry.p[pid] = keys.join(';');
+      }
+      row[CURRENT_USER] = entry;
+      const ok = await writeRow(row);
+      if (ok) dirty = false;
+    } catch (e) { /* keep dirty — poll retries */ }
+    writing = false;
+  }
+
+  async function poll() {
+    if (!CURRENT_USER) return;
+    try {
+      const row = await fetchRow();
+      const next = new Map();
+      for (const user in row) {
+        if (!user || user === CURRENT_USER || user.length > 40) continue;
+        const e = row[user];
+        if (!e || typeof e !== 'object' || typeof e.t !== 'number') continue;
+        const s = e.p && e.p[STATE.planet];
+        if (typeof s !== 'string' || !s.length) continue;
+        const set = new Set();
+        for (const part of s.split(';')) {
+          if (!ROAD_KEY_RE.test(part)) continue;
+          const ci2 = part.indexOf(':');
+          if (+part.slice(0, ci2) >= ROAD_LAT_CELLS || +part.slice(ci2 + 1) >= ROAD_LON_CELLS) continue;   // wrong-grid / stale keys
+          set.add(part);
+          if (set.size >= ROAD_MAX_CELLS) break;
+        }
+        if (set.size) next.set(user, set);
+      }
+      const sig = [...next.entries()].map(([u, st]) => u + ':' + st.size).sort().join('|');
+      if (sig !== lastForeignSig) {
+        foreign = next;
+        lastForeignSig = sig;
+        rebuild();
+      }
+    } catch (e) { /* roads are best-effort */ }
+    if (dirty && !pushTimer) pushLedger();
+  }
+
+  // ---------- lifecycle ----------
+  function onLogin() {
+    if (!timer) timer = setInterval(poll, POLL_MS);
+    poll();
+  }
+  function afterLoad() {
+    lastBuildSig = '';
+    rebuild();
+    poll();   // foreign roads for this world, right away
+  }
+  function onTravel() {
+    foreign = new Map();
+    lastForeignSig = '';
+    lastBuildSig = '';
+    hideGhost();
+    rebuild();
+    poll();
+  }
+  function teardown() {
+    if (STATE.roadMode) exit(true);
+    if (roadGroup) {
+      for (const m of roadGroup.children) {
+        if (m.geometry) m.geometry.dispose();
+        if (m.material) m.material.dispose();
+      }
+      earth.remove(roadGroup);
+      roadGroup = null; asphaltMat = null; markMat = null;
+    }
+    if (ghostGroup) {
+      for (const m of ghostGroup.children) {
+        if (m.geometry) m.geometry.dispose();
+        if (m.material) m.material.dispose();
+      }
+      earth.remove(ghostGroup);
+      ghostGroup = null;
+    }
+    ghostSig = ''; roadLast = null; lastBuildSig = '';
+    foreign = new Map(); lastForeignSig = '';
+    _tilesByPlot.clear();
+  }
+
+  // ---------- QA hooks (precedent: __qaOpenPlotById) ----------
+  function qaInfo() {
+    const asph = roadGroup ? roadGroup.children[0] : null;
+    const mark = roadGroup ? roadGroup.children[1] : null;
+    const tri = (m) => (m && m.geometry && m.geometry.attributes.position) ? m.geometry.attributes.position.count / 3 : 0;
+    return {
+      planet: STATE.planet, mode: STATE.roadMode, erase: STATE.roadErase,
+      mine: Object.keys(STATE.roads[STATE.planet] || {}).length,
+      mineAll: Object.keys(STATE.roads).reduce((n, pid) => n + Object.keys(STATE.roads[pid] || {}).length, 0),
+      foreignUsers: [...foreign.keys()],
+      foreignTiles: [...foreign.values()].reduce((n, s) => n + s.size, 0),
+      tilesRendered: roadGroup ? (roadGroup.userData.tileCount || 0) : 0,
+      groupVisible: !!(roadGroup && roadGroup.visible),
+      asphaltTris: Math.round(tri(asph)), markTris: Math.round(tri(mark)),
+      ledgerDirty: dirty
+    };
+  }
+  function qaClickDir(latDeg, lonDeg) {
+    const dir = latLonToDir(latDeg, lonDeg);
+    const p = earth.localToWorld(dir.clone().multiplyScalar(EARTH_RADIUS * 1.02));
+    handleClick({ plot: plotAtDir(dir), point: p });
+    return qaInfo();
+  }
+
+  return { enter, exit, toggleErase, handleClick, updateGhost, hideGhost,
+           updateRoadBanner, rebuild, setOpacity, tilesOnPlot,
+           onLogin, afterLoad, onTravel, teardown, poll, qaInfo, qaClickDir };
+})();
+window.Roads = Roads;
+window.__qaRoadInfo = () => Roads.qaInfo();
 
 // ====================================================================
 // WAR MARCH FX (v1.18) — armies you send to take another plot now
@@ -4586,8 +5353,13 @@ window.WarFx = WarFx;
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.23';
+const GAME_VERSION = 'v1.24';
 const RELEASE_NOTES = [
+  { v: 'v1.24', items: [
+    '🛣 <b>Roads!</b> — pave your own plots with real roads. Open any plot you own and hit Build Roads: click tile by tile, or click once and again further away — the whole line between them paves itself. Click an existing road to branch off it, and toggle Erase in the mode bar to remove your tiles. $150 + 1 Stone per tile.',
+    '🌍 <b>Roads connect across borders</b> — every tile snaps to the same world-wide road grid, so a road you pave to the edge of your plot automatically joins up with roads other players pave in the plots next door. Straight runs, corners, T-junctions and crossroads all form by themselves, whoever owns the land.',
+    '👀 <b>See the world\'s roads live</b> — other commanders\' roads appear on your globe as they build them (and yours on theirs), synced through the cloud. Sell a plot and its roads vanish; conquer one and they\'re yours to re-pave.'
+  ]},
   { v: 'v1.23', items: [
     '🤝 <b>The Player Market is open</b> — commanders now trade directly with each other. List any material you produce at YOUR price; other players buy it (whole or partial) and the credits land in your account automatically. Short on a part for your next build? Buy it from a rival instead of waiting for your own production.',
     '🧪 <b>Sixteen new materials</b> — Timber, Stone, Seafood, Glass, Steel, Chemicals, Plastic, Energy, Hydrogen, Crystals, Components, Data, Media, Research, Medicine and Luxuries join the economy. Every one has its own market price and can be produced, stockpiled, sold to the system Market — or flipped to other players at a markup.',
@@ -4858,6 +5630,7 @@ window.loginSubmit = function() {
   try { Chat.onLogin(); } catch (e) {}   // show 💬 tab + start live chat polling
   try { Wars.onLogin(); } catch (e) {}   // start war-march polling (arrivals, warnings)
   try { PlayerMarket.onLogin(); } catch (e) {}   // start player-market polling (listings, payouts)
+  try { Roads.onLogin(); } catch (e) {}   // start road-ledger polling (v1.24 — everyone's tiles)
   document.getElementById('login-screen').classList.add('hide');
   setTimeout(() => {
     document.getElementById('login-screen').style.display = 'none';
@@ -6524,12 +7297,15 @@ function initScene() {
   // the ghost hides when the pointer leaves the canvas
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && STATE.placing) cancelPlacement();
+    if (e.key === 'Escape' && STATE.roadMode) Roads.exit();   // v1.24
   });
   renderer.domElement.addEventListener('contextmenu', (e) => {
     if (STATE.placing) { e.preventDefault(); cancelPlacement(); }
+    else if (STATE.roadMode) { e.preventDefault(); Roads.exit(); }   // v1.24
   });
   renderer.domElement.addEventListener('pointerleave', () => {
     if (STATE.placing) hidePlaceGhost();
+    if (STATE.roadMode) Roads.hideGhost();   // v1.24
   });
 
   const qbtn = document.getElementById('quality-btn');
@@ -8514,6 +9290,8 @@ function updatePlotVisibility() {
     plotOwnedMesh.material.opacity = Math.max(baseOpacity * 0.95, 0.4);
     plotOwnedOutlineMesh.material.opacity = Math.max(baseOpacity * 1.0, 0.7);
   }
+  // Roads (v1.24) — fade in with the plots, vanish from orbit with them
+  try { Roads.setOpacity(baseOpacity, showAny); } catch (e) {}
 
   // Business meshes follow their plot's near side (the Earth rotates)
   if (hasClaims) {
@@ -8599,12 +9377,16 @@ function processPointerPick() {
       hidePlaceGhost();
     }
   }
+  // Roads (v1.24): the ghost tile + path preview track the hovered cell
+  if (STATE.roadMode) {
+    try { Roads.updateGhost(_mvHit); } catch (e) {}
+  }
 
   const tip = document.getElementById('plot-tip');
   if (hitPlot) {
     STATE.hoveredPlot = hitPlot;
     const _placingHere = STATE.placing && _mvHit && _mvHit.plot === ACTIVE_PLOT_BY_ID.get(STATE.placing.plotId);
-    renderer.domElement.style.cursor = _placingHere ? 'crosshair' : 'pointer';
+    renderer.domElement.style.cursor = (_placingHere || STATE.roadMode) ? 'crosshair' : 'pointer';
     tip.style.display = 'block';
     tip.style.left = e.clientX + 'px';
     tip.style.top = e.clientY + 'px';
@@ -8662,6 +9444,11 @@ function onPointerClick(e) {
   raycaster.setFromCamera(pointer, camera);
   const _clickHit = pickPlotHit();
   const hit = _clickHit ? _clickHit.plot : null;
+  // Roads (v1.24): road-mode clicks pave / erase tiles (before other modes)
+  if (STATE.roadMode) {
+    try { Roads.handleClick(_clickHit); } catch (e) {}
+    return;
+  }
   // Free placement: an armed click confirms the spot (or re-hints the plot)
   if (STATE.placing) {
     handlePlacementClick(_clickHit);
@@ -8829,11 +9616,22 @@ function openPlotModal(plot) {
       `;
     }
 
+    // Roads (v1.24) — paving entry for owned plots (road mode then works
+    // across ALL your land, not just this plot)
+    const _roadTilesHere = (() => { try { return Roads.tilesOnPlot(plot); } catch (e) { return 0; } })();
+    const roadEntry = `
+      <div class="road-entry">
+        <button class="road-btn" onclick="Roads.enter()">🛣 Build Roads${_roadTilesHere ? ` — ${_roadTilesHere} tile${_roadTilesHere > 1 ? 's' : ''} here` : ''}</button>
+        <div class="road-hint">$${ROAD_TILE_MONEY} + 🧱${ROAD_TILE_STONE} Stone per tile · click-to-pave in any of your plots · <b>roads connect across plot borders — and to other players' roads</b></div>
+      </div>
+    `;
+
     businessPanel = `
       <div class="business-panel">
         <div class="biz-hint">Region: <b style="color:${regionInfo.color}">${regionInfo.icon} ${regionInfo.name}</b> · Capacity: <b>${businesses.length}/${maxBiz}</b> businesses · <b style="color:#7fffd4">builds go where you click</b></div>
         ${bizCards}
         ${buildSection}
+        ${roadEntry}
       </div>
     `;
   }
@@ -9089,6 +9887,7 @@ window.travelTo = function(planetId) {
   STATE.claimedPlots = [];
   plotFillMesh = plotOwnedMesh = plotOutlineMesh = plotOwnedOutlineMesh = null;
   WarFx.reset();   // v1.18 — march fx belong to the world you're leaving
+  Roads.teardown();   // v1.24 — the road layer belongs to the world you're leaving
 
   // Swap the world
   earth.material = planetMaterial(planet);
@@ -9122,6 +9921,7 @@ window.travelTo = function(planetId) {
   }
   applyClaimColors();
   classifyPlotsByTerrain();   // Earth only — refreshes terrain from the masks
+  try { Roads.onTravel(); } catch (e) {}   // v1.24 — road layer for THIS world
   updateHUD();
   saveGame();
   showToast(`${planet.icon} Arrived at ${planet.name}${stripped ? ` — ⚔️ ${stripped} of your plots here were conquered while you were away` : ''}`, true);
@@ -11697,6 +12497,13 @@ function animate() {
         _m.opacity = _m.userData._base * (0.72 + 0.28 * (0.5 + 0.5 * Math.sin(_pt * 5.5 + 1.2)));
       }
     }
+  }
+  // Roads (v1.24): road mode yields the same way when a modal takes over
+  if (STATE.roadMode &&
+      (document.getElementById('game').classList.contains('hidden') ||
+       document.querySelector('.plot-modal.show') || document.querySelector('.clans-overlay.show') ||
+       STATE.multiBuy || STATE.multiSell || STATE.placing)) {
+    try { Roads.exit(true); } catch (e) {}
   }
   // Sun rides just off the camera's shoulder (rotated ~35 degrees right):
   // the globe always shows a day/night terminator like a real orbital view,
