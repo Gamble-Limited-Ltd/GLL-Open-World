@@ -5690,8 +5690,12 @@ window.WarFx = WarFx;
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.27';
+const GAME_VERSION = 'v1.28';
 const RELEASE_NOTES = [
+  { v: 'v1.28', items: [
+    '🏠 <b>Login returns to the home page</b> — signing in with your name and password now lands you on the home screen first: your Budget, Plots and Businesses at a glance, and the big ENTER WORLD button when you\'re ready to deploy. No more being thrown straight into orbit.',
+    '⚡ <b>Reloads resume instantly</b> — reload the page mid-game and the same tab picks up right where you left off, straight into the world. And the in-game <b>HOME</b> button now actually takes you home: it lands on this home page instead of dropping you back into orbit. (Logging out signs you out for real.)'
+  ]},
   { v: 'v1.27', items: [
     '🌍 <b>Login from any device</b> — signing in no longer races the background cloud sync. If this browser doesn\'t hold your account yet, the login now fetches it <b>straight from the cloud</b>: enter your name and password anywhere in the world and your empire is right there — plots, businesses, credits and all.',
     '⏳ <b>Clearer login feedback</b> — you\'ll see “Fetching your account from the cloud…” while it retrieves your empire, and if an account truly doesn\'t exist the message now tells you whether the cloud was checked (and reminds you names are case-sensitive).'
@@ -5999,6 +6003,10 @@ window.loginSubmit = async function() {
   // Success — proceed to menu
   CURRENT_USER = name;
   errEl.textContent = '';
+  // v1.28 — remember this login for the tab's lifetime: reloading the
+  // page mid-game resumes straight into the world (the launch script's
+  // auto-login). sessionStorage dies with the tab; logout clears it.
+  try { sessionStorage.setItem('openworld_session', JSON.stringify({ name, pwd })); } catch (e) {}
   updateMenuWelcome();
   try { Chat.onLogin(); } catch (e) {}   // show 💬 tab + start live chat polling
   try { Wars.onLogin(); } catch (e) {}   // start war-march polling (arrivals, warnings)
@@ -6152,6 +6160,7 @@ function renderLeaderboard() {
 
 window.logout = function() {
   saveGame();  // save before logging out
+  try { sessionStorage.removeItem('openworld_session'); } catch (e) {}
   CURRENT_USER = null;
   location.reload();
 };
@@ -13932,12 +13941,12 @@ window.enterGame = function() {
 };
 
 window.exitGame = function() {
-  // Navigate to the landing page (home) instead of the in-game menu screen.
-  // The landing page's session check will detect the existing sessionStorage
-  // session and auto-skip the login overlay, so the user sees the home page
-  // immediately.
-  try { saveGame && saveGame(); } catch (e) {}  // best-effort autosave before leaving
-  location.href = './';
+  // v1.28 — HOME button: swap straight back to the home (menu) screen
+  // in-page — no reload round-trip. The world keeps producing behind it,
+  // and Enter World drops you right back where you were.
+  try { saveGame && saveGame(); } catch (e) {}
+  document.getElementById('game').classList.add('hidden');
+  document.getElementById('menu').classList.remove('hidden');
 };
 
 window.openSettings = function() { renderSettingsQuality(); document.getElementById('settings').classList.add('show'); };
@@ -13990,9 +13999,23 @@ window.addEventListener('keydown', (e) => {
 
   // Called when login completes (login screen gets .hide class).
   // Works for BOTH auto-login AND manual login.
+  // v1.28 — AUTO-login (returning session) resumes straight into the
+  // world; MANUAL login stops at the home page so you see your empire
+  // stats and choose Enter World / Planets / Clans yourself.
   function onLoginComplete() {
     if (enterGameCalled) return;
     enterGameCalled = true;
+    // v1.28 — the in-game HOME button navigated here with a session: land
+    // on the home page even though the session auto-logged us in.
+    var exitHome = false;
+    try {
+      exitHome = sessionStorage.getItem('openworld_exit_home') === '1';
+      sessionStorage.removeItem('openworld_exit_home');
+    } catch (e) {}
+    if (!window.__AUTO_LOGIN || exitHome) {
+      console.log('[Launch] Showing home page');
+      return;   // leave the menu (home page) on screen; Enter World enters
+    }
     console.log('[Launch] Login complete, entering game...');
     setTimeout(function() {
       try { window.enterGame(); }
@@ -14044,6 +14067,10 @@ window.addEventListener('keydown', (e) => {
     nameInput.value = parsed.name;
     pwdInput.value = parsed.pwd;
     console.log('[Launch] Auto-filling login for:', parsed.name);
+
+    // Mark this as an AUTO login so the launch flow resumes straight
+    // into the world (a returning session shouldn't re-see the home page)
+    window.__AUTO_LOGIN = true;
 
     // Submit
     try { window.loginSubmit(); console.log('[Launch] loginSubmit called'); }
