@@ -5,9 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Open World</title>
 <style>
-/* Hide old menu screen permanently */
-#menu { display: none !important; }
-
+/* v1.29 — the legacy "Hide old menu screen permanently" force-hide that used
+   to live here (#menu { display:none !important }) is GONE: it was defeating
+   the home page after login (black screen). The .hidden class handles all
+   menu show/hide: login/signup removes it, enterGame adds it, HOME removes
+   it again, logout reloads the page. */
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#08141d}
 body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
@@ -658,6 +660,10 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 .login-card .login-error{color:#ff8080;font-family:Arial,sans-serif;font-size:12px;margin-top:12px;min-height:16px}
 .login-cloud{font-family:Arial,sans-serif;font-size:11px;letter-spacing:.5px;margin-top:14px;color:#c9a24a}
 .login-cloud.on{color:#7fffd4}
+/* v1.29 — build badge: always show which version this login card is, so a
+   stale cached copy is instantly recognizable (missing/old badge = hard-refresh) */
+.login-ver{font-family:Arial,sans-serif;font-size:10px;letter-spacing:2px;margin-top:12px;
+  color:#5c6672;text-transform:uppercase;font-weight:bold;text-align:center}
 
 /* Logout button in game HUD */
 .logout-btn{flex-shrink:0;padding:9px 14px;border:1px solid #5a2424;border-radius:8px;background:rgba(90,36,36,.4);
@@ -5690,8 +5696,13 @@ window.WarFx = WarFx;
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.28';
+const GAME_VERSION = 'v1.29';
 const RELEASE_NOTES = [
+  { v: 'v1.29', items: [
+    '🏠 <b>The home page actually appears after login now</b> — this fixes the black screen: a legacy style rule was force-hiding the home screen "permanently", so signing in dropped you onto a dark empty page instead of the menu. It\'s removed — logging in now lands you on the real home page: your Budget, Plots and Businesses at a glance, with the big ENTER WORLD button ready when you are.',
+    '🔖 <b>Build badge on the login screen</b> — the login card now shows the game\'s version number right on it ("BUILD V1.29" under the login button). One glance tells you you\'re on the latest build. If that badge is ever missing or shows an older number, your browser is holding a stale copy — hard-refresh the page (Ctrl+Shift+R on Windows, Cmd+Shift+R on Mac) and it will catch up.',
+    '⏱ <b>Login can no longer hang on a slow network</b> — when the login has to fetch your account from the cloud, it now gives the cloud 10 seconds and then tells you the network is slow instead of sitting on the "Fetching…" message forever. A bad connection can never freeze the login screen again.'
+  ]},
   { v: 'v1.28', items: [
     '🏠 <b>Login returns to the home page</b> — signing in with your name and password now lands you on the home screen first: your Budget, Plots and Businesses at a glance, and the big ENTER WORLD button when you\'re ready to deploy. No more being thrown straight into orbit.',
     '⚡ <b>Reloads resume instantly</b> — reload the page mid-game and the same tab picks up right where you left off, straight into the world. And the in-game <b>HOME</b> button now actually takes you home: it lands on this home page instead of dropping you back into orbit. (Logging out signs you out for real.)'
@@ -5865,6 +5876,7 @@ function renderLogin() {
     <div class="login-cloud ${CloudSync.status() === 'cloud' ? 'on' : ''}">${CloudSync.status() === 'cloud'
       ? '🌐 Online multiplayer: ON — one shared world across all devices (live sync every 30s)'
       : '⚠ Cloud saving: OFF — accounts stay in this browser only (online play disabled)'}</div>
+    <div class="login-ver">Build ${GAME_VERSION}</div>
   `;
   setTimeout(() => {
     const nameInput = document.getElementById('login-name');
@@ -5970,6 +5982,9 @@ window.loginSubmit = async function() {
   } else {
     // === LOGIN ===
     let existingSave = getSave(name);
+    // v1.29 — track a slow/timed-out cloud fetch so the error message
+    // doesn't wrongly claim "account not found" when the network hung.
+    let cloudSlow = false;
     if (!existingSave && CloudSync.status() === 'cloud') {
       // v1.27 — cross-device login: this browser may not hold the account
       // yet (the load-time sync can still be in flight, or it failed on
@@ -5977,7 +5992,17 @@ window.loginSubmit = async function() {
       // of rejecting the login — any device, same empire.
       errEl.textContent = '⏳ Fetching your account from the cloud…';
       let cloudSave = null;
-      try { cloudSave = await CloudSync.fetchSave(name); } catch (e) {}
+      try {
+        // v1.29 — never hang the login: race the cloud fetch against a
+        // 10-second timer. A bad network used to leave the login sitting
+        // on the ⏳ message forever with no way forward.
+        const raceResult = await Promise.race([
+          CloudSync.fetchSave(name),
+          new Promise(res => setTimeout(res, 10000, 'slow'))
+        ]);
+        if (raceResult === 'slow') { cloudSlow = true; }
+        else if (raceResult) { cloudSave = raceResult; }
+      } catch (e) {}
       if (cloudSave) {
         try { migrateSaveToGridV2(cloudSave); } catch (e) {}
         try { localStorage.setItem(SAVE_PREFIX + name, JSON.stringify(cloudSave)); } catch (e) {}
@@ -5987,9 +6012,11 @@ window.loginSubmit = async function() {
       errEl.textContent = '';
     }
     if (!existingSave) {
-      errEl.textContent = CloudSync.status() === 'cloud'
-        ? 'Account not found — not on this device and not in the cloud. Check the spelling (names are case-sensitive) or use Create Account.'
-        : 'Account not found — the cloud is unreachable from this browser, and accounts live on the device where they were created.';
+      errEl.textContent = cloudSlow
+        ? '⏱ The cloud took too long to answer from this network — check your connection and try again.'
+        : (CloudSync.status() === 'cloud'
+          ? 'Account not found — not on this device and not in the cloud. Check the spelling (names are case-sensitive) or use Create Account.'
+          : 'Account not found — the cloud is unreachable from this browser, and accounts live on the device where they were created.');
       nameInput.select();
       return;
     }
