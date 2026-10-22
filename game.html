@@ -220,6 +220,78 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 .mk-cancel:hover{background:rgba(90,30,30,.7)}
 .mk-empty{font-family:Arial,sans-serif;font-size:11px;color:#7fa0ab;padding:10px;text-align:center;border:1px dashed #1a3340;border-radius:8px;margin-bottom:8px;line-height:1.5}
 .mk-title{font-family:Arial,sans-serif;font-size:10px;color:#7fa0ab;letter-spacing:1.5px;margin:10px 0 5px;text-transform:uppercase}
+/* ══════════ v1.30 — THE EXCHANGE (order-book trading, Capital Rift style) ══════════ */
+.ex-rail{display:flex;gap:5px;overflow-x:auto;padding:6px;border:1px solid var(--cr-line);border-radius:5px;
+  background:rgba(7,10,15,.75);margin-bottom:10px;scrollbar-width:thin}
+.ex-rail::-webkit-scrollbar{height:5px}
+.ex-rail::-webkit-scrollbar-thumb{background:#2a3542;border-radius:3px}
+.ex-chip{flex:0 0 auto;padding:5px 9px;border:1px solid #232d3a;border-radius:4px;background:rgba(12,16,22,.85);
+  cursor:pointer;font-family:var(--cr-mono);font-size:11px;color:#8b95a1;letter-spacing:.4px;white-space:nowrap}
+.ex-chip:hover{border-color:#3a4756;color:#e6edf3}
+.ex-chip.sel{border-color:rgba(242,193,78,.6);background:rgba(242,193,78,.1);color:var(--cr-gold)}
+.ex-chip b{color:inherit;font-variant-numeric:tabular-nums}
+.ex-chip .up{color:var(--cr-up)} .ex-chip .dn{color:var(--cr-down)}
+.ex-book{display:flex;gap:8px;margin-bottom:10px}
+.ex-side{flex:1;min-width:0;border:1px solid var(--cr-line);border-radius:5px;background:rgba(7,10,15,.8);overflow:hidden}
+.ex-side-head{padding:4px 8px;font-size:9.5px;font-weight:800;letter-spacing:1.8px;font-family:inherit}
+.ex-side.bids .ex-side-head{color:var(--cr-up);background:rgba(61,220,151,.07);border-bottom:1px solid rgba(61,220,151,.2)}
+.ex-side.asks .ex-side-head{color:var(--cr-down);background:rgba(255,122,122,.07);border-bottom:1px solid rgba(255,122,122,.2)}
+.ex-lvl{display:flex;justify-content:space-between;gap:6px;padding:3px 8px;font-family:var(--cr-mono);
+  font-size:11px;color:#c6d0da;border-bottom:1px solid rgba(32,42,54,.45);font-variant-numeric:tabular-nums}
+.ex-lvl:last-child{border-bottom:none}
+.ex-lvl .q{color:#8b95a1}
+.ex-lvl.reserve{background:rgba(242,193,78,.05);color:var(--cr-gold)}
+.ex-lvl.reserve .q{color:rgba(242,193,78,.65)}
+.ex-lvl.mine{outline:1px dashed rgba(242,193,78,.35);outline-offset:-2px}
+.ex-mid{flex:0 0 118px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;
+  border:1px solid var(--cr-line);border-radius:5px;background:rgba(7,10,15,.8);padding:8px 4px}
+.ex-mid .px{font-family:var(--cr-mono);font-size:19px;font-weight:700;color:var(--cr-gold);font-variant-numeric:tabular-nums}
+.ex-mid .lb{font-size:9px;letter-spacing:1.6px;color:#8b95a1;font-weight:800}
+.ex-mid .sp{font-family:var(--cr-mono);font-size:10px;color:#8b95a1}
+.ex-trade{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;border:1px dashed var(--cr-line);border-radius:5px;
+  padding:8px;margin-bottom:10px;background:rgba(10,14,20,.5)}
+.ex-field{display:flex;flex-direction:column;gap:2px}
+.ex-field label{font-size:9px;color:#8b95a1;letter-spacing:1.2px;font-weight:700}
+.ex-field input,.ex-field select{background:rgba(8,24,44,.9);border:1px solid #1a3340;border-radius:4px;color:#e8eef0;
+  font-family:var(--cr-mono);font-size:12px;padding:5px 7px;width:104px}
+.ex-btn{padding:6px 12px;border-radius:4px;font-weight:800;letter-spacing:.8px;font-size:11px;cursor:pointer;
+  font-family:inherit;border:1px solid}
+.ex-btn.buy{border-color:#2c6e49;background:rgba(24,80,50,.5);color:#7fffd4}
+.ex-btn.buy:hover{background:rgba(24,80,50,.8)}
+.ex-btn.sell{border-color:#6e2c2c;background:rgba(90,30,30,.4);color:#ff8080}
+.ex-btn.sell:hover{background:rgba(90,30,30,.7)}
+.ex-btn.gold{border-color:rgba(242,193,78,.55);background:rgba(242,193,78,.1);color:var(--cr-gold)}
+.ex-btn.gold:hover{background:rgba(242,193,78,.2)}
+.ex-btn:disabled{opacity:.4;cursor:default}
+.ex-qty{display:flex;align-items:center;gap:4px}
+.ex-qty button{width:24px;height:26px;background:rgba(8,24,44,.9);border:1px solid #1a3340;border-radius:4px;
+  color:#9bb4bd;cursor:pointer;font-size:13px;font-family:var(--cr-mono)}
+.ex-qty button:hover{color:#fff;border-color:#3a4756}
+.ex-chip2{padding:3px 8px;border:1px solid #232d3a;border-radius:10px;background:rgba(12,16,22,.8);color:#8b95a1;
+  font-size:10px;cursor:pointer;font-family:var(--cr-mono)}
+.ex-chip2:hover{color:var(--cr-gold);border-color:rgba(242,193,78,.4)}
+.ex-sub{font-family:var(--cr-mono);font-size:10.5px;color:#8b95a1;margin:4px 0 8px;letter-spacing:.3px;line-height:1.6}
+.ex-sub b{color:var(--cr-gold)} .ex-sub .g{color:var(--cr-up)} .ex-sub .r{color:var(--cr-down)}
+.ex-order{display:flex;align-items:center;gap:8px;padding:5px 8px;border:1px solid #232d3a;border-radius:4px;
+  margin-bottom:4px;background:rgba(14,19,26,.7);font-family:var(--cr-mono);font-size:11px;font-variant-numeric:tabular-nums}
+.ex-order .who{color:#8b95a1;font-family:Arial,sans-serif;font-size:10px}
+.ex-order .fillbar{flex:1;height:4px;border-radius:2px;background:rgba(32,42,54,.8);overflow:hidden;min-width:40px}
+.ex-order .fillbar i{display:block;height:100%;background:var(--cr-up)}
+.ex-tape{border:1px solid var(--cr-line);border-radius:5px;background:rgba(7,10,15,.8);padding:6px 8px;margin-top:8px}
+.ex-tape-row{display:flex;justify-content:space-between;gap:8px;font-family:var(--cr-mono);font-size:10.5px;
+  color:#8b95a1;padding:2px 0;border-bottom:1px solid rgba(32,42,54,.4);font-variant-numeric:tabular-nums}
+.ex-tape-row:last-child{border-bottom:none}
+.ex-tape-row b{color:#e6edf3}
+.ex-hint{font-family:Arial,sans-serif;font-size:10.5px;color:#8b95a1;line-height:1.6;border:1px dashed var(--cr-line);
+  border-radius:5px;padding:8px 10px;margin-bottom:10px}
+.ex-hint b{color:var(--cr-gold)}
+/* ══════════ v1.30 — MERGED ESTATES (plot merge) ══════════ */
+.merge-banner{display:flex;align-items:center;gap:10px;padding:9px 14px;margin:0 0 10px;border-radius:6px;
+  border:1px solid rgba(242,193,78,.55);background:rgba(242,193,78,.1);color:var(--cr-gold);
+  font-family:Arial,sans-serif;font-size:12px;font-weight:700;letter-spacing:.6px}
+.merge-banner span{flex:1}
+.estate-chip{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:800;
+  letter-spacing:1.2px;border:1px solid rgba(242,193,78,.55);background:rgba(242,193,78,.12);color:var(--cr-gold)}
 /* Casino slots minigame */
 .gamble-card{width:min(520px,92vw);max-height:88vh;overflow-y:auto}
 .gamble-card h2{margin:0 0 4px;color:#f5cc74;font-size:24px}
@@ -432,43 +504,6 @@ body{font-family:Georgia,"Times New Roman",serif;color:#e8eef0}
 .admin-lock-hint{margin-top:13px;font-family:Arial,sans-serif;font-size:9.5px;letter-spacing:1.5px;color:#5d7885;text-transform:uppercase}
 @keyframes adminShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-9px)}40%{transform:translateX(8px)}60%{transform:translateX(-6px)}80%{transform:translateX(4px)}}
 .admin-shake{animation:adminShake .4s ease}
-.mat-row{display:flex;flex-direction:column;align-items:stretch;gap:9px;padding:12px;border:1px solid #1a3340;border-radius:8px;
-  background:rgba(20,50,60,.4);margin-bottom:8px}
-.mat-row .mat-main{display:flex;align-items:center;gap:12px;width:100%}
-.mat-row .mat-icon{font-size:24px;flex-shrink:0;width:32px;text-align:center}
-.mat-row .mat-info{flex:1;min-width:0}
-.mat-row .mat-name{font-family:Arial,sans-serif;font-size:14px;color:#e8eef0;font-weight:600}
-.mat-row .mat-meta{font-family:Arial,sans-serif;font-size:11px;color:#9bb4bd;margin-top:2px}
-.mat-row .mat-price{font-family:Georgia,serif;font-size:15px;color:#f5cc74;flex-shrink:0;text-align:right;white-space:nowrap}
-.mat-row .mat-trend{font-size:11px;margin-top:2px}
-.mat-trend.up{color:#7fffd4}
-.mat-trend.down{color:#ff8080}
-.mat-trend.stable{color:#9bb4bd}
-.mat-row .mat-stock{font-family:Arial,sans-serif;font-size:11px;color:#7fffd4;text-align:right;margin-top:2px}
-.mat-row .mat-sell{flex-shrink:0;padding:8px 14px;border:1px solid #2c4a55;border-radius:6px;
-  background:rgba(29,74,87,.6);color:#f5cc74;cursor:pointer;font-family:Arial,sans-serif;font-size:11px;
-  letter-spacing:1px;text-transform:uppercase;transition:all .15s;white-space:nowrap}
-.mat-row .mat-sell:hover:not(:disabled){background:rgba(40,100,110,.8)}
-.mat-row .mat-sell:disabled{opacity:.3;cursor:not-allowed}
-.mat-row .mat-sell.all{background:linear-gradient(135deg,#f5cc74,#d4a44a);color:#08141d;border-color:#f5cc74;font-weight:bold}
-.mat-row .mat-sell.all:hover:not(:disabled){filter:brightness(1.1)}
-/* Sell-amount strip — choose exactly how much of the stored material to sell */
-.mat-sell-ctrl{display:flex;align-items:center;flex-wrap:wrap;gap:5px;padding-left:44px}
-.mat-sell-ctrl .amt-btn{width:28px;height:30px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;
-  border:1px solid #2c4a55;border-radius:6px;background:rgba(29,74,87,.6);color:#cbd7dc;cursor:pointer;
-  font-family:Arial,sans-serif;font-size:15px;line-height:1;transition:all .15s}
-.mat-sell-ctrl .amt-btn:hover{background:rgba(40,100,110,.8);color:#fff}
-.mat-sell-ctrl .amt-btn:active{transform:translateY(1px)}
-.mat-sell-ctrl .amt-input{width:76px;flex-shrink:0;background:#0a1420;border:1px solid #2c4a55;border-radius:6px;
-  color:#e8f4ff;font-family:Arial,sans-serif;font-size:12.5px;padding:7px 4px;text-align:center;outline:none;
-  -moz-appearance:textfield;appearance:textfield}
-.mat-sell-ctrl .amt-input:focus{border-color:#f5cc74;box-shadow:0 0 0 2px rgba(245,204,116,.12)}
-.mat-sell-ctrl .amt-input::-webkit-outer-spin-button,.mat-sell-ctrl .amt-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
-.mat-sell-ctrl .amt-chip{flex-shrink:0;padding:7px 8px;border:1px solid #2c4a55;border-radius:6px;background:transparent;
-  color:#9bb4bd;cursor:pointer;font-family:Arial,sans-serif;font-size:9.5px;font-weight:bold;letter-spacing:.5px;
-  text-transform:uppercase;transition:all .15s}
-.mat-sell-ctrl .amt-chip:hover{color:#f5cc74;border-color:#f5cc74}
-.mat-sell-ctrl .mat-sell{margin-left:auto}
 .market-actions{display:flex;gap:10px;margin-top:14px}
 .market-actions .btn{flex:1;padding:13px;border-radius:8px;border:1px solid #2c4a55;cursor:pointer;font-family:Arial,sans-serif;
   font-size:13px;letter-spacing:2px;text-transform:uppercase;transition:all .2s;background:#14323c;color:#cbd7dc}
@@ -1761,7 +1796,23 @@ const STATE = {
   // PROPERTY (v1.26) — plots currently rented out to tenants (plot ids).
   // Persisted in the save; rent accrues by the minute in tickProduction.
   rented: new Set(),
-  rentDebt: 0            // session-only fractional rent accumulator
+  rentDebt: 0,            // session-only fractional rent accumulator
+  // EXCHANGE (v1.30) — order-book trading bookkeeping. Earned / delivered /
+  // reclaimed markers are persisted so payouts, deliveries and escrow
+  // returns are applied exactly once, across reloads and devices.
+  exEarnedApplied: 0,    // lifetime exchange sale credits already banked
+  exDelivered: {},       // orderId → units already delivered to my bids
+  exReclaimedIds: [],    // dead orders whose escrow was already returned
+  exRefundedFills: [],   // my bounced fills already reversed (race refunds)
+  exLastMat: null,       // session-only: material selected in the Exchange tab
+  // MERGED ESTATES (v1.30) — groupId → { members: [plotIds], planet }.
+  // Persisted as an array in the save; re-applied after every plot rebuild.
+  plotGroups: new Map(),
+  mergeMode: null,       // session-only: { base: plotId } while picking a merge partner
+  // BANKING (v1.30) — empire-level deposit at your Banks. Interest accrues
+  // by the minute in tickProduction; capacity scales with bank count.
+  bankDeposit: 0,
+  bankDebt: 0            // session-only fractional interest accumulator
 };
 
 const EARTH_RADIUS = STATE.radius;
@@ -4008,6 +4059,19 @@ function saveGame() {
     marketEarnedApplied: +STATE.marketEarnedApplied || 0,
     marketReclaimedIds: Array.isArray(STATE.marketReclaimedIds) ? STATE.marketReclaimedIds.slice() : [],
     marketRefundedBuys: Array.isArray(STATE.marketRefundedBuys) ? STATE.marketRefundedBuys.slice() : [],
+    // Exchange (v1.30) bookkeeping — see STATE comments
+    exEarnedApplied: +STATE.exEarnedApplied || 0,
+    exDelivered: (STATE.exDelivered && typeof STATE.exDelivered === 'object') ? { ...STATE.exDelivered } : {},
+    exReclaimedIds: Array.isArray(STATE.exReclaimedIds) ? STATE.exReclaimedIds.slice() : [],
+    exRefundedFills: Array.isArray(STATE.exRefundedFills) ? STATE.exRefundedFills.slice() : [],
+    // Merged estates (v1.30) — [{ planet, members: [ids] }]
+    plotGroups: (() => {
+      const out = [];
+      for (const g of STATE.plotGroups.values()) out.push({ planet: g.planet, members: g.members.slice() });
+      return out;
+    })(),
+    // Banking (v1.30) — deposits at your Banks
+    bankDeposit: +STATE.bankDeposit || 0,
     // Roads (v1.24) — my paved tiles per planet: { planetId: [[latIdx, lonIdx], ...] }
     roads: roadsForSave(),
     // Economy update (v1.25) — stock portfolio + rolling income ledger
@@ -4045,6 +4109,22 @@ function loadGame(username) {
   STATE.marketEarnedApplied = +save.marketEarnedApplied || 0;
   STATE.marketReclaimedIds = Array.isArray(save.marketReclaimedIds) ? save.marketReclaimedIds : [];
   STATE.marketRefundedBuys = Array.isArray(save.marketRefundedBuys) ? save.marketRefundedBuys : [];
+  // Exchange (v1.30) bookkeeping — defaults keep old saves valid
+  STATE.exEarnedApplied = +save.exEarnedApplied || 0;
+  STATE.exDelivered = (save.exDelivered && typeof save.exDelivered === 'object') ? save.exDelivered : {};
+  STATE.exReclaimedIds = Array.isArray(save.exReclaimedIds) ? save.exReclaimedIds : [];
+  STATE.exRefundedFills = Array.isArray(save.exRefundedFills) ? save.exRefundedFills : [];
+  // Merged estates (v1.30) — plain array from the save → runtime Map
+  STATE.plotGroups = new Map();
+  for (const g of (Array.isArray(save.plotGroups) ? save.plotGroups : [])) {
+    if (!g || !Array.isArray(g.members) || g.members.length < 2) continue;
+    const ids = g.members.map(Number).filter(id => Number.isFinite(id));
+    if (ids.length < 2) continue;
+    STATE.plotGroups.set(Math.min(...ids), { members: ids.slice().sort((a, b) => a - b), planet: g.planet });
+  }
+  // Banking (v1.30) — deposits at your Banks (defaults keep old saves valid)
+  STATE.bankDeposit = Math.max(0, +save.bankDeposit || 0);
+  STATE.bankDebt = 0;
   // Roads (v1.24) — my paved tiles (old saves: none — everyone starts roadless)
   STATE.roads = roadsFromSave(save.roads);
   // Planets: restore unlocks (default Earth-only for older saves) and make
@@ -4109,6 +4189,9 @@ function loadGame(username) {
       registerClaimedPlot(p);
     }
   }
+  // v1.30 — re-apply merged estates for THIS planet (visuals + combined
+  // area / slots; groups on other worlds keep their stats in the save)
+  try { applyPlotGroupsToActivePlanet(); } catch (e) { console.warn('[OpenWorld] estate restore failed:', e); }
 
   // Restore businesses for the ACTIVE planet (group by plotId — plots can
   // hold multiple). Off-planet businesses stay in BUSINESS_REGISTRY and
@@ -4967,7 +5050,7 @@ const Roads = (() => {
       return;
     }
     if ((STATE.inventory.stone || 0) + 1e-6 < stone) {
-      showToast(`Paving ${fresh.length} tiles needs 🧱 ${stone} Stone — you hold ${Math.floor(STATE.inventory.stone || 0)}. Quarries produce it, or buy some on the Player Market`, false);
+      showToast(`Paving ${fresh.length} tiles needs 🧱 ${stone} Stone — you hold ${Math.floor(STATE.inventory.stone || 0)}. Quarries produce it, or buy some on the Exchange`, false);
       return;
     }
     STATE.money -= cost;
@@ -5696,8 +5779,16 @@ window.WarFx = WarFx;
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.29';
+const GAME_VERSION = 'v1.30';
 const RELEASE_NOTES = [
+  { v: 'v1.30', items: [
+    '📋 <b>The Exchange — a real order book for every material</b> — the Market is now one global exchange, the Capital Rift way. <b>BUY / SELL</b> fill the best prices standing in the book: other commanders\' orders first, then <b>The Reserve</b> (the standing market maker) at an honest 6% spread. Watch the depth ladder, the last price and the spread before you pull the trigger.',
+    '🎚 <b>Limit orders</b> — rest a BID or an ASK at YOUR price. Bids escrow credits, asks escrow materials; when another commander — or the exchange crowd of roaming traders — crosses your price, the payout or delivery lands automatically. Crossing orders fill instantly at the better book price. Cancel anytime; unfilled orders return their escrow after 3 days.',
+    '♻ <b>Scrap anything back into materials</b> — tearing a building down no longer deletes it into the void: you recover <b>half the materials</b> it took to build and <b>a quarter of the credits</b>. Selling land scraps everything on it the same way. Repurpose your empire without wasting a single plank.',
+    '🔗 <b>Merge plots into estates</b> — bordering plots you own can fold into ONE property: combined area (production and land value scale with it), combined build slots, and a single bold gold boundary — the internal parcel lines literally vanish from the globe. Sell a member and the estate dissolves cleanly.',
+    '🏦 <b>The Vault — bank deposits at interest</b> — every Bank you own adds $500,000 of vault capacity. Deposit credits, earn 0.2% per minute, withdraw anytime. A patient commander\'s steady yield, on top of the Capital the banks already produce.',
+    '🌍 <b>The real world on the globe</b> — Earth\'s parcels are now named after the nearest real city: build your empire in the Paris Sector, the Tokyo Sector, the New York Sector — the map finally reads like the real world it orbits.'
+  ]},
   { v: 'v1.29', items: [
     '🏠 <b>The home page actually appears after login now</b> — this fixes the black screen: a legacy style rule was force-hiding the home screen "permanently", so signing in dropped you onto a dark empty page instead of the menu. It\'s removed — logging in now lands you on the real home page: your Budget, Plots and Businesses at a glance, with the big ENTER WORLD button ready when you are.',
     '🔖 <b>Build badge on the login screen</b> — the login card now shows the game\'s version number right on it ("BUILD V1.29" under the login button). One glance tells you you\'re on the latest build. If that badge is ever missing or shows an older number, your browser is holding a stale copy — hard-refresh the page (Ctrl+Shift+R on Windows, Cmd+Shift+R on Mac) and it will catch up.',
@@ -6038,6 +6129,7 @@ window.loginSubmit = async function() {
   try { Chat.onLogin(); } catch (e) {}   // show 💬 tab + start live chat polling
   try { Wars.onLogin(); } catch (e) {}   // start war-march polling (arrivals, warnings)
   try { PlayerMarket.onLogin(); } catch (e) {}   // start player-market polling (listings, payouts)
+  try { Exchange.onLogin(); } catch (e) {}   // v1.30 — start the order-book exchange polling (fills, payouts, deliveries)
   try { Roads.onLogin(); } catch (e) {}   // start road-ledger polling (v1.24 — everyone's tiles)
   try { WorldStats.onLogin(); } catch (e) {}   // v1.25 — world-economy presence polling
   try { Ticker.start(); } catch (e) {}   // v1.25 — live market ticker strip
@@ -7846,10 +7938,12 @@ function initScene() {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && STATE.placing) cancelPlacement();
     if (e.key === 'Escape' && STATE.roadMode) Roads.exit();   // v1.24
+    if (e.key === 'Escape' && STATE.mergeMode) exitMergeMode();   // v1.30
   });
   renderer.domElement.addEventListener('contextmenu', (e) => {
     if (STATE.placing) { e.preventDefault(); cancelPlacement(); }
     else if (STATE.roadMode) { e.preventDefault(); Roads.exit(); }   // v1.24
+    else if (STATE.mergeMode) { e.preventDefault(); exitMergeMode(); }   // v1.30
   });
   renderer.domElement.addEventListener('pointerleave', () => {
     if (STATE.placing) hidePlaceGhost();
@@ -9774,10 +9868,99 @@ function shapeIconSVG(sides) {
   return `<svg width="14" height="14" viewBox="-10 -10 20 20" style="vertical-align:middle;margin-right:4px;"><polygon points="${points.join(' ')}" ${stroke}/></svg>`;
 }
 
+// ====================================================================
+// v1.30 — REAL-WORLD PLOT NAMES (Capital Rift plays on the real map;
+// Open World's Earth now names its parcels after the nearest real city).
+// ~160 major cities, rough coordinates — a flavor layer, not an atlas.
+// ====================================================================
+const EARTH_CITIES = [
+  ['New York', 40.71, -74.01], ['Los Angeles', 34.05, -118.24], ['Chicago', 41.88, -87.63],
+  ['Mexico City', 19.43, -99.13], ['Toronto', 43.65, -79.38], ['Vancouver', 49.28, -123.12],
+  ['Havana', 23.11, -82.37], ['Kingston', 17.97, -76.79], ['Panama City', 8.98, -79.52],
+  ['Bogota', 4.71, -74.07], ['Lima', -12.05, -77.04], ['Quito', -0.18, -78.47],
+  ['Santiago', -33.45, -70.67], ['Buenos Aires', -34.60, -58.38], ['Montevideo', -34.90, -56.16],
+  ['Sao Paulo', -23.55, -46.63], ['Rio de Janeiro', -22.91, -43.17], ['Brasilia', -15.79, -47.88],
+  ['Manaus', -3.12, -60.02], ['Caracas', 10.48, -66.90], ['La Paz', -16.50, -68.15],
+  ['London', 51.51, -0.13], ['Paris', 48.86, 2.35], ['Berlin', 52.52, 13.40],
+  ['Madrid', 40.42, -3.70], ['Rome', 41.90, 12.50], ['Vienna', 48.21, 16.37],
+  ['Amsterdam', 52.37, 4.90], ['Brussels', 50.85, 4.35], ['Zurich', 47.37, 8.54],
+  ['Stockholm', 59.33, 18.07], ['Oslo', 59.91, 10.75], ['Copenhagen', 55.68, 12.57],
+  ['Helsinki', 60.17, 24.94], ['Dublin', 53.35, -6.26], ['Lisbon', 38.72, -9.14],
+  ['Warsaw', 52.23, 21.01], ['Prague', 50.08, 14.44], ['Budapest', 47.50, 19.04],
+  ['Athens', 37.98, 23.73], ['Istanbul', 41.01, 28.98], ['Kyiv', 50.45, 30.52],
+  ['Moscow', 55.76, 37.62], ['Reykjavik', 64.15, -21.94], ['Edinburgh', 55.95, -3.19],
+  ['Cairo', 30.04, 31.24], ['Lagos', 6.52, 3.38], ['Accra', 5.60, -0.19],
+  ['Dakar', 14.72, -17.47], ['Casablanca', 33.57, -7.59], ['Algiers', 36.75, 3.06],
+  ['Tunis', 36.81, 10.18], ['Khartoum', 15.50, 32.56], ['Addis Ababa', 9.03, 38.74],
+  ['Nairobi', -1.29, 36.82], ['Dar es Salaam', -6.79, 39.21], ['Kinshasa', -4.44, 15.27],
+  ['Luanda', -8.84, 13.23], ['Johannesburg', -26.20, 28.05], ['Cape Town', -33.92, 18.42],
+  ['Durban', -29.86, 31.02], ['Harare', -17.83, 31.05], ['Antananarivo', -18.88, 47.51],
+  ['Dubai', 25.20, 55.27], ['Riyadh', 24.71, 46.68], ['Tehran', 35.69, 51.39],
+  ['Baghdad', 33.31, 44.36], ['Jerusalem', 31.77, 35.21], ['Doha', 25.29, 51.53],
+  ['Kuwait City', 29.38, 47.99], ['Muscat', 23.59, 58.41], ['Sanaa', 15.37, 44.19],
+  ['Karachi', 24.86, 67.01], ['Lahore', 31.55, 74.34], ['Islamabad', 33.68, 73.05],
+  ['Delhi', 28.61, 77.21], ['Mumbai', 19.08, 72.88], ['Kolkata', 22.57, 88.36],
+  ['Chennai', 13.08, 80.27], ['Bengaluru', 12.97, 77.59], ['Hyderabad', 17.39, 78.49],
+  ['Colombo', 6.93, 79.85], ['Kathmandu', 27.72, 85.32], ['Dhaka', 23.81, 90.41],
+  ['Yangon', 16.87, 96.20], ['Bangkok', 13.76, 100.50], ['Hanoi', 21.03, 105.85],
+  ['Ho Chi Minh City', 10.82, 106.63], ['Phnom Penh', 11.56, 104.92], ['Vientiane', 17.97, 102.63],
+  ['Kuala Lumpur', 3.14, 101.69], ['Singapore', 1.35, 103.82], ['Jakarta', -6.21, 106.85],
+  ['Manila', 14.60, 120.98], ['Beijing', 39.90, 116.41], ['Shanghai', 31.23, 121.47],
+  ['Guangzhou', 23.13, 113.26], ['Shenzhen', 22.54, 114.06], ['Chengdu', 30.57, 104.07],
+  ['Xian', 34.34, 108.94], ['Hong Kong', 22.32, 114.17], ['Taipei', 25.03, 121.57],
+  ['Seoul', 37.57, 126.98], ['Busan', 35.18, 129.08], ['Pyongyang', 39.03, 125.75],
+  ['Tokyo', 35.68, 139.69], ['Osaka', 34.69, 135.50], ['Sapporo', 43.06, 141.35],
+  ['Fukuoka', 33.59, 130.40], ['Vladivostok', 43.12, 131.89], ['Yakutsk', 62.03, 129.67],
+  ['Ulaanbaatar', 47.89, 106.91], ['Novosibirsk', 55.03, 82.92], ['Yekaterinburg', 56.84, 60.61],
+  ['Almaty', 43.24, 76.89], ['Tashkent', 41.30, 69.24], ['Baku', 40.41, 49.87],
+  ['Tbilisi', 41.72, 44.78], ['Yerevan', 40.18, 44.51], ['Ashgabat', 37.96, 58.38],
+  ['Sydney', -33.87, 151.21], ['Melbourne', -37.81, 144.96], ['Brisbane', -27.47, 153.03],
+  ['Perth', -31.95, 115.86], ['Adelaide', -34.93, 138.60], ['Darwin', -12.46, 130.84],
+  ['Auckland', -36.85, 174.76], ['Wellington', -41.29, 174.78], ['Christchurch', -43.53, 172.64],
+  ['Suva', -18.14, 178.44], ['Port Moresby', -9.48, 147.15], ['Honolulu', 21.31, -157.86],
+  ['Anchorage', 61.22, -149.90], ['Nuuk', 64.18, -51.72], ['St Johns', 47.56, -52.71],
+  ['Denver', 39.74, -104.99], ['Dallas', 32.78, -96.80], ['Houston', 29.76, -95.37],
+  ['New Orleans', 29.95, -90.07], ['Miami', 25.76, -80.19], ['Atlanta', 33.75, -84.39],
+  ['Seattle', 47.61, -122.33], ['San Francisco', 37.77, -122.42], ['Las Vegas', 36.17, -115.14],
+  ['Phoenix', 33.45, -112.07], ['Salt Lake City', 40.76, -111.89], ['Minneapolis', 44.98, -93.27],
+  ['Detroit', 42.33, -83.05], ['Boston', 42.36, -71.06], ['Washington DC', 38.91, -77.04],
+  ['Montreal', 45.50, -73.57], ['Winnipeg', 49.90, -97.14], ['Calgary', 51.05, -114.07],
+];
+const CITY_NEAR_KM = 620;   // a parcel names itself after a city within this radius
+// City trig precomputed once — the boot pass names ~6,000 parcels and a
+// Chromebook should not pay a million Math.sin calls for it.
+const CITY_TRIG = EARTH_CITIES.map(c => {
+  const rad = Math.PI / 180;
+  const la = c[1] * rad, lo = c[2] * rad;
+  return { name: c[0], s: Math.sin(la), c: Math.cos(la), y: Math.cos(lo), z: Math.sin(lo) };
+});
+function nearestCity(lat, lon) {
+  const rad = Math.PI / 180;
+  const la = lat * rad, lo = lon * rad;
+  const sLa = Math.sin(la), cLa = Math.cos(la), x = cLa * Math.cos(lo), y = cLa * Math.sin(lo);
+  let best = null, bestD = Infinity;
+  for (let i = 0; i < CITY_TRIG.length; i++) {
+    const c = CITY_TRIG[i];
+    // squared chord distance on the unit sphere (monotone in gc distance)
+    const dx = sLa - c.s, dy = x - c.c * c.y, dz = y - c.c * c.z;
+    const d = dx * dx + dy * dy + dz * dz;
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  if (!best) return null;
+  // chord → great-circle km (Earth ≈ 6,371 km)
+  const gc = 2 * Math.asin(Math.min(1, Math.sqrt(bestD) / 2)) * 6371;
+  return gc <= CITY_NEAR_KM ? { name: best.name, km: Math.round(gc) } : null;
+}
+
 function plotName(lat, lon) {
-  // Simple region naming
   const ns = lat >= 0 ? 'N' : 'S';
   const ew = lon >= 0 ? 'E' : 'W';
+  const city = nearestCity(lat, lon);
+  if (city) {
+    // "Paris Sector 48.85N 2.35E" — the two leading words also feed the
+    // plot modal's flavor line ("a parcel in the Paris Sector")
+    return `${city.name} Sector ${Math.abs(lat).toFixed(2)}°${ns} ${Math.abs(lon).toFixed(2)}°${ew}`;
+  }
   const region = regionName(lat, lon);
   return `${region} ${Math.abs(lat).toFixed(2)}°${ns} ${Math.abs(lon).toFixed(2)}°${ew}`;
 }
@@ -10008,6 +10191,19 @@ function onPointerClick(e) {
     handlePlacementClick(_clickHit);
     return;
   }
+  // v1.30 — MERGE MODE: the click picks the bordering parcel that folds
+  // into the armed estate (anything else disarms)
+  if (STATE.mergeMode) {
+    const target = hit || STATE.hoveredPlot;
+    if (target && target.userData.owned && !target.userData.ownedByOther
+        && mergeCandidatesFor(STATE.mergeMode.base).includes(target.userData.id)) {
+      mergePlots(STATE.mergeMode.base, target.userData.id);
+    } else {
+      showToast('Merge cancelled — pick a lifted bordering parcel', false);
+      exitMergeMode();
+    }
+    return;
+  }
   // v1.26 — Capital Rift-style SHIFT-CLICK: hold Shift and click buyable
   // plots straight on the globe to queue them for multi-buy — no need to
   // arm the ✚ MULTI mode first. Each pick still has to border your land
@@ -10045,6 +10241,262 @@ function onPointerClick(e) {
 }
 
 // ====================================================================
+// MERGED ESTATES (v1.30) — fold bordering plots into ONE property, the
+// Capital Rift way. A merged estate shares everything: combined area
+// (production and land value scale with it), combined build slots, one
+// bold gold boundary — the internal parcel lines vanish from the globe
+// because the shared Voronoi edges are stripped from the render pools.
+// Sell any member (or lose it to conquest) and the estate dissolves
+// cleanly back into solo parcels with their original stats.
+// ====================================================================
+const ESTATE_OUTLINE = 0xf2c14e;   // bold gold boundary for merged land
+
+function groupOf(plotId) {
+  for (const [gid, g] of STATE.plotGroups) if (g.members.includes(plotId)) return gid;
+  return null;
+}
+function groupMembersOf(plotId) {
+  for (const g of STATE.plotGroups.values()) if (g.members.includes(plotId)) return g.members;
+  return [plotId];
+}
+
+// Combined area multiplier for a plot (merged estates sum their members).
+// Derived from the saved group membership, so off-planet production is
+// correct even before that world's meshes exist.
+function soloAreaMult(plotId) {
+  const p = ACTIVE_PLOT_BY_ID.get(plotId);
+  if (p) return p.userData._orig ? p.userData._orig.am : p.userData.areaMultiplier;
+  const planet = planetOfPlotId(plotId);
+  const meta = PLANET_META[planet.id];
+  const m = meta ? meta.get(plotId) : null;
+  return m ? m.areaMultiplier : 1;
+}
+function effectiveAreaMult(plotId) {
+  for (const g of STATE.plotGroups.values()) {
+    if (g.members.includes(plotId)) {
+      let sum = 0;
+      for (const id of g.members) sum += soloAreaMult(id);
+      return sum;
+    }
+  }
+  return soloAreaMult(plotId);
+}
+
+// Strip the Voronoi edges shared between members: a shared edge lies on
+// the perpendicular bisector of the two seeds, so its midpoint is
+// (angularly) equidistant from both — the test is exact geometry, not
+// an approximation. The union outline emerges naturally.
+function stripInternalEdges(memberPlots) {
+  const mid = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3();
+  for (const p of memberPlots) {
+    if (!p.userData._edgesFull) p.userData._edgesFull = p.userData._edges;
+    const e = p.userData._edgesFull;
+    const out = [];
+    for (let i = 0; i + 5 < e.length; i += 6) {
+      mid.set((e[i] + e[i + 3]) / 2, (e[i + 1] + e[i + 4]) / 2, (e[i + 2] + e[i + 5]) / 2).normalize();
+      let internal = false;
+      for (const q of memberPlots) {
+        if (q === p) continue;
+        if (!(p.userData.neighbors || []).includes(q.userData.id)) continue;
+        a.copy(p.userData.localDir).normalize();
+        b.copy(q.userData.localDir).normalize();
+        const dA = Math.acos(THREE.MathUtils.clamp(mid.dot(a), -1, 1));
+        const dB = Math.acos(THREE.MathUtils.clamp(mid.dot(b), -1, 1));
+        if (Math.abs(dA - dB) < 0.004) { internal = true; break; }
+      }
+      if (!internal) out.push(e[i], e[i + 1], e[i + 2], e[i + 3], e[i + 4], e[i + 5]);
+    }
+    p.userData._edges = new Float32Array(out);
+  }
+}
+function restoreFullEdges(p) {
+  if (p.userData._edgesFull) {
+    p.userData._edges = p.userData._edgesFull;
+    delete p.userData._edgesFull;
+  }
+}
+
+// Apply combined stats + estate visuals to every member (active planet).
+// Originals are remembered once (per session) so dissolving restores them.
+function applyGroupStats(members, groupId) {
+  for (const p of members) {
+    if (!p.userData._orig) {
+      p.userData._orig = {
+        am: p.userData.areaMultiplier,
+        area: p.userData.area,
+        slots: p.userData.maxBusinesses,
+        price: p.userData.price,
+        name: p.userData.name,
+      };
+    }
+  }
+  let am = 0, area = 0, slots = 0, price = 0;
+  for (const p of members) {
+    am += p.userData._orig.am;
+    area += p.userData._orig.area;
+    slots += p.userData._orig.slots;
+    price += p.userData._orig.price;
+  }
+  const planet = planetOfPlotId(members[0].userData.id);
+  const meta = PLANET_META[planet.id];
+  const name = `Estate #${groupId} ×${members.length}`;
+  for (const p of members) {
+    p.userData.areaMultiplier = am;
+    p.userData.area = area;
+    p.userData.maxBusinesses = slots;
+    p.userData.price = price;
+    p.userData.name = name;
+    p.userData.groupId = groupId;
+    if (meta) {
+      const mm = meta.get(p.userData.id);
+      if (mm) { mm.areaMultiplier = am; mm.price = price; mm.name = name; }
+    }
+    setPlotColors(p, p.userData.baseColor, ESTATE_OUTLINE);
+  }
+  stripInternalEdges(members);
+  _plotPoolsDirty = true;
+}
+
+// Re-apply saved groups for the ACTIVE planet after a load or travel —
+// also reconciles membership against what you still own (conquest loss
+// while away shrinks or dissolves the estate).
+function applyPlotGroupsToActivePlanet() {
+  if (!plotFillMesh) return;
+  for (const [gid, g] of Array.from(STATE.plotGroups)) {
+    const ownedMembers = g.members.filter(id => STATE.owned.has(id));
+    if (ownedMembers.length < 2) { STATE.plotGroups.delete(gid); continue; }
+    g.members = ownedMembers.slice();
+    const meshes = ownedMembers.map(id => ACTIVE_PLOT_BY_ID.get(id)).filter(Boolean);
+    if (meshes.length === ownedMembers.length) applyGroupStats(meshes, gid);
+  }
+  flushPlotPools();
+}
+
+// Dissolve the group containing plotId (sale / conquest loss) — every
+// member returns to solo stats, solo name and its own border.
+function dissolveGroupAround(plotId) {
+  const gid = groupOf(plotId);
+  if (gid == null) return;
+  const g = STATE.plotGroups.get(gid);
+  STATE.plotGroups.delete(gid);
+  const planet = planetOfPlotId(plotId);
+  const meta = PLANET_META[planet.id];
+  for (const id of g.members) {
+    const p = ACTIVE_PLOT_BY_ID.get(id);
+    if (p) {
+      const o = p.userData._orig;
+      if (o) {
+        p.userData.areaMultiplier = o.am;
+        p.userData.area = o.area;
+        p.userData.maxBusinesses = o.slots;
+        p.userData.price = o.price;
+        p.userData.name = o.name;
+        delete p.userData._orig;
+      }
+      delete p.userData.groupId;
+      restoreFullEdges(p);
+      if (meta) {
+        const mm = meta.get(id);
+        if (mm && o) { mm.areaMultiplier = o.am; mm.price = o.price; mm.name = o.name; }
+      }
+      // back to the standard owned look (business tint if built on)
+      if (p.userData.businesses && p.userData.businesses.length) {
+        const firstBt = getBusinessType(p.userData.businesses[0].type);
+        if (firstBt) setPlotColors(p, firstBt.color, firstBt.color);
+      } else if (p.userData.owned) {
+        setOwnedPlotLook(p, true);
+      } else {
+        setPlotColors(p, p.userData.baseColor, plotBaseOutline(p));
+      }
+    }
+  }
+  _plotPoolsDirty = true;
+  flushPlotPools();
+}
+
+// Bordering plots you own that could join this one's estate
+function mergeCandidatesFor(plotId) {
+  const inGroup = new Set(groupMembersOf(plotId));
+  const p = ACTIVE_PLOT_BY_ID.get(plotId);
+  if (!p) return [];
+  const out = [];
+  for (const nid of (p.userData.neighbors || [])) {
+    if (STATE.owned.has(nid) && !inGroup.has(nid) && !STATE.rented.has(nid)) out.push(nid);
+  }
+  return out;
+}
+
+window.exitMergeMode = function() {
+  if (!STATE.mergeMode) return;
+  const cands = mergeCandidatesFor(STATE.mergeMode.base);
+  STATE.mergeMode = null;
+  for (const id of cands) {
+    const q = ACTIVE_PLOT_BY_ID.get(id);
+    if (q && !STATE.multiSelect.has(id)) q.userData._selected = false;
+  }
+  flushPlotPools();
+  updateMultiBuyBar();
+};
+
+// Arm merge mode from the plot modal — bordering owned plots lift off
+// the globe as merge targets (same visual language as multi-buy picks).
+window.startMergeMode = function() {
+  const p = STATE.selectedPlot;
+  if (!p || !p.userData.owned || p.userData.ownedByOther) return;
+  if (STATE.rented.has(p.userData.id)) {
+    showToast('Rented-out land cannot merge — move the tenants out first', false);
+    return;
+  }
+  const cands = mergeCandidatesFor(p.userData.id);
+  if (!cands.length) {
+    showToast('No bordering plots you own — buy an adjacent parcel first', false);
+    return;
+  }
+  closePlotModal();
+  clearMultiSelect();
+  STATE.mergeMode = { base: p.userData.id };
+  for (const id of cands) {
+    const q = ACTIVE_PLOT_BY_ID.get(id);
+    if (q) q.userData._selected = true;
+  }
+  flushPlotPools();
+  showToast(`🔗 Merge armed — click a lifted bordering parcel to fold it into ${p.userData.name} (Esc / right-click cancels)`, true);
+};
+
+window.mergePlots = function(baseId, targetId) {
+  if (baseId == null || targetId == null || baseId === targetId) return;
+  const all = Array.from(new Set([...groupMembersOf(baseId), ...groupMembersOf(targetId)])).sort((a, b) => a - b);
+  for (const id of all) {
+    if (!STATE.owned.has(id)) { showToast('Merge failed — land changed hands', false); exitMergeMode(); return; }
+    if (STATE.rented.has(id)) { showToast('Rented-out land cannot merge — move the tenants out first', false); exitMergeMode(); return; }
+  }
+  // adjacency between the two estates (union of members' neighbors)
+  const baseSet = new Set(groupMembersOf(baseId));
+  let touching = false;
+  for (const id of groupMembersOf(targetId)) {
+    const q = ACTIVE_PLOT_BY_ID.get(id);
+    if (!q) continue;
+    for (const nid of (q.userData.neighbors || [])) if (baseSet.has(nid)) { touching = true; break; }
+    if (touching) break;
+  }
+  if (!touching) { showToast('Those plots do not border each other', false); exitMergeMode(); return; }
+  exitMergeMode();
+  // drop the old group entries (member _orig stats survive) and form the union
+  for (const gid of Array.from(new Set([groupOf(baseId), groupOf(targetId)]))) {
+    if (gid != null) STATE.plotGroups.delete(gid);
+  }
+  const gid = all[0];
+  STATE.plotGroups.set(gid, { members: all.slice(), planet: planetOfPlotId(all[0]).id });
+  const meshes = all.map(id => ACTIVE_PLOT_BY_ID.get(id)).filter(Boolean);
+  if (meshes.length === all.length) applyGroupStats(meshes, gid);
+  flushPlotPools();
+  updateHUD();
+  saveGame();
+  showToast(`🔗 Merged — Estate #${gid} is now ${all.length} parcels strong: combined area ${effectiveAreaMult(all[0]).toFixed(1)}×, ${meshes.reduce((t, p) => t + (p.userData.maxBusinesses || 1), 0)} build slots, one boundary`, true);
+  const anyMesh = meshes[0];
+  if (anyMesh) openPlotModal(anyMesh);
+};
+
 // PLOT MODAL (BUY / BUILD)
 // ====================================================================
 function openPlotModal(plot) {
@@ -10133,6 +10585,25 @@ function openPlotModal(plot) {
         ? `<button class="gamble-play-btn" ${(_cd <= 0 && _foodOk) ? '' : 'disabled'} style="${(_cd > 0 || !_foodOk) ? 'opacity:.55' : ''}" onclick="openCookAt(STATE.selectedPlot, ${idx})" title="${_cd > 0 ? 'Resting — ' + Math.ceil(_cd / 1000) + 's' : (_foodOk ? 'Cook for credits' : 'Needs ' + COOK_FOOD_COST + ' Food')}">🍳 ${_cd > 0 ? 'COOK — resting ' + Math.ceil(_cd / 1000) + 's' : (_foodOk ? 'COOK — earn up to $' + Math.round(cookPayout() * 3).toLocaleString() : 'COOK — needs ' + COOK_FOOD_COST + ' 🌾')}</button>`
         : '';
 
+      // v1.30 — Bank: the vault (deposits at interest, empire-wide)
+      const bankPanel = bt.id === 'bank' ? (() => {
+        const bs = bankStats();
+        return `
+          <div style="border:1px dashed rgba(242,193,78,.4);border-radius:6px;padding:7px 8px;margin-top:5px;background:rgba(242,193,78,.05)">
+            <div style="font-size:10px;color:#f2c14e;font-weight:700;letter-spacing:1.2px">🏦 THE VAULT — deposits at interest</div>
+            <div class="wk-row" style="margin-top:4px">
+              <span>Deposit <b style="color:#f2c14e">$${bs.deposit.toLocaleString()}</b>${bs.over ? ` <span style="color:#ff8080">(over cap $${bs.cap.toLocaleString()} — excess earns nothing)</span>` : ''} · earns <b style="color:#3ddc97">$${Math.round(bs.interestPerMin).toLocaleString()}/min</b> · ${bs.banks} bank${bs.banks === 1 ? '' : 's'} · capacity <b>$${bs.cap.toLocaleString()}</b></span>
+            </div>
+            <div style="display:flex;gap:5px;margin-top:4px;align-items:center;flex-wrap:wrap">
+              <input id="bank-amt" type="number" min="1" step="any" placeholder="amount" style="width:110px;background:rgba(8,24,44,.9);border:1px solid #1a3340;border-radius:5px;color:#e8eef0;font-family:var(--cr-mono);font-size:11px;padding:4px 7px">
+              <button class="wk-btn" onclick="bankDepositAct()">Deposit</button>
+              <button class="wk-btn" onclick="bankWithdrawAct()">Withdraw</button>
+              <button class="wk-btn" onclick="bankWithdrawAll()" title="Take the whole deposit back">All</button>
+            </div>
+            <div style="font-size:9.5px;color:#8b95a1;margin-top:3px">0.2% per minute, paid on the capacity-covered part — withdraw anytime. Every extra Bank raises the vault's capacity by $500,000.</div>
+          </div>`;
+      })() : '';
+
       // v1.25 — worker crew row (every business)
       const _wkN = (_wkMeta && _wkMeta.workers) || 0;
       const _wkFee = workerHireFee(bt);
@@ -10164,10 +10635,11 @@ function openPlotModal(plot) {
           </div>
           ${casinoPlayBtn}
           ${cookPlayBtn}
+          ${bankPanel}
           ${workerRow}
           <div style="display:flex;gap:5px;margin-top:4px">
             <button class="btn" style="flex:1;padding:4px;font-size:10px" onclick="moveBusiness(${idx})" title="Reposition this building anywhere on the plot">📍 Move</button>
-            <button class="btn demolish" style="flex:1;padding:4px;font-size:10px" onclick="demolishBusiness(${idx})">Demolish</button>
+            <button class="btn demolish" style="flex:1;padding:4px;font-size:10px" onclick="demolishBusiness(${idx})" title="Tear it down — recover half the materials and a quarter of the build cost">♻ Scrap</button>
           </div>
         </div>
       `;
@@ -10333,7 +10805,7 @@ function openPlotModal(plot) {
 
   card.innerHTML = `
     <span class="badge ${status}">${ownedByOther ? '🔒 claimed' : (borderLocked ? '🔒 border needed' : status)}</span>
-    <h2>${plot.userData.name}</h2>
+    <h2>${plot.userData.name}${plot.userData.groupId ? '<span class="estate-chip">MERGED ESTATE</span>' : ''}</h2>
     <div class="coords">LAT ${plot.userData.lat.toFixed(4)}° · LON ${plot.userData.lon.toFixed(4)}° · PLOT #${plot.userData.id.toString().padStart(4,'0')}</div>
     <div class="meta-row">
       <span class="meta-chip">${plotPlanet.icon} Planet <b>${plotPlanet.name}</b></span>
@@ -10362,6 +10834,7 @@ function openPlotModal(plot) {
     <div class="actions">
       <button class="btn" onclick="closePlotModal()">Cancel</button>
       ${owned && !ownedByOther ? `<button class="btn demolish" onclick="sellSelectedPlot()">Sell — +$${plotSaleInfo(plot.userData.id).refund.toLocaleString()}</button>` : ''}
+      ${owned && !ownedByOther && !STATE.rented.has(plot.userData.id) && mergeCandidatesFor(plot.userData.id).length ? `<button class="btn" style="border-color:rgba(242,193,78,.55);color:var(--cr-gold)" onclick="startMergeMode()" title="Fold a bordering parcel into this property — combined area and build slots, one boundary">🔗 Merge</button>` : ''}
       ${actionBtn}
     </div>
   `;
@@ -10536,6 +11009,8 @@ window.travelTo = function(planetId) {
       });
     }
   }
+  // v1.30 — estates on THIS world get their combined stats + borders back
+  try { applyPlotGroupsToActivePlanet(); } catch (e) {}
   applyClaimColors();
   classifyPlotsByTerrain();   // Earth only — refreshes terrain from the masks
   try { Roads.onTravel(); } catch (e) {}   // v1.24 — road layer for THIS world
@@ -10691,13 +11166,22 @@ function sellPlotCore(plotId) {
   if (!STATE.owned.has(plotId)) { showToast("You don't own this plot", false); return false; }
   const info = plotSaleInfo(plotId);
   // v1.26 — developed land sells at its LAND VALUE; the businesses on
-  // it are demolished with the sale (the buyer gets the land + roads).
+  // it are scrapped with the sale (the buyer gets the land + roads) and
+  // v1.30 pays the scrap refund: half their materials + a quarter of
+  // the build cost come back to you.
+  let scrapLabel = '';
   if (info.active) {
     for (const entry of info.active.userData.businesses || []) {
       try { disposeBusinessMesh(entry.mesh); } catch (e) {}
+      const bt = getBusinessType(entry.type);
+      if (bt) applyScrapRefund(scrapRefundFor(info.active, bt));
     }
     info.active.userData.businesses = [];
+    scrapLabel = ' — businesses scrapped for materials';
   }
+  // v1.30 — selling any member of a merged estate dissolves the group
+  // (the sold parcel leaves, the rest become normal plots again)
+  dissolveGroupAround(plotId);
   BUSINESS_REGISTRY.delete(plotId);
   BIZ_POS.delete(plotId);
   BIZ_META.delete(plotId);
@@ -10722,7 +11206,7 @@ function sellPlotCore(plotId) {
   }
   updateHUD();
   saveGame();
-  showToast(`Sold ${info.name} for $${info.refund.toLocaleString()} — it's unclaimed now`, true);
+  showToast(`Sold ${info.name} for $${info.refund.toLocaleString()} — it's unclaimed now${scrapLabel}`, true);
   return true;
 }
 
@@ -10731,7 +11215,7 @@ window.sellSelectedPlot = function() {
   if (!p || !p.userData.owned) return;
   const info = plotSaleInfo(p.userData.id);
   const nb = (BUSINESS_REGISTRY.get(p.userData.id) || []).length;
-  const warn = nb ? ` Its ${nb} business${nb > 1 ? 'es' : ''} will be demolished with the sale.` : '';
+  const warn = nb ? ` Its ${nb} business${nb > 1 ? 'es' : ''} are scrapped — you recover half their materials and a quarter of the build cost.` : '';
   if (!confirm(`Sell ${p.userData.name} for $${info.refund.toLocaleString()} (50% of land value)?${warn} It becomes unclaimed land anyone can buy.`)) return;
   if (sellPlotCore(p.userData.id)) closePlotModal();
 };
@@ -10739,7 +11223,7 @@ window.sellSelectedPlot = function() {
 window.sellPlotById = function(plotId) {
   const info = plotSaleInfo(plotId);
   const nb = (BUSINESS_REGISTRY.get(plotId) || []).length;
-  const warn = nb ? ` Its ${nb} business${nb > 1 ? 'es' : ''} will be demolished with the sale.` : '';
+  const warn = nb ? ` Its ${nb} business${nb > 1 ? 'es' : ''} are scrapped — you recover half their materials and a quarter of the build cost.` : '';
   if (!confirm(`Sell ${info.name} (${info.planet.icon} ${info.planet.name}) for $${info.refund.toLocaleString()} (50% of land value)?${warn} It becomes unclaimed land anyone can buy.`)) return;
   if (sellPlotCore(plotId)) renderMyPlotsPanel();
 };
@@ -10937,37 +11421,44 @@ window.multiSellAll = function() {
     }
   }
   // v1.26 — refunds are 50% of LAND VALUE (base + development), matching
-  // single-sell; businesses on sold plots are demolished with the sale.
-  let totalRefund = 0, totalBiz = 0;
+  // single-sell; v1.30 — businesses on sold plots are SCRAPPED (half their
+  // materials + a quarter of the build cost come back) and merged estates
+  // dissolve as their members leave.
+  let totalRefund = 0, totalBiz = 0, scrapParts = [];
   for (const id of ids) {
     totalRefund += plotSaleInfo(id).refund;
     totalBiz += (BUSINESS_REGISTRY.get(id) || []).length;
   }
   // Confirm with user
   const pluralS = ids.length > 1 ? 's' : '';
-  const warn = totalBiz ? ` Businesses on them (${totalBiz} total) will be demolished with the sale.` : '';
+  const warn = totalBiz ? ` Businesses on them (${totalBiz} total) are scrapped — you recover half their materials and a quarter of the build cost.` : '';
   if (!confirm(`Sell ${ids.length} plot${pluralS} for $${totalRefund.toLocaleString()} total (50% of land value)?${warn} They become unclaimed land anyone can buy.`)) return;
   // All checks passed — sell them all in one transaction
   const claims = getClaims();
   for (const id of ids) {
     const p = ACTIVE_PLOT_BY_ID.get(id);
-    for (const entry of p.userData.businesses || []) {
+    for (const entry of (p ? p.userData.businesses : []) || []) {
       try { disposeBusinessMesh(entry.mesh); } catch (e) {}
+      const bt = getBusinessType(entry.type);
+      if (bt && p) { const rf = scrapRefundFor(p, bt); applyScrapRefund(rf); scrapParts.push(scrapRefundLabel(rf)); }
     }
-    p.userData.owned = false;
-    p.userData.ownedByOther = false;
-    p.userData.ownerName = null;
-    p.userData.businesses = [];
-    p.userData._selected = false;
+    dissolveGroupAround(id);
+    if (p) {
+      p.userData.owned = false;
+      p.userData.ownedByOther = false;
+      p.userData.ownerName = null;
+      p.userData.businesses = [];
+      p.userData._selected = false;
+      setPlotColors(p, p.userData.baseColor, plotBaseOutline(p));
+      const ci = STATE.claimedPlots.indexOf(p);
+      if (ci >= 0) STATE.claimedPlots.splice(ci, 1);
+    }
     STATE.owned.delete(id);
     STATE.rented.delete(id);
     BUSINESS_REGISTRY.delete(id);
     BIZ_POS.delete(id);
     BIZ_META.delete(id);
     delete claims[id];
-    setPlotColors(p, p.userData.baseColor, plotBaseOutline(p));
-    const ci = STATE.claimedPlots.indexOf(p);
-    if (ci >= 0) STATE.claimedPlots.splice(ci, 1);
     STATE.multiSelect.delete(id);
   }
   STATE.money += totalRefund;
@@ -10976,7 +11467,7 @@ window.multiSellAll = function() {
   updateHUD();
   saveGame();
   updateMultiBuyBar();
-  showToast(`✅ Sold ${ids.length} plot${pluralS} for $${totalRefund.toLocaleString()}`, true);
+  showToast(`✅ Sold ${ids.length} plot${pluralS} for $${totalRefund.toLocaleString()}${scrapParts.length ? ' · scrapped: ' + scrapParts.slice(0, 3).join(', ') + (scrapParts.length > 3 ? '…' : '') : ''}`, true);
 };
 
 // Dispatcher: the bar's action button calls this — it routes to buy or sell
@@ -11203,6 +11694,41 @@ window.moveBusiness = function(businessIndex) {
   showToast(`${bt ? bt.name : 'Building'} — click its new spot inside ${p.userData.name}`, true);
 };
 
+// ====================================================================
+// SCRAP (v1.30) — nothing is ever just deleted, the Capital Rift way:
+// tearing a business down recovers half of the materials it took to
+// build it (scaled to the plot, floor'd) plus a quarter of the credits.
+// Plot sales scrap everything on the land with the same refund.
+// ====================================================================
+function scrapRefundFor(plot, bt) {
+  const am = plot && plot.userData ? plot.userData.areaMultiplier : 1;
+  const mats = {};
+  if (bt && bt.buildReq) {
+    for (const id of Object.keys(bt.buildReq)) {
+      const back = Math.floor(bt.buildReq[id] * (am || 1) * 0.5);
+      if (back >= 1) mats[id] = back;
+    }
+  }
+  const credits = bt ? Math.round(bt.buildCost * (am || 1) * 0.25) : 0;
+  return { mats, credits };
+}
+function scrapRefundLabel(rf) {
+  const parts = [];
+  for (const id of Object.keys(rf.mats)) {
+    const m = getMaterial(id);
+    if (m) parts.push(`${rf.mats[id]} ${m.icon} ${m.name}`);
+  }
+  if (rf.credits > 0) parts.push(`$${rf.credits.toLocaleString()}`);
+  return parts.length ? parts.join(' + ') : 'nothing';
+}
+function applyScrapRefund(rf) {
+  for (const id of Object.keys(rf.mats)) {
+    STATE.inventory[id] = (STATE.inventory[id] || 0) + rf.mats[id];
+  }
+  if (rf.credits > 0) STATE.money += rf.credits;
+  updateHUD();
+}
+
 window.demolishBusiness = function(businessIndex) {
   const p = STATE.selectedPlot;
   if (!p || !p.userData.businesses) return;
@@ -11210,6 +11736,8 @@ window.demolishBusiness = function(businessIndex) {
   const entry = p.userData.businesses[businessIndex];
   if (!entry) return;
   const bt = getBusinessType(entry.type);
+  const rf = scrapRefundFor(p, bt);
+  if (!confirm(`♻ Scrap this ${bt ? bt.name : 'business'}?\nYou recover: ${scrapRefundLabel(rf)}`)) return;
   // Remove business mesh
   if (entry.mesh) {
     disposeBusinessMesh(entry.mesh);
@@ -11233,6 +11761,8 @@ window.demolishBusiness = function(businessIndex) {
     BIZ_POS.delete(p.userData.id);
     BIZ_META.delete(p.userData.id);
   }
+  // v1.30 — the scrap yard pays out
+  applyScrapRefund(rf);
   // If no businesses left, restore the natural owned look; otherwise
   // recolor to first remaining
   if (p.userData.businesses.length === 0) {
@@ -11244,7 +11774,7 @@ window.demolishBusiness = function(businessIndex) {
   flushPlotPools();
   updateHUD();
   openPlotModal(p);
-  showToast(`Demolished ${bt ? bt.name : 'business'}`, true);
+  showToast(`♻ Scrapped ${bt ? bt.name : 'business'} — recovered ${scrapRefundLabel(rf)}`, true);
   saveGame();
 };
 
@@ -11295,7 +11825,7 @@ function updateMarket() {
   if (document.getElementById('market-modal').classList.contains('show')) {
     openMarketModal();
   }
-  showToast('📈 Market prices updated', true);
+  showToast('📋 The Exchange re-quoted — The Reserve moved with the tape', true);
 }
 
 // Compute total value of all materials in inventory at current market prices
@@ -11318,16 +11848,18 @@ function getMarketCountdown() {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-// v1.23 — the Market modal has two faces: the system Market (sell
-// instantly at fluctuating prices) and the Player Market (set your own
-// price, trade with other commanders). The active tab survives the
-// 15-minute system-price refresh re-renders.
-window.__mkTab = 'sell';
+// v1.23 — the Market modal's faces: THE EXCHANGE (the global order
+// book — instant fills, resting limit orders, The Reserve), direct
+// Listings (set your own price, trade with other commanders) and the
+// Stock Exchange. The active tab survives the 15-minute system-price
+// refresh re-renders.
+window.__mkTab = 'exchange';
 window.openMarketModal = function(tab) {
-  if (tab === 'players' || tab === 'sell' || tab === 'stocks') window.__mkTab = tab;
+  if (tab === 'exchange' || tab === 'players' || tab === 'stocks') window.__mkTab = tab;
   renderMarketModal();
   document.getElementById('market-modal').classList.add('show');
   try { PlayerMarket.refresh(); } catch (e) {}
+  try { Exchange.refresh(); } catch (e) {}
 };
 window.setMarketTab = function(t) {
   window.__mkTab = t;
@@ -11336,8 +11868,8 @@ window.setMarketTab = function(t) {
 function marketTabBar() {
   return `
     <div class="mk-tabs">
-      <button class="mk-tab ${window.__mkTab === 'sell' ? 'active' : ''}" onclick="setMarketTab('sell')"><b>🏪 System Market</b>sell instantly at today's prices</button>
-      <button class="mk-tab ${window.__mkTab === 'players' ? 'active' : ''}" onclick="setMarketTab('players')"><b>🤝 Player Market</b>trade with other commanders</button>
+      <button class="mk-tab ${window.__mkTab === 'exchange' ? 'active' : ''}" onclick="setMarketTab('exchange')"><b>📋 The Exchange</b>the global order book</button>
+      <button class="mk-tab ${window.__mkTab === 'players' ? 'active' : ''}" onclick="setMarketTab('players')"><b>🤝 Listings</b>direct offers</button>
       <button class="mk-tab ${window.__mkTab === 'stocks' ? 'active' : ''}" onclick="setMarketTab('stocks')"><b>📈 Stock Exchange</b>buy the dips, sell the peaks</button>
     </div>`;
 }
@@ -11346,77 +11878,275 @@ function renderMarketModal() {
   if (!card) return;
   if (window.__mkTab === 'players') { renderPlayerMarket(card); return; }
   if (window.__mkTab === 'stocks') { renderStockMarket(card); return; }
-  renderSystemMarket(card);
+  renderExchange(card);
 }
-function renderSystemMarket(card) {
-  const countdown = getMarketCountdown();
-  const invValue = getInventoryValue();
 
-  const rows = MATERIALS.filter(m => !m.military).map(m => {
-    const price = STATE.marketPrices[m.id];
-    const trend = STATE.marketTrend[m.id];
-    const trendIcon = trend === 'up' ? '▲' : (trend === 'down' ? '▼' : '◆');
-    const trendClass = trend === 'up' ? 'up' : (trend === 'down' ? 'down' : 'stable');
-    const stock = STATE.inventory[m.id] || 0;
-    const stockValue = stock * price;
-    const hasStock = stock > 0.01;
-    const pctVsBase = ((price / m.basePrice - 1) * 100).toFixed(0);
-    const pctSign = pctVsBase >= 0 ? '+' : '';
-    // Sell-amount strip: defaults to the full stock (one click still sells
-    // everything) but the commander can dial in any portion — type a number,
-    // use the − / + steppers, or hit the 25% / 50% / Max quick-fills. The
-    // Sell button previews the exact revenue for the chosen amount.
-    const sellCtrl = hasStock ? `
-      <div class="mat-sell-ctrl">
-        <button class="amt-btn" title="One less" onclick="nudgeSellAmount('${m.id}',-1)">−</button>
-        <input class="amt-input" id="sell-amt-${m.id}" type="number" min="0" step="any" inputmode="decimal"
-               value="${fmtQty(stock)}" title="Amount to sell (up to ${fmtQty(stock)})" oninput="updateSellPreview('${m.id}')">
-        <button class="amt-btn" title="One more" onclick="nudgeSellAmount('${m.id}',1)">+</button>
-        <button class="amt-chip" onclick="setSellPct('${m.id}',0.25)">25%</button>
-        <button class="amt-chip" onclick="setSellPct('${m.id}',0.5)">50%</button>
-        <button class="amt-chip" onclick="setSellPct('${m.id}',1)">Max</button>
-        <button class="mat-sell" id="sell-btn-${m.id}" onclick="sellMaterial('${m.id}')">Sell $${Math.round(stockValue).toLocaleString()}</button>
-      </div>
-    ` : '';
-    return `
-      <div class="mat-row">
-        <div class="mat-main">
-          <div class="mat-icon">${m.icon}</div>
-          <div class="mat-info">
-            <div class="mat-name">${m.name}</div>
-            <div class="mat-meta">Base $${m.basePrice} · ${pctSign}${pctVsBase}%</div>
-          </div>
-          <div>
-            <div class="mat-price">$${Math.round(price).toLocaleString()}</div>
-            <div class="mat-trend ${trendClass}">${trendIcon} ${trend}</div>
-          </div>
-          <div>
-            <div class="mat-stock">${hasStock ? stock.toFixed(1) : '—'}</div>
-            ${hasStock ? `<div class="mat-stock" style="color:#f5cc74">$${Math.round(stockValue).toLocaleString()}</div>` : ''}
-          </div>
-          ${hasStock ? '' : '<button class="mat-sell" disabled>Empty</button>'}
-        </div>
-        ${sellCtrl}
-      </div>
-    `;
+// ====================================================================
+// THE EXCHANGE TAB (v1.30) — depth ladder, instant fills, limit orders,
+// open-order management and the live trade tape.
+// ====================================================================
+window.__exSide = 'bid';   // limit-order side toggle (session-only)
+function renderExchange(card) {
+  if (!CURRENT_USER) { card.innerHTML = ''; return; }
+  const tradable = MATERIALS.filter(m => !m.military);
+  const selId = (STATE.exLastMat && getMaterial(STATE.exLastMat) && !getMaterial(STATE.exLastMat).military)
+    ? STATE.exLastMat : (tradable[0] && tradable[0].id);
+  const m = getMaterial(selId);
+  const bk = Exchange.book(selId);
+  const rq = bk.reserve;
+  const last = Exchange.lastPrice(selId);
+  const midPx = (last != null) ? last : Math.round(rq.mid);
+  const stock = Math.floor(STATE.inventory[selId] || 0);
+
+  // — material rail: every tradable code with its last price + trend —
+  const rail = tradable.map(mm => {
+    const px = Exchange.lastPrice(mm.id);
+    const trend = STATE.marketTrend[mm.id] || 'stable';
+    const arrow = trend === 'up' ? '<span class="up">▲</span>' : (trend === 'down' ? '<span class="dn">▼</span>' : '');
+    const held = Math.floor(STATE.inventory[mm.id] || 0);
+    return `<div class="ex-chip ${mm.id === selId ? 'sel' : ''}" onclick="exSel('${mm.id}')" title="${mm.name}${held ? ' — hold ' + held : ''}">${mm.code} <b>${px != null ? '$' + px : '—'}</b> ${arrow}</div>`;
   }).join('');
 
+  // — depth ladder: best 5 resting levels a side + The Reserve —
+  const lvlRow = (o) => `
+    <div class="ex-lvl ${o.owner === CURRENT_USER ? 'mine' : ''}" title="${o.owner === CURRENT_USER ? 'your order' : 'commander ' + o.owner + ' — ' + Exchange.fmtAge(o.placedAt)}">
+      <span class="q">${o.remaining.toLocaleString()}</span><span>$${o.price.toLocaleString()}</span>
+    </div>`;
+  const bidRows = bk.bids.slice(0, 5).map(lvlRow).join('')
+    || '<div class="ex-lvl"><span class="q">—</span><span>no bids resting</span></div>';
+  const askRows = bk.asks.slice(0, 5).map(lvlRow).join('')
+    || '<div class="ex-lvl"><span class="q">—</span><span>no asks resting</span></div>';
+  const bookHtml = `
+    <div class="ex-book">
+      <div class="ex-side bids">
+        <div class="ex-side-head">BIDS — buying</div>
+        ${bidRows}
+        <div class="ex-lvl reserve" title="The Reserve — the standing market maker, infinite depth"><span class="q">∞</span><span>$${rq.bid.toLocaleString()}</span></div>
+      </div>
+      <div class="ex-mid">
+        <div class="lb">LAST</div>
+        <div class="px">$${midPx.toLocaleString()}</div>
+        <div class="sp">spread $${(rq.ask - rq.bid).toLocaleString()}</div>
+        <div class="sp" style="color:#5c6a75">${m.icon} ${m.code}</div>
+      </div>
+      <div class="ex-side asks">
+        <div class="ex-side-head">ASKS — selling</div>
+        ${askRows}
+        <div class="ex-lvl reserve" title="The Reserve — the standing market maker, infinite depth"><span class="q">∞</span><span>$${rq.ask.toLocaleString()}</span></div>
+      </div>
+    </div>`;
+
+  // — instant fills —
+  const maxBuy = Math.floor(STATE.money / Math.max(1, rq.ask));
+  const instantHtml = `
+    <div class="mk-title">Instant fill</div>
+    <div class="ex-trade">
+      <div class="ex-field"><label>AMOUNT</label>
+        <div class="ex-qty">
+          <button onclick="exNudgeQty(-1)">−</button>
+          <input id="ex-qty" type="number" min="1" step="1" inputmode="numeric" value="10" oninput="exPreview()">
+          <button onclick="exNudgeQty(1)">+</button>
+        </div>
+      </div>
+      <button class="ex-chip2" onclick="exQtyPreset(10)">10</button>
+      <button class="ex-chip2" onclick="exQtyPreset(100)">100</button>
+      <button class="ex-chip2" onclick="exQtyMax('buy')" title="${maxBuy > 0 ? 'Affordable at the Reserve ask price' : 'Cannot afford any'}">Max buy ${maxBuy.toLocaleString()}</button>
+      <button class="ex-chip2" onclick="exQtyMax('sell')" title="Everything in storage">Max sell ${stock.toLocaleString()}</button>
+      <button class="ex-btn buy" id="ex-buy-btn" onclick="exInstantBuy()">BUY</button>
+      <button class="ex-btn sell" id="ex-sell-btn" onclick="exInstantSell()">SELL</button>
+    </div>
+    <div class="ex-sub" id="ex-instant-sub"></div>`;
+
+  // — limit orders —
+  const isBid = window.__exSide === 'bid';
+  const defPrice = isBid ? Math.max(1, rq.bid - 1) : (stock > 0 ? rq.ask + 1 : rq.ask + 1);
+  const limitHtml = `
+    <div class="mk-title">Limit order — rest it at your price</div>
+    <div class="ex-trade">
+      <button class="ex-btn ${isBid ? 'buy' : 'sell'}" onclick="exSide('${isBid ? 'ask' : 'bid'}')" title="Switch between buying and selling">${isBid ? 'BUY' : 'SELL'} LIMIT</button>
+      <div class="ex-field"><label>PRICE / UNIT ($)</label>
+        <input id="ex-price" type="number" min="1" step="1" inputmode="numeric" value="${defPrice}" oninput="exPreview()">
+      </div>
+      <button class="ex-chip2" onclick="exPresetPrice('best')" title="Join the best resting level">Best</button>
+      <button class="ex-chip2" onclick="exPresetPrice('reserve')" title="Sit just inside The Reserve">Reserve</button>
+      <button class="ex-btn gold" id="ex-limit-btn" onclick="exPlaceLimit()">PLACE ${isBid ? 'BID' : 'ASK'}</button>
+    </div>
+    <div class="ex-sub" id="ex-limit-sub"></div>`;
+
+  // — my open orders —
+  const mine = Exchange.myOrders();
+  const orderRows = mine.map(o => {
+    const om = getMaterial(o.mat);
+    const pct = o.qty0 > 0 ? Math.round(o.filled / o.qty0 * 100) : 0;
+    const live2 = !o.cancelled && o.remaining > 0 && o.expiresAt > Date.now();
+    return `
+      <div class="ex-order">
+        <span style="color:${o.side === 'bid' ? 'var(--cr-up)' : 'var(--cr-down)'}">${o.side === 'bid' ? 'BID' : 'ASK'}</span>
+        <span>${om.icon} ${om.code}</span>
+        <span>${o.remaining.toLocaleString()}/${o.qty0.toLocaleString()} @ $${o.price.toLocaleString()}</span>
+        <span class="fillbar" title="${pct}% filled"><i style="width:${pct}%"></i></span>
+        <span class="who">${live2 ? Exchange.fmtLeft(o.expiresAt) : (o.cancelled ? 'cancelled' : 'expired')}</span>
+        ${live2 ? `<button class="mk-cancel" onclick="exCancel('${o.id}')">✕</button>` : ''}
+      </div>`;
+  }).join('') || '<div class="mk-empty">No open orders. Place a limit bid or ask and it rests here — other commanders and the exchange crowd fill it while you play.</div>';
+  const ordersHtml = `
+    <div class="mk-title">Your open orders (${mine.length}/${Exchange.MAX_OWN_OPEN})</div>
+    ${orderRows}`;
+
+  // — the tape —
+  const tapeRows = Exchange.tape(8).map(t => {
+    const tm = getMaterial(t.mat);
+    return `<div class="ex-tape-row"><span>${tm.icon} ${tm.code} · ${t.qty.toLocaleString()} @ $${t.price.toLocaleString()}</span><span>${t.side === 'bid' ? 'buyer' : 'seller'} <b>${t.by}</b> · ${Exchange.fmtAge(t.at)}</span></div>`;
+  }).join('') || '<div class="ex-tape-row"><span>no trades on the tape yet — be the first</span><span></span></div>';
+  const tapeHtml = `
+    <div class="mk-title">Tape — last trades on the book</div>
+    <div class="ex-tape">${tapeRows}</div>`;
+
+  const st = Exchange.status() === 'cloud' ? '☁ live across every commander' : '💾 this device — cloud retrying';
   card.innerHTML = `
     <span class="badge available">market</span>
-    <h2>📈 Global Market</h2>
+    <h2>📋 The Exchange</h2>
     <div class="market-sub">
-      Inventory value: <b>$${Math.round(invValue).toLocaleString()}</b> ·
-      Next price update in: <b class="market-countdown">${countdown}</b>
+      ${st} · your credits <b>$${Math.floor(STATE.money).toLocaleString()}</b> ·
+      you hold <b>${stock.toLocaleString()} ${m.icon} ${m.name}</b> ·
+      Reserve re-quotes in <b class="market-countdown">${getMarketCountdown()}</b>
     </div>
     ${marketTabBar()}
-    <div class="biz-hint" style="margin-bottom:14px">Set exactly how much of each material to sell — type an amount, tap − / +, or use the quick chips. Prices fluctuate every 15 minutes; sell when they're high for maximum profit. To sell at <i>your own</i> price instead, open the Player Market tab.</div>
-    ${rows}
+    <div class="ex-hint">One book for every material, the <b>Capital Rift</b> way. <b>BUY / SELL</b> fill the best prices standing in the book (other commanders first, then <b>The Reserve</b> at a 6% spread). <b>Limit orders</b> rest at your price — bids escrow credits, asks escrow materials — and pay out the moment they're filled. Dashed outlines in the ladder are your own orders.</div>
+    <div class="ex-rail">${rail}</div>
+    ${bookHtml}
+    ${instantHtml}
+    ${limitHtml}
+    ${ordersHtml}
+    ${tapeHtml}
     <div class="market-actions">
       <button class="btn" onclick="closeMarketModal()">Close</button>
-      <button class="btn primary" onclick="sellAllMaterials()">Sell All Materials</button>
     </div>
   `;
+  try { exPreview(); } catch (e) {}
 }
+
+window.exSel = function(matId) {
+  STATE.exLastMat = matId;
+  renderMarketModal();
+};
+window.exSide = function(side) {
+  window.__exSide = side === 'ask' ? 'ask' : 'bid';
+  renderMarketModal();
+};
+window.exNudgeQty = function(d) {
+  const inp = document.getElementById('ex-qty');
+  if (!inp) return;
+  const cur = parseInt(inp.value, 10) || 0;
+  inp.value = Math.max(1, cur + d);
+  exPreview();
+};
+window.exQtyPreset = function(n) {
+  const inp = document.getElementById('ex-qty');
+  if (inp) { inp.value = n; exPreview(); }
+};
+window.exQtyMax = function(which) {
+  const inp = document.getElementById('ex-qty');
+  if (!inp) return;
+  if (which === 'buy') {
+    const rq = Exchange.reserveQuote(STATE.exLastMat || (MATERIALS.find(m => !m.military) || {}).id);
+    inp.value = Math.max(1, Math.floor(STATE.money / Math.max(1, rq.ask)));
+  } else {
+    const mat = STATE.exLastMat || (MATERIALS.find(m => !m.military) || {}).id;
+    inp.value = Math.max(1, Math.floor(STATE.inventory[mat] || 0));
+  }
+  exPreview();
+};
+window.exPresetPrice = function(kind) {
+  const mat = STATE.exLastMat || (MATERIALS.find(m => !m.military) || {}).id;
+  const inp = document.getElementById('ex-price');
+  if (!inp) return;
+  const bk = Exchange.book(mat);
+  const isBid = window.__exSide === 'bid';
+  if (kind === 'best') {
+    if (isBid && bk.bids.length) inp.value = bk.bids[0].price;
+    else if (!isBid && bk.asks.length) inp.value = bk.asks[0].price;
+    else inp.value = isBid ? bk.reserve.bid : bk.reserve.ask;
+  } else {   // 'reserve' — sit just inside The Reserve's quote
+    inp.value = isBid ? bk.reserve.bid + 1 : Math.max(1, bk.reserve.ask - 1);
+  }
+  exPreview();
+};
+// Live previews under both trade panels
+window.exPreview = function() {
+  const matId = STATE.exLastMat || (MATERIALS.find(m => !m.military) || {}).id;
+  const m = getMaterial(matId);
+  if (!m) return;
+  const bk = Exchange.book(matId);
+  const rq = bk.reserve;
+  const qtyInp = document.getElementById('ex-qty');
+  const subEl = document.getElementById('ex-instant-sub');
+  const qty = qtyInp ? (parseInt(qtyInp.value, 10) || 0) : 0;
+  if (subEl) {
+    if (qty > 0) {
+      // walk the book for an honest preview
+      let need = qty, spend = 0, gross = 0;
+      for (const o of bk.asks) { if (need <= 0) break; const t = Math.min(need, o.remaining); spend += t * o.price; need -= t; }
+      if (need > 0) spend += need * rq.ask;
+      need = qty;
+      for (const o of bk.bids) { if (need <= 0) break; const t = Math.min(need, o.remaining); gross += t * o.price; need -= t; }
+      if (need > 0) gross += need * rq.bid;
+      const stock = Math.floor(STATE.inventory[matId] || 0);
+      subEl.innerHTML = `BUY ${qty} → <b>$${Math.round(spend).toLocaleString()}</b> (${qty > (STATE.money / Math.max(1, rq.ask)) ? '<span class="r">over budget</span>' : 'affordable'}) · SELL ${qty} → <b>$${Math.round(gross).toLocaleString()}</b> ${qty > stock ? '<span class="r">(you hold ' + stock + ')</span>' : '(you hold ' + stock + ')'}`;
+    } else {
+      subEl.textContent = 'Set an amount — BUY fills the cheapest asks, SELL fills the highest bids.';
+    }
+  }
+  const priceInp = document.getElementById('ex-price');
+  const limitSub = document.getElementById('ex-limit-sub');
+  if (limitSub) {
+    const price = priceInp ? (parseInt(priceInp.value, 10) || 0) : 0;
+    const isBid = window.__exSide === 'bid';
+    if (price >= 1 && qty >= 1) {
+      if (isBid) {
+        const crosses = bk.asks.length && bk.asks[0].price <= price;
+        limitSub.innerHTML = crosses
+          ? `Crosses the book — fills instantly at the cheaper ask (<b>$${bk.asks[0].price}</b>); the rest rests as a bid.`
+          : `Rests in the book: ${qty} × $${price} = <b>$${(qty * price).toLocaleString()}</b> credits in escrow until it fills or expires (3 days).`;
+      } else {
+        const crosses = bk.bids.length && bk.bids[0].price >= price;
+        const stock = Math.floor(STATE.inventory[matId] || 0);
+        limitSub.innerHTML = crosses
+          ? `Crosses the book — fills instantly at the better bid (<b>$${bk.bids[0].price}</b>); the rest rests as an ask.`
+          : `Rests in the book: ${qty} ${m.icon} in escrow${qty > stock ? ' <span class="r">(you only hold ' + stock + ')</span>' : ''} — payout lands the moment it fills.`;
+      }
+    } else {
+      limitSub.textContent = 'Pick a price and an amount — priced at the market it fills in moments; pitched deeper it waits for the exchange crowd.';
+    }
+  }
+};
+window.exInstantBuy = async function() {
+  const inp = document.getElementById('ex-qty');
+  const matId = STATE.exLastMat || (MATERIALS.find(m => !m.military) || {}).id;
+  const r = await Exchange.instantBuy(matId, inp ? inp.value : 0);
+  showToast(r.msg, r.ok);
+  renderMarketModal();
+};
+window.exInstantSell = async function() {
+  const inp = document.getElementById('ex-qty');
+  const matId = STATE.exLastMat || (MATERIALS.find(m => !m.military) || {}).id;
+  const r = await Exchange.instantSell(matId, inp ? inp.value : 0);
+  showToast(r.msg, r.ok);
+  renderMarketModal();
+};
+window.exPlaceLimit = async function() {
+  const qtyInp = document.getElementById('ex-qty');
+  const priceInp = document.getElementById('ex-price');
+  const matId = STATE.exLastMat || (MATERIALS.find(m => !m.military) || {}).id;
+  const r = await Exchange.placeLimit(window.__exSide, matId, qtyInp ? qtyInp.value : 0, priceInp ? priceInp.value : 0);
+  showToast(r.msg, r.ok);
+  renderMarketModal();
+};
+window.exCancel = async function(id) {
+  const r = await Exchange.cancel(id);
+  showToast(r.msg, r.ok);
+  if (r.ok) renderMarketModal();
+};
 
 window.closeMarketModal = function() {
   document.getElementById('market-modal').classList.remove('show');
@@ -11575,103 +12305,10 @@ window.mkCancel = async function(id) {
   if (r.ok) renderMarketModal();
 };
 
-// Format a sell quantity for the amount input — trims float dust to 1 decimal
+// Format a quantity for amount inputs — trims float dust to 1 decimal
 function fmtQty(v) {
   return String(+Number(v).toFixed(1));
 }
-
-// Clamp a requested sell quantity to what's actually in storage
-function clampSellQty(qty, stock) {
-  if (!isFinite(qty) || qty <= 0) return 0;
-  return Math.min(qty, stock);
-}
-
-// Live revenue preview — keeps the Sell button label in sync with the amount
-window.updateSellPreview = function(materialId) {
-  const inp = document.getElementById('sell-amt-' + materialId);
-  const btn = document.getElementById('sell-btn-' + materialId);
-  if (!inp || !btn) return;
-  const stock = STATE.inventory[materialId] || 0;
-  const qty = clampSellQty(parseFloat(inp.value), stock);
-  btn.textContent = qty > 0
-    ? 'Sell $' + Math.floor(qty * STATE.marketPrices[materialId]).toLocaleString()
-    : 'Sell';
-};
-
-// Quick-fill chips: put 25% / 50% / Max of the current stock into the input
-window.setSellPct = function(materialId, pct) {
-  const inp = document.getElementById('sell-amt-' + materialId);
-  if (!inp) return;
-  const stock = STATE.inventory[materialId] || 0;
-  const qty = pct >= 1 ? stock : Math.floor(stock * pct * 10) / 10;
-  inp.value = fmtQty(qty);
-  updateSellPreview(materialId);
-};
-
-// − / + steppers: adjust the amount by one unit, clamped to storage
-window.nudgeSellAmount = function(materialId, delta) {
-  const inp = document.getElementById('sell-amt-' + materialId);
-  if (!inp) return;
-  const stock = STATE.inventory[materialId] || 0;
-  const cur = parseFloat(inp.value);
-  const qty = clampSellQty((isFinite(cur) ? cur : 0) + delta, stock);
-  inp.value = fmtQty(qty);
-  updateSellPreview(materialId);
-};
-
-window.sellMaterial = function(materialId) {
-  const m = getMaterial(materialId);
-  if (!m) return;
-  const stock = STATE.inventory[materialId] || 0;
-  if (stock <= 0) return;
-  // Sell exactly the amount chosen in the input (defaults to the full stock,
-  // so the single-click behaviour is unchanged); anything over stock is
-  // clamped, and zero/negative input is rejected with a hint.
-  const inp = document.getElementById('sell-amt-' + materialId);
-  const requested = inp ? parseFloat(inp.value) : stock;
-  const qty = clampSellQty(requested, stock);
-  if (qty <= 0) { showToast('Enter an amount to sell', false); return; }
-  const price = STATE.marketPrices[materialId];
-  const revenue = Math.floor(qty * price);
-  const remaining = stock - qty;
-  STATE.inventory[materialId] = remaining < 0.01 ? 0 : remaining;
-  STATE.money += revenue;
-  recordIncome(revenue);   // v1.25 — feeds the WORLD GDP 24H stat
-  updateHUD();
-  openMarketModal();  // refresh to show updated stock
-  const left = STATE.inventory[materialId] > 0
-    ? ' · ' + fmtQty(STATE.inventory[materialId]) + ' left'
-    : '';
-  showToast(`Sold ${fmtQty(qty)} ${m.icon} ${m.name} for $${revenue.toLocaleString()}${left}`, true);
-  saveGame();
-};
-
-window.sellAllMaterials = function() {
-  let total = 0;
-  let totalQty = 0;
-  const sold = [];
-  for (const m of MATERIALS) {
-    if (m.military) continue;   // troops are never sold
-    const qty = STATE.inventory[m.id] || 0;
-    if (qty > 0.01) {
-      const rev = Math.floor(qty * STATE.marketPrices[m.id]);
-      total += rev;
-      totalQty += qty;
-      STATE.inventory[m.id] = 0;
-      sold.push(`${qty.toFixed(1)} ${m.icon}`);
-    }
-  }
-  if (total > 0) {
-    STATE.money += total;
-    recordIncome(total);   // v1.25 — feeds the WORLD GDP 24H stat
-    updateHUD();
-    openMarketModal();
-    showToast(`Sold ${sold.join(', ')} for $${total.toLocaleString()}`, true);
-    saveGame();
-  } else {
-    showToast('No materials to sell', false);
-  }
-};
 
 // ====================================================================
 // ECONOMY UPDATE (v1.25) — street kitchens, cooks, workers, the Stock
@@ -12647,6 +13284,717 @@ const PlayerMarket = (() => {
   };
 })();
 window.PlayerMarket = PlayerMarket;
+
+// ====================================================================
+// THE EXCHANGE (v1.30) — one global order book for every material,
+// the Capital Rift way. Nothing trades at a fixed system price anymore:
+//   • INSTANT BUY  fills the cheapest standing asks (other commanders'
+//     sell orders first, then The Reserve — the exchange's standing
+//     market maker, quoting around the live mid price with a spread).
+//   • INSTANT SELL fills the highest standing bids (other commanders'
+//     buy orders first, then The Reserve's bid).
+//   • LIMIT ORDERS rest in the book at YOUR price: bids escrow credits,
+//     asks escrow materials. Other commanders — and the exchange crowd
+//     of roaming traders — fill them while you play or while you're
+//     away; payouts and deliveries land automatically.
+// Architecture mirrors the Player Market: shared openworld_data cloud
+// row ('openworld_exchange') + localStorage twin, append-only fill
+// logs, deterministic over-fill audit (latest fills refund first) and
+// monotone row merges, so two racing traders can never resurrect stock
+// or silently drop a fill.
+// ====================================================================
+const Exchange = (() => {
+  const KEY = 'openworld_exchange';
+  const MAX_ORDERS = 400;                       // rows kept in the shared ledger
+  const ORDER_TTL = 3 * 24 * 60 * 60 * 1000;    // a resting order lives 3 days
+  const DEAD_GRACE = 7 * 24 * 60 * 60 * 1000;   // dead rows kept 7 days for payouts / escrow return
+  const POLL_MS = 15000;
+  const MAX_OWN_OPEN = 12;
+  const MAX_FILLS = 160;                        // per-order fill log cap (audit guard)
+  const RESERVE_SPREAD = 0.06;                  // The Reserve: bid = mid×0.94, ask = mid×1.06
+  const BOT_MIN_AGE = 20000;                    // orders younger than this don't get crowd-filled yet
+
+  // The exchange crowd — roaming traders who work the book. Fills from
+  // them are ordinary fill records: your payouts/deliveries reconcile
+  // exactly like a real commander's trade.
+  const BOT_NAMES = ['CommanderVex', 'MidasRift', 'VoidHawk', 'KestrelCo', 'OrionMargin',
+    'LatticeCap', 'BrambleFund', 'AurumDesk', 'PolestarTX', 'IronwoodLLC', 'NimbusYards',
+    'CobaltRow', 'FairwaveCo', 'GranitePeak', 'SolarisCap', 'Tesserae'];
+
+  let client = null;
+  if (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase) {
+    try { client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch (e) {}
+  }
+  let lastCloudOk = client ? Date.now() : 0;
+  let lastCloudFail = 0;
+  const CLOUD_RETRY_MS = 30000;
+  function status() {
+    return (client && Date.now() - lastCloudOk < 60000) ? 'cloud' : 'local';
+  }
+
+  let orders = [];        // working copy of the shared book
+  let timer = null;
+  let writing = false;
+  let dirty = false;
+
+  // ---------- row IO (cloud + localStorage twin) ----------
+  function readLocal() {
+    try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { return {}; }
+  }
+  function writeLocal(data) {
+    try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {}
+  }
+  async function fetchRow() {
+    if (!client) return readLocal();
+    try {
+      const { data, error } = await client.from('openworld_data').select('data').eq('key', KEY).maybeSingle();
+      if (error) throw error;
+      lastCloudOk = Date.now();
+      return (data && data.data) || {};
+    } catch (e) {
+      return readLocal();
+    }
+  }
+  async function writeRow(data) {
+    writeLocal(data);
+    if (!client) return true;
+    if (Date.now() - lastCloudOk > CLOUD_RETRY_MS && Date.now() - lastCloudFail < CLOUD_RETRY_MS) return false;
+    try {
+      const { error } = await client.from('openworld_data')
+        .upsert({ key: KEY, data, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+      if (error) throw error;
+      lastCloudOk = Date.now();
+      lastCloudFail = 0;
+      return true;
+    } catch (e) {
+      lastCloudFail = Date.now();
+      return false;
+    }
+  }
+
+  // ---------- order model ----------
+  function fid() { return 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+  function oid() { return 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+  function sanitize(o) {
+    if (!o || typeof o.id !== 'string' || typeof o.owner !== 'string') return null;
+    if (o.side !== 'bid' && o.side !== 'ask') return null;
+    const m = getMaterial(o.mat);
+    if (!m || m.military) return null;
+    const qty0 = Math.floor(+o.qty0), price = Math.round(+o.price);
+    if (!isFinite(qty0) || qty0 < 1 || qty0 > 1e6) return null;
+    if (!isFinite(price) || price < 1 || price > 999999) return null;
+    const fills = [];
+    if (Array.isArray(o.fills)) {
+      for (const f of o.fills) {
+        if (fills.length >= MAX_FILLS) break;
+        if (!f || typeof f.id !== 'string' || typeof f.by !== 'string') continue;
+        const q = Math.floor(+f.qty), c = Math.round(+f.cost);
+        if (!isFinite(q) || q < 1 || !isFinite(c) || c < 0) continue;
+        fills.push({ id: f.id, by: f.by, qty: q, cost: c, at: +f.at || 0, refunded: !!f.refunded });
+      }
+    }
+    return {
+      id: o.id, owner: o.owner, side: o.side, mat: o.mat, qty0: qty0, price: price,
+      placedAt: +o.placedAt || Date.now(),
+      expiresAt: +o.expiresAt || Date.now(),
+      cancelled: !!o.cancelled,
+      fills: fills,
+    };
+  }
+  function filledOf(o) {
+    let t = 0;
+    for (const f of o.fills) if (!f.refunded) t += f.qty;
+    return t;
+  }
+  function remainingOf(o) { return Math.max(0, o.qty0 - filledOf(o)); }
+  function earnedOf(o) {
+    let t = 0;
+    for (const f of o.fills) if (!f.refunded) t += f.cost;
+    return t;
+  }
+  function isLive(o, now) {
+    return !o.cancelled && (o.expiresAt || 0) > now && remainingOf(o) > 0;
+  }
+
+  // ---------- deterministic audit (over-fills refund the latest fills) ----------
+  function auditOrders(arr) {
+    let changed = false;
+    for (const o of arr) {
+      o.fills.sort((a, b) => (a.at - b.at) || String(a.id).localeCompare(String(b.id)));
+      let over = filledOf(o) - o.qty0;
+      if (over > 0) {
+        for (let i = o.fills.length - 1; i >= 0 && over > 0; i--) {
+          if (o.fills[i].refunded) continue;
+          o.fills[i].refunded = true;
+          over -= o.fills[i].qty;
+          changed = true;
+        }
+      }
+    }
+    return changed;
+  }
+
+  // ---------- monotone row merge ----------
+  function mergeRows(fresh, mine) {
+    const now = Date.now();
+    const byId = new Map();
+    for (const o of (fresh.orders || [])) { const s = sanitize(o); if (s) byId.set(s.id, s); }
+    for (const o of (mine.orders || [])) {
+      const s = sanitize(o); if (!s) continue;
+      const f = byId.get(s.id);
+      if (!f) {
+        if ((s.expiresAt || 0) + DEAD_GRACE > now) byId.set(s.id, s);
+        continue;
+      }
+      const fillById = new Map();
+      for (const x of f.fills) fillById.set(x.id, x);
+      for (const x of s.fills) {
+        const fx = fillById.get(x.id);
+        if (!fx) fillById.set(x.id, x);
+        else if (x.refunded && !fx.refunded) fillById.set(x.id, x);
+        else if (fx.refunded && !x.refunded) fillById.set(x.id, fx);
+      }
+      f.fills = Array.from(fillById.values());
+      f.cancelled = f.cancelled || s.cancelled;
+      f.placedAt = Math.min(f.placedAt, s.placedAt);
+      f.expiresAt = Math.max(f.expiresAt, s.expiresAt);
+    }
+    return Array.from(byId.values());
+  }
+  function pruneOrders(arr) {
+    const now = Date.now();
+    let out = arr.filter(o => (o.expiresAt || 0) + DEAD_GRACE > now);
+    if (out.length > MAX_ORDERS) {
+      out.sort((a, b) => (a.expiresAt - b.expiresAt) || (a.placedAt - b.placedAt));
+      out = out.slice(out.length - MAX_ORDERS);
+    }
+    return out;
+  }
+
+  // ---------- write path (read-merge-write) ----------
+  async function persist() {
+    if (writing || !CURRENT_USER) return;
+    writing = true;
+    try {
+      const fresh = await fetchRow();
+      orders = mergeRows({ orders: (fresh && fresh.orders) || [] }, { orders });
+      auditOrders(orders);
+      orders = pruneOrders(orders);
+      const reached = await writeRow({ orders });
+      dirty = !reached;
+    } catch (e) { /* best-effort — the poll retries */ }
+    writing = false;
+  }
+
+  // ---------- The Reserve (standing market maker) ----------
+  // The live system mid price (the same tape every commander sees) with
+  // an honest 6% spread each way — instant trades always clear, solo
+  // commanders always have a counterparty, and the spread is the price
+  // of immediacy: patient limit orders trade inside it.
+  function reserveQuote(matId) {
+    const sys = STATE.marketPrices[matId] || getMaterial(matId).basePrice;
+    return {
+      mid: sys,
+      bid: Math.max(1, Math.floor(sys * (1 - RESERVE_SPREAD))),
+      ask: Math.max(1, Math.ceil(sys * (1 + RESERVE_SPREAD))),
+    };
+  }
+
+  // ---------- the book ----------
+  function liveSide(side, matId, excludeOwner) {
+    const now = Date.now();
+    return orders.filter(o =>
+      o.side === side && o.mat === matId && isLive(o, now) &&
+      (!excludeOwner || o.owner !== excludeOwner));
+  }
+  function book(matId) {
+    const bids = liveSide('bid', matId).sort((a, b) => (b.price - a.price) || (a.placedAt - b.placedAt));
+    const asks = liveSide('ask', matId).sort((a, b) => (a.price - b.price) || (a.placedAt - b.placedAt));
+    return { bids, asks, reserve: reserveQuote(matId) };
+  }
+
+  // ---------- crowd simulation (the exchange's roaming traders) ----------
+  // Each poll, my resting orders may be (partially) filled by the crowd.
+  // Orders priced AT the market fill fast; orders pitched deeper into
+  // the book fill slowly, exactly like a live exchange with thousands
+  // of participants. Fills are ordinary records — payouts, deliveries
+  // and escrow burn reconcile like any other trade.
+  function botPass() {
+    const now = Date.now();
+    let any = false;
+    for (const o of orders) {
+      if (o.owner !== CURRENT_USER || !isLive(o, now)) continue;
+      if (now - o.placedAt < BOT_MIN_AGE) continue;
+      const rq = reserveQuote(o.mat);
+      const r = o.price / rq.mid;
+      let p;
+      if (o.side === 'ask') p = 0.30 - (r - 1) * 2.4;
+      else p = 0.30 - (1 - r) * 2.4;
+      p = Math.max(0.015, Math.min(0.30, p));
+      if (Math.random() >= p) continue;
+      const rem = remainingOf(o);
+      if (rem < 1) continue;
+      const take = Math.max(1, Math.min(rem, Math.round(rem * (0.3 + Math.random() * 0.7))));
+      o.fills.push({
+        id: fid(), by: BOT_NAMES[(Math.random() * BOT_NAMES.length) | 0],
+        qty: take, cost: take * o.price, at: now, refunded: false,
+      });
+      any = true;
+    }
+    if (any) dirty = true;
+  }
+
+  // ---------- reconciliation: payouts, deliveries, escrow returns ----------
+  function reconcile() {
+    if (!CURRENT_USER) return;
+    // 1) payouts — credits earned by MY asks (players + crowd) bank here
+    let earned = 0;
+    for (const o of orders) {
+      if (o.owner === CURRENT_USER && o.side === 'ask') earned += earnedOf(o);
+    }
+    const applied = +STATE.exEarnedApplied || 0;
+    if (earned > applied) {
+      const payout = earned - applied;
+      STATE.exEarnedApplied = earned;
+      STATE.money += payout;
+      recordIncome(payout);   // exchange sales feed Company GDP / world economy
+      updateHUD();
+      saveGame();
+      showToast(`📋 Exchange: your asks sold — $${Math.round(payout).toLocaleString()} paid out`, true);
+    }
+    // 2) deliveries — materials bought by MY resting bids arrive here
+    for (const o of orders) {
+      if (o.owner !== CURRENT_USER || o.side !== 'bid') continue;
+      let qty = 0;
+      for (const f of o.fills) if (!f.refunded) qty += f.qty;
+      const got = +STATE.exDelivered[o.id] || 0;
+      if (qty > got) {
+        const deliver = qty - got;
+        STATE.exDelivered[o.id] = qty;
+        STATE.inventory[o.mat] = (STATE.inventory[o.mat] || 0) + deliver;
+        const m = getMaterial(o.mat);
+        showToast(`📋 Exchange: your bid filled — ${deliver} ${m.icon} ${m.name} delivered`, true);
+        updateHUD();
+        saveGame();
+      }
+    }
+    // 3) escrow returns — dead orders hand back what never traded (once)
+    for (const o of orders) {
+      if (o.owner !== CURRENT_USER) continue;
+      if (STATE.exReclaimedIds.includes(o.id)) continue;
+      const dead = o.cancelled || (o.expiresAt || 0) <= Date.now();
+      if (!dead) continue;
+      const rem = remainingOf(o);
+      STATE.exReclaimedIds.push(o.id);
+      if (rem > 0) {
+        if (o.side === 'ask') {
+          STATE.inventory[o.mat] = (STATE.inventory[o.mat] || 0) + rem;
+          const m = getMaterial(o.mat);
+          showToast(`📦 Expired ask — ${rem} ${m.icon} ${m.name} returned to storage`, true);
+        } else {
+          STATE.money += rem * o.price;
+          showToast(`↩️ Expired bid — $${(rem * o.price).toLocaleString()} escrow returned`, true);
+        }
+        updateHUD();
+      }
+      saveGame();
+    }
+    // 4) race refunds — a fill of mine that bounced after I already took
+    //    the goods: return the goods (if still held) and refund the credits
+    for (const o of orders) {
+      for (const f of o.fills) {
+        if (f.by !== CURRENT_USER || !f.refunded) continue;
+        if (STATE.exRefundedFills.includes(f.id)) continue;
+        STATE.exRefundedFills.push(f.id);
+        STATE.money += f.cost;
+        STATE.inventory[o.mat] = Math.max(0, (STATE.inventory[o.mat] || 0) - f.qty);
+        showToast(`↩️ An exchange trade was outraced — $${f.cost.toLocaleString()} refunded`, true);
+        saveGame();
+      }
+    }
+    // keep the persisted marker arrays from growing forever
+    if (STATE.exReclaimedIds.length > 400) STATE.exReclaimedIds = STATE.exReclaimedIds.slice(-200);
+    if (STATE.exRefundedFills.length > 400) STATE.exRefundedFills = STATE.exRefundedFills.slice(-200);
+    const dk = Object.keys(STATE.exDelivered);
+    if (dk.length > 400) {
+      const keep = {};
+      const liveIds = new Set(orders.filter(o => o.owner === CURRENT_USER).map(o => o.id));
+      for (const k of dk) if (liveIds.has(k)) keep[k] = STATE.exDelivered[k];
+      STATE.exDelivered = keep;
+    }
+  }
+
+  // ---------- polling ----------
+  async function poll() {
+    if (!CURRENT_USER) return;
+    try {
+      const row = await fetchRow();
+      orders = mergeRows(row, { orders });
+      const auditChanged = auditOrders(orders);
+      orders = pruneOrders(orders);
+      botPass();
+      reconcile();
+      if (auditChanged || dirty) await persist();
+      if (document.getElementById('market-modal').classList.contains('show') && window.__mkTab === 'exchange') {
+        renderMarketModal();
+      }
+    } catch (e) { /* best-effort */ }
+  }
+  function onLogin() {
+    if (!timer) timer = setInterval(poll, POLL_MS);
+    poll();
+  }
+  function refresh() { return poll(); }
+
+  // ---------- actions ----------
+  // Fill cheapest asks (other commanders first, The Reserve last).
+  async function instantBuy(mat, qty) {
+    if (!CURRENT_USER) return { ok: false, msg: 'Log in first' };
+    const m = getMaterial(mat);
+    if (!m || m.military) return { ok: false, msg: 'That material cannot be traded' };
+    const q = Math.floor(+qty);
+    if (!isFinite(q) || q < 1) return { ok: false, msg: 'Enter an amount to buy' };
+    try {
+      const row = await fetchRow();
+      orders = mergeRows(row, { orders });
+      auditOrders(orders);
+    } catch (e) { /* fall through to the local copy */ }
+    const now = Date.now();
+    const asks = liveSide('ask', mat, CURRENT_USER).sort((a, b) => (a.price - b.price) || (a.placedAt - b.placedAt));
+    let need = q, spend = 0;
+    const plan = [];
+    for (const o of asks) {
+      if (need <= 0) break;
+      const take = Math.min(need, remainingOf(o));
+      if (take < 1) continue;
+      plan.push({ o, take });
+      spend += take * o.price;
+      need -= take;
+    }
+    const rq = reserveQuote(mat);
+    const reserveQty = Math.max(0, need);
+    if (reserveQty > 0) spend += reserveQty * rq.ask;
+    spend = Math.round(spend);
+    if (spend > STATE.money) {
+      return { ok: false, msg: `Not enough credits — $${spend.toLocaleString()} needed` };
+    }
+    // append the fills, push to the row, verify they survived
+    const myFills = [];
+    for (const { o, take } of plan) {
+      const f = { id: fid(), by: CURRENT_USER, qty: take, cost: take * o.price, at: Date.now(), refunded: false };
+      o.fills.push(f);
+      myFills.push({ orderId: o.id, fill: f });
+    }
+    dirty = true;
+    let bounced = false;
+    try {
+      await persist();
+      const verify = await fetchRow();
+      orders = mergeRows(verify, { orders });
+      auditOrders(orders);
+      for (const mf of myFills) {
+        const vo = orders.find(x => x.id === mf.orderId);
+        const vf = vo && vo.fills.find(x => x.id === mf.fill.id);
+        if (!vf || vf.refunded) { bounced = true; break; }
+      }
+    } catch (e) { bounced = true; }
+    if (bounced) {
+      // nothing was charged — strip my phantom fills out of the local copy
+      for (const mf of myFills) {
+        const o = orders.find(x => x.id === mf.orderId);
+        if (!o) continue;
+        const i = o.fills.findIndex(x => x.id === mf.fill.id);
+        if (i >= 0) o.fills.splice(i, 1);
+      }
+      dirty = true;
+      persist();
+      return { ok: false, msg: 'The book moved — someone bought it first. Try again' };
+    }
+    // success — charge + deliver (the Reserve part clears instantly)
+    STATE.money -= spend;
+    STATE.inventory[mat] = (STATE.inventory[mat] || 0) + q;
+    updateHUD();
+    saveGame();
+    const fromSellers = q - reserveQty;
+    return {
+      ok: true,
+      msg: `Bought ${q} ${m.icon} ${m.name} for $${spend.toLocaleString()}` +
+        (reserveQty > 0 ? ` — ${fromSellers} from the book, ${reserveQty} from The Reserve @ $${rq.ask}` : ''),
+    };
+  }
+
+  // Fill highest bids (other commanders first, The Reserve last).
+  async function instantSell(mat, qty) {
+    if (!CURRENT_USER) return { ok: false, msg: 'Log in first' };
+    const m = getMaterial(mat);
+    if (!m || m.military) return { ok: false, msg: 'That material cannot be traded' };
+    const q = Math.floor(+qty);
+    if (!isFinite(q) || q < 1) return { ok: false, msg: 'Enter an amount to sell' };
+    const stock = STATE.inventory[mat] || 0;
+    if (q > stock) return { ok: false, msg: `You only hold ${fmtQty(stock)} ${m.name}` };
+    try {
+      const row = await fetchRow();
+      orders = mergeRows(row, { orders });
+      auditOrders(orders);
+    } catch (e) { /* fall through to the local copy */ }
+    const bids = liveSide('bid', mat, CURRENT_USER).sort((a, b) => (b.price - a.price) || (a.placedAt - b.placedAt));
+    let need = q, gross = 0;
+    const plan = [];
+    for (const o of bids) {
+      if (need <= 0) break;
+      const take = Math.min(need, remainingOf(o));
+      if (take < 1) continue;
+      plan.push({ o, take });
+      gross += take * o.price;
+      need -= take;
+    }
+    const rq = reserveQuote(mat);
+    const reserveQty = Math.max(0, need);
+    if (reserveQty > 0) gross += reserveQty * rq.bid;
+    gross = Math.round(gross);
+    // append fills onto the bid orders, persist, verify
+    const myFills = [];
+    for (const { o, take } of plan) {
+      const f = { id: fid(), by: CURRENT_USER, qty: take, cost: take * o.price, at: Date.now(), refunded: false };
+      o.fills.push(f);
+      myFills.push({ orderId: o.id, fill: f });
+    }
+    dirty = true;
+    let bounced = false;
+    try {
+      await persist();
+      const verify = await fetchRow();
+      orders = mergeRows(verify, { orders });
+      auditOrders(orders);
+      for (const mf of myFills) {
+        const vo = orders.find(x => x.id === mf.orderId);
+        const vf = vo && vo.fills.find(x => x.id === mf.fill.id);
+        if (!vf || vf.refunded) { bounced = true; break; }
+      }
+    } catch (e) { bounced = true; }
+    if (bounced) {
+      for (const mf of myFills) {
+        const o = orders.find(x => x.id === mf.orderId);
+        if (!o) continue;
+        const i = o.fills.findIndex(x => x.id === mf.fill.id);
+        if (i >= 0) o.fills.splice(i, 1);
+      }
+      dirty = true;
+      persist();
+      return { ok: false, msg: 'The book moved — someone sold first. Try again' };
+    }
+    // success — goods out, credits in (the Reserve part clears instantly)
+    STATE.inventory[mat] = stock - q;
+    STATE.money += gross;
+    recordIncome(gross);   // exchange sales feed Company GDP / world economy
+    updateHUD();
+    saveGame();
+    const toBidders = q - reserveQty;
+    return {
+      ok: true,
+      msg: `Sold ${q} ${m.icon} ${m.name} for $${gross.toLocaleString()}` +
+        (reserveQty > 0 ? ` — ${toBidders} into the book, ${reserveQty} to The Reserve @ $${rq.bid}` : ''),
+    };
+  }
+
+  // Rest a limit order at MY price. Crossing part executes immediately
+  // at the better book price; the remainder waits in the book (escrowed).
+  async function placeLimit(side, mat, qty, price) {
+    if (!CURRENT_USER) return { ok: false, msg: 'Log in first' };
+    const m = getMaterial(mat);
+    if (!m || m.military) return { ok: false, msg: 'That material cannot be traded' };
+    const q = Math.floor(+qty);
+    price = Math.round(+price);
+    if (!isFinite(q) || q < 1) return { ok: false, msg: 'Enter an amount' };
+    if (!isFinite(price) || price < 1) return { ok: false, msg: 'Enter a price per unit (at least $1)' };
+    if (price > 999999) return { ok: false, msg: 'Price too high — max $999,999 per unit' };
+    const now = Date.now();
+    const mineOpen = orders.filter(o => o.owner === CURRENT_USER && isLive(o, now)).length;
+    if (mineOpen >= MAX_OWN_OPEN) {
+      return { ok: false, msg: `Order limit reached — ${MAX_OWN_OPEN} open orders max` };
+    }
+    if (side === 'bid') {
+      const escrow = q * price;
+      if (escrow > STATE.money) return { ok: false, msg: `Not enough credits — $${escrow.toLocaleString()} would be escrowed` };
+    } else {
+      const stock = STATE.inventory[mat] || 0;
+      if (q > stock) return { ok: false, msg: `You only hold ${fmtQty(stock)} ${m.name}` };
+    }
+    try {
+      const row = await fetchRow();
+      orders = mergeRows(row, { orders });
+      auditOrders(orders);
+    } catch (e) { /* fall through to the local copy */ }
+    // ---- crossing part: execute immediately at the better book price ----
+    let crossed = 0, crossedGross = 0;
+    const myFills = [];
+    if (side === 'bid') {
+      const asks = liveSide('ask', mat, CURRENT_USER).sort((a, b) => (a.price - b.price) || (a.placedAt - b.placedAt));
+      let need = q;
+      for (const o of asks) {
+        if (need <= 0 || o.price > price) break;
+        const take = Math.min(need, remainingOf(o));
+        if (take < 1) continue;
+        const f = { id: fid(), by: CURRENT_USER, qty: take, cost: take * o.price, at: Date.now(), refunded: false };
+        o.fills.push(f);
+        myFills.push({ orderId: o.id, fill: f });
+        crossed += take;
+        crossedGross += take * o.price;
+        need -= take;
+      }
+    } else {
+      const bids = liveSide('bid', mat, CURRENT_USER).sort((a, b) => (b.price - a.price) || (a.placedAt - b.placedAt));
+      let need = q;
+      for (const o of bids) {
+        if (need <= 0 || o.price < price) break;
+        const take = Math.min(need, remainingOf(o));
+        if (take < 1) continue;
+        const f = { id: fid(), by: CURRENT_USER, qty: take, cost: take * o.price, at: Date.now(), refunded: false };
+        o.fills.push(f);
+        myFills.push({ orderId: o.id, fill: f });
+        crossed += take;
+        crossedGross += take * o.price;
+        need -= take;
+      }
+    }
+    if (crossed > 0) {
+      dirty = true;
+      let bounced = false;
+      try {
+        await persist();
+        const verify = await fetchRow();
+        orders = mergeRows(verify, { orders });
+        auditOrders(orders);
+        for (const mf of myFills) {
+          const vo = orders.find(x => x.id === mf.orderId);
+          const vf = vo && vo.fills.find(x => x.id === mf.fill.id);
+          if (!vf || vf.refunded) { bounced = true; break; }
+        }
+      } catch (e) { bounced = true; }
+      if (bounced) {
+        for (const mf of myFills) {
+          const o = orders.find(x => x.id === mf.orderId);
+          if (!o) continue;
+          const i = o.fills.findIndex(x => x.id === mf.fill.id);
+          if (i >= 0) o.fills.splice(i, 1);
+        }
+        dirty = true;
+        persist();
+        return { ok: false, msg: 'The book moved under the order — try again' };
+      }
+    }
+    // ---- apply the crossing part locally ----
+    if (side === 'bid' && crossed > 0) {
+      STATE.money -= Math.round(crossedGross);
+      STATE.inventory[mat] = (STATE.inventory[mat] || 0) + crossed;
+    } else if (side === 'ask' && crossed > 0) {
+      STATE.inventory[mat] = (STATE.inventory[mat] || 0) - crossed;
+      STATE.money += Math.round(crossedGross);
+      recordIncome(Math.round(crossedGross));
+    }
+    // ---- remainder rests in the book (escrowed) ----
+    const rest = q - crossed;
+    if (rest > 0) {
+      if (side === 'bid') {
+        STATE.money -= rest * price;                 // escrow the credits
+      } else {
+        STATE.inventory[mat] = (STATE.inventory[mat] || 0) - rest;   // escrow the goods
+      }
+      orders.push({
+        id: oid(), owner: CURRENT_USER, side: side, mat: mat, qty0: rest, price: price,
+        placedAt: now, expiresAt: now + ORDER_TTL, cancelled: false, fills: [],
+      });
+      dirty = true;
+      await persist();
+    }
+    updateHUD();
+    saveGame();
+    const lbl = side === 'bid' ? 'bid' : 'ask';
+    return {
+      ok: true,
+      msg: crossed > 0
+        ? (rest > 0
+          ? `${lbl.toUpperCase()} ${q} ${m.icon} ${m.name} @ $${price}: ${crossed} crossed instantly, ${rest} resting in the book`
+          : `${lbl.toUpperCase()} ${q} ${m.icon} ${m.name} @ $${price} — fully crossed instantly`)
+        : `${lbl.toUpperCase()} ${rest} ${m.icon} ${m.name} @ $${price} resting in the book${side === 'bid' ? ' — $' + (rest * price).toLocaleString() + ' in escrow' : ' — materials in escrow'}`,
+    };
+  }
+
+  async function cancel(id) {
+    if (!CURRENT_USER) return { ok: false, msg: 'Log in first' };
+    const o = orders.find(x => x.id === id);
+    if (!o || o.owner !== CURRENT_USER) return { ok: false, msg: 'Not your order' };
+    if (o.cancelled) return { ok: false, msg: 'Already cancelled' };
+    o.cancelled = true;
+    dirty = true;
+    try { await persist(); } catch (e) { /* poll retry */ }
+    // return the untraded escrow right away (mark reclaimed so the
+    // reconcile pass never double-returns it)
+    const rem = remainingOf(o);
+    if (!STATE.exReclaimedIds.includes(o.id)) STATE.exReclaimedIds.push(o.id);
+    if (rem > 0) {
+      if (o.side === 'ask') {
+        STATE.inventory[o.mat] = (STATE.inventory[o.mat] || 0) + rem;
+        const m = getMaterial(o.mat);
+        showToast(`📦 Cancelled ask — ${rem} ${m.icon} ${m.name} back in storage`, true);
+      } else {
+        STATE.money += rem * o.price;
+        showToast(`↩️ Cancelled bid — $${(rem * o.price).toLocaleString()} escrow returned`, true);
+      }
+      updateHUD();
+    }
+    saveGame();
+    return { ok: true, msg: 'Order cancelled' };
+  }
+
+  // ---------- queries for the UI ----------
+  function decorated(o) {
+    return {
+      id: o.id, owner: o.owner, side: o.side, mat: o.mat, price: o.price,
+      qty0: o.qty0, placedAt: o.placedAt, expiresAt: o.expiresAt,
+      cancelled: o.cancelled,
+      filled: filledOf(o), remaining: remainingOf(o), earned: earnedOf(o),
+    };
+  }
+  function myOrders() {
+    const now = Date.now();
+    return orders.filter(o => o.owner === CURRENT_USER && !o.cancelled && (o.expiresAt || 0) + DEAD_GRACE > now)
+      .map(decorated).sort((a, b) => b.placedAt - a.placedAt);
+  }
+  function tape(limit) {
+    const out = [];
+    for (const o of orders) {
+      for (const f of o.fills) {
+        if (f.refunded) continue;
+        out.push({ mat: o.mat, side: o.side, qty: f.qty, price: o.price, by: f.by, at: f.at, earned: f.cost });
+      }
+    }
+    out.sort((a, b) => b.at - a.at);
+    return out.slice(0, limit || 10);
+  }
+  function lastPrice(matId) {
+    let best = null;
+    for (const o of orders) {
+      if (o.mat !== matId) continue;
+      for (const f of o.fills) {
+        if (f.refunded) continue;
+        if (!best || f.at > best.at) best = { at: f.at, price: o.price };
+      }
+    }
+    return best ? best.price : null;
+  }
+  function fmtAge(ts) { return PlayerMarket.fmtAge(ts); }
+  function fmtLeft(ts) { return PlayerMarket.fmtLeft(ts); }
+
+  return {
+    status, onLogin, refresh, poll,
+    instantBuy, instantSell, placeLimit, cancel,
+    book, reserveQuote, myOrders, tape, lastPrice,
+    fmtAge, fmtLeft,
+    MAX_OWN_OPEN, ORDER_TTL, RESERVE_SPREAD,
+  };
+})();
+window.Exchange = Exchange;
 
 // ====================================================================
 // HUD UPDATES
@@ -13668,6 +15016,63 @@ function updateHUD() {
 // Apply accumulated production since last tick (called from animate loop).
 // Iterates the ALL-PLANET business registry — factories on Mars keep
 // producing while you're standing on Earth.
+// ====================================================================
+// BANKING (v1.30) — deposits at your Banks, the Capital Rift way.
+// Every Bank you own adds vault capacity; deposits earn interest by the
+// minute (paid on the capped part), withdraw anytime. Empire-level: one
+// vault, reachable from any Bank card.
+// ====================================================================
+const BANK_RATE_PER_MIN = 0.002;    // 0.2% per minute on deposited credits
+const BANK_CAP_PER_BANK = 500000;   // each Bank adds $500k of vault capacity
+function bankStats() {
+  let banks = 0;
+  for (const types of BUSINESS_REGISTRY.values()) {
+    for (const t of types) if (t === 'bank') banks++;
+  }
+  const cap = banks * BANK_CAP_PER_BANK;
+  const deposit = Math.max(0, +STATE.bankDeposit || 0);
+  const working = Math.min(deposit, cap);
+  const interestPerMin = working * BANK_RATE_PER_MIN;
+  return { banks, cap, deposit, working, over: deposit > cap, interestPerMin };
+}
+window.bankDepositAct = function() {
+  if (!CURRENT_USER) { showToast('Enter the world first', false); return; }
+  const inp = document.getElementById('bank-amt');
+  const amt = inp ? Math.floor(parseFloat(inp.value)) : NaN;
+  if (!isFinite(amt) || amt < 1) { showToast('Enter an amount to deposit', false); return; }
+  if (amt > STATE.money) { showToast('Not enough credits on hand', false); return; }
+  STATE.money -= amt;
+  STATE.bankDeposit = (+STATE.bankDeposit || 0) + amt;
+  updateHUD(); saveGame();
+  const bs = bankStats();
+  showToast(`🏦 Deposited $${amt.toLocaleString()} — the vault now earns $${Math.round(bs.interestPerMin).toLocaleString()}/min`, true);
+  if (STATE.selectedPlot) openPlotModal(STATE.selectedPlot);
+};
+window.bankWithdrawAct = function() {
+  if (!CURRENT_USER) { showToast('Enter the world first', false); return; }
+  const inp = document.getElementById('bank-amt');
+  const amt = inp ? Math.floor(parseFloat(inp.value)) : NaN;
+  const dep = +STATE.bankDeposit || 0;
+  if (!isFinite(amt) || amt < 1) { showToast('Enter an amount to withdraw', false); return; }
+  const take = Math.min(amt, dep);
+  if (take < 1) { showToast('Nothing deposited yet', false); return; }
+  STATE.bankDeposit = dep - take;
+  STATE.money += take;
+  updateHUD(); saveGame();
+  showToast(`🏦 Withdrew $${take.toLocaleString()} from the vault`, true);
+  if (STATE.selectedPlot) openPlotModal(STATE.selectedPlot);
+};
+window.bankWithdrawAll = function() {
+  if (!CURRENT_USER) { showToast('Enter the world first', false); return; }
+  const dep = +STATE.bankDeposit || 0;
+  if (dep < 1) { showToast('Nothing deposited yet', false); return; }
+  STATE.bankDeposit = 0;
+  STATE.money += dep;
+  updateHUD(); saveGame();
+  showToast(`🏦 Withdrew the full $${dep.toLocaleString()} from the vault`, true);
+  if (STATE.selectedPlot) openPlotModal(STATE.selectedPlot);
+};
+
 function tickProduction() {
   const now = performance.now();
   if (STATE.lastProductionTime === 0) {
@@ -13733,6 +15138,19 @@ function tickProduction() {
       updateHUD();
     }
   }
+  // v1.30 — bank interest: vault deposits earn by the minute on the
+  // capacity-covered part. Fractional like rent; feeds the GDP ledger.
+  const _bk = bankStats();
+  if (_bk.interestPerMin > 0) {
+    STATE.bankDebt = (STATE.bankDebt || 0) + (_bk.interestPerMin / 60) * dt;
+    if (STATE.bankDebt >= 1) {
+      const _got = Math.floor(STATE.bankDebt);
+      STATE.money += _got;
+      STATE.bankDebt -= _got;
+      recordIncome(_got);
+      updateHUD();
+    }
+  }
   STATE.lastProductionTime = now;
   if (anyProduced) updateHUD();
 }
@@ -13742,13 +15160,14 @@ function tickProduction() {
 function plotProductionInfo(plotId) {
   const active = ACTIVE_PLOT_BY_ID.get(plotId);
   if (active) {
-    return { areaMultiplier: active.userData.areaMultiplier, region: active.userData.region };
+    // v1.30 — merged estates work their combined area
+    return { areaMultiplier: effectiveAreaMult(plotId), region: active.userData.region };
   }
   const planet = planetOfPlotId(plotId);
   const meta = PLANET_META[planet.id];
   const m = meta ? meta.get(plotId) : null;
   if (!m) return null;
-  return { areaMultiplier: m.areaMultiplier, region: m.region };
+  return { areaMultiplier: effectiveAreaMult(plotId), region: m.region };
 }
 
 // Region bonus by region id (used by both mesh paths and off-planet meta)
