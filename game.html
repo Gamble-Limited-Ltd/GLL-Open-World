@@ -1243,6 +1243,29 @@ input,select,textarea{font-family:var(--cr-mono)}
 }
 </style>
 
+<style>
+/* ─── v1.31 UpdateGuard banner ─────────────────────────────────────── */
+#ow-update-banner{position:fixed;top:9px;right:14px;z-index:99999;
+  display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;
+  max-width:200px;white-space:nowrap;
+  background:linear-gradient(135deg,rgba(24,26,34,.97),rgba(36,31,20,.97));
+  border:1px solid rgba(242,193,78,.55);box-shadow:0 6px 24px rgba(0,0,0,.55);
+  font:700 10.5px/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  letter-spacing:.5px;color:#e8edf3}
+.ow-ub-text{color:#f2c14e;font-weight:800}
+.ow-ub-btn{cursor:pointer;border:none;border-radius:6px;padding:7px 12px;font-weight:800;
+  font-size:10px;letter-spacing:1px;color:#1a1408;
+  background:linear-gradient(135deg,#f2c14e,#d99a2b)}
+.ow-ub-btn:hover{filter:brightness(1.12)}
+.ow-ub-x{cursor:pointer;border:1px solid rgba(255,255,255,.18);border-radius:6px;
+  background:transparent;color:#9aa3af;font-size:11px;padding:5px 7px;line-height:1}
+.ow-ub-x:hover{color:#e8edf3;border-color:rgba(255,255,255,.4)}
+@media (max-width:640px){
+  #ow-update-banner{top:6px;right:6px;gap:6px;padding:6px 8px;max-width:172px}
+  .ow-ub-text{font-size:9.5px}
+  .ow-ub-btn{padding:6px 9px;font-size:9px}
+}
+</style>
 </head>
 <body>
 <!-- Force reset: clears ALL local game data on first load after deploy -->
@@ -5779,8 +5802,11 @@ window.WarFx = WarFx;
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.30';
+const GAME_VERSION = 'v1.31';
 const RELEASE_NOTES = [
+  { v: 'v1.31', items: [
+    '⚡ <b>Always the newest build</b> — the game moved to a fresh address (<b>openworld.html</b>) so no browser can keep handing you the old login and home screens after an update. On top of that, the game now checks for new builds automatically: if your copy is ever outdated, a gold <b>⚡ BUILD … IS LIVE</b> banner appears — one tap on <b>UPDATE</b> and you are on the latest version. Accounts, saves and your whole empire carry over untouched.'
+  ]},
   { v: 'v1.30', items: [
     '📋 <b>The Exchange — a real order book for every material</b> — the Market is now one global exchange, the Capital Rift way. <b>BUY / SELL</b> fill the best prices standing in the book: other commanders\' orders first, then <b>The Reserve</b> (the standing market maker) at an honest 6% spread. Watch the depth ladder, the last price and the spread before you pull the trigger.',
     '🎚 <b>Limit orders</b> — rest a BID or an ASK at YOUR price. Bids escrow credits, asks escrow materials; when another commander — or the exchange crowd of roaming traders — crosses your price, the payout or delivery lands automatically. Crossing orders fill instantly at the better book price. Cancel anytime; unfilled orders return their escrow after 3 days.',
@@ -15400,6 +15426,61 @@ window.closeSettings = function() { document.getElementById('settings').classLis
 window.startGame = window.enterGame; // legacy
 
 // Initial render: show login screen
+
+// ─── v1.31 UpdateGuard: self-healing builds ────────────────────────────
+// Some browsers keep serving an old cached copy of the game after a deploy.
+// This guard asks the server what the newest build is (cache-busted query,
+// so the answer is always fresh). If THIS page is older, a small banner
+// offers a one-tap update. It never auto-reloads — gameplay is never
+// interrupted against the player's will.
+(function() {
+  var dismissed = false;
+  function verNum(v) {
+    var m = /[vV](\d+)\.(\d+)/.exec(v || '');
+    return m ? (parseInt(m[1], 10) * 1000 + parseInt(m[2], 10)) : 0;
+  }
+  function check() {
+    if (dismissed) return;
+    fetch('version.json?t=' + Date.now())
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(data) {
+        if (!data || !data.version) return;
+        if (!(verNum(data.version) > verNum(GAME_VERSION))) return;
+        showBanner(data);
+      })
+      .catch(function() { /* offline / 404 — stay silent */ });
+  }
+  function showBanner(data) {
+    if (document.getElementById('ow-update-banner')) return;
+    var b = document.createElement('div');
+    b.id = 'ow-update-banner';
+    b.title = 'Build ' + data.version + ' is live — this copy is ' + GAME_VERSION +
+      '. Tap UPDATE for the newest version. Your empire and accounts are safe.';
+    b.innerHTML =
+      '<span class="ow-ub-text">⚡ ' + data.version + '</span>' +
+      '<button class="ow-ub-btn" id="ow-ub-go" aria-label="Update now">UPDATE</button>' +
+      '<button class="ow-ub-x" id="ow-ub-x" title="Dismiss" aria-label="Dismiss">✕</button>';
+    document.body.appendChild(b);
+    document.getElementById('ow-ub-go').onclick = function() {
+      var target;
+      try {
+        var file = (data.url || '').split('?')[0];
+        target = (file && location.href.indexOf(file) === -1)
+          ? new URL(file, location.href).href
+          : location.href.split('?')[0];
+      } catch (e) { target = location.href.split('?')[0]; }
+      location.replace(target + '?t=' + Date.now());
+    };
+    document.getElementById('ow-ub-x').onclick = function() {
+      dismissed = true;
+      var el = document.getElementById('ow-update-banner');
+      if (el) el.remove();
+    };
+  }
+  check();
+  setInterval(check, 60000);
+})();
+
 renderLogin();
 // If cloud saving is configured, pull every account from the cloud into
 // this browser before the player logs in, then refresh the login screen
