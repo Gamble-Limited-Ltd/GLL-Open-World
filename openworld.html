@@ -1359,6 +1359,84 @@ input,select,textarea{font-family:var(--cr-mono)}
 .update-list{font-size:12.5px;color:#c6d0da;line-height:1.7}
 .update-list b{color:#e6edf3}
 </style>
+
+<style>
+/* ═══════ v1.33 — THE OWNER'S HOME SCREEN: the cinematic artwork ═══════ */
+/* The home page is the owner's own design (repo main branch): the artwork
+   IS the page — PLAY and SETTINGS are hit-zones on the art at their exact
+   positions. Game chrome (stats, actions, build pill) floats as discreet
+   dark-gold chips in the top corners so the art stays the hero. The
+   owner's palette leads: gold #edc86f · paper #f0ead7 · dark chip bg. */
+
+.menu-screen{background:#070d10;overflow:hidden}
+.menu-stars{display:none}
+.menu-screen::after{display:none}    /* no scanlines over the artwork */
+
+/* — the artwork: the owner's cover technique (3:2 art always fills) — */
+.ow-artwork{position:absolute;top:50%;left:50%;z-index:0;
+  width:max(100vw,150vh);height:max(100vh,66.6667vw);
+  transform:translate(-50%,-50%);background:#0a141a}
+.ow-artwork-img{display:block;width:100%;height:100%;object-fit:cover}
+
+/* — hit zones: the owner's exact placement + hover glow — */
+.ow-artwork .hit{position:absolute;z-index:10;border:0;background:transparent;
+  cursor:pointer;border-radius:4px}
+.ow-artwork .hit:hover,.ow-artwork .hit:focus-visible{background:rgba(80,240,220,.08);
+  box-shadow:0 0 28px rgba(80,240,220,.22);outline:none}
+
+.ow-hit-play{left:5.5%;top:45.8%;width:30%;height:11%}
+.ow-hit-settings{left:5.5%;top:58.5%;width:29%;height:11%}
+
+/* — HUD: discreet chips over the sky, top-right — */
+.ow-hud{position:absolute;top:14px;right:16px;z-index:20;display:flex;
+  flex-direction:column;align-items:flex-end;gap:7px;max-width:min(66vw,600px)}
+.menu-welcome{margin:0;padding:0;background:none;border:0;
+  backdrop-filter:none;box-shadow:none;display:flex;flex-wrap:wrap;
+  justify-content:flex-end;gap:6px}
+.ow-chip-name{display:inline-flex;align-items:center;padding:6px 11px;
+  border:1px solid rgba(236,198,111,.38);border-radius:4px;background:rgba(9,15,17,.78);
+  font-family:var(--cr-mono);font-size:10.5px;font-weight:700;letter-spacing:1.4px;
+  color:#edc86f;text-transform:uppercase;white-space:nowrap;backdrop-filter:blur(6px)}
+.menu-welcome-stats{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+.menu-welcome-stat{display:inline-flex;align-items:center;gap:7px;padding:6px 11px;
+  border:1px solid rgba(236,198,111,.38);border-radius:4px;background:rgba(9,15,17,.78);
+  font-family:var(--cr-mono);font-size:10.5px;font-weight:700;letter-spacing:1.4px;
+  color:#f0ead7;text-transform:uppercase;white-space:nowrap;backdrop-filter:blur(6px)}
+.menu-welcome-stat b{color:#edc86f;font-family:var(--cr-mono);font-size:12.5px;font-weight:700}
+.ow-hud-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;
+  max-width:min(66vw,600px)}
+.ow-chip-btn{padding:6px 11px;border:1px solid rgba(236,198,111,.24);border-radius:4px;
+  background:rgba(9,15,17,.72);color:#e8e2cf;font-family:var(--cr-mono);font-size:9.5px;
+  font-weight:700;letter-spacing:1.2px;text-transform:uppercase;cursor:pointer;
+  backdrop-filter:blur(6px)}
+.ow-chip-btn:hover{border-color:rgba(236,198,111,.6);color:#edc86f;background:rgba(9,15,17,.92)}
+.ow-chip-logout:hover{border-color:rgba(239,150,125,.55);color:#ef967d}
+
+/* — build pill: same convention as the login badge — */
+.ow-build-pill{position:absolute;top:14px;left:16px;z-index:20;padding:5px 10px;
+  border:1px solid rgba(236,198,111,.25);border-radius:4px;background:rgba(9,15,17,.72);
+  font-family:var(--cr-mono);font-size:9px;font-weight:700;letter-spacing:2px;
+  color:#cbd6c4;text-transform:uppercase;backdrop-filter:blur(6px)}
+
+/* — portrait/narrow screens: FIT the art's width (cinematic letterbox) so the
+   owner's PLAY/SETTINGS buttons stay on-screen and clickable. Cover-crop
+   would push them off the left edge below ~4:3. — */
+@media (max-aspect-ratio: 4/3){
+  .ow-artwork{width:100vw;height:66.6667vw}
+}
+
+/* — mobile: chips shrink, action strip scrolls, art keeps filling — */
+@media(max-width:720px){
+  .ow-hud{top:10px;right:10px;max-width:calc(100vw - 130px);gap:5px}
+  .menu-welcome-stat{font-size:9px;padding:4px 8px}
+  .menu-welcome-stat b{font-size:10.5px}
+  .ow-hud-actions{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;
+    max-width:calc(100vw - 20px);scrollbar-width:none}
+  .ow-hud-actions::-webkit-scrollbar{display:none}
+  .ow-chip-btn{font-size:8.5px;padding:4px 8px;flex:none}
+  .ow-build-pill{top:10px;left:10px;font-size:8px;padding:4px 8px}
+}
+</style>
 </head>
 <body>
 <!-- Force reset: clears ALL local game data on first load after deploy -->
@@ -1392,54 +1470,34 @@ input,select,textarea{font-family:var(--cr-mono)}
 <div id="menu" class="screen hidden menu-screen">
   <div class="menu-stars"></div>
 
-  <div class="menu-grid">
-    <!-- Left panel: title + tagline + welcome + buttons -->
-    <div class="menu-left">
-      <div class="menu-eyebrow">Terra Command — A Global Strategy Game</div>
-      <h1 class="menu-title">Open <span class="accent">World</span></h1>
-      <div class="menu-subtitle">Earth Edition // Capital Terminal</div>
-      <p class="menu-tagline">Claim <b>plots of land</b>. Build <b>businesses</b>. Produce <b>materials</b>. Trade on a <b>fluctuating market</b>. Conquer the globe from your corner of the planet.</p>
-
-      <div class="menu-welcome" id="menu-welcome">
-        <div class="menu-welcome-label">Welcome back, Commander</div>
-        <div class="menu-welcome-name" id="menu-welcome-name">—</div>
-        <div class="menu-welcome-stats" id="menu-welcome-stats"></div>
-      </div>
-
-      <div class="menu-buttons">
-        <button class="menu-btn-play" onclick="enterGame()">Enter World</button>
-        <div class="menu-btn-row">
-          <button class="menu-btn-secondary" id="clans-menu-btn" onclick="openClans()">🛡 Clans</button>
-          <button class="menu-btn-secondary" onclick="openPlanets()">🪐 Planets</button>
-          <button class="menu-btn-secondary" onclick="openLeaderboard()">🏆 Leaderboard</button>
-          <button class="menu-btn-secondary" onclick="openSupport()">📮 Support</button>
-          <button class="menu-btn-secondary" onclick="openSettings()">Settings</button>
-          <button class="menu-btn-secondary" id="admin-btn" onclick="openAdmin()" style="display:none" title="World-owner administration (kingkanye26 only)">👑 Admin</button>
-          <button class="menu-btn-secondary" onclick="logout()">Logout</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Right side: decorative animated Earth -->
-    <div class="menu-right">
-      <div class="menu-earth-wrap">
-        <div class="menu-atmosphere"></div>
-        <div class="menu-hud-chip c1">ORBITAL VIEW</div>
-        <div class="menu-hud-chip c2">GRID <b>6,000</b> PLOTS</div>
-        <div class="menu-hud-chip c3">CLOUD SYNC <b>LIVE</b></div>
-        <div class="menu-earth"></div>
-        <div class="menu-orbit">
-          <div class="menu-plot-marker m1"></div>
-          <div class="menu-plot-marker m2"></div>
-          <div class="menu-plot-marker m3"></div>
-          <div class="menu-plot-marker m4"></div>
-          <div class="menu-plot-marker m5"></div>
-        </div>
-      </div>
-    </div>
+  <!-- v1.33 — THE OWNER'S HOME SCREEN: the cinematic artwork they built
+       (repo main branch, "Update homepage") is now the game's home page.
+       PLAY and SETTINGS are hit-zones on the art itself, exactly as designed. -->
+  <div class="ow-artwork" aria-label="Open World cinematic home screen">
+    <img class="ow-artwork-img" src="assets/home-screen.webp?v=2" alt="Open World cinematic home screen">
+    <button class="hit ow-hit-play" type="button" aria-label="Play" title="Play" onclick="enterGame()"></button>
+    <button class="hit ow-hit-settings" type="button" aria-label="Settings" title="Settings" onclick="openSettings()"></button>
   </div>
 
-  <div class="menu-footer">Open World · Earth Edition · <span>Claim · Build · Trade · Conquer</span></div>
+  <!-- Discreet HUD over the art — stats and actions as small chips,
+       top-right, clear of the art's own buttons. ids preserved:
+       updateMenuWelcome() keeps feeding these live. -->
+  <div class="ow-hud">
+    <div class="menu-welcome" id="menu-welcome">
+      <span class="ow-chip ow-chip-name" id="menu-welcome-name">—</span>
+      <span class="menu-welcome-stats" id="menu-welcome-stats"></span>
+    </div>
+    <div class="ow-hud-actions">
+      <button class="ow-chip-btn" id="clans-menu-btn" onclick="openClans()">🛡 Clans</button>
+      <button class="ow-chip-btn" onclick="openPlanets()">🪐 Planets</button>
+      <button class="ow-chip-btn" onclick="openLeaderboard()">🏆 Ranks</button>
+      <button class="ow-chip-btn" onclick="openSupport()">📮 Support</button>
+      <button class="ow-chip-btn" onclick="openSettings()">⚙ Settings</button>
+      <button class="ow-chip-btn" id="admin-btn" onclick="openAdmin()" style="display:none" title="World-owner administration (kingkanye26 only)">👑 Admin</button>
+      <button class="ow-chip-btn ow-chip-logout" onclick="logout()">⏻ Logout</button>
+    </div>
+  </div>
+  <div class="ow-build-pill">Build v1.33</div>
 
   <div class="modal" id="settings">
     <div class="panel">
@@ -5898,8 +5956,11 @@ window.WarFx = WarFx;
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.32';
+const GAME_VERSION = 'v1.33';
 const RELEASE_NOTES = [
+  { v: 'v1.33', items: [
+    '🏠 <b>Your home page is the home page</b> — the game now opens on the cinematic home screen you designed: the golden-hour artwork with PLAY and SETTINGS right on the art. It is the first screen when you load the site, it is where you land after logging in, and the in-game HOME button brings you back to it. Your Budget, Plots and Businesses sit as small chips in the corner — the artwork is the star.'
+  ]},
   { v: 'v1.32', items: [
     '🖥 <b>One design from the first pixel</b> — the login screen and the home screen were rebuilt in the same <b>Capital Terminal</b> look as the game itself: flat near-black panels, hairline gold borders, monospace readouts, soft scanlines. The front door now matches the trading floor — no more visual style change between logging in and playing.'
   ]},
@@ -15632,6 +15693,22 @@ window.addEventListener('keydown', (e) => {
   function onLoginComplete() {
     if (enterGameCalled) return;
     enterGameCalled = true;
+    // v1.33 — arrived from the owner's title screen (home.html) by pressing
+    // PLAY on the artwork: they already chose to play, so enter the world
+    // instead of stopping on a second home screen.
+    var playIntent = false;
+    try {
+      playIntent = sessionStorage.getItem('openworld_play_intent') === '1';
+      sessionStorage.removeItem('openworld_play_intent');
+    } catch (e) {}
+    if (playIntent) {
+      console.log('[Launch] Play intent from the title screen — entering game');
+      setTimeout(function() {
+        try { window.enterGame(); }
+        catch (e) { console.error('[Launch] enterGame error:', e); }
+      }, 50);
+      return;
+    }
     // v1.28 — the in-game HOME button navigated here with a session: land
     // on the home page even though the session auto-logged us in.
     var exitHome = false;
