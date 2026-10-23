@@ -1266,6 +1266,99 @@ input,select,textarea{font-family:var(--cr-mono)}
   .ow-ub-btn{padding:6px 9px;font-size:9px}
 }
 </style>
+
+<style>
+/* ═══════ v1.32 — TERMINAL ENTRY: login + home speak Capital Terminal ═══════ */
+/* tokens: bg #05070b · panel rgba(7,10,15,.9) · hairline #202a36 · text #e6edf3
+   muted #8b95a1 · gold #f2c14e · up #3ddc97 · down #ff7a7a · mono = --cr-mono */
+
+/* — shared: soft CRT scanlines (mirrors in-game .sf-fx, gentler) — */
+.login-screen::after,.menu-screen::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:1;
+  background:repeating-linear-gradient(0deg,rgba(255,255,255,.015) 0 1px,transparent 1px 3px)}
+
+/* ─────────── LOGIN — flat terminal panel ─────────── */
+.login-screen{background:#05070b}
+.login-screen::before{opacity:.22}
+.login-card{width:min(430px,92vw);padding:0 34px 34px;border:1px solid #202a36;border-radius:6px;
+  background:rgba(7,10,15,.92);box-shadow:0 25px 80px rgba(0,0,0,.75);text-align:center;overflow:hidden}
+.login-head{margin:0 -34px 24px;padding:11px 16px;border-bottom:1px solid #202a36;
+  background:rgba(7,10,15,.65);font-family:var(--cr-mono);font-size:9px;font-weight:700;
+  letter-spacing:3.2px;color:#8b95a1;text-transform:uppercase}
+.login-head b{color:var(--cr-gold);font-weight:700}
+.login-logo{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  font-size:25px;font-weight:900;letter-spacing:7px;color:#e6edf3;text-transform:uppercase;margin-bottom:5px}
+.login-logo .lg-w{color:var(--cr-gold)}
+.login-sub{font-family:var(--cr-mono);font-size:9.5px;color:#8b95a1;letter-spacing:4px;margin-bottom:24px}
+.login-tabs{background:rgba(5,8,12,.9);border:1px solid #202a36;border-radius:4px;padding:3px;margin-bottom:24px}
+.login-tab{border-radius:3px;font-size:10.5px;font-weight:800;letter-spacing:1.8px;color:#8b95a1}
+.login-tab:hover{color:#e6edf3}
+.login-tab.active{background:rgba(242,193,78,.12);color:var(--cr-gold);
+  box-shadow:inset 0 0 0 1px rgba(242,193,78,.4)}
+.login-card .login-label{font-family:var(--cr-mono);font-size:9px;color:#8b95a1;letter-spacing:2.6px}
+.login-card .login-input{padding:12px 14px;border:1px solid #202a36;border-radius:4px;
+  background:rgba(5,8,12,.9);color:#e6edf3;font-family:var(--cr-mono);font-size:14px}
+.login-card .login-input:focus{border-color:rgba(242,193,78,.55);box-shadow:0 0 0 3px rgba(242,193,78,.07)}
+.login-card .login-input::placeholder{color:#4a545f}
+.login-card .login-btn{padding:13px;border:1px solid rgba(242,193,78,.55);border-radius:4px;
+  background:rgba(242,193,78,.13);color:var(--cr-gold);font-size:12px;font-weight:800;letter-spacing:2.8px}
+.login-card .login-btn:hover{background:rgba(242,193,78,.22);transform:translateY(-1px)}
+.login-card .login-btn:disabled{background:rgba(242,193,78,.06);color:#6a5a30}
+.login-card .login-error{color:var(--cr-down);font-family:var(--cr-mono);font-size:11px}
+.login-cloud{font-family:var(--cr-mono);font-size:10px;color:#8b95a1;letter-spacing:.3px}
+.login-cloud.on{color:var(--cr-up)}
+.login-ver{font-family:var(--cr-mono);font-size:9px;letter-spacing:2.4px;color:#5c6672}
+
+/* ─────────── HOME — the command terminal ─────────── */
+.menu-screen{background:#05070b}
+.menu-eyebrow{font-family:var(--cr-mono);font-size:9.5px;color:#8b95a1;letter-spacing:3.4px}
+.menu-eyebrow::before{background:var(--cr-gold)}
+.menu-title{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  font-size:clamp(44px,6.5vw,76px);font-weight:900;color:#e6edf3;letter-spacing:3px;
+  text-transform:uppercase;line-height:.95;margin:0 0 8px;text-shadow:none}
+.menu-title .accent{color:var(--cr-gold)}
+.menu-subtitle{font-family:var(--cr-mono);font-size:10px;color:#8b95a1;letter-spacing:3.5px;margin-bottom:26px}
+.menu-tagline{font-family:inherit;font-style:normal;font-size:14px;color:#8b95a1;line-height:1.75;max-width:470px}
+.menu-tagline b{color:var(--cr-gold);font-style:normal;font-weight:700}
+.menu-welcome{background:rgba(7,10,15,.9);border:1px solid #202a36;border-radius:4px;
+  padding:16px 20px;margin-bottom:26px;backdrop-filter:blur(8px);box-shadow:0 6px 24px rgba(0,0,0,.5)}
+.menu-welcome-label{font-family:var(--cr-mono);font-size:8.5px;color:#8b95a1;letter-spacing:2.6px}
+.menu-welcome-name{font-family:inherit;font-size:18px;font-weight:800;color:#e6edf3;letter-spacing:.4px;margin-bottom:12px}
+.menu-welcome-stat{font-size:11px;color:#8b95a1}
+.menu-welcome-stat b{color:#fff;font-family:var(--cr-mono);font-size:14px;font-weight:700}
+.menu-welcome-stat:first-child b{color:var(--cr-gold)}
+.menu-buttons{gap:10px}
+.menu-btn-play{position:relative;padding:16px 30px;border:1px solid rgba(242,193,78,.55);border-radius:4px;
+  background:rgba(242,193,78,.13);color:var(--cr-gold);font-size:12.5px;font-weight:800;letter-spacing:3.2px}
+.menu-btn-play:hover{background:rgba(242,193,78,.24);transform:translateY(-1px);
+  box-shadow:0 10px 34px rgba(242,193,78,.18);filter:none}
+.menu-btn-play::after{color:var(--cr-gold);font-size:18px;right:20px}
+.menu-btn-secondary{padding:12px 20px;border:1px solid #202a36;border-radius:4px;
+  background:rgba(7,10,15,.75);color:#c6d0da;font-size:10.5px;font-weight:700;letter-spacing:2px}
+.menu-btn-secondary:hover{background:rgba(7,10,15,.95);border-color:rgba(242,193,78,.4);color:var(--cr-gold)}
+.menu-plot-marker{background:rgba(61,220,151,.9);box-shadow:0 0 12px rgba(61,220,151,.75)}
+.menu-footer{font-family:var(--cr-mono)}
+.menu-footer span{color:#5c6672}
+/* globe data chips — terminal readouts around Earth */
+.menu-hud-chip{position:absolute;z-index:3;font-family:var(--cr-mono);font-size:8.5px;font-weight:700;
+  letter-spacing:2px;color:#8b95a1;padding:5px 9px;border:1px solid #202a36;border-radius:3px;
+  background:rgba(7,10,15,.85);white-space:nowrap;pointer-events:none}
+.menu-hud-chip b{color:var(--cr-up);font-weight:700}
+.menu-hud-chip.c1{top:-6px;left:-34px}
+.menu-hud-chip.c2{top:38%;right:-52px}
+.menu-hud-chip.c3{bottom:-10px;left:4%}
+@media(max-width:960px){.menu-hud-chip{display:none}}
+
+/* ─────────── WHAT'S NEW modal — same terminal language ─────────── */
+.plot-card h2{font-family:inherit;color:#e6edf3;font-size:22px;font-weight:800;
+  letter-spacing:1px;text-transform:uppercase}
+.plot-card .coords{font-family:var(--cr-mono);font-size:10px;color:#8b95a1;letter-spacing:2px;
+  text-transform:uppercase}
+.plot-card .badge.available{background:rgba(61,220,151,.08);color:var(--cr-up);
+  border:1px solid rgba(61,220,151,.35);border-radius:3px;font-family:var(--cr-mono)}
+.update-ver{font-family:var(--cr-mono);color:var(--cr-gold);font-size:15px;letter-spacing:1px}
+.update-list{font-size:12.5px;color:#c6d0da;line-height:1.7}
+.update-list b{color:#e6edf3}
+</style>
 </head>
 <body>
 <!-- Force reset: clears ALL local game data on first load after deploy -->
@@ -1302,9 +1395,9 @@ input,select,textarea{font-family:var(--cr-mono)}
   <div class="menu-grid">
     <!-- Left panel: title + tagline + welcome + buttons -->
     <div class="menu-left">
-      <div class="menu-eyebrow">A Global Strategy Game</div>
+      <div class="menu-eyebrow">Terra Command — A Global Strategy Game</div>
       <h1 class="menu-title">Open <span class="accent">World</span></h1>
-      <div class="menu-subtitle">Earth Edition</div>
+      <div class="menu-subtitle">Earth Edition // Capital Terminal</div>
       <p class="menu-tagline">Claim <b>plots of land</b>. Build <b>businesses</b>. Produce <b>materials</b>. Trade on a <b>fluctuating market</b>. Conquer the globe from your corner of the planet.</p>
 
       <div class="menu-welcome" id="menu-welcome">
@@ -1331,6 +1424,9 @@ input,select,textarea{font-family:var(--cr-mono)}
     <div class="menu-right">
       <div class="menu-earth-wrap">
         <div class="menu-atmosphere"></div>
+        <div class="menu-hud-chip c1">ORBITAL VIEW</div>
+        <div class="menu-hud-chip c2">GRID <b>6,000</b> PLOTS</div>
+        <div class="menu-hud-chip c3">CLOUD SYNC <b>LIVE</b></div>
         <div class="menu-earth"></div>
         <div class="menu-orbit">
           <div class="menu-plot-marker m1"></div>
@@ -5802,8 +5898,11 @@ window.WarFx = WarFx;
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.31';
+const GAME_VERSION = 'v1.32';
 const RELEASE_NOTES = [
+  { v: 'v1.32', items: [
+    '🖥 <b>One design from the first pixel</b> — the login screen and the home screen were rebuilt in the same <b>Capital Terminal</b> look as the game itself: flat near-black panels, hairline gold borders, monospace readouts, soft scanlines. The front door now matches the trading floor — no more visual style change between logging in and playing.'
+  ]},
   { v: 'v1.31', items: [
     '⚡ <b>Always the newest build</b> — the game moved to a fresh address (<b>openworld.html</b>) so no browser can keep handing you the old login and home screens after an update. On top of that, the game now checks for new builds automatically: if your copy is ever outdated, a gold <b>⚡ BUILD … IS LIVE</b> banner appears — one tap on <b>UPDATE</b> and you are on the latest version. Accounts, saves and your whole empire carry over untouched.'
   ]},
@@ -5974,7 +6073,8 @@ function renderLogin() {
   const isSignup = _loginMode === 'signup';
 
   card.innerHTML = `
-    <div class="login-logo">Open World</div>
+    <div class="login-head">TERRA COMMAND <b>TERMINAL</b></div>
+    <div class="login-logo">Open <span class="lg-w">World</span></div>
     <div class="login-sub">Earth Edition</div>
     <div class="login-tabs">
       <button class="login-tab ${!isSignup ? 'active' : ''}" onclick="setLoginMode('login')">Login</button>
