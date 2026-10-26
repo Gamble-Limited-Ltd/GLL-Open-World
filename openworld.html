@@ -1439,26 +1439,6 @@ input,select,textarea{font-family:var(--cr-mono)}
 </style>
 </head>
 <body>
-<!-- Force reset: clears ALL local game data on first load after deploy -->
-<script>
-(function() {
-  var RESET_VERSION = '2026-10-15-full-wipe';
-  if (localStorage.getItem('openworld_reset_version') === RESET_VERSION) return;
-  console.log('[Reset] Full local data wipe in progress...');
-  var keys = [];
-  for (var i = 0; i < localStorage.length; i++) {
-    var k = localStorage.key(i);
-    if (k && k.startsWith('openworld_') && k !== 'openworld_reset_version') keys.push(k);
-  }
-  for (var j = 0; j < keys.length; j++) localStorage.removeItem(keys[j]);
-  // Also clear the login session
-  try { sessionStorage.removeItem('openworld_session'); } catch(e) {}
-  localStorage.setItem('openworld_reset_version', RESET_VERSION);
-  console.log('[Reset] Wiped ' + keys.length + ' keys. Reloading...');
-  location.reload();
-})();
-</script>
-
 <!-- ============ LOGIN SCREEN ============ -->
 <div id="login-screen" class="login-screen">
   <div class="login-card" id="login-card">
@@ -1497,7 +1477,7 @@ input,select,textarea{font-family:var(--cr-mono)}
       <button class="ow-chip-btn ow-chip-logout" onclick="logout()">⏻ Logout</button>
     </div>
   </div>
-  <div class="ow-build-pill">Build v1.33</div>
+  <div class="ow-build-pill">Build v1.34</div>
 
   <div class="modal" id="settings">
     <div class="panel">
@@ -5956,8 +5936,11 @@ window.WarFx = WarFx;
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.33';
+const GAME_VERSION = 'v1.34';
 const RELEASE_NOTES = [
+  { v: 'v1.34', items: [
+    '🏠 <b>Your home page is the front door again</b> — the site now opens on YOUR tactical home page: log in at the commander login gate, then land on the full dashboard — live Budget, Plots and Materials, your empire income ticking every second, market sparklines, the banner customizer and the owner control center. <b>LAUNCH GAME</b> drops you straight into the world, and the login works across every device exactly like the game\'s own. (The cinematic artwork now lives on as the in-game HOME screen.)'
+  ]},
   { v: 'v1.33', items: [
     '🏠 <b>Your home page is the home page</b> — the game now opens on the cinematic home screen you designed: the golden-hour artwork with PLAY and SETTINGS right on the art. It is the first screen when you load the site, it is where you land after logging in, and the in-game HOME button brings you back to it. Your Budget, Plots and Businesses sit as small chips in the corner — the artwork is the star.'
   ]},
