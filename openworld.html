@@ -1223,6 +1223,26 @@ input,select,textarea{font-family:var(--cr-mono)}
 .e3d-biz b{color:#7fffd4}
 .e3d-side-hint{margin-top:16px;font-size:10px;line-height:1.8;color:#66727e;letter-spacing:1px;text-align:center}
 .e3d-hintbar{flex-shrink:0;padding:8px;border-top:1px solid #22303d;font-size:10px;letter-spacing:1.5px;color:#66727e;text-align:center}
+/* ---- v1.36 · MACHINE SHOP ---- */
+#machine-modal{z-index:45}
+#machine-modal .plot-card{max-height:min(680px,92vh);overflow-y:auto;scrollbar-width:thin}
+.mch-title{font-size:11px;font-weight:800;letter-spacing:1.6px;color:#f2c14e;margin:10px 0 5px}
+.mch-row{display:flex;align-items:center;gap:9px;padding:7px 9px;border:1px solid #1a3340;border-radius:7px;background:rgba(20,50,60,.3);margin-bottom:5px}
+.mch-row .mch-ico,.mch-opt .mch-ico{font-size:20px}
+.mch-row .mch-info{flex:1;min-width:0}
+.mch-row .mch-info b{display:block;font-size:12.5px;color:#e8eef0}
+.mch-row .mch-info span{font-size:10.5px;color:#7fffd4}
+.mch-empty{font-size:11px;color:#8b95a1;padding:8px 10px;border:1px dashed #22303d;border-radius:7px}
+.mch-list{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;scrollbar-width:thin;padding-right:2px}
+.mch-opt{display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid #2c4a55;border-radius:8px;background:rgba(15,22,30,.6)}
+.mch-opt.off{opacity:.6}
+.mch-opt .mch-info{flex:1;min-width:0}
+.mch-opt .mch-info b{display:block;font-size:12.5px;color:#e8eef0}
+.mch-opt .mch-info b i{font-style:normal;color:#9bb4bd;font-weight:400;font-size:10.5px}
+.mch-opt .mch-info span{display:block;font-size:10px;color:#8fa9b2;line-height:1.45}
+.mch-opt .mch-cost{color:#f2c14e}
+.mch-opt .wk-btn{flex-shrink:0}
+
 @media (max-width:900px){
   #estate3d-modal .plot-card{width:96vw;height:88vh}
   .e3d-side{display:none}
@@ -1510,7 +1530,7 @@ input,select,textarea{font-family:var(--cr-mono)}
       <button class="ow-chip-btn ow-chip-logout" onclick="logout()">⏻ Logout</button>
     </div>
   </div>
-  <div class="ow-build-pill">Build v1.35</div>
+  <div class="ow-build-pill">Build v1.36</div>
 
   <div class="modal" id="settings">
     <div class="panel">
@@ -1665,6 +1685,14 @@ input,select,textarea{font-family:var(--cr-mono)}
       <!-- filled dynamically -->
     </div>
   </div>
+
+<!-- v1.36 — machine shop: factory machine bays -->
+<div class="plot-modal" id="machine-modal">
+  <div class="plot-card" id="machine-card" style="max-width:560px">
+    <!-- filled dynamically -->
+  </div>
+</div>
+
 
   <div class="toast" id="toast"></div>
 
@@ -4253,6 +4281,7 @@ function saveGame() {
             if (mm.cuisine) rec.cz = mm.cuisine;
             if (mm.workers) rec.wk = mm.workers;
             if (mm.cookAt) rec.ck = mm.cookAt;
+            if (mm.machines && mm.machines.length) rec.mc = mm.machines.slice();   // v1.36 — machine bays
           }
           out.push(rec);
         }
@@ -4373,6 +4402,7 @@ function loadGame(username) {
       cuisine: (typeof b.cz === 'string') ? b.cz : null,
       workers: Math.max(0, Math.min(WORKER_MAX, Math.floor(+b.wk || 0))),
       cookAt: +b.ck || 0,
+      machines: sanitizeMachines(b.mc),   // v1.36 — factory machine bays
     });
   }
   // Economy update (v1.25): stocks + income ledger (defaults keep old saves valid)
@@ -4504,6 +4534,9 @@ function addBusinessToPlot(plot, bt, index, customPos, opts) {
   if (plot.userData.businesses.length === 1) {
     setPlotColors(plot, bt.color, bt.color);
   }
+  // v1.36 — factories carry their machine rack on the roof (no-op when
+  // the bays are empty; rebuilt from meta on reload / capture / travel)
+  if (bt.id === 'factory') refreshFactoryMachines(plot.userData.id, index);
 }
 
 // ====================================================================
@@ -5987,8 +6020,11 @@ window.WarFx = WarFx;
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.35';
+const GAME_VERSION = 'v1.36';
 const RELEASE_NOTES = [
+  { v: 'v1.36', items: [
+    '⚙ <b>Machines — every factory is yours to build</b> — every Factory you place now has <b>3 machine bays</b>. Open its ⚙ MACHINE SHOP and install any of <b>12 different machines</b>, each producing a different resource: Hydroponic Trays grow 🌾 Food, Auto-Drill Rigs pull ⛏️ Ore, Kiln Arrays cut 🧱 Stone, Rolling Mills press 🔩 Steel, Spectrometers grind out 🔬 Research, Gem Cutters polish 💎 Luxuries and more. Machines run <b>only inside Factories</b> — not on any other business — their output scales with the plot and rides the factory crew\'s bonus, and each one stands on the factory roof in the world and the 3D viewer. Remove a machine for half its cost back; machines even raise your land\'s development grade.'
+  ]},
   { v: 'v1.35', items: [
     '🗺 <b>3D Estate Viewer</b> — your PROPERTY panel now has a <b>3D VIEW</b>: a live 3D diorama of everything you own, one planet at a time. Every plot stands as a terrain tile ringed in its grade color, every business is the same detailed miniature that stands on the globe (flames, beacons and spinners included) and keeps the exact spot you placed it, rented plots float a gold gem, and clicking a tile opens its full dossier — land value, income, rent and grade factors. Drag to orbit, scroll to zoom.'
   ]},
@@ -10828,6 +10864,16 @@ function openPlotModal(plot) {
           </div>`;
       })() : '';
 
+      // v1.36 — machines: this factory's equipment bays
+      const _machList = (bizMetaOf(plot.userData.id, idx) || {}).machines || [];
+      const _machIcons = _machList.map(m => { const mt = getMachineType(m); return mt ? mt.icon : ''; }).join(' ');
+      const machinesRow = bt.id === 'factory' ? `
+        <div class="wk-row" style="align-items:center">
+          <span>⚙ <b>${_machList.length}</b>/${FACTORY_MACHINE_SLOTS} machines${_machIcons ? ` — ${_machIcons}` : ' — empty bays'}</span>
+          <span style="flex:1"></span>
+          <button class="wk-btn" style="font-weight:800;color:#f2c14e;border-color:rgba(242,193,78,.5)" onclick="openMachineShop(${idx})">⚙ MACHINE SHOP</button>
+        </div>` : '';
+
       // v1.25 — worker crew row (every business)
       const _wkN = (_wkMeta && _wkMeta.workers) || 0;
       const _wkFee = workerHireFee(bt);
@@ -10860,6 +10906,7 @@ function openPlotModal(plot) {
           ${casinoPlayBtn}
           ${cookPlayBtn}
           ${bankPanel}
+          ${machinesRow}
           ${workerRow}
           <div style="display:flex;gap:5px;margin-top:4px">
             <button class="btn" style="flex:1;padding:4px;font-size:10px" onclick="moveBusiness(${idx})" title="Reposition this building anywhere on the plot">📍 Move</button>
@@ -10906,7 +10953,7 @@ function openPlotModal(plot) {
           <button class="biz-option ${b.military ? 'mil-option' : ''} ${canBuild ? '' : 'disabled'}" ${canBuild ? '' : 'disabled'} onclick="buildBusiness('${b.id}')">
             <div class="biz-icon">${b.icon}</div>
             <div class="biz-info">
-              <div class="biz-name">${b.name} <span style="color:#9bb4bd;font-size:10px">→ ${mat.icon} ${mat.name}</span></div>
+              <div class="biz-name">${b.name}${b.id === 'factory' ? ' <span style="color:#7fffd4;font-size:9px;letter-spacing:.6px">⚙ 3 MACHINE BAYS</span>' : ''} <span style="color:#9bb4bd;font-size:10px">→ ${mat.icon} ${mat.name}</span></div>
               <div class="biz-cost">$${effCost.toLocaleString()}${reqChips ? ` + ${reqChips}` : ''} build${terrainReason ? ` · <span style="color:#ff8080">${terrainReason}</span>` : ''}${bonusDisplay}</div>
             </div>
             <div class="biz-income">+${effRate.toFixed(1)}/s</div>
@@ -11259,6 +11306,7 @@ const SELL_REFUND_RATE = 0.5;
 const RENT_RATE_PER_MIN = 0.0008;
 // Development → land-value bonus (capped at +150% total)
 const DEV_PCT_PER_BIZ = 0.08;        // +8% per business
+const DEV_PCT_PER_MACHINE = 0.015;    // v1.36 — +1.5% per installed machine
 const DEV_PCT_PER_VARIETY = 0.04;    // +4% per distinct business type
 const DEV_PCT_PER_WORKER = 0.02;     // +2% per hired worker
 const DEV_PCT_PER_ROAD = 0.005;      // +0.5% per paved road tile (cap +40%)
@@ -11289,7 +11337,7 @@ function plotDevStats(plotId) {
   const types = BUSINESS_REGISTRY.get(plotId) || [];
   const meta = BIZ_META.get(plotId) || [];
   const variety = new Set();
-  let workers = 0, military = 0;
+  let workers = 0, military = 0, machines = 0;
   for (let i = 0; i < types.length; i++) {
     const bt = getBusinessType(types[i]);
     if (!bt) continue;
@@ -11297,20 +11345,21 @@ function plotDevStats(plotId) {
     if (bt.military) military++;
     const mm = meta[i];
     if (mm && mm.workers) workers += mm.workers;
+    if (mm && Array.isArray(mm.machines)) machines += mm.machines.length;   // v1.36 — machine bays
   }
   let roadTiles = 0;
   try {
     const p = ACTIVE_PLOT_BY_ID.get(plotId);
     if (p && typeof Roads !== 'undefined' && Roads.tilesOnPlot) roadTiles = Roads.tilesOnPlot(p) || 0;
   } catch (e) { /* roads are optional flavor for the grade */ }
-  return { biz: types.length, variety: variety.size, workers, military, roadTiles };
+  return { biz: types.length, variety: variety.size, workers, military, machines, roadTiles };
 }
 
 // The layout grade: D → S. Businesses, variety, crews, roads and
 // garrisons all lift the score; the tier multiplies rent.
 function plotGradeInfo(plotId) {
   const s = plotDevStats(plotId);
-  const score = s.biz * 2.5 + s.variety * 1.5 + s.workers * 0.5
+  const score = s.biz * 2.5 + s.variety * 1.5 + s.workers * 0.5 + s.machines * 0.5
     + Math.min(10, s.roadTiles * 0.25) + s.military * 3;
   let tier = GRADE_TIERS[0];
   for (const t of GRADE_TIERS) if (score >= t.min) tier = t;
@@ -11320,6 +11369,7 @@ function plotGradeInfo(plotId) {
   if (s.workers) factors.push(`${s.workers} crew`);
   if (s.roadTiles) factors.push(`${s.roadTiles} road tiles`);
   if (s.military) factors.push('garrisoned');
+  if (s.machines) factors.push(`${s.machines} machine${s.machines > 1 ? 's' : ''}`);   // v1.36
   return { ...s, score, tier, factors };
 }
 
@@ -11332,7 +11382,8 @@ function plotLandValue(plotId) {
     + s.variety * DEV_PCT_PER_VARIETY
     + s.workers * DEV_PCT_PER_WORKER
     + Math.min(0.40, s.roadTiles * DEV_PCT_PER_ROAD)
-    + s.military * DEV_PCT_PER_MIL;
+    + s.military * DEV_PCT_PER_MIL
+    + s.machines * DEV_PCT_PER_MACHINE;   // v1.36 — machine bays
   pct = Math.min(DEV_PCT_CAP, pct);
   return Math.round(base * (1 + pct));
 }
@@ -11395,11 +11446,12 @@ function sellPlotCore(plotId) {
   // the build cost come back to you.
   let scrapLabel = '';
   if (info.active) {
-    for (const entry of info.active.userData.businesses || []) {
+    const _sellMeta = BIZ_META.get(plotId) || [];
+    (info.active.userData.businesses || []).forEach((entry, _si) => {
       try { disposeBusinessMesh(entry.mesh); } catch (e) {}
       const bt = getBusinessType(entry.type);
-      if (bt) applyScrapRefund(scrapRefundFor(info.active, bt));
-    }
+      if (bt) applyScrapRefund(scrapRefundFor(info.active, bt, (_sellMeta[_si] || {}).machines));
+    });
     info.active.userData.businesses = [];
     scrapLabel = ' — businesses scrapped for materials';
   }
@@ -11488,8 +11540,12 @@ function renderMyPlotsPanel() {
     const rate = plotRentRate(id);
     totalLandValue += info.landValue;
     if (rented) totalRent += rate;
+    // v1.36 — machine bays on this plot's factories
+    let _nm = 0;
+    const _mlMetas = BIZ_META.get(id) || [];
+    types.forEach((t, _ti) => { const _me = _mlMetas[_ti]; if (_me && Array.isArray(_me.machines)) _nm += _me.machines.length; });
     const bizLabel = types.length
-      ? `${types.length} business${types.length > 1 ? 'es' : ''} · +${income.toFixed(1)}/s`
+      ? `${types.length} business${types.length > 1 ? 'es' : ''} · +${income.toFixed(1)}/s${_nm ? ` · ⚙${_nm} machine${_nm > 1 ? 's' : ''}` : ''}`
       : 'empty land — build or rent';
     return `
       <div class="myplot-row">
@@ -11633,6 +11689,10 @@ function estate3dBuildTiles(planetId) {
       const m = bizMetaOf(id, idx);
       const cuisine = m && m.cuisine ? m.cuisine : null;
       const mesh = buildBusinessMesh(bt, s, cuisine);
+      // v1.36 — factories carry their machines on the roof here too
+      if (bt.id === 'factory' && m && Array.isArray(m.machines) && m.machines.length) {
+        factoryMachineRack(mesh, m.machines, s);
+      }
       mesh.rotation.x = -Math.PI / 2;   // authored +Z sky -> +Y up on the flat tile
       const holder = new THREE.Group();
       holder.rotation.y = [0, Math.PI / 2, Math.PI, -Math.PI / 2][idx % 4];
@@ -11721,11 +11781,19 @@ function estate3dRenderSide(hiddenNote) {
   let sel = '';
   const t = E3D.selected;
   if (t) {
-    const bizRows = t.types.map(x => {
+    const bizRows = t.types.map((x, _i) => {
       const bt = getBusinessType(x);
       if (!bt) return '';
       const r = t.prod ? (bt.rate * t.prod.areaMultiplier * regionBonusById(bt.id, t.prod.region)) : bt.rate;
-      return `<div class="e3d-biz"><span>${bt.icon} ${bt.name}</span><b>+${r.toFixed(2)}/s</b></div>`;
+      // v1.36 — machine bays listed under their factory
+      const _mrows = machinesOf(t.id, _i).map(_mid => {
+        const _mt = getMachineType(_mid);
+        if (!_mt) return '';
+        const _mr = t.prod ? (_mt.rate * t.prod.areaMultiplier) : _mt.rate;
+        const _mm2 = getMaterial(_mt.produces);
+        return `<div class="e3d-biz" style="padding-left:14px;opacity:.85"><span>${_mt.icon} ${_mt.name}</span><b>+${_mr.toFixed(2)} ${_mm2.icon}/s</b></div>`;
+      }).join('');
+      return `<div class="e3d-biz"><span>${bt.icon} ${bt.name}</span><b>+${r.toFixed(2)}/s</b></div>${_mrows}`;
     }).join('');
     sel = `
       <div class="e3d-sel">
@@ -12153,11 +12221,11 @@ window.multiSellAll = function() {
   const claims = getClaims();
   for (const id of ids) {
     const p = ACTIVE_PLOT_BY_ID.get(id);
-    for (const entry of (p ? p.userData.businesses : []) || []) {
+    (p ? p.userData.businesses : []).forEach((entry, _sei) => {
       try { disposeBusinessMesh(entry.mesh); } catch (e) {}
       const bt = getBusinessType(entry.type);
-      if (bt && p) { const rf = scrapRefundFor(p, bt); applyScrapRefund(rf); scrapParts.push(scrapRefundLabel(rf)); }
-    }
+      if (bt && p) { const rf = scrapRefundFor(p, bt, machinesOf(id, _sei)); applyScrapRefund(rf); scrapParts.push(scrapRefundLabel(rf)); }
+    });
     dissolveGroupAround(id);
     if (p) {
       p.userData.owned = false;
@@ -12416,7 +12484,7 @@ window.moveBusiness = function(businessIndex) {
 // build it (scaled to the plot, floor'd) plus a quarter of the credits.
 // Plot sales scrap everything on the land with the same refund.
 // ====================================================================
-function scrapRefundFor(plot, bt) {
+function scrapRefundFor(plot, bt, machines) {
   const am = plot && plot.userData ? plot.userData.areaMultiplier : 1;
   const mats = {};
   if (bt && bt.buildReq) {
@@ -12426,7 +12494,15 @@ function scrapRefundFor(plot, bt) {
     }
   }
   const credits = bt ? Math.round(bt.buildCost * (am || 1) * 0.25) : 0;
-  return { mats, credits };
+  // v1.36 — machines scrap for half their price (equipment is standard size)
+  let _mc = credits;
+  if (machines && machines.length) {
+    for (const mid of machines) {
+      const mt = getMachineType(mid);
+      if (mt) _mc += Math.round(mt.cost * 0.5);
+    }
+  }
+  return { mats, credits: _mc };
 }
 function scrapRefundLabel(rf) {
   const parts = [];
@@ -12452,7 +12528,7 @@ window.demolishBusiness = function(businessIndex) {
   const entry = p.userData.businesses[businessIndex];
   if (!entry) return;
   const bt = getBusinessType(entry.type);
-  const rf = scrapRefundFor(p, bt);
+  const rf = scrapRefundFor(p, bt, (bizMetaOf(p.userData.id, businessIndex) || {}).machines);
   if (!confirm(`♻ Scrap this ${bt ? bt.name : 'business'}?\nYou recover: ${scrapRefundLabel(rf)}`)) return;
   // Remove business mesh
   if (entry.mesh) {
@@ -13276,6 +13352,301 @@ window.fireWorker = function(plotId, idx) {
   const plot = ACTIVE_PLOT_BY_ID.get(plotId) || STATE.selectedPlot;
   if (plot && STATE.selectedPlot === plot) openPlotModal(plot);
 };
+
+// ====================================================================
+// v1.36 — MACHINES (Factories & machine bays)
+// Every Factory you place has MACHINE BAYS on its floor: install any
+// of the machine types below and each one produces its own resource —
+// one factory might grow Food, pull Ore and cut Stone, another grinds
+// out Research and Luxuries. Machines run ONLY inside Factories (the
+// shop opens from a factory's card and the install path re-checks the
+// host building), their output scales with the plot like every other
+// producer and rides the factory crew's output bonus. Costs are fixed
+// (the equipment is standard size) and removing a machine recovers
+// half its price. Each installed machine also stands on the factory
+// roof as a small glowing gadget — on the globe and in the 3D Estate
+// Viewer — and counts toward the plot's development grade.
+// ====================================================================
+const FACTORY_MACHINE_SLOTS = 3;   // machine bays per factory
+
+const MACHINE_TYPES = [
+  // — tier 1: bootstrap equipment, credits only —
+  { id: 'hydroponics', name: 'Hydroponic Tray',  icon: '🌱', cost: 8000,   produces: 'food',    rate: 0.30, color: 0x7cb342, shape: 'tray',
+    buildReq: null,
+    desc: 'Stacked grow-trays under grow-lights — green, quiet and always on.' },
+  { id: 'bandsaw',     name: 'Band Saw Line',    icon: '🪵', cost: 12000,  produces: 'wood',    rate: 0.32, color: 0x8d6e4f, shape: 'saw',
+    buildReq: null,
+    desc: 'A ripping blade line that turns scrap timber into board stock.' },
+  { id: 'kiln',        name: 'Kiln Array',       icon: '🧱', cost: 14000,  produces: 'stone',   rate: 0.32, color: 0x9e9e9e, shape: 'kiln',
+    buildReq: null,
+    desc: 'Firing chambers cutting dimension stone around the clock.' },
+  { id: 'autodrill',   name: 'Auto-Drill Rig',   icon: '⛏️', cost: 22000,  produces: 'ore',     rate: 0.35, color: 0x8d6e63, shape: 'drill',
+    buildReq: null,
+    desc: 'A self-tending drill head that never sleeps.' },
+  // — tier 2: fed by your own raw stock —
+  { id: 'rollmill',    name: 'Rolling Mill',     icon: '🔩', cost: 48000,  produces: 'steel',   rate: 0.28, color: 0x78909c, shape: 'mill',
+    buildReq: { ore: 12 },
+    desc: 'Hot rollers pressing billets into structural sections.' },
+  { id: 'cracker',     name: 'Catalytic Cracker',icon: '🧪', cost: 66000,  produces: 'chem',    rate: 0.26, color: 0x9ccc65, shape: 'chem',
+    buildReq: { oil: 10 },
+    desc: 'Catalyst beds cracking heavy feed into base chemicals.' },
+  { id: 'extruder',    name: 'Plastic Extruder', icon: '🥤', cost: 78000,  produces: 'plastic', rate: 0.24, color: 0xf06292, shape: 'ext',
+    buildReq: { chem: 10 },
+    desc: 'A screw line squeezing out plastic profile by the meter.' },
+  { id: 'turbine',     name: 'Turbine Generator',icon: '⚡', cost: 96000,  produces: 'energy',  rate: 0.24, color: 0xffee58, shape: 'turb',
+    buildReq: { steel: 10 },
+    desc: 'A spinning mass humming out clean power for the line.' },
+  // — tier 3: precision industry —
+  { id: 'serverrack',  name: 'Server Rack',      icon: '💾', cost: 150000, produces: 'data',    rate: 0.18, color: 0x5c6bc0, shape: 'rack',
+    buildReq: { goods: 15 },
+    desc: 'Blade servers crunching raw data in the factory basement.' },
+  { id: 'robocell',    name: 'Robot Arm Cell',   icon: '🤖', cost: 170000, produces: 'comp',    rate: 0.20, color: 0x4dd0e1, shape: 'arm',
+    buildReq: { steel: 12 },
+    desc: 'Articulated arms assembling precision components day and night.' },
+  { id: 'spectrometer',name: 'Spectrometer',     icon: '🔬', cost: 280000, produces: 'research',rate: 0.15, color: 0xba68c8, shape: 'spec',
+    buildReq: { comp: 8, data: 8 },
+    desc: 'Ion beams and detectors sorting out pure research.' },
+  { id: 'gemcutter',   name: 'Gem Cutter',       icon: '💎', cost: 460000, produces: 'lux',     rate: 0.12, color: 0xf48fb1, shape: 'gem',
+    buildReq: { research: 6 },
+    desc: 'Lattice saws and laps polishing true luxuries.' },
+];
+
+function getMachineType(id) { return MACHINE_TYPES.find(m => m.id === id); }
+
+// Save-side sanitizer: keep only real machine ids, cap at the bay count
+function sanitizeMachines(arr) {
+  if (!Array.isArray(arr)) return [];
+  const out = [];
+  for (const id of arr) {
+    if (typeof id === 'string' && getMachineType(id) && !out.includes(id) && out.length < FACTORY_MACHINE_SLOTS) out.push(id);
+  }
+  return out;
+}
+
+// The machines installed in a plot's business slot (any planet)
+function machinesOf(plotId, idx) {
+  const meta = bizMetaOf(plotId, idx);
+  return (meta && Array.isArray(meta.machines)) ? meta.machines : [];
+}
+
+// ------------------------------------------------------------------
+// MACHINE SHOP — the modal (opens from a factory's plot card)
+// ------------------------------------------------------------------
+const MACH = { plotId: null, idx: -1 };
+
+window.openMachineShop = function(idx) {
+  const p = STATE.selectedPlot;
+  if (!p || !p.userData.owned) return;
+  const types = BUSINESS_REGISTRY.get(p.userData.id) || [];
+  if (types[idx] !== 'factory') {
+    showToast('Machines only run inside Factories — build one first', false);
+    return;
+  }
+  MACH.plotId = p.userData.id;
+  MACH.idx = idx;
+  renderMachineShop();
+  document.getElementById('machine-modal').classList.add('show');
+};
+
+window.closeMachineShop = function() {
+  document.getElementById('machine-modal').classList.remove('show');
+  MACH.plotId = null;
+  MACH.idx = -1;
+};
+
+function machineShopRefreshPlotCard() {
+  // keep the plot card behind the shop in sync (bay count / icons)
+  if (MACH.plotId === null) return;
+  if (document.getElementById('plot-modal').classList.contains('show')
+    && STATE.selectedPlot && STATE.selectedPlot.userData.id === MACH.plotId) {
+    openPlotModal(STATE.selectedPlot);
+  }
+}
+
+window.installMachine = function(machineId) {
+  if (MACH.plotId === null || MACH.idx < 0) return;
+  const types = BUSINESS_REGISTRY.get(MACH.plotId) || [];
+  if (types[MACH.idx] !== 'factory') { showToast('Machines only run inside Factories', false); window.closeMachineShop(); return; }
+  const mt = getMachineType(machineId);
+  if (!mt) return;
+  const meta = ensureBizMeta(MACH.plotId, MACH.idx, {});
+  if (!Array.isArray(meta.machines)) meta.machines = [];
+  if (meta.machines.length >= FACTORY_MACHINE_SLOTS) { showToast(`All ${FACTORY_MACHINE_SLOTS} machine bays are full`, false); return; }
+  if (STATE.money < mt.cost) { showToast(`The ${mt.name} costs $${mt.cost.toLocaleString()} — not enough credits`, false); return; }
+  const _miss = missingBuildReq(mt.buildReq || null);
+  if (Object.keys(_miss).length) { showToast(`${mt.name} needs ${missingReqText(_miss)} — keep that stock instead of selling it`, false); return; }
+  STATE.money -= mt.cost;
+  if (mt.buildReq) for (const id in mt.buildReq) {
+    STATE.inventory[id] = Math.max(0, (STATE.inventory[id] || 0) - mt.buildReq[id]);
+  }
+  meta.machines.push(mt.id);
+  refreshFactoryMachines(MACH.plotId, MACH.idx);
+  const _prod = plotProductionInfo(MACH.plotId);
+  const _r = mt.rate * (_prod ? _prod.areaMultiplier : 1);
+  const _mat = getMaterial(mt.produces);
+  showToast(`⚙ ${mt.name} installed — producing ${_r.toFixed(2)} ${_mat.icon} ${_mat.name}/s`, true);
+  updateHUD();
+  saveGame();
+  renderMachineShop();
+  machineShopRefreshPlotCard();
+};
+
+window.removeMachine = function(slotIdx) {
+  if (MACH.plotId === null || MACH.idx < 0) return;
+  const meta = bizMetaOf(MACH.plotId, MACH.idx);
+  if (!meta || !Array.isArray(meta.machines)) return;
+  const mid = meta.machines[slotIdx];
+  const mt = getMachineType(mid);
+  if (!mt) return;
+  meta.machines.splice(slotIdx, 1);
+  const refund = Math.round(mt.cost * 0.5);
+  STATE.money += refund;
+  refreshFactoryMachines(MACH.plotId, MACH.idx);
+  showToast(`Removed ${mt.icon} ${mt.name} — $${refund.toLocaleString()} recovered`, true);
+  updateHUD();
+  saveGame();
+  renderMachineShop();
+  machineShopRefreshPlotCard();
+};
+
+function renderMachineShop() {
+  const card = document.getElementById('machine-card');
+  if (!card || MACH.plotId === null) return;
+  const plot = ACTIVE_PLOT_BY_ID.get(MACH.plotId);
+  if (!plot || !plot.userData.owned) return;
+  const meta = ensureBizMeta(MACH.plotId, MACH.idx, {});
+  if (!Array.isArray(meta.machines)) meta.machines = [];
+  const _prod = plotProductionInfo(MACH.plotId);
+  const am = _prod ? _prod.areaMultiplier : (plot.userData.areaMultiplier || 1);
+  const _wk = 1 + WORKER_OUTPUT * ((meta.workers || 0));
+
+  const slots = meta.machines.map((mid, i) => {
+    const mt = getMachineType(mid);
+    if (!mt) return '';
+    const mat = getMaterial(mt.produces);
+    const r = mt.rate * am * _wk;
+    return `
+      <div class="mch-row">
+        <span class="mch-ico">${mt.icon}</span>
+        <span class="mch-info"><b>${mt.name}</b><span>+${r.toFixed(2)} ${mat.icon} ${mat.name}/s</span></span>
+        <button class="wk-btn" onclick="removeMachine(${i})" title="Uninstall — recover half the cost">Remove $${Math.round(mt.cost * 0.5).toLocaleString()}</button>
+      </div>`;
+  }).join('');
+
+  const full = meta.machines.length >= FACTORY_MACHINE_SLOTS;
+  const opts = MACHINE_TYPES.map(mt => {
+    const mat = getMaterial(mt.produces);
+    const r = mt.rate * am * _wk;
+    const afford = STATE.money >= mt.cost;
+    const req = mt.buildReq || null;
+    const missing = missingBuildReq(req);
+    const matsOk = Object.keys(missing).length === 0;
+    const reqChips = req ? Object.keys(req).map(id => {
+      const rm = getMaterial(id);
+      const have = STATE.inventory[id] || 0;
+      const short = have + 1e-6 < req[id];
+      return short
+        ? `<span style="color:#ff8080">${rm.icon} ${req[id]}</span>`
+        : `<span style="color:#9bb4bd">${rm.icon} ${req[id]}</span>`;
+    }).join(' · ') : '';
+    const ok = !full && afford && matsOk;
+    const btnLabel = full ? 'Bays full' : (afford ? (matsOk ? 'Install' : 'Needs mats') : 'Not enough $');
+    return `
+      <div class="mch-opt ${ok ? '' : 'off'}">
+        <span class="mch-ico">${mt.icon}</span>
+        <span class="mch-info">
+          <b>${mt.name} <i>→ ${mat.icon} ${mat.name}</i></b>
+          <span>${mt.desc}</span>
+          <span class="mch-cost">$${mt.cost.toLocaleString()}${reqChips ? ' + ' + reqChips : ''} · +${r.toFixed(2)} ${mat.icon}/s here</span>
+        </span>
+        <button class="wk-btn" ${ok ? '' : 'disabled'} onclick="installMachine('${mt.id}')">${btnLabel}</button>
+      </div>`;
+  }).join('');
+
+  card.innerHTML = `
+    <span class="badge available">machines</span>
+    <h2>⚙ Machine Shop</h2>
+    <div class="biz-hint">Factory on <b>${plot.userData.name}</b> · bays <b>${meta.machines.length}/${FACTORY_MACHINE_SLOTS}</b> · machines only run inside <b>Factories</b></div>
+    <div class="mch-title">INSTALLED</div>
+    ${slots || '<div class="mch-empty">No machines yet — every factory runs its own unique production line.</div>'}
+    <div class="mch-title" style="margin-top:10px">CATALOG</div>
+    <div class="mch-list">${opts}</div>
+    <div class="cook-sub" style="margin-top:6px">Output scales with the plot (×${am.toFixed(2)}) and rides the factory crew's bonus (currently +${Math.round((_wk - 1) * 100)}%). Machine prices are fixed — the equipment is standard size. Removing a machine recovers half its cost.</div>
+    <div class="actions" style="margin-top:10px"><button class="btn" onclick="closeMachineShop()">Close</button></div>
+  `;
+}
+
+// ------------------------------------------------------------------
+// 3D — the machine rack: one small glowing gadget per installed
+// machine, standing on the factory's roof. Shared by the globe
+// (addBusinessToPlot → refreshFactoryMachines) and the 3D Estate
+// Viewer (which calls factoryMachineRack directly on its own mesh).
+// ------------------------------------------------------------------
+const MACHINE_SHAPE_PRIM = {
+  tray: 'box', saw: 'box', kiln: 'cyl', drill: 'cone', mill: 'cyl', chem: 'cyl',
+  ext: 'box', turb: 'sph', rack: 'box', arm: 'cone', spec: 'cone', gem: 'sph',
+};
+
+function factoryMachineRack(mesh, machines, s) {
+  const up = mesh.children && mesh.children[0];   // buildBusinessMesh wrapper (authored Y-up)
+  if (!up) return null;
+  const rack = new THREE.Group();
+  rack.position.set(-s * 0.16, s * 0.51, 0);      // the main hall's roof
+  machines.slice(0, FACTORY_MACHINE_SLOTS).forEach((mid, i) => {
+    const mt = getMachineType(mid);
+    if (!mt) return;
+    const x = -s * 0.3 + i * s * 0.3;
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x2b3a44, roughness: 0.7, metalness: 0.35 });
+    bodyMat.userData._bizInstance = true;
+    const capMat = new THREE.MeshStandardMaterial({
+      color: mt.color, roughness: 0.35, metalness: 0.15,
+      emissive: new THREE.Color(mt.color), emissiveIntensity: 0.6 });
+    capMat.userData._bizInstance = true;
+    const base = new THREE.Mesh(new THREE.BoxGeometry(s * 0.2, s * 0.12, s * 0.15), bodyMat);
+    base.position.set(x, s * 0.06, 0);
+    rack.add(base);
+    const prim = MACHINE_SHAPE_PRIM[mt.shape] || 'box';
+    let cap;
+    if (prim === 'cyl') {
+      cap = new THREE.Mesh(new THREE.CylinderGeometry(s * 0.055, s * 0.055, s * 0.16, 10), capMat);
+      cap.position.set(x, s * 0.2, 0);
+    } else if (prim === 'cone') {
+      cap = new THREE.Mesh(new THREE.CylinderGeometry(s * 0.018, s * 0.055, s * 0.2, 6), capMat);
+      cap.position.set(x, s * 0.22, 0);
+    } else if (prim === 'sph') {
+      cap = new THREE.Mesh(new THREE.SphereGeometry(s * 0.055, 10, 8), capMat);
+      cap.position.set(x, s * 0.2, 0);
+    } else {
+      cap = new THREE.Mesh(new THREE.BoxGeometry(s * 0.19, s * 0.07, s * 0.13), capMat);
+      cap.position.set(x, s * 0.17, 0);
+    }
+    rack.add(cap);
+  });
+  up.add(rack);
+  return rack;
+}
+
+// Re-sync a factory's roof rack with its installed machines (globe path)
+function refreshFactoryMachines(plotId, idx) {
+  const plot = ACTIVE_PLOT_BY_ID.get(plotId);
+  if (!plot) return;   // off-world factories have no mesh here (registry-only)
+  const entry = (plot.userData.businesses || [])[idx];
+  if (!entry || entry.type !== 'factory' || !entry.mesh) return;
+  const old = entry.mesh.userData.machineRack;
+  if (old) {
+    old.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material && o.material.userData && o.material.userData._bizInstance) o.material.dispose();
+    });
+    if (old.parent) old.parent.remove(old);
+    entry.mesh.userData.machineRack = null;
+  }
+  const meta = bizMetaOf(plotId, idx);
+  const machines = (meta && Array.isArray(meta.machines)) ? meta.machines : [];
+  if (!machines.length) return;
+  const s = Math.max(0.0075, Math.min(0.019, plot.userData.areaMultiplier * 0.0095));
+  entry.mesh.userData.machineRack = factoryMachineRack(entry.mesh, machines, s);
+}
 
 // ---------- STOCK EXCHANGE ----------
 window.stkBuy = function(t) {
@@ -15826,6 +16197,19 @@ function tickProduction() {
           anyProduced = true;
         }
       }
+      // v1.36 — machine bays: each machine in a factory produces its own
+      // material, scaled by the plot and boosted by the factory's crew
+      if (bt.id === 'factory' && _meta && Array.isArray(_meta.machines) && _meta.machines.length) {
+        for (const _mid of _meta.machines) {
+          const _mt = getMachineType(_mid);
+          if (!_mt) continue;
+          const _mp = _mt.rate * info.areaMultiplier * _wk * dt;
+          if (_mp > 0) {
+            STATE.inventory[_mt.produces] = (STATE.inventory[_mt.produces] || 0) + _mp;
+            anyProduced = true;
+          }
+        }
+      }
     }
   }
   // v1.25 — wages: crews are paid continuously out of credits. When
@@ -16194,6 +16578,7 @@ window.addEventListener('keydown', (e) => {
     window.closeUpdatePopup();
     window.closeSupport();
     window.closeEstate3D();
+    window.closeMachineShop();
     if (STATE.multiBuy) window.toggleMultiBuy();
   }
 });
