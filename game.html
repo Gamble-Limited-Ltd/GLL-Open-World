@@ -1196,6 +1196,39 @@ input,select,textarea{font-family:var(--cr-mono)}
 #planets-modal .plot-card,#myplots-modal .plot-card{max-height:min(680px,92vh);display:flex;flex-direction:column;overflow:hidden}
 #planets-modal .plot-card>*,#myplots-modal .plot-card>*{flex-shrink:0}
 #planets-modal .panel-scroll,#myplots-modal .panel-scroll{flex:1 1 auto;min-height:0}
+/* ---- v1.35 · 3D ESTATE VIEWER ---- */
+#estate3d-modal{z-index:50}
+#estate3d-modal .plot-card{width:min(1180px,96vw);height:min(720px,92vh);padding:0;display:flex;flex-direction:column;overflow:hidden}
+.e3d-top{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #22303d;flex-shrink:0}
+.e3d-title{font-size:12px;font-weight:800;letter-spacing:2px;color:#f2c14e;white-space:nowrap}
+.e3d-tabs{flex:1;display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.e3d-tab{background:rgba(15,22,30,.8);border:1px solid #2c4a55;color:#9fb2bd;border-radius:999px;padding:6px 14px;font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer}
+.e3d-tab span{margin-left:6px;color:#f2c14e}
+.e3d-tab.active{border-color:rgba(242,193,78,.6);color:#f2c14e;background:rgba(242,193,78,.08)}
+.e3d-close{background:none;border:1px solid #2c4a55;color:#9fb2bd;border-radius:6px;width:30px;height:30px;font-size:14px;cursor:pointer;line-height:1}
+.e3d-close:hover{color:#ff7a7a;border-color:rgba(255,122,122,.5)}
+.e3d-body{flex:1;display:flex;min-height:0}
+.e3d-stage{flex:1;position:relative;min-width:0;background:#05070d}
+.e3d-stage canvas{display:block}
+#estate3d-tooltip{position:absolute;display:none;pointer-events:none;background:rgba(7,12,18,.95);border:1px solid rgba(47,214,255,.4);border-radius:6px;padding:6px 10px;font-size:11px;color:#e6edf3;white-space:nowrap;z-index:5}
+.e3d-side{width:290px;flex-shrink:0;border-left:1px solid #22303d;padding:16px;overflow-y:auto;scrollbar-width:thin}
+.e3d-side-head{font-size:13px;font-weight:800;letter-spacing:2px;color:#f2c14e;margin-bottom:10px}
+.e3d-side-stats{font-size:12px;line-height:1.7;color:#c4d3dd}
+.e3d-note{margin-top:8px;font-size:10px;color:#8b95a1;letter-spacing:.5px}
+.e3d-sel{margin-top:14px;border:1px solid #2c4a55;border-radius:8px;padding:12px;background:rgba(15,22,30,.5)}
+.e3d-sel-name{font-size:14px;font-weight:800;color:#e6edf3}
+.e3d-sel-stats{margin-top:6px;font-size:11.5px;line-height:1.7;color:#9fb2bd}
+.e3d-bizlist{margin-top:10px;display:flex;flex-direction:column;gap:4px}
+.e3d-biz{display:flex;justify-content:space-between;font-size:11.5px;color:#c4d3dd}
+.e3d-biz b{color:#7fffd4}
+.e3d-side-hint{margin-top:16px;font-size:10px;line-height:1.8;color:#66727e;letter-spacing:1px;text-align:center}
+.e3d-hintbar{flex-shrink:0;padding:8px;border-top:1px solid #22303d;font-size:10px;letter-spacing:1.5px;color:#66727e;text-align:center}
+@media (max-width:900px){
+  #estate3d-modal .plot-card{width:96vw;height:88vh}
+  .e3d-side{display:none}
+  .e3d-title{display:none}
+}
+
 .panel-scroll{overflow-y:auto;margin:6px 0 14px;padding-right:8px}
 .panel-scroll::-webkit-scrollbar{width:8px}
 .panel-scroll::-webkit-scrollbar-thumb{background:#2c4a55;border-radius:4px}
@@ -1477,7 +1510,7 @@ input,select,textarea{font-family:var(--cr-mono)}
       <button class="ow-chip-btn ow-chip-logout" onclick="logout()">⏻ Logout</button>
     </div>
   </div>
-  <div class="ow-build-pill">Build v1.34</div>
+  <div class="ow-build-pill">Build v1.35</div>
 
   <div class="modal" id="settings">
     <div class="panel">
@@ -1676,6 +1709,24 @@ input,select,textarea{font-family:var(--cr-mono)}
 <div class="plot-modal" id="myplots-modal">
   <div class="plot-card" id="myplots-card">
     <!-- filled dynamically by renderMyPlotsPanel() -->
+  </div>
+</div>
+
+<!-- v1.35 — 3D Estate Viewer: a live 3D diorama of your whole portfolio. -->
+<div class="plot-modal" id="estate3d-modal">
+  <div class="plot-card" id="estate3d-card">
+    <div class="e3d-top">
+      <div class="e3d-title">🗺 PORTFOLIO — 3D VIEW</div>
+      <div class="e3d-tabs" id="estate3d-tabs"></div>
+      <button class="e3d-close" onclick="closeEstate3D()" title="Close the 3D viewer">✕</button>
+    </div>
+    <div class="e3d-body">
+      <div class="e3d-stage" id="estate3d-stage">
+        <div id="estate3d-tooltip"></div>
+      </div>
+      <div class="e3d-side" id="estate3d-side"></div>
+    </div>
+    <div class="e3d-hintbar">DRAG TO ORBIT · SCROLL TO ZOOM · CLICK A TILE TO INSPECT</div>
   </div>
 </div>
 
@@ -5936,8 +5987,11 @@ window.WarFx = WarFx;
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.34';
+const GAME_VERSION = 'v1.35';
 const RELEASE_NOTES = [
+  { v: 'v1.35', items: [
+    '🗺 <b>3D Estate Viewer</b> — your PROPERTY panel now has a <b>3D VIEW</b>: a live 3D diorama of everything you own, one planet at a time. Every plot stands as a terrain tile ringed in its grade color, every business is the same detailed miniature that stands on the globe (flames, beacons and spinners included) and keeps the exact spot you placed it, rented plots float a gold gem, and clicking a tile opens its full dossier — land value, income, rent and grade factors. Drag to orbit, scroll to zoom.'
+  ]},
   { v: 'v1.34', items: [
     '🏠 <b>Your home page is the front door again</b> — the site now opens on YOUR tactical home page: log in at the commander login gate, then land on the full dashboard — live Budget, Plots and Materials, your empire income ticking every second, market sparklines, the banner customizer and the owner control center. <b>LAUNCH GAME</b> drops you straight into the world, and the login works across every device exactly like the game\'s own. (The cinematic artwork now lives on as the in-game HOME screen.)'
   ]},
@@ -11458,8 +11512,500 @@ function renderMyPlotsPanel() {
     <div class="coords">${ids.length} PLOT${ids.length > 1 ? 'S' : ''} ACROSS ${nPlanets} PLANET${nPlanets > 1 ? 'S' : ''}</div>
     <div class="desc" style="margin-bottom:14px">Portfolio: <b style="color:#f2c14e">$${totalLandValue.toLocaleString()}</b> in land${totalRent ? ` · <b style="color:#7fffd4">$${totalRent.toLocaleString()}/min</b> rent collected` : ''}. Renting pays by the minute; businesses, crews, roads and garrisons raise every plot's grade, rent and resale value. Selling refunds <b>50% of land value</b> and frees the claim.</div>
     <div class="panel-scroll">${rows}</div>
-    <div class="actions"><button class="btn" onclick="closeMyPlots()">Close</button></div>
+    <div class="actions"><button class="btn" style="border-color:rgba(242,193,78,.55);color:#f2c14e;font-weight:800" onclick="openEstate3D()">🗺 3D VIEW</button><button class="btn" onclick="closeMyPlots()">Close</button></div>
   `;
+}
+
+// ====================================================================
+// v1.35 — 3D ESTATE VIEWER ("Portfolio — 3D View")
+// A live 3D diorama of everything you own, one planet at a time:
+// every owned plot becomes a grade-rimmed terrain tile, every business
+// is the SAME detailed miniature that stands on the globe (flames,
+// strobes and spinners included), your custom building placements are
+// preserved, rented plots float a gold gem, and clicking a tile opens
+// its full dossier in the side panel. Drag to orbit, scroll to zoom.
+// Own renderer/scene/controls — created on open, fully disposed on
+// close, so it never touches the main game loop's scene.
+// ====================================================================
+const E3D = {
+  open: false, planetId: null,
+  scene: null, camera: null, renderer: null, controls: null,
+  dirLight: null, tileGroup: null, stars: null, ground: null,
+  tiles: [],            // { id, info, grade, income, top, topMat, rimMat, gem, holder }
+  fxList: [], gems: [], markers: [], pin: null,
+  raycaster: null, ndc: null, pointerPx: { x: 0, y: 0 }, pointerDirty: false,
+  hovered: null, selected: null,
+  raf: 0, downX: 0, downY: 0, resizeFn: null,
+};
+
+// Terrain palette per world (water plots use the water tone).
+const E3D_TERRAIN = {
+  earth:   { land: 0x2f5d3f, water: 0x15506e },
+  luna:    { land: 0x8d939e, water: 0x8d939e },
+  mars:    { land: 0x9c5a3a, water: 0x7a4a30 },
+  oceanus: { land: 0x18566e, water: 0x18566e },
+};
+
+function _e3dTerrainColor(planetId, isWater) {
+  const t = E3D_TERRAIN[planetId] || E3D_TERRAIN.earth;
+  return isWater ? t.water : t.land;
+}
+
+// Quadrant layout for multiple businesses on one tile (index 0..3),
+// mirroring the classic in-plot grid but scaled to the diorama tile.
+function _e3dQuadrant(idx) {
+  const q = 0.27;
+  if (idx === 0) return { x: -q, z: q };
+  if (idx === 1) return { x: q, z: q };
+  if (idx === 2) return { x: -q, z: -q };
+  return { x: q, z: -q };
+}
+
+function _e3dEmitColor(hex) { return new THREE.Color(hex); }
+
+// ---- build the tile diorama for one planet ------------------------
+function estate3dBuildTiles(planetId) {
+  const planet = PLANET_BY_ID[planetId];
+  if (!planet) return;
+  // Off-planet stats must exist (same trick the economy uses for
+  // cross-planet production).
+  if (!PLANET_META[planet.id] || !PLANET_META[planet.id].size) generatePlots(planet, { metaOnly: true });
+
+  // Clear previous tiles (renderer/scene/camera persist).
+  if (E3D.tileGroup) { estate3dDisposeTiles(); }
+
+  const group = new THREE.Group();
+  E3D.tileGroup = group;
+  E3D.scene.add(group);
+  E3D.tiles = []; E3D.fxList = []; E3D.gems = []; E3D.markers = [];
+  E3D.hovered = null; E3D.selected = null;
+
+  const ids = [...STATE.owned].filter(id => planetOfPlotId(id).id === planetId);
+  // Developed plots first — they are the interesting ones.
+  ids.sort((a, b) => ((BUSINESS_REGISTRY.get(b) || []).length - (BUSINESS_REGISTRY.get(a) || []).length) || (a - b));
+  const MAX_TILES = 48;
+  const shown = ids.slice(0, MAX_TILES);
+  const hidden = ids.length - shown.length;
+
+  const PITCH = 1.62;
+  const cols = Math.min(6, Math.max(1, Math.ceil(Math.sqrt(shown.length || 1))));
+  const rows = Math.ceil(shown.length / cols) || 1;
+
+  shown.forEach((id, i) => {
+    const cx = (i % cols) - (cols - 1) / 2;
+    const cz = Math.floor(i / cols) - (rows - 1) / 2;
+    const tile = new THREE.Group();
+    tile.position.set(cx * PITCH, 0, cz * PITCH);
+
+    const info = plotSaleInfo(id);
+    const grade = plotGradeInfo(id);
+    const meta = info.meta || {};
+    const rented = STATE.rented.has(id);
+    const types = BUSINESS_REGISTRY.get(id) || [];
+
+    // — grade rim (the glowing edge = plot grade color) —
+    const rimColor = _e3dEmitColor(grade.tier.color);
+    const rimMat = new THREE.MeshStandardMaterial({
+      color: 0x10161e, roughness: 0.6, metalness: 0.25,
+      emissive: rimColor, emissiveIntensity: 0.55 });
+    const rim = new THREE.Mesh(E3D.geo.rim, rimMat);
+    rim.position.y = 0.045;
+    tile.add(rim);
+
+    // — terrain top —
+    const terrHex = _e3dTerrainColor(planetId, meta.isWater);
+    const topMat = new THREE.MeshStandardMaterial({
+      color: terrHex, roughness: 0.85, metalness: 0.05,
+      emissive: new THREE.Color(meta.isWater ? 0x0a2233 : 0x000000), emissiveIntensity: 1 });
+    const top = new THREE.Mesh(E3D.geo.top, topMat);
+    top.position.y = 0.095;
+    top.userData.tileIndex = E3D.tiles.length;
+    tile.add(top);
+
+    // — businesses: the same miniatures that stand on the globe —
+    const activeP = ACTIVE_PLOT_BY_ID.get(id);
+    const sizeA = activeP && activeP.userData.sizeA ? activeP.userData.sizeA : null;
+    const savedPos = BIZ_POS.get(id) || [];
+    const s = types.length === 1 ? 0.36 : 0.26;
+    types.forEach((t, idx) => {
+      const bt = getBusinessType(t);
+      if (!bt) return;
+      const m = bizMetaOf(id, idx);
+      const cuisine = m && m.cuisine ? m.cuisine : null;
+      const mesh = buildBusinessMesh(bt, s, cuisine);
+      mesh.rotation.x = -Math.PI / 2;   // authored +Z sky -> +Y up on the flat tile
+      const holder = new THREE.Group();
+      holder.rotation.y = [0, Math.PI / 2, Math.PI, -Math.PI / 2][idx % 4];
+      // v1.17 free placement: honor the player's chosen spot when the
+      // plot is on the active world (scaled into tile space).
+      let spot = _e3dQuadrant(idx);
+      const sp = savedPos[idx];
+      if (sp && sizeA && isFinite(sp.u) && isFinite(sp.w)) {
+        spot = {
+          x: Math.max(-0.44, Math.min(0.44, (sp.u / sizeA) * 0.42)),
+          z: Math.max(-0.44, Math.min(0.44, (sp.w / sizeA) * 0.42)) };
+      }
+      holder.position.set(spot.x, 0.13, spot.z);
+      holder.add(mesh);
+      tile.add(holder);
+      if (mesh.userData.fx) E3D.fxList.push(mesh.userData.fx);
+    });
+
+    // — empty plot: a gold claim stake —
+    if (!types.length) {
+      const stake = new THREE.Mesh(E3D.geo.stake, E3D.stakeMat);
+      stake.position.y = 0.13 + 0.17;
+      tile.add(stake);
+      E3D.markers.push(stake);
+    }
+
+    // — rented: floating gold gem —
+    let gem = null;
+    if (rented) {
+      gem = new THREE.Mesh(E3D.geo.gem, E3D.gemMat);
+      gem.position.set(0, 0.85, 0);
+      tile.add(gem);
+      E3D.gems.push({ obj: gem, ph: i * 1.3 });
+    }
+
+    // income/s for the dossier (same math as My Land)
+    const prod = plotProductionInfo(id);
+    let income = 0;
+    for (const t of types) {
+      const bt = getBusinessType(t);
+      if (bt && prod) income += bt.rate * prod.areaMultiplier * regionBonusById(bt.id, prod.region);
+    }
+    const rate = plotRentRate(id);
+
+    group.add(tile);
+    E3D.tiles.push({
+      id, info, grade, rented, types, income, rate, prod,
+      group: tile, top, topMat, rimMat, gem,
+      _emi0: topMat.emissive.getHex(),
+    });
+  });
+
+  if (E3D.ground) { E3D.scene.remove(E3D.ground); E3D.ground.geometry.dispose(); E3D.ground.material.dispose(); }
+  const span = Math.max(cols, rows) * PITCH;
+  const gMat = new THREE.MeshStandardMaterial({ color: 0x0a0f16, roughness: 1, metalness: 0 });
+  E3D.ground = new THREE.Mesh(new THREE.CircleGeometry(span * 1.35, 48), gMat);
+  E3D.ground.rotation.x = -Math.PI / 2;
+  E3D.ground.position.y = -0.06;
+  E3D.scene.add(E3D.ground);
+
+  const box = new THREE.Box3().setFromObject(group);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.z, 2);
+  E3D.camera.position.set(center.x + maxDim * 0.5, center.y + maxDim * 0.95, center.z + maxDim * 1.05);
+  E3D.controls.target.copy(center);
+  E3D.controls.minDistance = maxDim * 0.35;
+  E3D.controls.maxDistance = maxDim * 4;
+  E3D.controls.update();
+
+  estate3dRenderSide(hidden);
+}
+
+// ---- side panel ---------------------------------------------------
+function estate3dRenderSide(hiddenNote) {
+  const planet = PLANET_BY_ID[E3D.planetId];
+  const tiles = E3D.tiles;
+  let land = 0, rent = 0, inc = 0, nb = 0;
+  for (const t of tiles) {
+    land += t.info.landValue;
+    if (t.rented) rent += t.rate;
+    inc += t.income;
+    nb += t.types.length;
+  }
+  const note = hiddenNote ? `<div class="e3d-note">showing ${tiles.length} of ${tiles.length + hiddenNote} plots — developed land first</div>` : '';
+  let sel = '';
+  const t = E3D.selected;
+  if (t) {
+    const bizRows = t.types.map(x => {
+      const bt = getBusinessType(x);
+      if (!bt) return '';
+      const r = t.prod ? (bt.rate * t.prod.areaMultiplier * regionBonusById(bt.id, t.prod.region)) : bt.rate;
+      return `<div class="e3d-biz"><span>${bt.icon} ${bt.name}</span><b>+${r.toFixed(2)}/s</b></div>`;
+    }).join('');
+    sel = `
+      <div class="e3d-sel">
+        <div class="e3d-sel-name">${t.info.name} <span class="grade-chip" style="color:${t.grade.tier.color}">${t.grade.tier.g}</span></div>
+        <div class="e3d-sel-stats">
+          land value <b style="color:#f2c14e">$${t.info.landValue.toLocaleString()}</b> · income <b style="color:#7fffd4">+$${t.income.toFixed(1)}/s</b><br>
+          ${t.rented ? `rented — <b style="color:#f2c14e">$${t.rate.toLocaleString()}/min</b>` : 'not rented out'} · resale <b>$${t.info.refund.toLocaleString()}</b>
+        </div>
+        ${bizRows ? `<div class="e3d-bizlist">${bizRows}</div>` : '<div class="e3d-sel-stats" style="margin-top:8px">empty land — build or rent</div>'}
+        ${t.grade.factors.length ? `<div class="e3d-sel-stats" style="margin-top:8px;color:#8b95a1">grade ${t.grade.tier.g} · ${t.grade.factors.join(' · ')}</div>` : ''}
+      </div>`;
+  }
+  document.getElementById('estate3d-side').innerHTML = `
+    <div class="e3d-side-head">${planet.icon} ${planet.name.toUpperCase()}</div>
+    <div class="e3d-side-stats">
+      <b style="color:#f2c14e">${tiles.length}</b> plots · <b style="color:#f2c14e">$${land.toLocaleString()}</b> land<br>
+      <b style="color:#7fffd4">+$${inc.toFixed(1)}/s</b> income · ${nb} businesses${rent ? ` · <b style="color:#f2c14e">$${rent.toLocaleString()}/min</b> rent` : ''}
+    </div>
+    ${note}
+    ${sel || '<div class="e3d-sel-stats" style="padding:14px 0">Click a tile in the diorama to open its dossier.</div>'}
+    <div class="e3d-side-hint">drag to orbit · scroll to zoom<br>click a tile to inspect</div>`;
+}
+
+// ---- tabs ---------------------------------------------------------
+function estate3dRenderTabs() {
+  const counts = {};
+  for (const id of STATE.owned) {
+    const pid = planetOfPlotId(id).id;
+    counts[pid] = (counts[pid] || 0) + 1;
+  }
+  const pids = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+  document.getElementById('estate3d-tabs').innerHTML = pids.map(pid => {
+    const p = PLANET_BY_ID[pid];
+    const act = pid === E3D.planetId;
+    return `<button class="e3d-tab${act ? ' active' : ''}" onclick="estate3dShowPlanet('${pid}')">${p.icon} ${p.name}<span>${counts[pid]}</span></button>`;
+  }).join('');
+}
+
+// ---- open / close / switch ---------------------------------------
+window.openEstate3D = function() {
+  if (E3D.open) return;
+  if (!gameInitialized) { showToast('Enter the world first', false); return; }
+  if (!STATE.owned.size) { showToast('You don\'t own any plots yet — buy land first', false); return; }
+  E3D.open = true;
+  document.getElementById('estate3d-modal').classList.add('show');
+
+  // Fresh scene graph each open (renderer recreated: WebGL contexts are
+  // a finite resource, so nothing leaks between opens).
+  const stage = document.getElementById('estate3d-stage');
+  E3D.scene = new THREE.Scene();
+  E3D.scene.background = new THREE.Color(0x05070d);
+  E3D.camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.1, 400);
+  E3D.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  E3D.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  E3D.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  E3D.renderer.toneMappingExposure = 1.05;
+  stage.appendChild(E3D.renderer.domElement);
+
+  // lights: soft ambient + a sun riding the camera's shoulder (the
+  // diorama stays evenly lit from every orbit angle, just like the globe)
+  E3D.scene.add(new THREE.AmbientLight(0x8fa3b8, 0.85));
+  E3D.dirLight = new THREE.DirectionalLight(0xfff2d8, 1.7);
+  E3D.dirLight.position.set(3, 5, 3);
+  E3D.scene.add(E3D.dirLight);
+
+  // starfield backdrop
+  const starGeo = new THREE.BufferGeometry();
+  const pos = new Float32Array(900 * 3);
+  for (let i = 0; i < 900; i++) {
+    const r = 60 + Math.random() * 40;
+    const th = Math.random() * Math.PI * 2;
+    const ph = Math.acos(2 * Math.random() - 1);
+    pos[i * 3] = r * Math.sin(ph) * Math.cos(th);
+    pos[i * 3 + 1] = r * Math.cos(ph);
+    pos[i * 3 + 2] = r * Math.sin(ph) * Math.sin(th);
+  }
+  starGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  E3D.stars = new THREE.Points(starGeo, new THREE.PointsMaterial({
+    color: 0xaac8ff, size: 0.8, sizeAttenuation: true, transparent: true, opacity: 0.8 }));
+  E3D.scene.add(E3D.stars);
+
+  // shared per-open resources: geometries and static materials used by
+  // every tile (only the per-tile terrain/rim materials are per-instance,
+  // because hover and grade rims tint them individually).
+  E3D.geo = {
+    rim:  new THREE.BoxGeometry(1.20, 0.09, 1.20),
+    top:  new THREE.BoxGeometry(1.06, 0.07, 1.06),
+    stake: new THREE.ConeGeometry(0.13, 0.34, 4),
+    gem:  new THREE.OctahedronGeometry(0.13),
+  };
+  E3D.stakeMat = new THREE.MeshStandardMaterial({
+    color: 0xf2c14e, roughness: 0.35, metalness: 0.6,
+    emissive: 0x6b5314, emissiveIntensity: 0.8 });
+  E3D.gemMat = new THREE.MeshStandardMaterial({
+    color: 0xf2c14e, roughness: 0.15, metalness: 0.85,
+    emissive: 0x8a6a18, emissiveIntensity: 0.9 });
+
+  // selection pin (a gold marker above the selected tile)
+  const pinMat = new THREE.MeshStandardMaterial({
+    color: 0xf2c14e, roughness: 0.2, metalness: 0.8,
+    emissive: 0x8a6a18, emissiveIntensity: 1 });
+  E3D.pin = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.4, 4), pinMat);
+  E3D.pin.rotation.x = Math.PI;      // point down at the tile
+  E3D.pin.visible = false;
+  E3D.scene.add(E3D.pin);
+
+  E3D.raycaster = new THREE.Raycaster();
+  E3D.ndc = new THREE.Vector2();
+
+  E3D.controls = new OrbitControls(E3D.camera, E3D.renderer.domElement);
+  E3D.controls.enableDamping = true;
+  E3D.controls.dampingFactor = 0.08;
+  E3D.controls.maxPolarAngle = 1.45;   // never dive under the floor
+  E3D.controls.autoRotate = true;
+  E3D.controls.autoRotateSpeed = 0.55;
+
+  // pointer plumbing: hover + click-vs-drag discrimination
+  const el = E3D.renderer.domElement;
+  el.addEventListener('pointermove', e => {
+    E3D.pointerPx = { x: e.clientX, y: e.clientY };
+    E3D.pointerDirty = true;
+  });
+  el.addEventListener('pointerdown', e => { E3D.downX = e.clientX; E3D.downY = e.clientY; });
+  el.addEventListener('click', e => {
+    if (Math.abs(e.clientX - E3D.downX) + Math.abs(e.clientY - E3D.downY) > 6) return; // was a drag
+    E3D.pointerPx = { x: e.clientX, y: e.clientY };
+    estate3dPick(true);
+  });
+
+  E3D.resizeFn = () => estate3dResize();
+  window.addEventListener('resize', E3D.resizeFn);
+  estate3dResize();
+
+  // default planet: the one holding the most land
+  const counts = {};
+  for (const id of STATE.owned) {
+    const pid = planetOfPlotId(id).id;
+    counts[pid] = (counts[pid] || 0) + 1;
+  }
+  const best = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+  E3D.planetId = best;
+  estate3dRenderTabs();
+  estate3dBuildTiles(best);
+
+  E3D.raf = requestAnimationFrame(estate3dLoop);
+};
+
+window.closeEstate3D = function() {
+  if (!E3D.open) return;
+  cancelAnimationFrame(E3D.raf);
+  window.removeEventListener('resize', E3D.resizeFn);
+  if (E3D.controls) { E3D.controls.dispose(); E3D.controls = null; }
+  estate3dDisposeTiles();
+  if (E3D.stars) { E3D.scene.remove(E3D.stars); E3D.stars.geometry.dispose(); E3D.stars.material.dispose(); E3D.stars = null; }
+  if (E3D.ground) { E3D.scene.remove(E3D.ground); E3D.ground.geometry.dispose(); E3D.ground.material.dispose(); E3D.ground = null; }
+  if (E3D.pin) { E3D.scene.remove(E3D.pin); E3D.pin.geometry.dispose(); E3D.pin.material.dispose(); E3D.pin = null; }
+  if (E3D.geo) {
+    for (const k in E3D.geo) E3D.geo[k].dispose();
+    E3D.geo = null;
+  }
+  if (E3D.stakeMat) { E3D.stakeMat.dispose(); E3D.stakeMat = null; }
+  if (E3D.gemMat) { E3D.gemMat.dispose(); E3D.gemMat = null; }
+  if (E3D.renderer) {
+    E3D.renderer.dispose();
+    if (E3D.renderer.domElement.parentNode) E3D.renderer.domElement.parentNode.removeChild(E3D.renderer.domElement);
+    E3D.renderer = null;
+  }
+  E3D.scene = null; E3D.camera = null; E3D.dirLight = null;
+  E3D.open = false; E3D.planetId = null;
+  document.getElementById('estate3d-modal').classList.remove('show');
+  document.getElementById('estate3d-tooltip').style.display = 'none';
+};
+
+window.estate3dShowPlanet = function(pid) {
+  if (!E3D.open || pid === E3D.planetId) return;
+  E3D.planetId = pid;
+  estate3dRenderTabs();
+  estate3dBuildTiles(pid);
+};
+
+// ---- teardown of the tile set (planet switch keeps the renderer) --
+function estate3dDisposeTiles() {
+  if (!E3D.tileGroup) return;
+  // collect business roots FIRST, then dispose (mutating the graph
+  // mid-traverse would skip siblings)
+  const bizRoots = [];
+  E3D.tileGroup.traverse(o => { if (o.userData && o.userData.businessId) bizRoots.push(o); });
+  for (const bm of bizRoots) disposeBusinessMesh(bm);
+  for (const t of E3D.tiles) {
+    t.topMat.dispose();      // geometries are shared per-open (E3D.geo)
+    t.rimMat.dispose();
+  }
+  E3D.scene.remove(E3D.tileGroup);
+  E3D.tileGroup = null;
+  E3D.tiles = []; E3D.fxList = []; E3D.gems = []; E3D.markers = [];
+  if (E3D.pin) E3D.pin.visible = false;
+  E3D.hovered = null; E3D.selected = null;
+}
+
+// ---- picking ------------------------------------------------------
+function estate3dPick(isClick) {
+  if (!E3D.renderer) return;
+  const rect = E3D.renderer.domElement.getBoundingClientRect();
+  E3D.ndc.x = ((E3D.pointerPx.x - rect.left) / rect.width) * 2 - 1;
+  E3D.ndc.y = -((E3D.pointerPx.y - rect.top) / rect.height) * 2 + 1;
+  E3D.raycaster.setFromCamera(E3D.ndc, E3D.camera);
+  const meshes = E3D.tiles.map(t => t.top);
+  const hits = E3D.raycaster.intersectObjects(meshes, false);
+  const tip = document.getElementById('estate3d-tooltip');
+
+  if (hits.length) {
+    const t = E3D.tiles[hits[0].object.userData.tileIndex];
+    if (isClick) {
+      E3D.selected = t;
+      E3D.pin.visible = true;
+      const wp = t.group.position;
+      E3D.pin.position.set(wp.x, 1.15, wp.z);
+      estate3dRenderSide();
+      E3D.controls.autoRotate = false;   // stop drifting while inspecting
+    } else if (E3D.hovered !== t) {
+      if (E3D.hovered) E3D.hovered.topMat.emissive.setHex(E3D.hovered._emi0);
+      E3D.hovered = t;
+      t.topMat.emissive.setHex(0x1c3f4f);
+      document.body.style.cursor = 'pointer';
+    }
+    if (!isClick) {
+      tip.style.display = 'block';
+      tip.innerHTML = `<b>${t.info.name}</b> · grade <b style="color:${t.grade.tier.color}">${t.grade.tier.g}</b> · ${t.types.length} business${t.types.length === 1 ? '' : 'es'}${t.rented ? ' · <b style="color:#f2c14e">rented</b>' : ''}`;
+      const st = document.getElementById('estate3d-stage').getBoundingClientRect();
+      tip.style.left = Math.max(8, Math.min(E3D.pointerPx.x - st.left + 16, st.width - 250)) + 'px';
+      tip.style.top = Math.max(8, E3D.pointerPx.y - st.top + 18) + 'px';
+    }
+  } else {
+    if (isClick) {
+      // click on empty space: release the inspection — the slow orbit resumes
+      E3D.controls.autoRotate = true;
+    } else {
+      if (E3D.hovered) { E3D.hovered.topMat.emissive.setHex(E3D.hovered._emi0); E3D.hovered = null; }
+      document.body.style.cursor = '';
+      tip.style.display = 'none';
+    }
+  }
+}
+
+// ---- resize -------------------------------------------------------
+function estate3dResize() {
+  if (!E3D.renderer) return;
+  const stage = document.getElementById('estate3d-stage');
+  const w = Math.max(1, stage.clientWidth), h = Math.max(1, stage.clientHeight);
+  E3D.camera.aspect = w / h;
+  E3D.camera.updateProjectionMatrix();
+  E3D.renderer.setSize(w, h);
+}
+
+// ---- render loop --------------------------------------------------
+function estate3dLoop() {
+  E3D.raf = requestAnimationFrame(estate3dLoop);
+  if (!E3D.renderer) return;
+  const t = performance.now() * 0.001;
+
+  E3D.controls.update();
+  E3D.dirLight.position.copy(E3D.camera.position);
+
+  // per-instance fx — same math as updateBizFx() on the globe
+  for (const fx of E3D.fxList) {
+    for (const f of fx.flames) {
+      const k = 1 + 0.26 * Math.sin(t * 11 + f.ph) + 0.12 * Math.sin(t * 23 + f.ph * 2);
+      f.spr.scale.set(f.w * k, f.h * (1.55 - k * 0.32), 1);
+    }
+    for (const st of fx.strobes) st.spr.visible = (((t * st.freq + st.ph) % 1) + 1) % 1 < st.duty;
+    for (const sp of fx.spins) sp.o.rotation.y = t * sp.v + sp.ph;
+  }
+  // living details: gems bob, stakes slowly turn, the pin hovers
+  for (const g of E3D.gems) g.obj.position.y = 0.85 + 0.07 * Math.sin(t * 2 + g.ph);
+  for (const mk of E3D.markers) mk.rotation.y = t * 0.8;
+  if (E3D.pin && E3D.pin.visible) E3D.pin.position.y = 1.15 + 0.06 * Math.sin(t * 3);
+  E3D.stars.rotation.y = t * 0.008;
+
+  if (E3D.pointerDirty) { E3D.pointerDirty = false; estate3dPick(false); }
+  E3D.renderer.render(E3D.scene, E3D.camera);
 }
 
 // Debug/QA helper: open a plot card straight from its plot id (used by
@@ -15647,6 +16193,7 @@ window.addEventListener('keydown', (e) => {
     window.closeMyPlots();
     window.closeUpdatePopup();
     window.closeSupport();
+    window.closeEstate3D();
     if (STATE.multiBuy) window.toggleMultiBuy();
   }
 });
