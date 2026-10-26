@@ -3,67 +3,32 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Open World</title>
-<meta name="description" content="Open World — claim plots, build businesses, trade on a living market, conquer the globe.">
+<title>Open World — Earth Edition</title>
 <style>
-/* The owner's home-screen design (repo main branch) — kept as built. */
-:root{color-scheme:dark;--paper:#f0ead7;--gold:#edc86f}
-*{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#08141d}
-body{font-family:Georgia,"Times New Roman",serif;color:var(--paper)}
-button{font:inherit}
-.screen{position:relative;width:100vw;height:100vh;overflow:hidden;background:#08141d}
-.artwork{position:absolute;top:50%;left:50%;width:max(100vw,150vh);height:max(100vh,66.6667vw);transform:translate(-50%,-50%)}
-.hero-image{display:block;width:100%;height:100%}
-.hit{position:absolute;z-index:10;border:0;background:transparent;cursor:pointer;border-radius:4px}
-.hit:hover,.hit:focus-visible{background:rgba(80,240,220,.08);box-shadow:0 0 28px rgba(80,240,220,.22);outline:none}
-.play{left:5.5%;top:45.8%;width:30%;height:11%}
-.settings-hit{left:5.5%;top:58.5%;width:29%;height:11%}
-.modal{display:none;position:absolute;inset:0;z-index:30;align-items:center;justify-content:center;background:rgba(0,0,0,.78);backdrop-filter:blur(8px)}
-.modal.open{display:flex}
-.panel{width:min(520px,86vw);padding:38px;border:1px solid #7897a0;border-radius:10px;background:linear-gradient(145deg,#0b1d29,#08131d);box-shadow:0 25px 80px rgba(0,0,0,.82);color:#fff}
-.panel h2{margin:0 0 12px;color:#f5cc74;font-size:36px}
-.panel p{margin:0 0 24px;font:400 16px/1.7 Arial,sans-serif;color:#cbd7dc}
-.close{padding:11px 25px;border:1px solid #73929b;border-radius:5px;background:#14323c;color:white;cursor:pointer;font-size:16px}
-.close:hover{background:#1a404b}
-.build-pill{position:absolute;top:16px;left:16px;z-index:10;padding:6px 11px;border:1px solid rgba(236,226,194,.4);border-radius:3px;background:rgba(15,33,24,.78);color:#f1e7c9;font:700 10px/1 Arial,sans-serif;letter-spacing:1.6px;text-transform:uppercase}
-/* Portrait/narrow screens: fit the art's width (cinematic letterbox) so the
-   PLAY/SETTINGS buttons baked into the art stay on-screen and clickable. */
-@media (max-aspect-ratio: 4/3){
-  .artwork{width:100vw;height:66.6667vw}
-}
+  html,body{margin:0;padding:0;height:100%;background:#05070b;color:#e6edf3;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}
+  .wrap{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+  .mark{font-weight:900;font-size:34px;letter-spacing:1px;color:#f2f6fa}
+  .mark span{color:#f2c14e}
+  .sub{font-size:11px;letter-spacing:3px;color:#8b95a1;font-weight:700}
+  a{color:#f2c14e;text-decoration:none;border:1px solid rgba(242,193,78,.45);border-radius:4px;
+    padding:10px 22px;font-weight:800;letter-spacing:1.2px;font-size:12px;background:rgba(242,193,78,.08)}
+  a:hover{background:rgba(242,193,78,.16)}
 </style>
 </head>
 <body>
-<main class="screen" id="homeScreen">
-  <div class="artwork">
-    <img class="hero-image" src="assets/home-screen.webp?v=2" alt="Open World cinematic home screen">
-    <button class="hit play" type="button" aria-label="Play" onclick="startGame()"></button>
-    <button class="hit settings-hit" type="button" aria-label="Settings" onclick="openSettings()"></button>
-  </div>
-  <div class="build-pill">Build v1.33</div>
-  <div class="modal" id="settings">
-    <div class="panel">
-      <h2>Settings</h2>
-      <p>Your adventure settings will live here as the game is built.</p>
-      <button class="close" onclick="closeSettings()">CLOSE</button>
-    </div>
-  </div>
-</main>
+<div class="wrap">
+  <div class="mark">OPEN <span>WORLD</span></div>
+  <div class="sub">EARTH EDITION</div>
+  <a href="index.html">ENTER THE WORLD →</a>
+</div>
 <script>
-// PLAY enters the real game (the 3D open world). The play-intent flag tells
-// the game this visit came from the title screen, so after login you drop
-// straight into the world instead of a second home screen.
-function startGame() {
-  try { sessionStorage.setItem('openworld_play_intent', '1'); } catch (e) {}
-  window.location.href = 'openworld.html';
-}
-function openSettings() { document.getElementById('settings').classList.add('open'); }
-function closeSettings() { document.getElementById('settings').classList.remove('open'); }
-// Keyboard: Enter plays — same as the art's PLAY button.
-window.addEventListener('keydown', function (e) {
-  if (e.key === 'Enter' && !document.getElementById('settings').classList.contains('open')) startGame();
-});
+// v1.34 — the cinematic title screen gave way to the commander's home
+// page. Redirect with a cache-buster so every cached copy of this page
+// converges on the FRESH homepage — no stale redirect loops possible.
+try {
+  location.replace('index.html?t=' + Date.now());
+} catch (e) {}
 </script>
 </body>
 </html>
