@@ -1530,7 +1530,7 @@ input,select,textarea{font-family:var(--cr-mono)}
       <button class="ow-chip-btn ow-chip-logout" onclick="logout()">⏻ Logout</button>
     </div>
   </div>
-  <div class="ow-build-pill">Build v1.39</div>
+  <div class="ow-build-pill">Build v1.40</div>
 
   <div class="modal" id="settings">
     <div class="panel">
@@ -1926,11 +1926,9 @@ function applyQualityChange() {
     starField.material.dispose();
     buildStarField();
   }
-  if (earth) {
-    earth.geometry.dispose();
-    earth.geometry = new THREE.SphereGeometry(EARTH_RADIUS, q.earthSegments, q.earthSegments);
-    try { Nature.onQualityChange(); } catch (e) {}   // v1.39 — terrain for Earth, sphere elsewhere
-  }
+  // v1.40 — the flat world's chunks are resolution-independent; nothing
+  // to rebuild on quality change (the old sphere/Nature terrain was
+  // quality-driven)
   if (atmosphere) {
     atmosphere.geometry.dispose();
     atmosphere.geometry = new THREE.SphereGeometry(EARTH_RADIUS * 1.034, q.atmoSegments, q.atmoSegments);
@@ -1996,11 +1994,11 @@ const STATE = {
   lastProductionTime: 0,        // timestamp of last production tick
   marketUpdateInterval: 15 * 60 * 1000,  // 15 minutes in ms (v1.4 slow pacing)
   radius: 1.0,                // Earth radius in scene units
-  zoomMin: 1.035,             // v1.39 — from orbit all the way down among the trees
-  zoomMax: 7.5,               // farthest — full orbital sector view with rings and ships
-  zoomTarget: 2.2,             // matches the default camera distance (low orbit)
-  plotRevealDist: 3.3,        // camera distance at which plots begin to appear
-  plotFullDist: 2.0,          // camera distance at which plots are fully visible
+  zoomMin: 6,                 // v1.40 — flat map: down among the treetops
+  zoomMax: 5200,              // farthest — the whole Earth in view
+  zoomTarget: 620,             // matches the default camera altitude (map view)
+  plotRevealDist: 1500,       // camera altitude at which plots begin to appear
+  plotFullDist: 300,          // camera altitude at which plots are fully visible
   // Convert scene units to km for display. Earth radius ≈ 6371 km.
   unitToKm: 6371,
   // PLANETS — the active world and the ones this account has bought into.
@@ -3900,7 +3898,7 @@ function getPlotOwner(plotId) {
 // territory stays readable for war.
 // --------------------------------------------------------------------
 function setOwnedPlotLook(p, mine) {
-  try { Nature.refreshPlot(p); } catch (e) {}   // v1.39 — keep forests off claimed land
+  try { FW.refreshPlot(p); } catch (e) {}   // v1.40 — keep forests off claimed land
   if (mine) {
     setPlotColors(p, p.userData.baseColor, plotBaseOutline(p));
   } else {
@@ -4490,7 +4488,7 @@ function addBusinessToPlot(plot, bt, index, customPos, opts) {
   // v1.21: buildings sized for the smaller grid-v2 parcels (plots are
   // ~0.61× their old linear size; buildings follow, slightly tighter
   // still so the little plots read clearly)
-  const bizScale = Math.max(0.0075, Math.min(0.019, plot.userData.areaMultiplier * 0.0095));
+  const bizScale = Math.max(5.5, Math.min(12, plot.userData.areaMultiplier * 7.5));
   const _opts = opts || {};
   // v1.25 — cuisine: explicit choice → the stored meta (reload/capture)
   let _cuisine = _opts.cuisine || null;
@@ -4506,16 +4504,11 @@ function addBusinessToPlot(plot, bt, index, customPos, opts) {
   const offset = (posSrc && typeof posSrc.u === 'number' && isFinite(posSrc.u) && typeof posSrc.w === 'number' && isFinite(posSrc.w))
     ? clampUWToPlot(plot, posSrc.u, posSrc.w, 0)
     : getBusinessOffset(index, Math.max(total, plot.userData.maxBusinesses), plot.userData.sizeA);
-  const centroidPos = plot.userData.localDir.clone().multiplyScalar(EARTH_RADIUS * 1.006);
-  // Build tangent basis at plot location
-  const p_i = plot.userData.localDir;
-  const ref = Math.abs(p_i.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-  const uAxis = new THREE.Vector3().crossVectors(p_i, ref).normalize();
-  const wAxis = new THREE.Vector3().crossVectors(p_i, uAxis).normalize();
-  const pos = centroidPos.clone()
-    .addScaledVector(uAxis, offset.u)
-    .addScaledVector(wAxis, offset.w);
-  bizMesh.lookAt(pos.clone().multiplyScalar(2));
+  // v1.40 — flat map: u → east (+x), w → north (−z) from the plot centroid
+  const bx = plot.userData.wx + offset.u * FW.RAD2U;
+  const bz = plot.userData.wz - offset.w * FW.RAD2U;
+  const pos = new THREE.Vector3(bx, FW.groundY(bx, bz) + bizScale * 0.08, bz);
+  bizMesh.rotation.set(0, Math.PI, 0);   // stand upright, front to the default view
   bizMesh.position.copy(pos);
   // Business meshes never move again — freeze the matrix so the
   // renderer skips per-frame matrix updates for them.
@@ -4553,19 +4546,13 @@ function addBusinessToPlot(plot, bt, index, customPos, opts) {
 const _PLACE_Z = new THREE.Vector3(0, 0, 1);
 let placeGhost = null;
 
-function plotTangentBasis(plot) {
-  const p_i = plot.userData.localDir;
-  const ref = Math.abs(p_i.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-  const uAxis = new THREE.Vector3().crossVectors(p_i, ref).normalize();
-  const wAxis = new THREE.Vector3().crossVectors(p_i, uAxis).normalize();
-  return { uAxis, wAxis };
-}
-
-// World-space point (a raycast hit) → tangent-plane (u,w) on the plot
+// v1.40 — flat map: plots use a fixed compass basis (u = east, w = north),
+// so no per-plot tangent basis is needed anymore
 function worldPointToPlotUW(plot, worldPoint) {
-  const { uAxis, wAxis } = plotTangentBasis(plot);
-  const local = earth.worldToLocal(worldPoint.clone()).normalize();
-  return { u: local.dot(uAxis), w: local.dot(wAxis) };
+  return {
+    u: (worldPoint.x - plot.userData.wx) / FW.RAD2U,
+    w: (plot.userData.wz - worldPoint.z) / FW.RAD2U
+  };
 }
 
 // Point-in-polygon on the plot's tangent-plane cell (ray-cast method)
@@ -4602,17 +4589,17 @@ function clampUWToPlot(plot, u, w, inset) {
   return { u: u * k, w: w * k };
 }
 
-// Tangent-plane (u,w) → the earth-local 3D position buildings/ghosts sit at
+// Tangent-plane (u,w) → the flat-map 3D position buildings/ghosts sit at
 function plotUWToWorld(plot, u, w) {
-  const { uAxis, wAxis } = plotTangentBasis(plot);
-  return plot.userData.localDir.clone().multiplyScalar(EARTH_RADIUS * 1.006)
-    .addScaledVector(uAxis, u).addScaledVector(wAxis, w);
+  const x = plot.userData.wx + u * FW.RAD2U;
+  const z = plot.userData.wz - w * FW.RAD2U;
+  return new THREE.Vector3(x, FW.groundY(x, z) + 0.1, z);
 }
 
-// Stand an object upright on the globe at an earth-local position (the
-// same orientation addBusinessToPlot gives meshes — parent-safe)
+// v1.40 — flat world: objects stand upright (any Y rotation is kept)
 function orientToSurface(obj, localPos) {
-  obj.quaternion.setFromUnitVectors(_PLACE_Z, localPos.clone().normalize());
+  obj.rotation.x = 0;
+  obj.rotation.z = 0;
 }
 
 // --- ghost marker: pulsing ring + beam showing the pending spot ---
@@ -4623,9 +4610,10 @@ function buildPlaceGhost() {
   const dotMat = new THREE.MeshBasicMaterial({ color: 0xf5cc74, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false });
   const dot = new THREE.Mesh(new THREE.CircleGeometry(0.16, 20), dotMat);
   const beamMat = new THREE.MeshBasicMaterial({ color: 0xf5cc74, transparent: true, opacity: 0.55, depthWrite: false });
+  ring.rotation.x = -Math.PI / 2;    // v1.40 — ring + dot lie flat on the ground
+  dot.rotation.x = -Math.PI / 2;
   const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 1.6, 10, 1, true), beamMat);
-  beam.rotation.x = Math.PI / 2;     // cylinder Y-axis → group +Z (skyward)
-  beam.position.z = 0.8;
+  beam.position.y = 0.8;             // beam stands upright
   placeGhost.add(ring, dot, beam);
   placeGhost.renderOrder = 998;
   placeGhost.visible = false;
@@ -4645,7 +4633,7 @@ function positionPlaceGhost(plot, uw) {
   const pos = plotUWToWorld(plot, uw.u, uw.w);
   placeGhost.position.copy(pos);
   orientToSurface(placeGhost, pos);
-  const bizScale = Math.max(0.0075, Math.min(0.019, plot.userData.areaMultiplier * 0.0095));
+  const bizScale = Math.max(5.5, Math.min(12, plot.userData.areaMultiplier * 7.5));
   placeGhost.userData._base = bizScale * 1.15;   // ring ≈ the building's footprint
   placeGhost.scale.setScalar(placeGhost.userData._base);
   placeGhost.visible = true;
@@ -4662,7 +4650,7 @@ function beginPlacement(opts) {
   setPlaceGhostColor(opts.mode === 'move' ? 0x39e0ff : 0xf5cc74);
   // Too far out to see the plots? Glide in so the placement click can land
   const dist = camera.position.distanceTo(controls.target);
-  if (dist > STATE.plotRevealDist) STATE.zoomTarget = STATE.plotFullDist;
+  if (dist > STATE.plotRevealDist) STATE.zoomTarget = Math.min(STATE.plotFullDist, 170);   // v1.40 — glide in close enough to place precisely
   updatePlaceBanner();
   renderer.domElement.style.cursor = 'crosshair';
 }
@@ -6023,8 +6011,13 @@ window.WarFx = WarFx;
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.39';
+const GAME_VERSION = 'v1.40';
 const RELEASE_NOTES = [
+  { v: 'v1.40', items: [
+    '🗺 <b>The whole Earth, one great map</b> — the world is no longer a ball you circle: it is the real Earth laid out as one huge natural map, built from real land data. Real continents and coastlines, mountain ranges where the real ones stand, climate-colored terrain — park greens, forests, savanna, deserts, boreal belts, tundra and ice — and <b>naturally generated lakes</b> dotted across the land. It is all generated from one fixed seed, so every player walks the exact same world, every visit: the same mountains, the same forests, the same lakes.',
+    '🔍 <b>Zoom from orbit to the treetops</b> — one smooth scroll now carries you from the whole Earth in view all the way down to standing among the trees. The view pans like a map, zooms toward the point under your cursor, and the terrain detail refines as you descend, with forests rising around you.',
+    '🧭 <b>A map, not an orbit</b> — the camera, radar and HUD are rebuilt for map navigation: the radar sweeps the land around your position, the coordinates read your live latitude/longitude over the map, the altitude meter tracks your height over the terrain — and Luna, Mars and Oceanus are flat generated worlds of their own (craters, dunes and a world-ocean with reef islets).'
+  ]},
   { v: 'v1.39', items: [
     '🌍 <b>A natural Earth</b> — the world is no longer a photo from orbit: it is <b>generated terrain</b> now — rolling green hills, sandy shores, snowy mountain ranges and <b>naturally generated lakes</b>, all deterministic (the same world for every player, every visit). <b>Real forests</b> grow across the continents — trees thicken as you descend, and your own land stays clear so you can keep building. The globe still reads as Earth: real coastlines, deserts, boreal belts and ice caps. And you can <b>zoom in much, much farther</b> — from orbit all the way down to walking among the trees, with terrain detail that refines as you descend.',
     '🛣 <b>Roads retired</b> — the natural world has no roads and no generated buildings. The road builder is retired from the plot panel (existing save data is kept safely).'
@@ -8858,46 +8851,1014 @@ try {
   };
 } catch (e) {}
 
+// ====================================================================
+// FLAT WORLD (v1.40) — the real Earth as one great natural map.
+// The planet ball is retired: every world is now a flat terrain map
+// rendered from real land data (Natural Earth, public domain — 720×360
+// half-degree cells, bit-packed below) plus deterministic fBm relief,
+// hand-placed mountain ranges where the real ones stand, naturally
+// generated lakes, climate-colored biomes and instanced forests.
+// One fixed seed → the terrain, the trees and the lakes are IDENTICAL
+// for every player on every visit — a shared world you can walk.
+// The camera pans like a map, zooms toward the cursor from the whole
+// Earth in view down among the trees, and tilts as you descend.
+// ====================================================================
+const FW = (() => {
+  // ---------- map constants ----------
+  const DEG = 20;                          // world units per degree
+  const WORLD_X = 3600, WORLD_Z = 1800;    // half-extents (lon ±180, lat ±90)
+  const CH = 200, CNX = 36, CNZ = 18;      // 10° chunks → 36×18 = 648
+  const RAD2U = DEG * 180 / Math.PI;       // tangent-plane radians → map units
+
+  // ---------- built-in land mask (Natural Earth, public domain) ----------
+  // 720 × 360 cells at 0.5°, bit-packed row-major (MSB first).
+  // Cell (gx, gy): lon ∈ [−180 + gx·0.5, …], lat ∈ [90 − (gy+1)·0.5, …]
+  const MASK_W = 720, MASK_H = 360;
+  const MASK_B64 = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD////+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP//////gAAAAH////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB////////gAAB8P/////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH////////A/////////////8A/8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAx////////B/////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/8P//////g/////////////////AAAAAAAAAAAAAAAAAAAAHvgAAAAAAAAAAAAB/8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//+gP///8P///////////////+AAAAAAAAAAAB//+AAAAAAHwAAAAAAAAAAAAAH//gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB////////gAf///////////////AAAAAAAAAD8/n//AAAAAAAAAAAAAAAAAAAAAB//4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABgAAD//3//8AAD///////////////8AAAAAAAAAH//+AAAAAAAAAAAAAAAAAAAAAAAAP/7wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADgA/4+D/////+AP////////////////4AAAAAAAAAD//+AAAAAAAAAAAAAAAAAAAAAAAAAAH/gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB+fgHg///8H/////////////////4AAAAAAAAAAf/x+AAAAAAAAAAAAAAAAAAAAAAAAAf+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAfwAAAB8AH3//AA/////////////////4AAAAAAAAAAB/h/gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/wAAAAAAAAD//4AAB////////////////+AAAAAAAAAAD+AAAAAAAAAAAAAAAAAAAAAAAAAAAB/gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/gAMAAAH/4////AAP////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAB+AAAAAAAAAAH/+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/wfwfAD/4D+AABwAAB////////////////wAAAAAAAAAAAAAAAAAAAAAAAAAAP/+AAAAAAAAAD////+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//H+D/4A/gA+AAAAAAA/////////////4AAAAAAAAAAAAAAAAAAAAAAAAAH/8AAAAAAAAD///////gAAAAAAD//AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///8APx+////wAAAAAAP////////////4AAAAAAAAAAAAAAAAAAAAAAAAD/8AAAAAAAAH////////AAAAAAAD//z+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/wAAAA+P///wAAAAAAB////////////wAAAAAAAAAAAAAAAAAAAAAAAAH/AAAAAAAAB////////gAAAAAAAAcAAPAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/AAAAAAAAAAAAAAAAAAAAA////////////gAAAAAAAAAAAAAAAAAAAAAAAAf4AAAAAAAAD///////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH//wAAAAOM/+AYEQAAAAAAAf///////////wAAAAAAAAAAAAAAAAAAAAAAAB/wAAAAAAA//////////+EAAAAAAAB4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP//mAAHgf5/4fz//4AAAAAAP//////////wAAAAAAAAAAAAAAAAAAAAAAAAB/AAAAAAAB////////////8A/8AAAA/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf//++d+B/8/A///sgAAAAAAD//////////4AAAAAAAAAAAAAAAAAAAAAAAAP+AAAA/xgB////////////////AAADwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//v//+/A/++B///n+AAAAAAH//////////MAAAAAAAAAAAAAAAAAAAAAAAAP4AAAB/xx9////////////////AAAP//8AAAAAAAAAAAAAAAAAAAAAAAAAAAAf/f////gH+eB/////wAAAAAP//////////4AAAAAAAAAAAAAAAAAAAAAAAAf8AAAD/n//////////////////AwAH///gAAAAAAAAA+AAAAAADgAAAAAAAAAD8Af///gAB/g//////gAAAAAf/////////8AAAAAAAAAAAAAAAAAAAAAAAAD+AAAP/v//////////////////x//////8AAAAAAAAAAAAAAAD//wAAAAAAAAAAH////4AB/wf/////8AAAAB7////////9+AAAAAAAAAAAAAAA//gAAAAAAA/gAAf/z////////////////////////////gAAAAAAAAAAAB////+AAAAAAcAAAAf///gB/4A//////wAAAD/////////wAAAAAAAAAAAAAAAz//gAAAAAAAAAAAP/z////////////////////////////wAAAAAAAAAAAD///////AAB//c8B/////w+fwAPhAf//4AAAD//////////gAAAAAAAAAAAAAP///3AAAAAAAAA8AP/3////////////////////////////wAAD/+AAAAAAP////////D/////wf////B/v+QP+AH//8AAAAB////////8AAAAAAAAAAAAAB/////4AAAAAAAAf8D/3///////////////////////////////gAAAf////////////////////////////////////////////////////////////////8AAAAAAH////+/7wA/APAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAD////////////////////////////////////////////////////////////////wAAAAAAA/8P/h4AAADAHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf///////////////////////////////////////////////////////////////AAAAAAAAH+H4AAAAAAAPgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH//////////////////////////////////////////////////////////////+AAAAAAAAD8fgAAAAAAAeAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADD/////////////////////////////////////////////////////////////4AAAAAAQAD/MAAAAAAAB8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf////////////////////////////////////////////////////////////wAAAAAAPwfOAAAAAAAABwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4AAf////////////////////////////////////////////////////////////gAAPwAAH/4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/wP/////////////////////////////////////////////////////////////AAAf4AAH/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH4AH/v////////////////////////f4B////AAAAH///4AAAAAf//wAAAAAAAH///g///8fP/////////////////////////////////////////////+AAAAAAf///////////////////////8f+AwP//wAAAH///4AAAAAH//AAAAAAAAP///j////P//////////////////////////////////////////////4AACAAAP///////////////////////A/vwAB//4AAAD///4AAAAAA/wAAAAAAAA///+P///////////////////////////////////////////////////8AAAeAD///////////////////////+AOAAAA//4AAAB///gAAAAAAAAAAAAAAAH///wf///////////////////////////////////////////////////8AAAAA////////////////////////wAA+AAAH8YAAAAf/+AAAAAAAAAAAAAAAA////A////////////////////////////////////////////////////+AAAAB////////////////////////gAA4d/cAfAAAAAP/+AAAAAAAAAAAAAAAD////A///////////////////////////////////////////////7///+AAAAAD////////////////////////AAAAY//AAAAAAAH//AAAAAAAAAAAAAAAD///+Af//////////////////////////////////////////////z///gAAAAAD///////////////////////+AAAAA//wAAAAAAD/+AAAAAAAAAAAAAAAD///+A/////////////////////////////////////////////gfH//8AAAAAAB/////+/////////////////8AAAAA//+AAAAAAAH8AAAAAAAAAAAAAAAD////A/////////////////////////////////////////////Acf//wAAAAAAe/////8H////////////////4AAAAA//+AIAAAAAB8AAAAAAAAAAAAAAAD////gP4H/////////////////////////////////////////8AB//HAAAAAAAAB///PwAA///////////////4AAAAAf//AcAAAAAAAAAAAAAAAAAAAAAAD////wAAH/////////////////////////////////////////4AH5AAAAAAAAAAB//+MAAAH//////////////4AAAAB///A+AAAAAAAAAAAAAAAAAAAAAAD/3//gB////////////////////////////////////////w8P8AP4AAAAAAAAAAA3//AAAAB///////////////AAAAB///x/AAAAAAAAAAAAAAAAAAAAAAB/j/8AD///////////////////////////////////////wAAAAA/wAAAAAAAAAAAAP8AAAAAP//////////////gAAAA/////gAAAAAAAAAAAAAAAAAAfAAAeD/8AA///////////////////////////////////////AAAAAB/gAAAAAAAAAAAAPzwAAAAAP/////////////gAAAAf////wAAAAAAAAAAAAAAAAAA+AAAAB/8AE//////////////////////////////////////+AAAAAf/wAAAAAAAAAAAAfPgAAAAAP/////////////2AAAAP////4AAAAAAAAAAAAAAAAAA/wAAAd/4A+//////////////////////////////////////4AAAAAf/4AAAAAAAAAAAB8GAAAAAAD//////////////4AAAP////4AAAAAAAAAAAAAAAAAB/wAAD4/4A///////////////////////////////////////gAAAAB//4AAAAAAAAAAAHwAAAAAAAB//////////////+AAAP////4AAAAAAAAAAAAAAAAAA/gAAD8fwA///////////////////////////////////////AAAAAB//4AAAAAAAAAAB/AAAAAAAAB///////////////wAAf/////AAAAAAAAAAAAAAAAAA/4AAD3+AA//////////////////////////////////////8AAAAAB//AAAAAAAAAAAHgAAAAAAAAAf///////////////wB//////gAAAAAAAAAAAAAAAAAP4AADzgAA//////////////////////////////////////wAAAAAD//AAAAAAAAAAA+AAAAAAAAAAP///////////////8P//////+AAAAAAAAAAAAAAAAfv8AABwADn//////////////////////////////////////gAAAAAB//AAAAAAAAAAAAAAAAAAAAAAH///////////////8H///////AAAAAAAAAAAAAAAB/h/AAB84////////////////////////////////////////8QMAAAB/4AAAAAAAAAAAAAAAAAAAAAHj///////////////8D///////gAAAAAAAAAAAAAAD/B/AAD///////////////////////////////////////////+EAAAB/4AAAAAAAAAAAAAAAAAAAAADh///////////////8D///////4AAAAAAAAAAAAAAB/P/gD/////////////////////////////////////////////+AAAB/4AAAAAAAAAAAAAAAAAAAAABh///////////////+D///////4AAAAAAAAAAAAAAB/P/8H/////////////////////////////////////////////+AAAA+AAAAAAAAAAAAAAAAAAAAAAAwP///////////////D///////4AAAAAAAAAAAAAAD+H/8P/////////////////////////////////////////////+AAAA+AAAAAAAAAAAAAAAAAAAAAAAAP///////////////n///////wAAAAAAAAAAAAAABwf/4f/////////////////////////////////////////////eAAAA8AAAAAAAAAAAAAAAAAAAAAAAAP//////////////////////+4AAAAAAAAAAAAAAAAH/5//////////////////////////////////////////////OAAAAYAAAAAAAAAAAAAAAAAAAAAAAAX//////////////////////xwAAAAAAAAAAAAAAAAP+H//////////////////////////////////////////////PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf////////////////////B/DwAAAAAAAAAAAAAAAA6AP//////////////////////////////////////////////PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD3//////////////////+HAD4AAAAAAAAAAAAAAAAAI//////////////////////////////////////////////+PgAAAAAAAAAAAAAAAAAAAAAAAAAAAAB9//////////////////4A4H/wAAAAAAAAAAAAAAAAP//////////////////////////////////////////////+PgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAe//////////////////v8AP/gAAAAAAAAAAAAAAAH///////////////////////////////////////////////+cAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM///////////////////4AP/4AAAAAAAAAAAAAAAP///////////////////////////////////////////////8cAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH///////////////////wAf/4AAAAAAAAAAAAAAAD///////////////////////////////////////////////4MAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/////////////////7/4AAP4AAAAAAAAAAAAAAAAf//////////////////////////////////////////////weAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH///////////////////+DAAwAAAAAAAAAAAAAAAAP////////////z///8B////////////////////////////gfAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD////////////////////3AAAAAAAAAAAAAAAAAAAH//////////z8D///gB////////////////////////////gLAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/////////////////////AAAAAAAAAAAAAAAAAAAH//////////g+H///AB////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///////////////////P8AAAAAAAAAAAAAAAAAAAH////n/////B////8Af///////////////////////////8AYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH//////////////////8/gAAAAAAAAAAAAAAAAAAAH////h////8A8P//4Af///////////////////////////4AcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH//////////////////x8AAAAAAAAAAAAAAAAAAAAH//+/g////8AAB//8B////////////////////////////wAfIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/////////////////+BwAAAAAAAAAAAAAAAAAAAAP//8P4f///8AAA//+Af///////////////////////////gA/4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/////////////////8AAAAAAAAAAAAAAAAAAAA////xwP8H///4AAAP/+Af///////////////////////////AD/4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/////////////////4AAAAAAAAAAAAAAAAAAAB////gBn+B///wAAAD/+AD/////////////////////////+AAH/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/////////////////4AAAAAAAAAAAAAAAAAAAB////gBz/Af//wAAAB//AD/////////////////////////8AAHmAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/////////////////+AAAAAAAAAAAAAAAAAAAB////ABg/4H//4D/AB//gA/////////////////////////wAAHgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH////////////////+AAAAAAAAAAAAAAAAAAAAA///+AAAf8P//8P/4H//wAf////////////////////////wAABgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH////////////////+AAAAAAAAAAAAAAAAAAAAA///wADwD/P/jn//////wAf////////////////////////gAADwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH////////////////wAAAAAAAAAAAAAAAAAAAAA///gADwB9v/j///////8D//////////////////////n//AAAHwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD////////////////wAAAAAAAAAAAAAAAAAAAAB///AADwAcH8B///////wB/////////////////////+Pn8AAADwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD////////////////gAAAAAAAAAAAAAAAAAAAAB///AADwAeD+D///////wB/////////////////////8OD4AAAHwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD////////////////AAAAAAAAAAAAAAAAAAAAAD///gAAAAcB+B///////gA/////////////////////wAD+AAAHgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB////////////////AAAAAAAAAAAAAAAAAAAAAA///AAAAAYA/D///////gA/////////////////////wAH/AAAPgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA///////////////+AAAAAAAAAAAAAAAAAAAAAA//+AAAA/gA/h///////wA/////////////////////8YD/AAAfAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf//////////////+AAAAAAAAAAAAAAAAAAAAAA//4AAA4PgA8A///////8A//////////////////////+AfgAE/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf//////////////+AAAAAAAAAAAAAAAAAAAAAAB/wB//8BgAeAf///////j//////////////////////8A/gAP/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP//////////////+AAAAAAAAAAAAAAAAAAAAAABwA///8AAAAABj5////////////////////////////wA/gAP/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH//////////////+AAAAAAAAAAAAAAAAAAAAAAAwD///8AAAAAAAA////////////////////////////AAfgAf/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////////+AAAAAAAAAAAAAAAAAAAAAAB/////8AAAB+ABx///////////////////////////+AA/g//+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////////4AAAAAAAAAAAAAAAAAAAAAAD/////8AAAAAADh///////////////////////////+AA8B//4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf/////////////gAAAAAAAAAAAAAAAAAAAAAAD/////4AAAAAAAB////////////////////////////gAAH+8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH////////////+AAAAAAAAAAAAAAAAAAAAAAAP/////8AAAAAAAD////////////////////////////gAAOf4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD////////////8AAAAAAAAAAAAAAAAAAAAAAA//////+AAAAAAAD////////////////////////////wAA/6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB////////////4AAAAAAAAAAAAAAAAAAAAAAB///////8AA4AAAH////////////////////////////4AAfYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////////////gAAAAAAAAAAAAAAAAAAAAAAB////////gD+AAAH////////////////////////////4AAPAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////////////AAAAAAAAAAAAAAAAAAAAAAAD////////wH/4AAH////////////////////////////8AAOAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAef//////////AAAAAAAAAAAAAAAAAAAAAAAD////////4H//x+P////////////////////////////8AAOAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAef//////////AAAAAAAAAAAAAAAAAAAAAAAD/////////n/////////////////////////////////4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOP///////wf/AAAAAAAAAAAAAAAAAAAAAAAD///////////////////////////////////////////4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPP///////wG/AAAAAAAAAAAAAAAAAAAAAAAD///////////////////j///////////////////////+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADn/////4HwAfAAAAAAAAAAAAAAAAAAAAAAAH///////////////////h///////////////////////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB3/////gAAAPgAAAAAAAAAAAAAAAAAAAAAAP///////////////////h///////////////////////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB7////+AAAAPgAAAAAAAAAAAAAAAAAAAAAA////////////////////w///////////////////////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH4////8AAAAPwAAAAAAAAAAAAAAAAAAAAAD///////////////7////wf//////////////////////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD8f///8AAAAPwAAAAAAAAAAAAAAAAAAAAAH///////////////x////4H//////////////////////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA+P///8AAAAHzwAAAAAAAAAAAAAAAAAAAAP///////////////w////+B4/////////////////////gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPH///8AAAADwQAAAAAAAAAAAAAAAAAAAAf///////////////4////+AC/////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHH///8AAAADwAAAAAAAAAAAAAAAAAAAAA////////////////4f////wG/////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHj///8AAAABwAAAAAAAAAAAAAAAAAAAAA////////////////8P////wOA/8f////////////////+MAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHh///4AAAAABgAAAAAAAAAAAAAAAAAAAA////////////////+P////gfAAAP////////////////8cAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABw///4AAAAABgAAAAAAAAAAAAAAAAAAAD////////////////+H////w/AAAP////////////////4cAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4P//4AAAAAAgAAAAAAAAAAAAAAAAAAAD////////////////+D//////4AAD////////////////g8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcH//4AAAAAAAAAAAAAAAAAAAAAAAAAAH/////////////////B//////8AAB////////////////A4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH//4AAAA/4AAAAAAAAAAAAAAAAAAAAH/////////////////B//////+AAA///////////////8A4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//4AAABz/gAAAAAAAAAAAAAAAAAAAP/////////////////w///////AAA///////3//////+gAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//4AAAAAPwAAAAAAAAAAAAAAAAAAAP/////////////////w//////+AAAf/////8D//////4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//8AA/gAD4AAAAAAAAAAAAAAAAAAAf/////////////////4//////+AAAP/////AD/////HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAAAAAAAAAAAAAAAAB//8AB/gAB+AAAAAAAAAAAAAAAAAAAP/////////////////wf/////8AAAAf////gD////8HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAD//+AB/AAAfwAAAAAAAAAAAAAAAAAAH/////////////////4P/////wAAAAf////AB////4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB4AAAAAAAAAAAAAAAB///AD+AAAAH4AAAAAAAAAAAAAAAAAH/////////////////4H/////wAAAAf///8AAf///wPAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAA///AD+AAAAD/AAAAAAAAAAAAAAAAAH/////////////////4D/////wAAAAf///wAAf///wfAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP//gP+AAAAB/gAAAAAAAAAAAAAAAAH/////////////////4D/////AAAAAf///gAAf///weAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH////8AAB4f8ngAAAAAAAAAAAAAAAH/////////////////+D/////AAAAAP///AAAP///4MAAAeAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////8AAAQAwAAAAAAAAAAAAAAAAAH//////////////////B////4AAAAAP//+AAAP///8AAAA+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///8AAAAAAAAAAAAAAAAAAAAAAAH//////////////////A////4AAAAAP//8AAAH///8AAAA+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///8AAAAAAAAAAAAAAAAAAAAAAAP//////////////////gf///AAAAAAP//4AAAP///+AAAA+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf//4AAAAAAAAAAAAAAAAAAAAAAAH//////////////////gf//4AAAAAAP//wAAAPn///gAAB+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADD///AAAAAAAAAAAAAAAAAAAAAAP//////////////////gf//4AAAAAAH/+AAAACH///wAAB8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA///wAAAAAAAAAAAAAAAAAAAAAP//////////////////4f//gAAAAAAD/+AAAAAH///wAAB8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf//wAAAAAAAAAAAAAAAAAAAAA///////////////////8f/8AAAAAAAD/+AAAAAH///4AAA8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP//wAAAAAAAAAAAAAAAAAAAAAf//////////////////+P/wAAAAAAAB/+AAAAAH///4AAAfAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//wAAAAAAAAAAAAAAAAAAAAAP///////////////////P/AAAAAAAAB/+AAAAAD///4AAAfwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/gAAAAAAAAAAAAAAAAAAAAAP///////////////////vwAAAAAAAAB/+AAAAAD///4AAA5wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB/wAAAAAAAAAAAAAAAAAAAAAP////////////////////gAAAAAAAAB/+AAAAAD///4AAAYYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/gAAAwAAAAAAAAAAAAAAAAAP///////////////////4AAAAAAAAAA/8AAAAADw//4AAAIGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAfgAAD2AAAAAAAAAAAAAAAAAH///////////////////wADgAAAAAAA/8AAAAABwf/4AAAGHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPgAAfvgAAAAAAAAAAAAAAAAB///////////////////4A/gAAAAAAAf8AAAAABwP/wAADDvAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPgAB//wAOAAAAAAAAAAAAAAA///////////////////8P/gAAAAAAAf8AAAAADgP/AAADH+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPwAD///vuAAAAAAAAAAAAAAA//////////////////////AAAAAAAAP4AAAAABgB+AAAGB2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH4AD/f//8AAAAAAAAAAAAAAAP/////////////////////AAAAAAAAP6AAAAADgA8AAAMDyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA8fH////+AAAAAAAAAAAAAAAP/////////////////////AAAAAAAAP/AAAAADgB4AAAYBjgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/7/////+AAAAAAAAAAAAAAAH////////////////////+AAAAAAAAHngAAAAD4AgAAAwAHgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAfx//////gAAAAAAAAAAAAAAH////////////////////+AAAAAAAADHgAAAAD4AAAAAAB/gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADx//////4AAAAAAAAAAAAAAD////////////////////8AAAAAAAAAHwAAAAA4AAAAAAD/gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAg//////8AAAAAAAAAAAAAAB////////////////////8AAAAAAAAAHwAAAAAcAAAAAAHPwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//////8AAAAAAAAAAAAAAAf///////////////////4AAAAAAAAAHwAAAAAfAAAABgAegAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf//////AAAAAAAAAAAAAAAP////P//////////////4AAAAAAAAADgAAAAAPgAAADwAPAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf///////gAAAAAAAAAAAAAH///wH//////////////wAAAAAAAAAAAAAAAAPwAAAH4ADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf///////4AAAAAAAAAAAAAD//+AD//////////////wAAAAAAAAAAAAAAD4P4AAAP+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf///////8AAAAAAAAAAAAAA/AYAD//////////////gAAAAAAAAAAAAAAB8H4AAA/8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf///////+AAAAAAAAAAAAAAAAAAAx/////////////AAAAAAAAAAAAAAAA+H4AAB/4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf////////AAAAAAAAAAAAAAAAAAAA////////////+AAAAAAAAAAAAAAAAfH4AAB/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/////////gAAAAAAAAAAAAAAAAAAAf///////////8AAAAAAAAAAAAAAAAPz4AAD/gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/////////gAAAAAAAAAAAAAAAAAAAf///////////4AAAAAAAAAAAAAAAAH78AA//wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/////////gAAAAAAAAAAAAAAAAAAAf///////////wAAAAAAAAAAAAAAAAH88AA//4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/////////wAAAAAAAAAAAAAAAAAAA////////////gAAAAAAAAAAAAAAAAB/+AP//wAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/////////4AAAAAAAAAAAAAAAAAAA///////////+AAAAAAAAAAAAAAAAAB/8AP//8YGPAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf/////////wAAAAAAAAAAAAAAAAAAA///////////8AAAAAAAAAAAAAAAAAA/wAf//w/8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf/////////gAAAAAAAAAAAAAAAAAAA///////////4AAAAAAAAAAAAAAAAAA/8Af//xgQGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf/////////+AAAAAAAAAAAAAAAAAAA///////////wAAAAAAAAAAAAAAAAAAf8AP//hgAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA///////////wAAAAAAAAAAAAAAAAAB///////////gAAAAAAAAAAAAAAAAAAP8AP//xhgCB8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA///////////+AAAAAAAAAAAAAAAAAB///////////AAAAAAAAAAAAAAAAAAAP+AH//D/AAH+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////////////gAAAAAAAAAAAAAAAAA//////////+AAAAAAAAAAAAAAAAAAAH/AD//D8AAB+DgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////////////wAAAAAAAAAAAAAAAAA//////////8AAAAAAAAAAAAAAAAAAAD/AD//D8AAAGP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP////////////AAAAAAAAAAAAAAAAAf/////////4AAAAAAAAAAAAAAAAAAAD/wD/+H+AAA+f/gAAYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf/////////////AAAAAAAAAAAAAAAAP/////////4AAAAAAAAAAAAAAAAAAAB/4Af+H+A/8f//8AAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//////////////wAAAAAAAAAAAAAAAH/////////wAAAAAAAAAAAAAAAAAAAA/wAAeBuAQEf///gADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//////////////4AAAAAAAAAAAAAAAD/////////wAAAAAAAAAAAAAAAAAAAAfwAAABnAAAB///4AHgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//////////////8AAAAAAAAAAAAAAAB/////////gAAAAAAAAAAAAAAAAAAAAPwAAABlgAAAP//8AHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB///////////////wAAAAAAAAAAAAAAB/////////AAAAAAAAAAAAAAAAAAAAADwAAADjgAAAB//8B+EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA///////////////wAAAAAAAAAAAAAAA/////////AAAAAAAAAAAAAAAAAAAAABwAAAAAAAADA///P4GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB///////////////wAAAAAAAAAAAAAAA/////////AAAAAAAAAAAAAAAAAAAAAAfAAAAAAAADA///xgHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf//////////////4AAAAAAAAAAAAAAAf////////gAAAAAAAAAAAAAAAAAAAAA/xwAAAAAACAf//AADwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP//////////////4AAAAAAAAAAAAAAAf////////gAAAAAAAAAAAAAAAAAAAAAP/8AAAAAAAAf//gAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP//////////////4AAAAAAAAAAAAAAAf////////gAAAAAAAAAAAAAAAAAAAAAAv/gAAAAAAB//vwAABgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH//////////////4AAAAAAAAAAAAAAAP////////gAAAAAAAAAAAAAAAAAAAAAAA/4YRAAAAB3+D4AAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////////wAAAAAAAAAAAAAAAP////////gAAAAAAAAAAAAAAAAAAAAAAAAR9+DwAAAB+D8AAAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////////wAAAAAAAAAAAAAAAf////////wAAAAAAAAAAAAAAAAAAAAAAAAAAAPAAAAAMB+AAASAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//////////////gAAAAAAAAAAAAAAAP////////wAAAAAAAAAAAAAAAAAAAAAAAAADwcAAAAAAA/AAAfAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//////////////AAAAAAAAAAAAAAAAP////////4AAAAAAAAAAAAAAAAAAAAAAAAAAg4AAAAAAAHwAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/////////////+AAAAAAAAAAAAAAAAH////////4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAABgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/////////////8AAAAAAAAAAAAAAAAH////////4AAAAAAAAAAAAAAAAAAAAAAAAAAAAABwAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf////////////8AAAAAAAAAAAAAAAAH////////4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcAAcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf////////////4AAAAAAAAAAAAAAAAP////////8AAIAAAAAAAAAAAAAAAAAAAAAAAAAAD/8AeAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP////////////wAAAAAAAAAAAAAAAAP////////8AAcAAAAAAAAAAAAAAAAAAAAAAAAAAP/8AeAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH////////////gAAAAAAAAAAAAAAAAf////////8AAcAAAAAAAAAAAAAAAAAAAAAAAAAAP/4AfAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH////////////gAAAAAAAAAAAAAAAA/////////8AB+AAAAAAAAAAAAAAAAAAAAAAAAAAf/4AfAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH////////////gAAAAAAAAAAAAAAAA/////////8AB+AAAAAAAAAAAAAAAAAAAAAAAAB8f/wAfwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD////////////gAAAAAAAAAAAAAAAA/////////8AD+AAAAAAAAAAAAAAAAAAAAAAAAD+f/gAf4AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB////////////gAAAAAAAAAAAAAAAB/////////8AH+AAAAAAAAAAAAAAAAAAAAAAAAH///wAf4AAAAAAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf///////////gAAAAAAAAAAAAAAAB/////////4AP+AAAAAAAAAAAAAAAAAAAAAAAAP///8A/4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///////////gAAAAAAAAAAAAAAAB/////////wD/8AAAAAAAAAAAAAAAAAAAAAAAAf////A/4AAAAAADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///////////AAAAAAAAAAAAAAAAB/////////gD/8AAAAAAAAAAAAAAAAAAAAAAAB/////g/8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA///////////AAAAAAAAAAAAAAAAB////////+AD/4AAAAAAAAAAAAAAAAAAAAAAAD/////5/8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf//////////AAAAAAAAAAAAAAAAB////////4AH/4AAAAAAAAAAAAAAAAAAAAAAAD///////+AAAAAAAAAA8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/////////+AAAAAAAAAAAAAAAAB////////wAD/4AAAAAAAAAAAAAAAAAAAAAAAD///////+AAAAAAAAAAYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/////////+AAAAAAAAAAAAAAAAA////////gAD/4AAAAAAAAAAAAAAAAAAAAAAAH///////+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/////////+AAAAAAAAAAAAAAAAAf//////+AAD/wAAAAAAAAAAAAAAAAAAAAAAAP////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/////////+AAAAAAAAAAAAAAAAAf//////8AAD/wAAAAAAAAAAAAAAAAAAAAAAAf////////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/////////8AAAAAAAAAAAAAAAAAP//////8AAD/wAAAAAAAAAAAAAAAAAAAAAAH/////////8AAAADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/////////4AAAAAAAAAAAAAAAAAP//////8AAH/gAAAAAAAAAAAAAAAAAAAAAB//////////8AAAADgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/////////4AAAAAAAAAAAAAAAAAH//////+AAH/gAAAAAAAAAAAAAAAAAAAAAH//////////+AAAAB4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/////////4AAAAAAAAAAAAAAAAAH//////+AAP/gAAAAAAAAAAAAAAAAAAAAAf//////////+AAAAAcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/////////gAAAAAAAAAAAAAAAAAD///////AAP/AAAAAAAAAAAAAAAAAAAAAB////////////gAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/////////gAAAAAAAAAAAAAAAAAD///////AAP/AAAAAAAAAAAAAAAAAAAAAB////////////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH////////wAAAAAAAAAAAAAAAAAAD//////+AAH/AAAAAAAAAAAAAAAAAAAAAB////////////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH////////AAAAAAAAAAAAAAAAAAAD///////AAH/AAAAAAAAAAAAAAAAAAAAAB////////////4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH///////4AAAAAAAAAAAAAAAAAAAD//////+AAH+AAAAAAAAAAAAAAAAAAAAAD////////////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///////wAAAAAAAAAAAAAAAAAAAB//////4AAH+AAAAAAAAAAAAAAAAAAAAAB////////////+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///////gAAAAAAAAAAAAAAAAAAAB//////gAAB4AAAAAAAAAAAAAAAAAAAAAB/////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///////AAAAAAAAAAAAAAAAAAAAB//////AAAAAAAAAAAAAAAAAAAAAAAAAAD/////////////gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP//////+AAAAAAAAAAAAAAAAAAAAA//////AAAAAAAAAAAAAAAAAAAAAAAAAAD/////////////gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP//////+AAAAAAAAAAAAAAAAAAAAA//////AAAAAAAAAAAAAAAAAAAAAAAAAAB/////////////gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///////AAAAAAAAAAAAAAAAAAAAA//////AAAAAAAAAAAAAAAAAAAAAAAAAAB/////////////gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP//////+AAAAAAAAAAAAAAAAAAAAAf/////AAAAAAAAAAAAAAAAAAAAAAAAAAA/////////////gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf//////+AAAAAAAAAAAAAAAAAAAAAP////+AAAAAAAAAAAAAAAAAAAAAAAAAAA/////////////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf//////+AAAAAAAAAAAAAAAAAAAAAP////+AAAAAAAAAAAAAAAAAAAAAAAAAAAf////////////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf//////4AAAAAAAAAAAAAAAAAAAAAH////8AAAAAAAAAAAAAAAAAAAAAAAAAAAf////////////gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf//////4AAAAAAAAAAAAAAAAAAAAAH////4AAAAAAAAAAAAAAAAAAAAAAAAAAAP////////////gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf//////wAAAAAAAAAAAAAAAAAAAAAD////wAAAAAAAAAAAAAAAAAAAAAAAAAAAP////////////gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA///////gAAAAAAAAAAAAAAAAAAAAAB////gAAAAAAAAAAAAAAAAAAAAAAAAAAAP////////////gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA///////gAAAAAAAAAAAAAAAAAAAAAB////AAAAAAAAAAAAAAAAAAAAAAAAAAAAP////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//////+AAAAAAAAAAAAAAAAAAAAAAA///+AAAAAAAAAAAAAAAAAAAAAAAAAAAAH////B///////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf/////8AAAAAAAAAAAAAAAAAAAAAAA///8AAAAAAAAAAAAAAAAAAAAAAAAAAAAH///4AP//////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//////8AAAAAAAAAAAAAAAAAAAAAAB///4AAAAAAAAAAAAAAAAAAAAAAAAAAAAH//+AAD/////+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//////4AAAAAAAAAAAAAAAAAAAAAAA///gAAAAAAAAAAAAAAAAAAAAAAAAAAAAH//4AAB/////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//////wAAAAAAAAAAAAAAAAAAAAAAA//8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAP//wAAA9////4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//////gAAAAAAAAAAAAAAAAAAAAAAAfwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/AAAAA7////4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB////8eAAAAAAAAAAAAAAAAAAAAAAAAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD8AAAAAb////wAAAAAAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB/////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE////wAAAAAADgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///gAAAAAABgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/////gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH///gAAAAAABwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/////gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH///gAAAAAAA8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH///AAAAAAAAcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//+AAAAAAAAecAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP////+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//gAAAAAAAAf4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH////gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADHAAAAAAAAAf4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB/gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYAAAAAAAAMOAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP//wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf4AAAAAAAP+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf//wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP4AAAAAAAfgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf//+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP4AAAAAAA/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAb//8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPwAAAAAAB+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAb//4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHgAAAAAAD8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH//wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf//wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf//wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB/gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA///gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB///gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB///AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//gAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//gAH+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//wACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAfAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf/gAAAAAAAAAYAAAB/AA/wAAAAAD4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//gAAAAAAAAAcAAAH/wH//AH////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf//8AAAAAAAG///+f///////////////+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf////w/gAAAA/////////////////////+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD////////gAAP//////////////////////4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA+AD/////////wAA////////////////////////8cAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAef/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB/4f/////////wAB//////////////////////////gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA///gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP////////////gA////////////////////////////gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA///wAAAAAAAAAAAAAAAAAAAAAAPw///wAH////////////8AP////////////////////////////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/v/4AAAAAAAAAAAAAAAAAAAAAH/////////////////////gP/////////////////////////////+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///8AAAAAAAAAAAAAAAAAHg+P//////////////////////A////////////////////////////////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAA//3/8AAAAAAAAAAAAAAAAf/////////////////////////+D/////////////////////////////////gAAAAAAAAAAAAAAAAAAAAAAAAAAAA//AAAAAAAd/H/8AAAAAAAAAAAAAAAA/////////////////////////////////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAOAAAAYAAAAAAP/8AAAAAAAAAAAAAAAH////////////////////////////////////////////////////////////+AAAAAAAAAAAAAAAAAAAACAAAAAAAH/wBx/4AYAAf//+AAAAAAAAAAAAAAD/////////////////////////////////////////////////////////////8AAAAAAAAAAAAAAAAAAAAA4fwBgAAH//////9/4f///+AAAAAAAAAAAAAAH/////////////////////////////////////////////////////////////wAAAAAAAAAAAAAAAAAAAAAAAP/wAAAf////////////4AAAAAAAAAAAAAAD////////////////////////////////////////////////////////////8AAAAAAAAAAAAAAAAAA/////////wAAH///////////+AAAAAAAAAAAAAAAP////////////////////////////////////////////////////////////wAAAAAAAAAAAAAAAGH/////////////////////////8AAAAAAAAAAAAAAB/////////////////////////////////////////////////////////////AAAAAAAAAAAAAAAAf/////////////////////////+AAAAAAAAAAAAAAAf////////////////////////////////////////////////////////////8AAAAAAAAAAAAAAAAf////////////////////////+AAAAAAAAAAAAAAB//////////////////////////////////////////////////////////////8AAAAAAAAAAAAAAAH///////////////////////wAAAAAAAAAAAAAAAf///////////////////////////////////////////////////////////////4AAAAAAAAAAAAd/B////////////////////////+AAAAAAAAAAAAAAD////////////////////////////////////////////////////////////////8AAAAAAAAAAAAf///////////////////////////4AAAAAAAAAAAAA/////////////////////////////////////////////////////////////////+AAAAAAAAAAGAP//////////////////////////wAAAAAAAAD/gAA///////////////////////////////////////////////////////////////////wAAAAAAAAAH8A//////////////////////////gAAAAAAAAP/4AA///////////////////////////////////////////////////////////////////8AAAAAAAAAB/AAf////////////////////////gAAAAAAAAf/8AA//////////////////////////////////////////////////////////////////AAAAAAAAAAAAAAAAD///////////////////////4AAAADAAB//8AAAA///////////////////////////////////////////////////////////////8AAAAAAAAAAAAAAAAAf///////////////////////AAAAPgB///wAAAAP//////////////////////////////////////////////////////////////8AAAAAAAAAAAAAAAAD/////////////////////////wAf/gA//gAAAAf///////////////////////////////////////////////////////////////4AAAAAAAAAAAAAB/9///////////////////////////gAAAAAAAAAH/////////////////////////////////////////////////////////////////+AAAAAAAAAAAAAAP//////////////////////////////AAAAP4B////////////////////////////////////////////////////////////////////AAAAAAAAAAAAAAA///////////////////////////////AA////////////////////////////////////////////////////////////////////////4AAAAAAAAAAAAAA///////////////////////////////4f/////////////////////////////////////////////////////////////////////////gAAAAAAAAAAAAB///////////////////////////////////////////////////////////////////////////////////////////////////////////gAAAAAAAAAAAA///////////////////////////////////////////////////////////////////////////////////////////////////////////4AAAc8//AAAAAB///////////////////////////////////////////////////////////////////////////////////////////////////////////8fAAAAAB///////4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH+AP/8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+  const _mask = (() => {
+    const bin = atob(MASK_B64);
+    const a = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
+    return a;
+  })();
+
+  function maskCell(gx, gy) {
+    if (gy < 0) gy = 0; else if (gy >= MASK_H) gy = MASK_H - 1;
+    gx = ((gx % MASK_W) + MASK_W) % MASK_W;
+    const i = gy * MASK_W + gx;
+    return (_mask[i >> 3] >> (7 - (i & 7))) & 1;
+  }
+
+  // Bilinear landness 0..1 — smooth coastlines instead of blocky cells
+  function landAt(lon, lat) {
+    let fx = (lon + 180) * 2 - 0.5, fy = (90 - lat) * 2 - 0.5;
+    const x0 = Math.floor(fx), y0 = Math.floor(fy);
+    fx -= x0; fy -= y0;
+    const a = maskCell(x0, y0), b = maskCell(x0 + 1, y0);
+    const c = maskCell(x0, y0 + 1), d = maskCell(x0 + 1, y0 + 1);
+    return (a + (b - a) * fx) + ((c - a) + (a - b - c + d) * fx) * fy;
+  }
+
+  // Continentality — wide blurred mask (2.5° cells, ±3° average),
+  // precomputed once. Inland areas get stronger rolling relief.
+  const CONT_W = 144, CONT_H = 72;
+  const _cont = new Float32Array(CONT_W * CONT_H);
+  for (let gy = 0; gy < CONT_H; gy++) {
+    for (let gx = 0; gx < CONT_W; gx++) {
+      let s = 0, n = 0;
+      const cx = Math.round(gx * 5 + 2.5), cy = Math.round(gy * 5 + 2.5);
+      for (let dy = -3; dy <= 3; dy++) {
+        for (let dx = -3; dx <= 3; dx++) {
+          s += maskCell(cx + dx * 3, cy + dy * 3); n++;
+        }
+      }
+      _cont[gy * CONT_W + gx] = s / n;
+    }
+  }
+  function contAt(lon, lat) {
+    let fx = (lon + 180) / 2.5 - 0.5, fy = (90 - lat) / 2.5 - 0.5;
+    const x0 = Math.max(0, Math.min(CONT_W - 2, Math.floor(fx)));
+    const y0 = Math.max(0, Math.min(CONT_H - 2, Math.floor(fy)));
+    fx = Math.max(0, Math.min(1, fx - x0)); fy = Math.max(0, Math.min(1, fy - y0));
+    const i = y0 * CONT_W + x0;
+    const a = _cont[i], b = _cont[i + 1], c = _cont[i + CONT_W], d = _cont[i + CONT_W + 1];
+    return (a + (b - a) * fx) + ((c - a) + (a - b - c + d) * fx) * fy;
+  }
+
+  // Mountain ranges — polylines in lon/lat where the real ranges stand,
+  // pre-baked into a 1.25° grid (288×144) with a smooth falloff.
+  const MTN = [
+    [[[-150, 61], [-140, 60], [-135, 58], [-128, 51], [-120, 47], [-113, 44], [-107, 39], [-106, 33], [-105, 30]], 4.5, 1.00],  // Rockies
+    [[[-124, 40], [-122, 44], [-121, 48]], 2.2, 0.70],   // Cascades
+    [[[-119, 36], [-118, 37.5]], 1.6, 0.60],             // Sierra
+    [[[-84, 34], [-81, 36], [-78, 39], [-74, 42], [-70, 45]], 2.6, 0.45],  // Appalachians
+    [[[-68, 10], [-74, 7], [-77, 4], [-78, -1], [-76, -6], [-70, -14], [-68, -22], [-69, -32], [-71, -42], [-71, -50]], 3.2, 1.00],  // Andes
+    [[[-46, -21], [-42, -17], [-38, -10]], 5.0, 0.32],   // Brazilian highlands
+    [[[-8, 31.5], [-4, 33.5], [-1, 35]], 2.4, 0.50],     // Atlas
+    [[[6, 44], [9, 45.5], [12, 46.3], [14, 46.5]], 2.1, 0.80],  // Alps
+    [[[-1.5, 43], [2, 42.6]], 1.4, 0.60],                // Pyrenees
+    [[[19, 49.5], [23, 47.5], [26, 45.3]], 2.4, 0.42],   // Carpathians
+    [[[6, 59], [10, 62.5], [15, 67], [18, 69]], 2.6, 0.60],  // Scandes
+    [[[59, 52], [59.5, 57], [61, 62], [64, 67]], 2.0, 0.50],  // Urals
+    [[[40, 43.5], [44, 42.5], [47, 41.5]], 1.5, 0.75],   // Caucasus
+    [[[46, 34], [50, 33], [54, 31], [57, 28]], 2.6, 0.60],  // Zagros
+    [[[73, 35], [77, 32.5], [81, 30.5], [85, 28.7], [89, 28], [93, 29]], 4.2, 1.15],  // Himalaya
+    [[[68, 42], [74, 42], [80, 42.5], [86, 43]], 2.6, 0.70],  // Tian Shan
+    [[[85, 49], [90, 48], [95, 50]], 2.6, 0.50],         // Altai
+    [[[100, 31], [103, 28.5]], 2.8, 0.60],               // Hengduan
+    [[[130, 64], [135, 67]], 2.6, 0.40],                 // Verkhoyansk
+    [[[137, 35.5], [139, 37], [140.5, 38.5]], 1.5, 0.60],  // Japanese alps
+    [[[147, -20], [149, -25], [151, -30], [150, -34], [147, -37]], 2.6, 0.45],  // Great Dividing
+    [[[167, -45.5], [169, -44], [171, -42.5]], 1.3, 0.70],  // Southern Alps
+    [[[37, 7], [39, 9.5], [38, 12.5]], 3.0, 0.55],       // Ethiopian
+    [[[29, -25], [29.5, -29]], 2.2, 0.45],               // Drakensberg
+    [[[36, -1], [37.5, 1.5]], 2.0, 0.42],                // Kenya highlands
+    [[[-43, 72], [-41, 76], [-39, 79]], 5.0, 0.60],      // Greenland ice cap
+  ];
+  const MNW = 288, MNH = 144;
+  const _mtn = new Float32Array(MNW * MNH);
+  for (let gy = 0; gy < MNH; gy++) {
+    for (let gx = 0; gx < MNW; gx++) {
+      const lon = -180 + (gx + 0.5) * 1.25, lat = 90 - (gy + 0.5) * 1.25;
+      let v = 0;
+      for (let m = 0; m < MTN.length; m++) {
+        const pts = MTN[m][0], w = MTN[m][1], s = MTN[m][2];
+        for (let i = 0; i < pts.length - 1; i++) {
+          const x1 = pts[i][0], y1 = pts[i][1], x2 = pts[i + 1][0], y2 = pts[i + 1][1];
+          const clat = (y1 + y2) * 0.5 * Math.PI / 180;
+          const ax = (lon - x1) * Math.cos(clat), ay = lat - y1;
+          const bx = (x2 - x1) * Math.cos(clat), by = y2 - y1;
+          const L2 = bx * bx + by * by || 1e-9;
+          let t = (ax * bx + ay * by) / L2;
+          t = t < 0 ? 0 : t > 1 ? 1 : t;
+          const dx = ax - bx * t, dy = ay - by * t;
+          v += s * Math.exp(-(dx * dx + dy * dy) / (w * w * 0.5));
+        }
+      }
+      _mtn[gy * MNW + gx] = Math.min(1.25, v);
+    }
+  }
+  function mtnAt(lon, lat) {
+    let fx = (lon + 180) / 1.25 - 0.5, fy = (90 - lat) / 1.25 - 0.5;
+    const x0 = Math.max(0, Math.min(MNW - 2, Math.floor(fx)));
+    const y0 = Math.max(0, Math.min(MNH - 2, Math.floor(fy)));
+    fx = Math.max(0, Math.min(1, fx - x0)); fy = Math.max(0, Math.min(1, fy - y0));
+    const i = y0 * MNW + x0;
+    const a = _mtn[i], b = _mtn[i + 1], c = _mtn[i + MNW], d = _mtn[i + MNW + 1];
+    return (a + (b - a) * fx) + ((c - a) + (a - b - c + d) * fx) * fy;
+  }
+
+  // ---------- deterministic hash noise (same on every machine) ----------
+  function ihash(x, y, s) {
+    let h = Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(y | 0, 0x165667b1) ^ Math.imul(s | 0, 0x9e3779b9);
+    h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
+    h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+    h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+  }
+  function vnoise(x, y, s) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const xf = x - xi, yf = y - yi;
+    const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    const a = ihash(xi, yi, s), b = ihash(xi + 1, yi, s);
+    const c = ihash(xi, yi + 1, s), d = ihash(xi + 1, yi + 1, s);
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+  }
+  function fbm(x, y, s, oct) {
+    let amp = 1, sum = 0, norm = 0;
+    for (let i = 0; i < oct; i++) {
+      sum += amp * vnoise(x, y, s + i * 101);
+      norm += amp; amp *= 0.5; x *= 2.03; y *= 2.03;
+    }
+    return sum / norm;
+  }
+
+  // ---------- per-planet world configs ----------
+  const CFG = {
+    earth:   { land: 'mask', water: true,  trees: true,  seed: 1337,
+               zenith: 0x3a74bd, horizon: 0xd9e9f6, sky: 0x8fc3ec,
+               hemiSky: 0xcfe3f5, hemiGround: 0x53724b, sun: 0xfff2d8, sunI: 1.9,
+               waterColor: 0x2e7fc2, stars: false },
+    luna:    { land: 'none', water: false, trees: false, seed: 42424,
+               zenith: 0x010207, horizon: 0x0a0f18, sky: 0x02040a,
+               hemiSky: 0x2a3340, hemiGround: 0x22201e, sun: 0xfff6e8, sunI: 2.6,
+               stars: true },
+    mars:    { land: 'none', water: false, trees: false, seed: 90210,
+               zenith: 0x8f5030, horizon: 0xe0a87c, sky: 0xc98a5e,
+               hemiSky: 0xe0b28a, hemiGround: 0x7a3d24, sun: 0xffe8c8, sunI: 2.2,
+               stars: false, mars: true },
+    oceanus: { land: 'all',  water: true,  trees: false, seed: 73502,
+               zenith: 0x2e9c8e, horizon: 0xc5ece4, sky: 0x6fd2c4,
+               hemiSky: 0xbfe8df, hemiGround: 0x1e5e56, sun: 0xfff2d8, sunI: 1.9,
+               waterColor: 0x1fa894, stars: false },
+  };
+  let _cfg = CFG.earth;
+
+  // ---------- terrain height ----------
+  // y-up world coordinates: x = lon·DEG (east+), z = −lat·DEG (north−)
+  function terrainHeight(x, z) {
+    const lon = x / DEG, lat = -z / DEG;
+    if (_cfg.land === 'mask') {
+      const land = landAt(lon, lat);
+      if (land < 0.5) {                      // ocean floor → shelf → abyss
+        const dep = (0.5 - land) * 2;
+        return -(1.5 + dep * dep * 30 + fbm(x * 0.012, z * 0.012, _cfg.seed + 11, 2) * 3);
+      }
+      const cont = contAt(lon, lat);
+      const mtn = mtnAt(lon, lat);
+      let h = 2.2 + land * 1.6;                                    // coastal plains
+      h += (fbm(x * 0.0042, z * 0.0042, _cfg.seed, 5) - 0.42) * (7 + cont * 9);   // rolling relief
+      h += mtn * (16 + 34 * fbm(x * 0.011, z * 0.011, _cfg.seed + 5, 4));         // ranges
+      // naturally generated lakes — one fixed noise field for the whole world
+      const lk = fbm(x * 0.0028, z * 0.0028, _cfg.seed + 77, 2);
+      if (lk > 0.615 && land > 0.56) {
+        const lf = Math.min(1, (lk - 0.615) / 0.11);
+        h = h * (1 - lf) + (-3.2) * lf;
+      }
+      const coast = Math.min(1, Math.max(0, (land - 0.5) / 0.16));  // flat beaches
+      return h * (0.3 + 0.7 * coast);
+    }
+    if (_cfg.land === 'none') {               // luna / mars — dry rugged worlds
+      let h = 2.5;
+      h += (fbm(x * 0.005, z * 0.005, _cfg.seed, 5) - 0.45) * (_cfg.stars ? 9 : 11);
+      h += (fbm(x * 0.02, z * 0.02, _cfg.seed + 9, 2) - 0.5) * 2.2;
+      if (_cfg.stars) {                       // luna — crater basins with rims
+        const c = vnoise(x * 0.016, z * 0.016, _cfg.seed + 31);
+        if (c > 0.74) h -= ((c - 0.74) / 0.26) * 5.5;
+        else if (c > 0.68) h += ((0.74 - c) / 0.06) * 1.8;
+      }
+      return Math.max(0.6, h);
+    }
+    // 'all' — oceanus: a world-ocean with rare reef islets
+    let h = -(7 + fbm(x * 0.004, z * 0.004, _cfg.seed, 4) * 15);
+    const isl = fbm(x * 0.0021, z * 0.0021, _cfg.seed + 55, 2);
+    if (isl > 0.78) h += ((isl - 0.78) / 0.22) * 12;
+    return h;
+  }
+
+  function moistureAt(x, z) {
+    const lat = -z / DEG;
+    const belt = 0.52 + 0.38 * Math.cos(lat * Math.PI / 25);   // ITCZ wet / horse-latitudes dry
+    return Math.min(1, Math.max(0, belt + (fbm(x * 0.0058, z * 0.0058, _cfg.seed + 3, 3) - 0.5) * 0.9));
+  }
+
+  // ---------- biome colors (low-poly climate palette) ----------
+  const _tA = new THREE.Color(), _tB = new THREE.Color();
+  function lerpTo(out, hex, t) { _tB.setHex(hex); out.lerp(_tB, t); return out; }
+  function biomeColor(out, lon, lat, h, slope, moist, land) {
+    if (_cfg.land === 'mask') {
+      if (h < -0.05) {                         // underwater floor
+        out.setHex(0x497e9d);
+        return lerpTo(out, 0x1a3c59, Math.min(1, -h / 24));
+      }
+      const aLat = Math.abs(lat);
+      const temp = Math.max(0, 1 - aLat / 85 - Math.max(0, h) * 0.007);
+      const snowLine = 34 - aLat * 0.21;
+      if (h > snowLine) { out.setHex(0xeef3f5); return out; }          // snow caps
+      if (slope > 0.62) { out.setHex(0x8b8272); return out; }          // exposed rock
+      if (h > 24) { out.setHex(0x8b8272); return lerpTo(out, 0xd8dde0, Math.min(1, (h - 24) / Math.max(1, snowLine - 24))); }
+      if (h < 1.7 && land < 0.6) { out.setHex(0xd9c489); return out; } // beaches
+      if (temp < 0.14) { out.setHex(0x9aa07e); return out; }           // tundra
+      if (moist < 0.3 && temp > 0.62) { out.setHex(0xd9b56f); return out; }  // desert
+      if (moist < 0.42 && temp > 0.62) { out.setHex(0xbfae66); return out; } // savanna
+      if (moist > 0.62 && temp > 0.66) { out.setHex(0x4c9440); return out; } // lush tropical
+      if (moist > 0.55) { out.setHex(0x51904a); return out; }           // forest green
+      if (temp < 0.4) { out.setHex(0x3f6f4e); return out; }             // boreal
+      out.setHex(0x79a85a); return out;                                  // open grass
+    }
+    if (_cfg.stars) {                          // luna — cratered grays
+      out.setHex(0x9a9893);
+      if (h < 3) lerpTo(out, 0x6f6d69, Math.min(1, (3 - h) / 8));
+      if (h > 8) lerpTo(out, 0xb5b3ac, 0.5);
+      return out;
+    }
+    if (_cfg.land === 'all') {                 // oceanus — reef seabed
+      if (h > -1.5) { out.setHex(0xd9c489); return out; }
+      out.setHex(0x3f8f84);
+      return lerpTo(out, 0x17454d, Math.min(1, -h / 18));
+    }
+    // mars — rust bands + polar caps
+    out.setHex(0xb96b42);
+    lerpTo(out, 0x8a4626, fbm(lon * 2.7, lat * 2.7, _cfg.seed + 4, 2));
+    if (Math.abs(lat) > 78) { out.setHex(0xe8e2da); return out; }
+    if (h > 16) lerpTo(out, 0xd8a06a, 0.6);
+    return out;
+  }
+
+  // ---------- chunk system ----------
+  const _chunks = new Array(CNX * CNZ).fill(null);
+  let _worldRoot = null, _waterMesh = null, _skyMesh = null, _starPts = null;
+  let _sun = null, _hemi = null, _amb = null;
+  const _chunkMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+
+  function chunkRec(cx, cz) {
+    let rec = _chunks[cz * CNX + cx];
+    if (!rec) {
+      rec = { cx, cz, x0: -WORLD_X + cx * CH, z0: -WORLD_Z + cz * CH, res: 0, mesh: null, trees: null, treesOn: false };
+      _chunks[cz * CNX + cx] = rec;
+    }
+    return rec;
+  }
+
+  function chunkGeo(rec, res) {
+    const g = new THREE.PlaneGeometry(CH, CH, res, res);
+    g.rotateX(-Math.PI / 2);
+    const pos = g.attributes.position;
+    const cwx = rec.x0 + CH / 2, cwz = rec.z0 + CH / 2;
+    const hgt = new Float32Array(pos.count);
+    for (let i = 0; i < pos.count; i++) {
+      const h = terrainHeight(cwx + pos.getX(i), cwz + pos.getZ(i));
+      hgt[i] = h;
+      pos.setY(i, h);
+    }
+    // slope + climate colors (index math on the PlaneGeometry grid)
+    const W = res + 1, step = CH / res;
+    const colors = new Float32Array(pos.count * 3);
+    const cTmp = new THREE.Color();
+    const jSeed = ((rec.cx * 73856093) ^ (rec.cz * 19349663) ^ (_cfg.seed * 2654435761)) | 0;
+    for (let iy = 0; iy <= res; iy++) {
+      for (let ix = 0; ix <= res; ix++) {
+        const i = iy * W + ix;
+        const hL = hgt[iy * W + Math.max(0, ix - 1)], hR = hgt[iy * W + Math.min(res, ix + 1)];
+        const hD = hgt[Math.max(0, iy - 1) * W + ix], hU = hgt[Math.min(res, iy + 1) * W + ix];
+        const sx = (hR - hL) / (2 * step), sz = (hU - hD) / (2 * step);
+        const slope = Math.min(1, Math.sqrt(sx * sx + sz * sz) / 1.35);
+        const wx = cwx + pos.getX(i), wz = cwz + pos.getZ(i);
+        const lon = wx / DEG, lat = -wz / DEG;
+        biomeColor(cTmp, lon, lat, hgt[i], slope, moistureAt(wx, wz), landAt(lon, lat));
+        const j = 0.93 + ihash(i, jSeed, 3) * 0.13;      // low-poly patchwork
+        colors[i * 3] = cTmp.r * j;
+        colors[i * 3 + 1] = cTmp.g * j;
+        colors[i * 3 + 2] = cTmp.b * j;
+      }
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    g.computeVertexNormals();
+    return g;
+  }
+
+  function setChunkRes(rec, res) {
+    if (rec.res === res && rec.mesh) return;
+    if (rec.mesh) { _worldRoot.remove(rec.mesh); rec.mesh.geometry.dispose(); rec.mesh = null; }
+    rec.res = res;
+    if (res > 0) {
+      rec.mesh = new THREE.Mesh(chunkGeo(rec, res), _chunkMat);
+      rec.mesh.position.set(rec.x0 + CH / 2, 0, rec.z0 + CH / 2);
+      _worldRoot.add(rec.mesh);
+    }
+  }
+
+  // ---------- trees (two species, manually merged, instanced per chunk) ----------
+  function _mergeParts(parts) {   // parts: [{geo, color, x, y, z}]
+    let total = 0;
+    const list = parts.map(p => {
+      const g = (p.geo.index != null) ? p.geo.toNonIndexed() : p.geo;
+      total += g.attributes.position.count;
+      return { g, p };
+    });
+    const pos = new Float32Array(total * 3), col = new Float32Array(total * 3);
+    const c = new THREE.Color();
+    let o = 0;
+    for (const { g, p } of list) {
+      const pa = g.attributes.position;
+      c.setHex(p.color);
+      for (let i = 0; i < pa.count; i++) {
+        pos[o * 3] = pa.getX(i) + p.x;
+        pos[o * 3 + 1] = pa.getY(i) + p.y;
+        pos[o * 3 + 2] = pa.getZ(i) + p.z;
+        col[o * 3] = c.r; col[o * 3 + 1] = c.g; col[o * 3 + 2] = c.b;
+        o++;
+      }
+      g.dispose(); p.geo.dispose();
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    g.computeVertexNormals();
+    return g;
+  }
+  const TREE_GEO_CONIF = _mergeParts([
+    { geo: new THREE.CylinderGeometry(0.24, 0.34, 1.3, 6), color: 0x6b4a2f, x: 0, y: 0.65, z: 0 },
+    { geo: new THREE.ConeGeometry(1.45, 2.1, 6), color: 0x2e6b3c, x: 0, y: 2.1, z: 0 },
+    { geo: new THREE.ConeGeometry(1.05, 1.75, 6), color: 0x357a46, x: 0, y: 3.2, z: 0 },
+    { geo: new THREE.ConeGeometry(0.62, 1.3, 6), color: 0x3f8a50, x: 0, y: 4.15, z: 0 },
+  ]);
+  const TREE_GEO_BROAD = _mergeParts([
+    { geo: new THREE.CylinderGeometry(0.26, 0.38, 1.7, 6), color: 0x74513a, x: 0, y: 0.85, z: 0 },
+    { geo: new THREE.IcosahedronGeometry(1.75, 0), color: 0x4f9440, x: 0, y: 3.0, z: 0 },
+    { geo: new THREE.IcosahedronGeometry(1.0, 0), color: 0x5ca44b, x: 1.1, y: 2.35, z: 0.5 },
+  ]);
+  const _treeMat = new THREE.MeshPhongMaterial({
+    vertexColors: true, flatShading: true, shininess: 4,
+    specular: new THREE.Color(0x111111)
+  });
+  const _UP = new THREE.Vector3(0, 1, 0);
+
+  function removeChunkTrees(rec) {
+    if (rec.trees) {
+      for (const m of rec.trees) {
+        if (m.parent) m.parent.remove(m);
+        if (m.geometry) m.geometry.dispose();
+      }
+      rec.trees = null;
+    }
+    rec.treeCount = 0;
+    rec.treeDense = false;
+    rec.treesOn = false;
+  }
+
+  function buildChunkTrees(rec, dense) {
+    removeChunkTrees(rec);
+    if (!_cfg.trees || !_worldRoot) return;
+    rec.trees = [];
+    rec.treeDense = !!dense;
+    // deterministic per-chunk seed → the same forest for every player
+    const seed = (((rec.cx * 73856093) ^ (rec.cz * 19349663) ^ (_cfg.seed * 2654435761)) | 0) >>> 0;
+    const rng = mulberry32(seed);
+    const cwx = rec.x0 + CH / 2, cwz = rec.z0 + CH / 2;
+    const half = CH / 2 - 4;
+    // dense tier (near the camera): half the spacing — the forest thickens
+    // as you descend, exactly like walking into it
+    const spacing = dense ? 3.2 : 6.4;
+    const jitter = dense ? 2.2 : 5.2;
+    const MAX_TREES = dense ? 550 : 300;
+    // claimed land stays clear so plots are always buildable
+    const clears = [];
+    for (const id of STATE.owned) {
+      const p = ACTIVE_PLOT_BY_ID.get(id);
+      if (p && p.userData.wx !== undefined) {
+        const r = (p.userData.sizeA || 0.05) * RAD2U * 0.85;
+        if (Math.abs(p.userData.wx - cwx) < CH + r && Math.abs(p.userData.wz - cwz) < CH + r) {
+          clears.push([p.userData.wx, p.userData.wz, r]);
+        }
+      }
+    }
+    const spots = [];
+    for (let gz = -half; gz <= half; gz += spacing) {
+      for (let gx = -half; gx <= half; gx += spacing) {
+        const x = cwx + gx + (rng() - 0.5) * jitter;
+        const z = cwz + gz + (rng() - 0.5) * jitter;
+        let skip = false;
+        for (const cde of clears) {
+          const dx = x - cde[0], dz = z - cde[1];
+          if (dx * dx + dz * dz < cde[2] * cde[2]) { skip = true; break; }
+        }
+        if (skip) continue;
+        const lon = x / DEG, lat = -z / DEG;
+        const land = landAt(lon, lat);
+        if (land < 0.72) continue;                       // inland only
+        const moist = moistureAt(x, z);
+        const temp = Math.max(0, 1 - Math.abs(lat) / 85);
+        if (temp < 0.16) continue;                       // too cold
+        const h = terrainHeight(x, z);
+        if (h < 0.4 || h > 26) continue;                 // water / snow / high
+        // (lakes are already excluded by the h < 0.4 water test — the raw
+        // lake-noise field also carves shallow dip regions that stay ABOVE
+        // water, and filtering on it left wide phantom tree-less bands)
+        const s1 = terrainHeight(x + 3, z), s2 = terrainHeight(x, z + 3);
+        if (Math.abs(s1 - h) + Math.abs(s2 - h) > 5.5) continue;   // too steep
+        const dens = moist > 0.62 ? 0.72 : moist > 0.5 ? 0.38 : moist > 0.42 ? 0.11 : 0.035;
+        if (rng() > dens) continue;
+        const conifer = (temp < 0.5) || (h > 13) || (temp < 0.75 && fbm(x * 0.01, z * 0.01, _cfg.seed + 21, 2) > 0.62);
+        spots.push({ x, h, z, r: rng(), conifer });
+      }
+    }
+    // Even decimation over the cap — sampling the grid row-by-row with a
+    // break would leave whole strips of the chunk bald; striding over the
+    // full spot list keeps the coverage uniform (and deterministic).
+    let kept = spots;
+    if (spots.length > MAX_TREES) {
+      kept = [];
+      const stride = spots.length / MAX_TREES;
+      for (let i = 0; i < MAX_TREES; i++) kept.push(spots[Math.floor(i * stride)]);
+    }
+    if (kept.length) {
+      const mesh = _makeForestMesh(kept, cwx, cwz);
+      if (mesh) { rec.trees.push(mesh); rec.treeCount = kept.length; rec.treesOn = true; }
+    }
+  }
+
+  // One merged regular Mesh per chunk holding the whole forest — every
+  // tree baked in (transform + per-tree tint), with LOCAL xz coordinates
+  // relative to the chunk center and the mesh positioned there — the
+  // exact pattern the terrain chunks use, which renders correctly at
+  // every zoom distance (large-magnitude baked world coordinates proved
+  // unreliable on some rasterizers up close).
+  function _makeForestMesh(spots, cwx, cwz) {
+    const conifP = TREE_GEO_CONIF.attributes.position;
+    const conifC = TREE_GEO_CONIF.attributes.color;
+    const broadP = TREE_GEO_BROAD.attributes.position;
+    const broadC = TREE_GEO_BROAD.attributes.color;
+    let total = 0;
+    for (const t of spots) total += (t.conifer ? conifP.count : broadP.count);
+    const pos = new Float32Array(total * 3), col = new Float32Array(total * 3);
+    let o = 0;
+    for (const t of spots) {
+      const srcP = t.conifer ? conifP : broadP;
+      const srcC = t.conifer ? conifC : broadC;
+      const s = 0.65 + t.r * 0.85;
+      const sy = s * (0.9 + t.r * 0.3);
+      const a = t.r * Math.PI * 2;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      const tint = 0.85 + t.r * 0.3;              // per-tree brightness
+      const tintR = tint * (0.92 + t.r * 0.16);   // slight warm/cool shift
+      const baseY = t.h - 0.15;
+      for (let i = 0; i < srcP.count; i++) {
+        const vx = srcP.getX(i) * s, vy = srcP.getY(i) * sy, vz = srcP.getZ(i) * s;
+        pos[o * 3] = (t.x - cwx) + ca * vx - sa * vz;
+        pos[o * 3 + 1] = baseY + vy;
+        pos[o * 3 + 2] = (t.z - cwz) + sa * vx + ca * vz;
+        col[o * 3] = srcC.getX(i) * tintR;
+        col[o * 3 + 1] = srcC.getY(i) * tint;
+        col[o * 3 + 2] = srcC.getZ(i) * tint;
+        o++;
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    g.computeVertexNormals();
+    const mesh = new THREE.Mesh(g, _treeMat);
+    mesh.position.set(cwx, 0, cwz);   // positioned like the terrain chunks
+    mesh.raycast = () => {};          // never intercept plot picking
+    _worldRoot.add(mesh);
+    return mesh;
+  }
+
+  // A plot was claimed — regrow the forests around it without the plot
+  function refreshPlot(plot) {
+    if (!plot || plot.userData.wx === undefined || !_cfg.trees) return;
+    const r = (plot.userData.sizeA || 0.05) * RAD2U;
+    for (const rec of _chunks) {
+      if (!rec || !rec.treesOn) continue;
+      if (Math.abs(plot.userData.wx - (rec.x0 + CH / 2)) < CH / 2 + r &&
+          Math.abs(plot.userData.wz - (rec.z0 + CH / 2)) < CH / 2 + r) {
+        buildChunkTrees(rec, rec.treeDense);
+      }
+    }
+  }
+
+  // ---------- sky / water / lights ----------
+  function makeSky() {
+    const g = new THREE.SphereGeometry(9000, 32, 15);
+    const pos = g.attributes.position;
+    const colors = new Float32Array(pos.count * 3);
+    const cz = new THREE.Color(_cfg.zenith), ch = new THREE.Color(_cfg.horizon);
+    const c = new THREE.Color();
+    for (let i = 0; i < pos.count; i++) {
+      const t = Math.max(0, pos.getY(i) / 9000);
+      c.copy(ch).lerp(cz, Math.pow(t, 0.62));
+      colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const m = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, depthWrite: false });
+    _skyMesh = new THREE.Mesh(g, m);
+    _skyMesh.renderOrder = -999;
+    _skyMesh.raycast = () => {};
+    scene.add(_skyMesh);
+  }
+
+  function makeStars() {
+    const n = 1600;
+    const pos = new Float32Array(n * 3);
+    const rng = mulberry32(_cfg.seed + 99);
+    for (let i = 0; i < n; i++) {
+      const u = rng() * 2 - 1, th = rng() * Math.PI * 2, r = Math.sqrt(1 - u * u);
+      pos[i * 3] = r * Math.cos(th) * 8800;
+      pos[i * 3 + 1] = u * 8800;
+      pos[i * 3 + 2] = r * Math.sin(th) * 8800;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    _starPts = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 2.2, sizeAttenuation: false, depthWrite: false }));
+    _starPts.renderOrder = -998;
+    _starPts.raycast = () => {};
+    scene.add(_starPts);
+  }
+
+  function updateSun() {
+    if (!_sun || !controls) return;
+    const t = controls.target;
+    _sun.position.set(t.x + 1500, 2600, t.z + 950);
+    _sun.target.position.copy(t);
+    _sun.target.updateMatrixWorld();
+  }
+
+  // ---------- build / dispose ----------
+  function build(planetId) {
+    _cfg = CFG[planetId] || CFG.earth;
+    _zoomAnchor = null;
+    _worldRoot = new THREE.Group();
+    _worldRoot.name = 'flat-world';
+    earth = _worldRoot;                 // the game's world container
+    scene.add(_worldRoot);
+    // base-resolution chunks everywhere (upgraded around the camera later)
+    for (let cz = 0; cz < CNZ; cz++) {
+      for (let cx = 0; cx < CNX; cx++) {
+        setChunkRes(chunkRec(cx, cz), 8);
+      }
+    }
+    if (_cfg.water) {
+      // one sea-level plane — the oceans and every generated lake; it
+      // extends far past the map so the world reads as shoreless blue
+      // all the way to the horizon
+      _waterMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(WORLD_X * 2 + 30000, WORLD_Z * 2 + 30000).rotateX(-Math.PI / 2),
+        new THREE.MeshPhongMaterial({
+          color: _cfg.waterColor, transparent: true, opacity: 0.72,
+          shininess: 90, specular: new THREE.Color(0x9fd8ff), depthWrite: false
+        }));
+      _waterMesh.renderOrder = -1;
+      _waterMesh.raycast = () => {};
+      scene.add(_waterMesh);
+    }
+    makeSky();
+    if (_cfg.stars) makeStars();
+    _sun = new THREE.DirectionalLight(_cfg.sun, _cfg.sunI);
+    scene.add(_sun); scene.add(_sun.target);
+    _hemi = new THREE.HemisphereLight(_cfg.hemiSky, _cfg.hemiGround, 0.75);
+    scene.add(_hemi);
+    _amb = new THREE.AmbientLight(0xffffff, 0.16);
+    scene.add(_amb);
+    scene.background = new THREE.Color(_cfg.sky);
+  }
+
+  function dispose() {
+    for (const rec of _chunks) {
+      if (!rec) continue;
+      if (rec.mesh) { _worldRoot.remove(rec.mesh); rec.mesh.geometry.dispose(); rec.mesh = null; }
+      removeChunkTrees(rec);
+      rec.res = 0;
+    }
+    _chunks.fill(null);
+    if (placeGhost) { try { _worldRoot.remove(placeGhost); } catch (e) {} placeGhost = null; }
+    if (_waterMesh) { scene.remove(_waterMesh); _waterMesh.geometry.dispose(); _waterMesh.material.dispose(); _waterMesh = null; }
+    if (_skyMesh) { scene.remove(_skyMesh); _skyMesh.geometry.dispose(); _skyMesh.material.dispose(); _skyMesh = null; }
+    if (_starPts) { scene.remove(_starPts); _starPts.geometry.dispose(); _starPts.material.dispose(); _starPts = null; }
+    if (_sun) { scene.remove(_sun); scene.remove(_sun.target); _sun = null; }
+    if (_hemi) { scene.remove(_hemi); _hemi = null; }
+    if (_amb) { scene.remove(_amb); _amb = null; }
+    if (_worldRoot) { scene.remove(_worldRoot); _worldRoot = null; }
+    earth = null;
+    _zoomAnchor = null;
+  }
+
+  // ---------- camera ----------
+  function placeCamera(tx, tz, dist) {
+    if (!controls || !camera) return;
+    const ty = Math.max(terrainHeight(
+      THREE.MathUtils.clamp(tx, -WORLD_X, WORLD_X),
+      THREE.MathUtils.clamp(tz, -WORLD_Z, WORLD_Z)), 0);
+    controls.target.set(
+      THREE.MathUtils.clamp(tx, -WORLD_X, WORLD_X), ty,
+      THREE.MathUtils.clamp(tz, -WORLD_Z, WORLD_Z));
+    camera.position.setFromSpherical(new THREE.Spherical(dist, 0.98, -0.55)).add(controls.target);
+    const minY = Math.max(terrainHeight(camera.position.x, camera.position.z), 0) + 5;
+    if (camera.position.y < minY) camera.position.y = minY;
+    STATE.zoomTarget = dist;
+    refreshAll();
+  }
+
+  function focusOwnedOrDefault() {
+    let plot = null;
+    for (const id of STATE.owned) {
+      plot = ACTIVE_PLOT_BY_ID.get(id);
+      if (plot) break;
+    }
+    if (plot && plot.userData.wx !== undefined) placeCamera(plot.userData.wx, plot.userData.wz, 170);
+    else placeCamera(200, -940, 620);   // opening view over the Alps
+  }
+
+  // ---------- LOD maintenance (throttled, budgeted) ----------
+  let _lastT = 0, _budget = 5, _treeBudget = 2;
+  let _zoomAnchor = null;                 // wheel zoom aims here
+  const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const v1 = new THREE.Vector3();
+
+  function refreshAll() {
+    _lastT = 0; _budget = 9999; _treeBudget = 999;
+    update(performance.now());
+    _budget = 5; _treeBudget = 2;
+  }
+
+  function update(now) {
+    if (_skyMesh) _skyMesh.position.copy(camera.position);
+    if (_starPts) _starPts.position.copy(camera.position);
+    updateSun();
+    if (now - _lastT < 160) return;
+    _lastT = now;
+    const cam = camera.position;
+    for (const rec of _chunks) {
+      if (!rec) continue;
+      const ccx = rec.x0 + CH / 2, ccz = rec.z0 + CH / 2;
+      const dx = cam.x - ccx, dz = cam.z - ccz, dy = cam.y;
+      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      const want = d < 860 ? 40 : d < 2500 ? 16 : 8;
+      if (want !== rec.res && _budget > 0) { setChunkRes(rec, want); _budget--; }
+      const wantTrees = _cfg.trees && want === 40 && d < 640;
+      const wantDense = _cfg.trees && want === 40 && d < 340;
+      if (wantDense && (!rec.treesOn || !rec.treeDense)) {
+        if (_treeBudget > 0) { buildChunkTrees(rec, true); _treeBudget--; }
+      } else if (wantTrees && !rec.treesOn) {
+        if (_treeBudget > 0) { buildChunkTrees(rec, false); _treeBudget--; }
+      } else if (!wantTrees && rec.treesOn && _treeBudget > 0) {
+        removeChunkTrees(rec);
+      } else if (wantTrees && rec.treesOn && rec.treeDense && !wantDense && _treeBudget > 0) {
+        // drifted out of the dense ring — thin back to normal spacing
+        buildChunkTrees(rec, false);
+        _treeBudget--;
+      }
+    }
+  }
+
+  // ---------- public API ----------
+  return {
+    build, dispose, update, refreshAll, refreshPlot,
+    placeCamera, focusOwnedOrDefault, terrainHeight, moistureAt,
+    groundPlane, v1,
+    RAD2U, DEG, WORLD_X, WORLD_Z,
+    groundY(x, z) { return Math.max(terrainHeight(x, z), 0); },
+    plotSurfaceY(x, z) { return Math.max(terrainHeight(x, z), 0) + 0.18; },
+    isWaterAt(lat, lon) {
+      if (_cfg.land !== 'mask') return _cfg.land === 'all';
+      return landAt(lon, lat) < 0.5;
+    },
+    elevationAt(lat, lon) {
+      const h = terrainHeight(lon * DEG, -lat * DEG);
+      return Math.max(0, Math.min(255, Math.round(Math.max(0, h) * 8)));
+    },
+    setZoomAnchor(x, z) { _zoomAnchor = (x === null) ? null : { x, z }; },
+    pullZoomAnchor() {   // called by the zoom glide each frame
+      if (!_zoomAnchor || !controls) return;
+      return _zoomAnchor;
+    },
+    clearZoomAnchor() { _zoomAnchor = null; },
+    setWaterVisible(vis) {
+      if (_waterMesh) _waterMesh.visible = vis;
+    },
+    refreshForestGeometry(cx, cz, magenta) {
+      const rec = this.chunkAt(-WORLD_X + cx * CH + CH / 2, -WORLD_Z + cz * CH + CH / 2);
+      if (!rec || !rec.trees || !rec.trees[0]) return 'no-forest';
+      const old = rec.trees[0].geometry;
+      const g2 = new THREE.BufferGeometry();
+      g2.setAttribute('position', new THREE.BufferAttribute(new Float32Array(old.attributes.position.array), 3));
+      g2.setAttribute('color', new THREE.BufferAttribute(new Float32Array(old.attributes.color.array), 3));
+      g2.computeVertexNormals();
+      rec.trees[0].geometry = g2;
+      if (magenta) rec.trees[0].material = new THREE.MeshBasicMaterial({ color: 0xff00ff });
+      old.dispose();
+      return 'swapped';
+    },
+    showOnlyForest(cx, cz) {
+      let shown = 0;
+      for (const rec of _chunks) {
+        if (!rec || !rec.trees) continue;
+        const on = rec.cx === cx && rec.cz === cz;
+        for (const m of rec.trees) m.visible = on;
+        if (on) shown++;
+      }
+      return { shown };
+    },
+    setTreesVisible(vis) {
+      for (const rec of _chunks) {
+        if (rec && rec.trees) for (const m of rec.trees) m.visible = vis;
+      }
+    },
+    setTreesMaterial(mat) {
+      for (const rec of _chunks) {
+        if (rec && rec.trees) for (const m of rec.trees) m.material = mat || _treeMat;
+      }
+    },
+    setTerrainVisible(vis) {
+      for (const rec of _chunks) {
+        if (rec && rec.mesh) rec.mesh.visible = vis;
+      }
+    },
+    setSkyVisible(vis) {
+      if (_skyMesh) _skyMesh.visible = vis;
+      if (_starPts) _starPts.visible = vis;
+    },
+    makeTreeAt(x, y, z, scale, usePhong, parent, positioned) {
+      // diagnostic: one full conifer, forest-style — optionally parented
+      // to the world root and/or built positioned+local (chunk pattern)
+      const src = TREE_GEO_CONIF.attributes.position;
+      const srcC = TREE_GEO_CONIF.attributes.color;
+      const pos = new Float32Array(src.count * 3), col = new Float32Array(src.count * 3);
+      for (let i = 0; i < src.count; i++) {
+        if (positioned) {
+          pos[i * 3] = src.getX(i) * scale;
+          pos[i * 3 + 1] = src.getY(i) * scale + y;
+          pos[i * 3 + 2] = src.getZ(i) * scale;
+        } else {
+          pos[i * 3] = src.getX(i) * scale + x;
+          pos[i * 3 + 1] = src.getY(i) * scale + y;
+          pos[i * 3 + 2] = src.getZ(i) * scale + z;
+        }
+        col[i * 3] = srcC.getX(i); col[i * 3 + 1] = srcC.getY(i); col[i * 3 + 2] = srcC.getZ(i);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      g.computeVertexNormals();
+      const mat = usePhong ? _treeMat : new THREE.MeshBasicMaterial({ color: 0xff00ff });
+      const m = new THREE.Mesh(g, mat);
+      if (positioned) m.position.set(x, 0, z);
+      m.raycast = () => {};
+      (parent === 'earth' ? _worldRoot : scene).add(m);
+      return { verts: src.count, parent: parent === 'earth' ? 'earth' : 'scene', positioned: !!positioned };
+    },
+    makeForestAt(x, y, z, n, keepMat) {
+      // diagnostic: a REAL merged forest mesh (via _makeForestMesh) with n
+      // trees spread around (x,z), magenta material for visibility
+      const spots = [];
+      const spread = window.__FW_SPREAD || 27;
+      for (let i = 0; i < n; i++) {
+        const cols = Math.max(1, Math.round(Math.sqrt(n) * (spread / 6)));
+        const px = x + (i % cols) * (2 * spread / cols) - spread;
+        const pz = z + Math.floor(i / cols) * (2 * spread / cols) - spread;
+        spots.push({
+          x: px,
+          h: window.__FW_TERRAIN_H ? terrainHeight(px, pz) : y + 0.15,
+          z: pz,
+          r: (i * 0.618) % 1,
+          conifer: true
+        });
+      }
+      const mesh = _makeForestMesh(spots, x, z);
+      if (mesh && !keepMat) mesh.material = new THREE.MeshBasicMaterial({ color: 0xff00ff });
+      return { n, trees: spots.length, mat: keepMat ? 'phong' : 'magenta' };
+    },
+    renderInfo() {
+      return renderer ? { calls: renderer.info.render.calls, tris: renderer.info.render.triangles } : null;
+    },
+    makeTreeProbe(x, z) {
+      // DEFINITIVE split test at the map target:
+      //  A) positioned Mesh, LOCAL geometry (proven path)
+      //  B) positioned Mesh, LOCAL geometry, MeshBasic (no lighting)
+      //  C) world-baked geometry Mesh at origin (the forest-mesh path)
+      //  D) world-baked + transparent material (the plot-pool path)
+      //  E) positioned Mesh, LOCAL geometry, TRANSPARENT Phong
+      // All at scale 3, spread along +x from the target.
+      const out = { probes: [] };
+      const py = Math.max(terrainHeight(x, z), 0);
+      const mk = (label, dx, kind) => {
+        const px = x + dx;
+        const yy = Math.max(terrainHeight(px, z), 0);
+        let obj, geo;
+        if (kind === 'baked' || kind === 'bakedT') {
+          // copy TREE_GEO_CONIF arrays, translated to world coords
+          const src = TREE_GEO_CONIF.attributes.position;
+          const srcC = TREE_GEO_CONIF.attributes.color;
+          const p = new Float32Array(src.count * 3), c = new Float32Array(src.count * 3);
+          for (let i = 0; i < src.count; i++) {
+            p[i * 3] = src.getX(i) * 3 + px;
+            p[i * 3 + 1] = src.getY(i) * 3 + yy;
+            p[i * 3 + 2] = src.getZ(i) * 3 + z;
+            c[i * 3] = srcC.getX(i); c[i * 3 + 1] = srcC.getY(i); c[i * 3 + 2] = srcC.getZ(i);
+          }
+          geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.BufferAttribute(p, 3));
+          geo.setAttribute('color', new THREE.BufferAttribute(c, 3));
+          geo.computeVertexNormals();
+          const mat = (kind === 'bakedT')
+            ? new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, transparent: true, opacity: 0.95 })
+            : _treeMat;
+          obj = new THREE.Mesh(geo, mat);
+        } else if (kind === 'basic') {
+          obj = new THREE.Mesh(TREE_GEO_CONIF, new THREE.MeshBasicMaterial({ vertexColors: true }));
+          obj.position.set(px, yy, z);
+          obj.scale.setScalar(3);
+        } else if (kind === 'trans') {
+          obj = new THREE.Mesh(TREE_GEO_CONIF, new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, transparent: true, opacity: 0.95 }));
+          obj.position.set(px, yy, z);
+          obj.scale.setScalar(3);
+        } else {
+          obj = new THREE.Mesh(TREE_GEO_CONIF, _treeMat);
+          obj.position.set(px, yy, z);
+          obj.scale.setScalar(3);
+        }
+        obj.raycast = () => {};
+        scene.add(obj);
+        out.probes.push({ label, x: px });
+        return obj;
+      };
+      mk('A-phong-local', -80, 'local');
+      mk('B-basic-local', -40, 'basic');
+      mk('C-phong-BAKED', 0, 'baked');
+      mk('D-phong-bakedT', 40, 'bakedT');
+      mk('E-phong-localT', 80, 'trans');
+      return out;
+    },
+    get cfg() { return _cfg; },
+    chunkAt(x, z) {
+      const cx = Math.floor((x + WORLD_X) / CH), cz = Math.floor((z + WORLD_Z) / CH);
+      return (cx >= 0 && cx < CNX && cz >= 0 && cz < CNZ) ? _chunks[cz * CNX + cx] : null;
+    },
+    debugChunks() {
+      const chunks = [], sample = [];
+      for (const rec of _chunks) {
+        if (!rec || !rec.treesOn || !rec.trees) continue;
+        const mesh = rec.trees[0];
+        let bbox = null;
+        if (mesh && mesh.geometry) {
+          mesh.geometry.computeBoundingBox();
+          const bb = mesh.geometry.boundingBox;
+          bbox = {
+            min: [+bb.min.x.toFixed(1), +bb.min.y.toFixed(1), +bb.min.z.toFixed(1)],
+            max: [+bb.max.x.toFixed(1), +bb.max.y.toFixed(1), +bb.max.z.toFixed(1)]
+          };
+        }
+        chunks.push({ c: [rec.cx, rec.cz], res: rec.res, n: rec.treeCount || 0,
+                      verts: mesh && mesh.geometry ? mesh.geometry.attributes.position.count : 0,
+                      bbox,
+                      meshPos: mesh ? [+mesh.position.x.toFixed(1), +mesh.position.y.toFixed(1), +mesh.position.z.toFixed(1)] : null,
+                      firstVerts: mesh && mesh.geometry ? Array.from(mesh.geometry.attributes.position.array.slice(0, 9)).map(v => +v.toFixed(2)) : null,
+                      visible: mesh ? mesh.visible : null });
+      }
+      return { chunks, sample, worldRoot: _worldRoot ? {
+        pos: [+_worldRoot.position.x.toFixed(3), +_worldRoot.position.y.toFixed(3), +_worldRoot.position.z.toFixed(3)],
+        rot: [+_worldRoot.rotation.x.toFixed(3), +_worldRoot.rotation.y.toFixed(3), +_worldRoot.rotation.z.toFixed(3)],
+        scale: [+_worldRoot.scale.x.toFixed(3), +_worldRoot.scale.y.toFixed(3), +_worldRoot.scale.z.toFixed(3)],
+        visible: _worldRoot.visible,
+        mw: _worldRoot.matrixWorld.elements.slice(0, 4).map(v => +v.toFixed(3))
+      } : null };
+    },
+    stats() {
+      let hi = 0, med = 0, trees = 0, treeChunks = 0;
+      for (const rec of _chunks) {
+        if (!rec) continue;
+        if (rec.res === 40) hi++; else if (rec.res === 16) med++;
+        if (rec.treesOn && rec.treeCount) { trees += rec.treeCount; treeChunks++; }
+      }
+      return { planet: _cfg === CFG.earth ? 'earth' : _cfg === CFG.luna ? 'luna' : _cfg === CFG.mars ? 'mars' : 'oceanus', hi, med, trees, treeChunks };
+    }
+  };
+})();
+
+// QA hooks for the automated E2E pass (harmless in production)
+try {
+  window.__FW_QA = function() {
+    const s = FW.stats();
+    return {
+      ...s,
+      dist: camera ? +camera.position.distanceTo(controls.target).toFixed(1) : null,
+      target: controls ? [+controls.target.x.toFixed(1), +controls.target.z.toFixed(1)] : null
+    };
+  };
+  window.__FW_SET_CAM = function(lat, lon, dist) {
+    if (!camera || !controls) return 'no-scene';
+    FW.placeCamera(lon * 20, -lat * 20, dist);
+    return 'ok';
+  };
+  window.__FW_BIZ = function() {
+    const out = [];
+    for (const p of STATE.claimedPlots) {
+      for (const e of (p.userData.businesses || [])) {
+        if (e.mesh) {
+          e.mesh.updateMatrixWorld(true);
+          const v = new THREE.Vector3().setFromMatrixPosition(e.mesh.matrixWorld);
+          out.push({
+            type: e.type,
+            pos: [+v.x.toFixed(1), +v.y.toFixed(1), +v.z.toFixed(1)],
+            visible: e.mesh.visible,
+            inScene: !!e.mesh.parent,
+            scale: +e.mesh.scale.x.toFixed(2)
+          });
+        }
+      }
+    }
+    return JSON.stringify(out);
+  };
+  window.__FW_TERRAIN = function(lat, lon) {
+    return {
+      h: +FW.terrainHeight(lon * 20, -lat * 20).toFixed(2),
+      water: FW.isWaterAt(lat, lon)
+    };
+  };
+} catch (e) {}
 function initScene() {
   canvasContainer = document.getElementById('canvas-container');
 
   scene = new THREE.Scene();
 
-  camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.01, 1000);
-  camera.position.set(0, 0.15, 2.2);   // low-orbit default — globe big, plots in sight
+  // v1.40 — flat-world camera: one continuous range from treetop level
+  // (6 units up) to the whole Earth in view (5200). A tuned near/far pair
+  // (2→12000) keeps z-precision clean at every gameplay distance — and
+  // avoids the logarithmicDepthBuffer + InstancedMesh conflict that
+  // swallowed the forests in three r160.
+  camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 2, 12000);
+  camera.position.set(200, 500, -500);   // placeholder — FW.placeCamera sets the real view
 
   const q = QUALITY_LEVELS[getEffectiveQuality()];
   renderer = new THREE.WebGLRenderer({ antialias: q.antialias, alpha: false, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.pixelRatioCap));
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setClearColor(0x020209, 1);
+  renderer.setClearColor(0x8fc3ee, 1);   // v1.40 — sky-tinted backdrop
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   canvasContainer.appendChild(renderer.domElement);
 
-  // Lighting — the sun is locked to the camera and ambient is strong, so the
-  // ENTIRE world stays evenly lit no matter where you orbit or how the globe
-  // spins. (A fixed low sun used to leave one whole hemisphere dark.)
-  const sun = new THREE.DirectionalLight(0xfff6e0, 2.3);
-  sun.position.set(5, 2, 4);
-  scene.add(sun);
-  sunLight = sun;
+  // v1.40 — lighting lives in the FW module now: a steady sun over the
+  // map, a hemisphere sky/ground light and a touch of ambient (rebuilt
+  // per planet with the world itself)
 
-  const ambient = new THREE.AmbientLight(0x7ba8cc, 0.42);
-  scene.add(ambient);
-  // Gentle back-fill for soft edge shading around the globe's limb
-  const fill = new THREE.DirectionalLight(0x5e82b8, 0.5);
-  fill.position.set(-5, -2, -4);
-  scene.add(fill);
-
-  // Controls
+  // Controls — v1.40 map navigation: left-drag pans across the terrain,
+  // right-drag tilts and rotates the view, the wheel glides the zoom
+  // (intercepted below) toward the point under the cursor.
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
-  controls.dampingFactor = 0.08;
-  controls.rotateSpeed = 0.45;
+  controls.dampingFactor = 0.09;
+  controls.rotateSpeed = 0.42;
   controls.minDistance = STATE.zoomMin;
   controls.maxDistance = STATE.zoomMax;
-  controls.enablePan = false;
+  controls.enablePan = true;
+  controls.screenSpacePanning = false;    // pan across the map plane
+  controls.minPolarAngle = 0.06;          // near top-down
+  controls.maxPolarAngle = 1.32;          // scenic low angle
+  controls.panSpeed = 0.9;
+  controls.zoomToCursor = true;           // pinch-dolly aims at the ground too
+  controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+  controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
   // Track drag state for auto-rotate pause
   controls.addEventListener('start', () => { controls._isInteracting = true; });
   controls.addEventListener('end',   () => { controls._isInteracting = false; });
@@ -8943,6 +9904,16 @@ function initScene() {
         : Math.pow(1 / (1 - ZOOM_STEP), steps);   // scroll down -> zoom out
       STATE.zoomTarget = THREE.MathUtils.clamp(
         STATE.zoomTarget * factor, STATE.zoomMin, STATE.zoomMax);
+      // v1.40 — aim the glide at the ground point under the cursor
+      try {
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointer.set(((e.clientX - rect.left) / rect.width) * 2 - 1,
+                    -((e.clientY - rect.top) / rect.height) * 2 + 1);
+        raycaster.setFromCamera(pointer, camera);
+        if (raycaster.ray.intersectPlane(FW.groundPlane, FW.v1)) {
+          FW.setZoomAnchor(FW.v1.x, FW.v1.z);
+        }
+      } catch (err) {}
     }
     lastInteractionTime = performance.now();    // pause auto-rotate while zooming
   }, { passive: false, capture: true });
@@ -8950,20 +9921,15 @@ function initScene() {
   raycaster = new THREE.Raycaster();
   pointer = new THREE.Vector2();
 
-  buildStarField();
-  buildEarth();
-  // Boot directly onto the saved planet — swap the sphere material before
-  // the first frame (Earth keeps its NASA textures, others are procedural)
+  // v1.40 — the flat world: real continents, deterministic terrain,
+  // naturally generated lakes and forests (the FW module above)
+  FW.build(STATE.planet);
   const _bootPlanet = PLANET_BY_ID[STATE.planet] || PLANET_BY_ID.earth;
-  if (_bootPlanet.id !== 'earth') {
-    earth.material = planetMaterial(_bootPlanet);
-    try { Nature.setPlanet(_bootPlanet); } catch (e) {}   // v1.39 — smooth sphere off-Earth
-  }
-  setAtmosphere(_bootPlanet);
   generatePlots(_bootPlanet);
-  buildOrbitalRings();
-  buildShips();
+  classifyPlotsByTerrain();          // synchronous — the land mask is built in
+  FW.placeCamera(200, -940, 620);    // opening view over the Alps
   initRadar();
+  hideLoader();
 
   window.addEventListener('resize', onResize);
   renderer.domElement.addEventListener('pointermove', onPointerMove);
@@ -9248,26 +10214,18 @@ function loadTopologyMask() {
 
 // Sample the water mask at a given lat/lon. Returns true if water.
 function isWaterAt(lat, lon) {
-  if (!_waterMaskData) return false;
-  // Equirectangular mapping:
-  // x = (lon + 180) / 360 * width
-  // y = (90 - lat) / 180 * height
-  const x = Math.floor(((lon + 180) / 360) * _waterMaskData.width) % _waterMaskData.width;
-  const y = Math.floor(((90 - lat) / 180) * _waterMaskData.height);
-  const idx = (Math.max(0, Math.min(_waterMaskData.height - 1, y)) * _waterMaskData.width + Math.max(0, Math.min(_waterMaskData.width - 1, x))) * 4;
-  // Use red channel (grayscale image — R=G=B)
-  const brightness = _waterMaskData.data[idx];
-  return brightness > 128;
+  // v1.40 — the flat world carries the real land mask built in (Natural
+  // Earth, public domain): synchronous, offline-safe and identical for
+  // every player — no texture download anymore.
+  return FW.isWaterAt(lat, lon);
 }
 
 // Sample the topology (elevation) at a given lat/lon. Returns 0-255 brightness.
 // Higher = more elevated (mountains). Only meaningful on land.
 function elevationAt(lat, lon) {
-  if (!_topologyData) return 0;
-  const x = Math.floor(((lon + 180) / 360) * _topologyData.width) % _topologyData.width;
-  const y = Math.floor(((90 - lat) / 180) * _topologyData.height);
-  const idx = (Math.max(0, Math.min(_topologyData.height - 1, y)) * _topologyData.width + Math.max(0, Math.min(_topologyData.width - 1, x))) * 4;
-  return _topologyData.data[idx];  // red channel (grayscale)
+  // v1.40 — the generated terrain answers directly (mountain > 160,
+  // highland > 110 on the same 0-255 scale the region rules expect)
+  return FW.elevationAt(lat, lon);
 }
 
 // Determine the climate zone for a plot based on latitude.
@@ -10323,28 +11281,33 @@ function drawRadar(now) {
   ctx.beginPath(); ctx.moveTo(C, C);
   ctx.lineTo(C + Math.cos(sweep) * RR, C + Math.sin(sweep) * RR);
   ctx.stroke();
-  // blips: patrol ships, positioned relative to where the camera looks
-  const camA = Math.atan2(camera.position.z, camera.position.x);
-  const t = now * 0.001;
-  for (const d of SHIP_ORBITS) {
-    const a = d.phase + t * d.speed;
-    const rel = _normAngle(a - camA);
-    const dist = Math.min(0.92, Math.max(0.18, (d.r - 1.0) / 1.05));
-    const x = C + Math.sin(rel) * dist * RR;
-    const y = C - Math.cos(rel) * dist * RR;
-    // a blip flashes bright right as the sweep passes over it
-    const da = Math.abs(_normAngle((rel - Math.PI / 2) - sweep));
-    const glow = da < 0.6 ? (1 - da / 0.6) : 0;
-    const alpha = 0.45 + 0.55 * glow;
-    ctx.beginPath(); ctx.arc(x, y, d.kind === 'station' ? 3.4 : 2.6, 0, Math.PI * 2);
-    ctx.fillStyle = d.kind === 'station'
-      ? 'rgba(255,214,140,' + alpha.toFixed(3) + ')'
-      : 'rgba(96,226,255,' + alpha.toFixed(3) + ')';
-    ctx.fill();
-    if (glow > 0.05) {           // fresh-paint ring on recent contacts
-      ctx.beginPath(); ctx.arc(x, y, 4.5 + 3 * (1 - glow), 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(120,235,255,' + (glow * 0.7).toFixed(3) + ')';
-      ctx.lineWidth = 1; ctx.stroke();
+  // v1.40 — flat map: the radar sweeps the LAND around your position —
+  // your plots flash gold, rivals purple, the nearest open land teal
+  const tgt = controls ? controls.target : null;
+  if (tgt && STATE.plots.length) {
+    const range = Math.max(240, Math.min(2800, camera.position.distanceTo(tgt) * 1.15));
+    for (const p of STATE.plots) {
+      const ud = p.userData;
+      if (ud.wx === undefined) continue;
+      const dx = ud.wx - tgt.x, dz = ud.wz - tgt.z;
+      if (dx > range || dx < -range || dz > range || dz < -range) continue;
+      const d = Math.sqrt(dx * dx + dz * dz);
+      if (d > range) continue;
+      const owned = ud.owned || STATE.owned.has(ud.id);
+      const rival = !!ud.ownedByOther;
+      if (!owned && !rival && d > range * 0.45) continue;   // clutter guard far out
+      const x = C + (dx / range) * RR;
+      const y = C + (dz / range) * RR;
+      const da = Math.abs(_normAngle(Math.atan2(dz, dx) - sweep));
+      const glow = da < 0.5 ? (1 - da / 0.5) : 0;
+      ctx.beginPath();
+      ctx.arc(x, y, owned ? 2.8 : rival ? 2.4 : 1.6, 0, Math.PI * 2);
+      ctx.fillStyle = owned
+        ? 'rgba(255,205,110,' + (0.75 + 0.25 * glow).toFixed(3) + ')'
+        : rival
+          ? 'rgba(214,140,255,' + (0.75 + 0.25 * glow).toFixed(3) + ')'
+          : 'rgba(96,226,255,0.45)';
+      ctx.fill();
     }
   }
   // center marker — you
@@ -10358,9 +11321,12 @@ function updateSpaceHud(now) {
   if (clockEl) clockEl.textContent = new Date().toISOString().slice(11, 19);
   const cx = document.getElementById('sf-coord-x');
   const cy = document.getElementById('sf-coord-y');
-  if (cx && cy && camera) {
-    cx.textContent = (camera.position.x * STATE.unitToKm).toFixed(1);
-    cy.textContent = (camera.position.y * STATE.unitToKm).toFixed(1);
+  if (cx && cy && camera && controls) {
+    // v1.40 — live latitude/longitude of the map position under you
+    const lat = -controls.target.z / 20;
+    const lon = controls.target.x / 20;
+    cx.textContent = Math.abs(lat).toFixed(2) + '\u00b0' + (lat >= 0 ? 'N' : 'S');
+    cy.textContent = Math.abs(lon).toFixed(2) + '\u00b0' + (lon >= 0 ? 'E' : 'W');
   }
   // v1.26 — COMPANY readouts: your personal GDP (24h income ledger) and
   // total businesses across every world (replaces the old rank/lvl flavor)
@@ -10492,7 +11458,12 @@ function rebuildPlotPools() {
     const t = ud._tris, n = t.length;
     const dPos = owned ? owPos : unPos, dCol = owned ? owCol : unCol;
     const base = owned ? vo : vu;
-    for (let k = 0; k < n; k++) dPos[base + k] = t[k] * scale;
+    const fc = ud._flatC;   // v1.40 — lift a selected plot around its own centroid
+    if (fc) {
+      for (let k = 0; k < n; k++) dPos[base + k] = fc[k % 3] + (t[k] - fc[k % 3]) * scale;
+    } else {
+      for (let k = 0; k < n; k++) dPos[base + k] = t[k] * scale;
+    }
     c.setHex(ud._fillHex);
     for (let k = 0; k < n / 3; k++) {
       dCol[base + k * 3] = c.r; dCol[base + k * 3 + 1] = c.g; dCol[base + k * 3 + 2] = c.b;
@@ -10502,7 +11473,12 @@ function rebuildPlotPools() {
     const e = ud._edges, m = e.length;
     const dOPos = owned ? owOPos : unOPos, dOCol = owned ? owOCol : unOCol;
     const ebase = owned ? eo : eu;
-    for (let k = 0; k < m; k++) dOPos[ebase + k] = e[k] * scale;
+    const efc = ud._flatC;   // v1.40 — centroid-relative lift for outlines too
+    if (efc) {
+      for (let k = 0; k < m; k++) dOPos[ebase + k] = efc[k % 3] + (e[k] - efc[k % 3]) * scale;
+    } else {
+      for (let k = 0; k < m; k++) dOPos[ebase + k] = e[k] * scale;
+    }
     c.setHex(ud._outlineHex);
     for (let k = 0; k < m / 3; k++) {
       dOCol[ebase + k * 3] = c.r; dOCol[ebase + k * 3 + 1] = c.g; dOCol[ebase + k * 3 + 2] = c.b;
@@ -10682,47 +11658,39 @@ function generatePlots(planet, opts = {}) {
       if (best >= 0 && bestD < 1e-6) bordering.push(planet.idBase + neighbors[best].j);
     }
 
-    // ---- Step 3: Build spherical polygon mesh ----
-    // Each cell is rendered as a triangle fan on the sphere surface:
-    //   - Centroid = p_i (on sphere)
-    //   - Boundary vertices = sphere-projected from tangent plane
-    //   - Triangles: (centroid, v_k, v_{k+1}) for each edge
-    // This ensures all geometry is ON the sphere, eliminating inter-cell
-    // overlap caused by flat tangent-plane approximation.
-    const vertexRadius = EARTH_RADIUS * 1.004;
-    const centroid3D = p_i.clone().multiplyScalar(vertexRadius);
-    const sphereVerts = [];
+    // ---- Step 3: Build the flat-map plot cell (v1.40) ----
+    // The cell polygon is still the tangent-plane Voronoi cell (same
+    // seeds, same areas, same ids as every version before) — now it is
+    // laid onto the flat map at the plot's real Earth position:
+    // u → east (+x), w → north (−z). Every vertex drops onto the
+    // generated terrain so claims hug the land and float just above
+    // the ocean surface.
+    const RAD2U = 180 / Math.PI * 20;         // tangent radians → map units (1° = 20u)
+    const cwx = seed.lon * 20, cwz = -seed.lat * 20;
+    const uwY = (u, w) => FW.plotSurfaceY(cwx + u * RAD2U, cwz - w * RAD2U);
+    const cY = uwY(0, 0);
+    // ring with edge midpoints — the fill hugs rolling terrain
+    const ring = [];
     for (let k = 0; k < cell.length; k++) {
-      const v = cell[k];
-      const pos3D = new THREE.Vector3()
-        .addScaledVector(p_i, 1.0)
-        .addScaledVector(uAxis, v.u)
-        .addScaledVector(wAxis, v.w);
-      pos3D.normalize().multiplyScalar(vertexRadius);
-      sphereVerts.push(pos3D);
+      const a = cell[k], b = cell[(k + 1) % cell.length];
+      ring.push(a);
+      ring.push({ u: (a.u + b.u) / 2, w: (a.w + b.w) / 2 });
     }
-
-    // Triangle fan from centroid to each edge, kept as a flat
-    // Float32Array — cells are merged into pooled meshes (see PLOT
-    // RENDER POOLS above) rather than one Mesh per plot.
-    const tris = new Float32Array(sphereVerts.length * 9);
-    for (let k = 0; k < sphereVerts.length; k++) {
-      const v1 = sphereVerts[k];
-      const v2 = sphereVerts[(k + 1) % sphereVerts.length];
+    const tris = new Float32Array(ring.length * 9);
+    for (let k = 0; k < ring.length; k++) {
+      const p1 = ring[k], p2 = ring[(k + 1) % ring.length];
       let o = k * 9;
-      tris[o] = centroid3D.x; tris[o+1] = centroid3D.y; tris[o+2] = centroid3D.z;
-      tris[o+3] = v1.x; tris[o+4] = v1.y; tris[o+5] = v1.z;
-      tris[o+6] = v2.x; tris[o+7] = v2.y; tris[o+8] = v2.z;
+      tris[o] = cwx; tris[o+1] = cY; tris[o+2] = cwz;
+      tris[o+3] = cwx + p1.u * RAD2U; tris[o+4] = uwY(p1.u, p1.w); tris[o+5] = cwz - p1.w * RAD2U;
+      tris[o+6] = cwx + p2.u * RAD2U; tris[o+7] = uwY(p2.u, p2.w); tris[o+8] = cwz - p2.w * RAD2U;
     }
-
-    // Boundary edges for the outline, as a flat Float32Array (3D, planet-local)
-    const edges = new Float32Array(sphereVerts.length * 6);
-    for (let k = 0; k < sphereVerts.length; k++) {
-      const v1 = sphereVerts[k];
-      const v2 = sphereVerts[(k + 1) % sphereVerts.length];
+    // outline follows the cell corners (crisp borders just above the fill)
+    const edges = new Float32Array(cell.length * 6);
+    for (let k = 0; k < cell.length; k++) {
+      const p1 = cell[k], p2 = cell[(k + 1) % cell.length];
       let o = k * 6;
-      edges[o] = v1.x; edges[o+1] = v1.y; edges[o+2] = v1.z;
-      edges[o+3] = v2.x; edges[o+4] = v2.y; edges[o+5] = v2.z;
+      edges[o] = cwx + p1.u * RAD2U; edges[o+1] = uwY(p1.u, p1.w) + 0.06; edges[o+2] = cwz - p1.w * RAD2U;
+      edges[o+3] = cwx + p2.u * RAD2U; edges[o+4] = uwY(p2.u, p2.w) + 0.06; edges[o+5] = cwz - p2.w * RAD2U;
     }
 
     // Build 2D polygon for area computation (shoelace on tangent plane)
@@ -10823,8 +11791,10 @@ function generatePlots(planet, opts = {}) {
       baseColor: baseColor.getHex(),
       sizeA: Math.sqrt(area),   // linear plot size (business layout on plot)
       polyUW: cell.map(v => ({ u: v.u, w: v.w })),  // tangent-plane polygon — free-placement clamp
-      _tris: tris,              // fill triangles, planet-local coords
-      _edges: edges,            // outline segments, planet-local coords
+      wx: cwx, wz: cwz,         // v1.40 — plot centroid on the flat map
+      _flatC: [cwx, cY, cwz],   // v1.40 — centroid for selection scaling
+      _tris: tris,              // fill triangles, flat-map world coords
+      _edges: edges,            // outline segments, flat-map world coords
       _fillHex: baseColor.getHex(),
       _outlineHex: PLOT_UNOWNED_OUTLINE
     };
@@ -11026,13 +11996,14 @@ let _lastOpacityBucket = -1;
 
 function updatePlotVisibility() {
   if (!plotFillMesh) return;
-  const dist = camera.position.length();
-  // 0 when far (zoomMax), 1 when close (plotFullDist)
+  // v1.40 — flat map: the camera ALTITUDE over the map target drives the
+  // plot veil (fades in from 1500 down to 300 units above the ground)
+  const dist = camera.position.distanceTo(controls.target);
   const t = 1 - THREE.MathUtils.clamp((dist - STATE.plotFullDist) / (STATE.plotRevealDist - STATE.plotFullDist), 0, 1);
   let baseOpacity = t;
-  // v1.39 — deep in the natural view, ease the plot veil back so the
-  // terrain and forest read through (plot borders stay visible for play)
-  if (dist < 1.16) baseOpacity *= Math.max(0.45, Math.min(1, (dist - 1.03) / 0.13));
+  // Deep in the natural view, ease the plot veil back so the terrain and
+  // the forest read through (the faint borders stay visible for play)
+  if (dist < 160) baseOpacity *= Math.max(0.22, Math.min(1, (dist - 40) / 120));
   const showAny = t > 0.02;
   const hasClaims = STATE.claimedPlots.length > 0;
   // v1.22: the bright always-visible pool is for RIVAL land only
@@ -11043,9 +12014,6 @@ function updatePlotVisibility() {
   const opacityChanged = bucket !== _lastOpacityBucket;
   if (opacityChanged) _lastOpacityBucket = bucket;
 
-  // World cells — yours included (v1.22) — appear when zoomed in and
-  // fade with the terrain like everything else; only rival-claimed
-  // cells stay visible from space.
   plotFillMesh.visible = showAny;
   plotOutlineMesh.visible = showAny;
   plotOwnedMesh.visible = hasRivals;
@@ -11060,20 +12028,14 @@ function updatePlotVisibility() {
   // Roads (v1.24) — fade in with the plots, vanish from orbit with them
   try { Roads.setOpacity(baseOpacity, showAny); } catch (e) {}
 
-  // Business meshes follow their plot's near side (the Earth rotates)
+  // v1.40 — flat map: businesses show whenever plots do (no far side)
   if (hasClaims) {
-    _camLocal.copy(camera.position);
-    earth.worldToLocal(_camLocal);
-    const dotThresholdOwned = 0.03 * _camLocal.length();
-    const bizNear = baseOpacity > 0.05;
+    const bizNear = t > 0.05;
     for (const p of STATE.claimedPlots) {
-      const dir = p.userData.localDir;
-      const dot = dir.x * _camLocal.x + dir.y * _camLocal.y + dir.z * _camLocal.z;
-      const bizVisible = dot > dotThresholdOwned && bizNear;
       const businesses = p.userData.businesses;
       if (businesses) {
         for (const entry of businesses) {
-          if (entry.mesh) entry.mesh.visible = bizVisible;
+          if (entry.mesh) entry.mesh.visible = bizNear;
         }
       }
     }
@@ -12017,12 +12979,12 @@ window.travelTo = function(planetId) {
   WarFx.reset();   // v1.18 — march fx belong to the world you're leaving
   Roads.teardown();   // v1.24 — the road layer belongs to the world you're leaving
 
-  // Swap the world
-  earth.material = planetMaterial(planet);
-  setAtmosphere(planet);
+  // Swap the world (v1.40 — every planet is a flat generated terrain now)
+  FW.dispose();
+  FW.build(planetId);
   STATE.planet = planetId;
   generatePlots(planet);
-  try { Nature.setPlanet(planet); } catch (e) { console.warn('[OpenWorld] Nature travel failed:', e); }
+  FW.refreshAll();
 
   // Re-apply ownership + businesses + other players' claims.
   // The global claims registry is the authority — if one of my plots here
@@ -17049,21 +18011,19 @@ function regionBonusById(businessId, region) {
 }
 
 function updateZoomMeter() {
-  const dist = camera.position.length();
-  // Altitude above surface (km)
-  const altUnits = Math.max(0, dist - EARTH_RADIUS);
-  const altKm = altUnits * STATE.unitToKm;
+  // v1.40 — flat map: altitude is the camera's height over the map target
+  const dist = camera.position.distanceTo(controls.target);
   const altEl = document.getElementById('altitude');
-  if (altKm > 1000) {
-    altEl.textContent = (altKm / 1000).toFixed(1) + ' Mm';
-  } else if (altKm > 1) {
-    altEl.textContent = Math.round(altKm).toLocaleString() + ' km';
-  } else {
-    altEl.textContent = 'Surface';
+  if (altEl) {
+    if (dist < 30) altEl.textContent = 'Canopy';
+    else if (dist < 1000) altEl.textContent = Math.round(dist * 5.55).toLocaleString() + ' km';
+    else altEl.textContent = (dist * 5.55 / 1000).toFixed(1) + ' Mm';
   }
-  // Zoom bar fill: 0% at zoomMax, 100% at zoomMin
-  const t = 1 - THREE.MathUtils.clamp((dist - STATE.zoomMin) / (STATE.zoomMax - STATE.zoomMin), 0, 1);
-  document.getElementById('zoom-fill').style.width = (t * 100).toFixed(1) + '%';
+  // Zoom bar fill: log scale across the whole map zoom range
+  const lo = Math.log(STATE.zoomMin), hi = Math.log(STATE.zoomMax);
+  const t = 1 - THREE.MathUtils.clamp((Math.log(Math.max(1, dist)) - lo) / (hi - lo), 0, 1);
+  const fill = document.getElementById('zoom-fill');
+  if (fill) fill.style.width = (t * 100).toFixed(1) + '%';
 }
 
 // ====================================================================
@@ -17121,14 +18081,9 @@ function animate() {
   processPointerPick();   // v1.21 — deferred plot picking (one per frame)
   WarFx.restoreShake();   // v1.18 — undo last frame's battle jitter before controls see it
   tickAdaptiveQuality(now);
-  // Slow auto-rotate, paused while user is interacting OR hovering the canvas
-  // (so they can reliably click plots without the world drifting).
+  // v1.40 — the flat map never auto-drifts; it waits for your hand
   const sinceInteract = now - lastInteractionTime;
   const paused = controls._isInteracting || sinceInteract < 1500;
-  if (earthAutoRotate && !paused && camera.position.length() > 1.3) {
-    // v1.39 — the world stops drifting once you're down among the trees
-    earth.rotation.y += 0.0004;
-  }
   // Smooth zoom glide: ease the actual camera distance toward the wheel
   // target with a capped speed (~60% distance change per second), so no
   // gesture can ever slam the view across the zoom range — it glides.
@@ -17136,6 +18091,7 @@ function animate() {
   // stays authoritative and the target just follows along.
   if (controls._isInteracting) {
     STATE.zoomTarget = camera.position.distanceTo(controls.target);
+    FW.clearZoomAnchor();
   } else {
     const _curDist = camera.position.distanceTo(controls.target);
     if (Math.abs(STATE.zoomTarget - _curDist) > 0.0005) {
@@ -17143,11 +18099,47 @@ function animate() {
       const _maxRatio = Math.exp(0.32 * _dt);   // capped glide speed (~38%/s)
       const _ratio = THREE.MathUtils.clamp(STATE.zoomTarget / _curDist, 1 / _maxRatio, _maxRatio);
       camera.position.sub(controls.target).setLength(_curDist * _ratio).add(controls.target);
+      // v1.40 — glide toward the ground point under the cursor (map feel):
+      // translate the whole camera rig so the view direction stays steady
+      const _fwA = FW.pullZoomAnchor();
+      if (_fwA) {
+        const _k = (1 - _ratio) * 2.2;
+        const _nx = THREE.MathUtils.clamp(controls.target.x + (_fwA.x - controls.target.x) * _k, -3600, 3600);
+        const _nz = THREE.MathUtils.clamp(controls.target.z + (_fwA.z - controls.target.z) * _k, -1800, 1800);
+        camera.position.x += _nx - controls.target.x;
+        camera.position.z += _nz - controls.target.z;
+        controls.target.x = _nx;
+        controls.target.z = _nz;
+      }
+    } else {
+      FW.clearZoomAnchor();
     }
   }
   _zoomLastT = now;
-  try { Nature.update(now); } catch (e) { /* v1.39 — terrain/forest LOD upkeep */ }
+  try { FW.update(now); } catch (e) { /* v1.40 — flat-world chunk/LOD upkeep */ }
   controls.update();
+  // v1.40 — the target RIDES THE TERRAIN SURFACE (not the y=0 map plane):
+  // aiming at the plane put the view center underground at close zoom,
+  // letting every rolling hill wall the scene off. The target also stays
+  // within the map bounds.
+  controls.target.y = FW.groundY(controls.target.x, controls.target.z);
+  controls.target.x = THREE.MathUtils.clamp(controls.target.x, -3600, 3600);
+  controls.target.z = THREE.MathUtils.clamp(controls.target.z, -1800, 1800);
+  // Auto-tilt (Google-Earth style): as you descend the view tilts toward
+  // straight-down, so rolling hills between you and the target can never
+  // wall the camera off — the last hill before a valley would otherwise
+  // hide everything at ground level
+  const _fwDist = camera.position.distanceTo(controls.target);
+  controls.maxPolarAngle = Math.max(0.12, Math.min(1.32, (_fwDist - 6) * 0.011));
+  let _fwGround = FW.groundY(camera.position.x, camera.position.z);
+  for (let _fwk = 1; _fwk <= 4; _fwk++) {
+    const _fwt = _fwk / 5;
+    _fwGround = Math.max(_fwGround, FW.groundY(
+      camera.position.x + (controls.target.x - camera.position.x) * _fwt,
+      camera.position.z + (controls.target.z - camera.position.z) * _fwt));
+  }
+  const _fwMinY = _fwGround + 4;
+  if (camera.position.y < _fwMinY) camera.position.y = _fwMinY;
   // Free placement upkeep: cancel when a modal/menu takes over, and pulse
   // the ghost ring while the pending spot is armed
   if (STATE.placing) {
@@ -17171,18 +18163,8 @@ function animate() {
        STATE.multiBuy || STATE.multiSell || STATE.placing)) {
     try { Roads.exit(true); } catch (e) {}
   }
-  // Sun rides just off the camera's shoulder (rotated ~35 degrees right):
-  // the globe always shows a day/night terminator like a real orbital view,
-  // while the side you are looking at stays readable for gameplay.
-  if (sunLight) {
-    _sunSph.setFromVector3(camera.position);
-    _sunSph.theta += 0.62;
-    _sunSph.phi = Math.max(0.6, Math.min(Math.PI - 0.6, _sunSph.phi));
-    sunLight.position.setFromSpherical(_sunSph);
-  }
-  if (clouds) { clouds.visible = STATE.planet === 'earth'; clouds.rotation.y += 0.00055; }
-  if (orbitalGroup) orbitalGroup.rotation.y += 0.00028;
-  updateShips(now);
+  // v1.40 — the sun is placed by FW.update (a steady light over the map);
+  // no orbital dressing (rings / ships / cloud deck) around a flat world
   updateBizFx(now);      // business accents: neon breathing, flares, strobes
   WarFx.update(now);     // v1.18 — war marches: convoys, runways, beacons, bursts, shake
   updatePlotVisibility();
@@ -17231,6 +18213,8 @@ window.enterGame = function() {
         showToast(`Welcome back, ${CURRENT_USER}!`, true);
       }
     }
+    // v1.40 — open the map over your land when you have any
+    try { FW.focusOwnedOrDefault(); } catch (e) {}
     // Businesses on planets you own land on but aren't visiting still
     // produce — make sure their generation meta exists for production
     for (const pl of PLANETS) {
