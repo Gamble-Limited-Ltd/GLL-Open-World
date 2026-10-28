@@ -1530,7 +1530,7 @@ input,select,textarea{font-family:var(--cr-mono)}
       <button class="ow-chip-btn ow-chip-logout" onclick="logout()">⏻ Logout</button>
     </div>
   </div>
-  <div class="ow-build-pill">Build v1.38</div>
+  <div class="ow-build-pill">Build v1.39</div>
 
   <div class="modal" id="settings">
     <div class="panel">
@@ -1817,6 +1817,7 @@ input,select,textarea{font-family:var(--cr-mono)}
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // ====================================================================
 // ONLINE MULTIPLAYER (optional) — powered by a free Supabase project.
@@ -1928,6 +1929,7 @@ function applyQualityChange() {
   if (earth) {
     earth.geometry.dispose();
     earth.geometry = new THREE.SphereGeometry(EARTH_RADIUS, q.earthSegments, q.earthSegments);
+    try { Nature.onQualityChange(); } catch (e) {}   // v1.39 — terrain for Earth, sphere elsewhere
   }
   if (atmosphere) {
     atmosphere.geometry.dispose();
@@ -1994,7 +1996,7 @@ const STATE = {
   lastProductionTime: 0,        // timestamp of last production tick
   marketUpdateInterval: 15 * 60 * 1000,  // 15 minutes in ms (v1.4 slow pacing)
   radius: 1.0,                // Earth radius in scene units
-  zoomMin: 1.12,              // closest zoom — low orbit over the surface (wide zoom range now)
+  zoomMin: 1.035,             // v1.39 — from orbit all the way down among the trees
   zoomMax: 7.5,               // farthest — full orbital sector view with rings and ships
   zoomTarget: 2.2,             // matches the default camera distance (low orbit)
   plotRevealDist: 3.3,        // camera distance at which plots begin to appear
@@ -3898,6 +3900,7 @@ function getPlotOwner(plotId) {
 // territory stays readable for war.
 // --------------------------------------------------------------------
 function setOwnedPlotLook(p, mine) {
+  try { Nature.refreshPlot(p); } catch (e) {}   // v1.39 — keep forests off claimed land
   if (mine) {
     setPlotColors(p, p.userData.baseColor, plotBaseOutline(p));
   } else {
@@ -5127,7 +5130,7 @@ const Roads = (() => {
 
   function setOpacity(t, showAny) {
     if (!roadGroup) return;
-    roadGroup.visible = !!(showAny && roadGroup.userData.tileCount > 0);
+    roadGroup.visible = false;   // v1.39 — natural world: roads are retired (save data kept)
     // Roads keep a punchy floor while the plot layer is up — they're thin
     // features and would wash out at the far end of the plot zoom band
     if (asphaltMat) asphaltMat.opacity = Math.max(t * 0.96, 0.78);
@@ -6020,8 +6023,12 @@ window.WarFx = WarFx;
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.38';
+const GAME_VERSION = 'v1.39';
 const RELEASE_NOTES = [
+  { v: 'v1.39', items: [
+    '🌍 <b>A natural Earth</b> — the world is no longer a photo from orbit: it is <b>generated terrain</b> now — rolling green hills, sandy shores, snowy mountain ranges and <b>naturally generated lakes</b>, all deterministic (the same world for every player, every visit). <b>Real forests</b> grow across the continents — trees thicken as you descend, and your own land stays clear so you can keep building. The globe still reads as Earth: real coastlines, deserts, boreal belts and ice caps. And you can <b>zoom in much, much farther</b> — from orbit all the way down to walking among the trees, with terrain detail that refines as you descend.',
+    '🛣 <b>Roads retired</b> — the natural world has no roads and no generated buildings. The road builder is retired from the plot panel (existing save data is kept safely).'
+  ]},
   { v: 'v1.38', items: [
     '🚀 <b>Home page straight into the 3D world</b> — clicking <b>PLAY FREE IN BROWSER</b>, <b>LAUNCH GAME</b> or <b>ENTER WORLD</b> on your home page now takes you <b>directly into the 3D world</b> the moment login completes. The brief stop on the old in-game title screen in between is gone.'
   ]},
@@ -8099,6 +8106,758 @@ let raycaster, pointer;
 let canvasContainer;
 let sunLight; // camera-locked sun — keeps the whole world lit from every angle
 
+// ====================================================================
+// v1.39 — NATURAL EARTH: generated terrain, lakes & forests
+// ====================================================================
+// The Earth is no longer a satellite photo stretched over a smooth
+// ball — it is a generated world: real relief (plains, hills and
+// mountain ranges shaped by the NASA topology map), natural lakes
+// (deterministic depressions that fill with the sea-level water
+// shell), climate colors (park greens, savanna, desert, snow) and
+// forests of low-poly trees that grow across every continent.
+// Everything is hash-seeded: the same world for every player on
+// every visit — nothing here is random per session.
+//
+// Layers (children of `earth`, Earth only — Luna/Mars/Oceanus keep
+// their procedural textures):
+//   terrain mesh   displaced + vertex-colored sphere (the land itself)
+//   water shell    translucent sea-level sphere — oceans + every lake
+//   tree cells     6-degree instanced forests, activated near camera
+//   micro forest   dense near-camera trees for the deepest zoom
+//   ground patch   fine local terrain when you zoom in far
+//
+// Gameplay is untouched: plots, businesses, machines and picking all
+// work exactly as before (plot fills float above the tallest terrain;
+// picking only ever raycasts the plot pools). Trees keep clear of any
+// plot you own, so your land is always ready to build on.
+// ====================================================================
+const NATURE_SEED = 1391397;
+const NAT = {
+  ocean: -0.0013,      // ocean floor base (below sea level = EARTH_RADIUS)
+  lakeBed: -0.0012,    // generated lake beds
+  landBase: 0.00045,   // plains sit just above the sea
+  reliefMax: 0.00215,  // how far real mountain ranges rise
+  hillAmp: 0.0011,     // rolling-hills amplitude
+  terrainMax: 0.0026,  // hard cap — stays under the plot fills (1.004)
+  globalBias: -0.0002, // global mesh sits low so the fine patch always wins
+  patchLift: 0.00003,  // fine patch rides just above the global mesh
+  treeLift: 0.00006    // tree roots sit just above true terrain
+};
+
+// ---- deterministic noise: integer hash -> value noise -> fbm ------
+function _natHash(ix, iy, seed) {
+  let h = (Math.imul(ix, 374761393) + Math.imul(iy, 668265263) + Math.imul(seed, 2246822519)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+function _natNoise(x, y, seed) {
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const a = _natHash(xi, yi, seed), b = _natHash(xi + 1, yi, seed);
+  const c = _natHash(xi, yi + 1, seed), d = _natHash(xi + 1, yi + 1, seed);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+function _natFbm(x, y, seed, oct) {
+  let f = 0, amp = 0.5, tot = 0, fx = x, fy = y;
+  for (let i = 0; i < oct; i++) {
+    f += _natNoise(fx, fy, seed + i * 101) * amp;
+    tot += amp;
+    fx *= 2.03; fy *= 1.97; amp *= 0.5;
+  }
+  return f / tot;   // 0..1
+}
+function _natSmooth(a, b, t) {
+  if (a === b) return t >= b ? 1 : 0;
+  let x = (t - a) / (b - a);
+  x = x < 0 ? 0 : x > 1 ? 1 : x;
+  return x * x * (3 - 2 * x);
+}
+
+// ---- lat/lon <-> direction (same convention as the plot seeds) -----
+const _natLL = { lat: 0, lon: 0 };
+function natLatLonToDir(lat, lon, out) {
+  const la = lat * Math.PI / 180, lo = lon * Math.PI / 180;
+  const cl = Math.cos(la);
+  out.set(cl * Math.cos(lo), Math.sin(la), -cl * Math.sin(lo));
+  return out.normalize();
+}
+function natDirToLatLon(dir, out) {
+  out = out || _natLL;
+  out.lat = Math.asin(THREE.MathUtils.clamp(dir.y, -1, 1)) * 180 / Math.PI;
+  out.lon = -Math.atan2(dir.z, dir.x) * 180 / Math.PI;
+  return out;
+}
+function natAngDist(lat1, lon1, lat2, lon2) {
+  const a = lat1 * Math.PI / 180, b = lat2 * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const c = Math.sin(a) * Math.sin(b) + Math.cos(a) * Math.cos(b) * Math.cos(dLon);
+  return Math.acos(THREE.MathUtils.clamp(c, -1, 1)) * 180 / Math.PI;
+}
+
+// ---- the heightfield (radius = EARTH_RADIUS + h) -------------------
+function natHeight(lat, lon) {
+  if (lat > 89.5 || lat < -89.5) lon = 0;          // sphere pole seam
+  if (_waterMaskData && isWaterAt(lat, lon)) {
+    return NAT.ocean - 0.0008 * _natFbm(lon * 0.35, lat * 0.35, 4242, 2);
+  }
+  // Before the masks arrive the fallback world is dry land above the sea
+  let h = _waterMaskData ? NAT.landBase : 0.0007;
+  if (_topologyData) {
+    const elev = elevationAt(lat, lon) / 255;
+    h += _natSmooth(0.30, 0.88, elev) * NAT.reliefMax;
+  }
+  h += (_natFbm(lon * 0.7, lat * 0.7, 1337, 2) - 0.5) * NAT.hillAmp;
+  if (_waterMaskData) {
+    // Naturally generated lakes — deterministic depressions on the land.
+    // Deep enough to dip below the sea-level shell, so water fills them.
+    const lake = _natFbm(lon * 0.16, lat * 0.16, 9292, 3);
+    if (lake > 0.62) {
+      const t = _natSmooth(0.62, 0.80, lake);
+      h = h * (1 - t) + NAT.lakeBed * t;
+    }
+  }
+  return Math.min(NAT.terrainMax, Math.max(-0.0017, h));
+}
+
+// ---- terrain colors (stylized natural palette) ---------------------
+const _nc2 = new THREE.Color();
+function natColor(lat, lon, h, out) {
+  if (lat > 89.5 || lat < -89.5) lon = 0;
+  const absLat = Math.abs(lat);
+  const moist = _natFbm(lon * 0.07, lat * 0.07, 9090, 3);
+  const forest = _natFbm(lon * 0.11, lat * 0.11, 17171, 3);
+
+  if (h < 0.00002) {
+    // Underwater: sandy shallows fade to a dark bed (turquoise edges
+    // through the translucent water — lakes read like the reference)
+    const d = Math.min(1, Math.max(0, -h / 0.0013));
+    out.setRGB(0.76, 0.70, 0.52);
+    _nc2.setRGB(0.075, 0.16, 0.27);
+    out.lerp(_nc2, d);
+    return;
+  }
+  // Grass base: golden where dry, park-green where moist
+  out.setRGB(0.60, 0.53, 0.28);
+  _nc2.setRGB(0.34, 0.55, 0.21);
+  out.lerp(_nc2, _natSmooth(0.34, 0.62, moist));
+  // Forest masses read darker from orbit (the trees come in on zoom)
+  _nc2.setRGB(0.16, 0.36, 0.15);
+  out.lerp(_nc2, _natSmooth(0.46, 0.74, forest));
+  // Deserts: dry subtropical belts
+  const dryW = _natSmooth(0.42, 0.30, moist) * (1 - _natSmooth(36, 52, absLat));
+  _nc2.setRGB(0.82, 0.71, 0.45);
+  out.lerp(_nc2, dryW);
+  // Boreal belt
+  _nc2.setRGB(0.27, 0.37, 0.24);
+  out.lerp(_nc2, _natSmooth(48, 64, absLat) * 0.55);
+  // Rock on the high slopes
+  _nc2.setRGB(0.46, 0.44, 0.40);
+  out.lerp(_nc2, _natSmooth(0.0016, 0.0024, h));
+  // Snow caps + polar ice
+  const snowW = Math.max(_natSmooth(0.00215, 0.0026, h), _natSmooth(62, 72, absLat));
+  _nc2.setRGB(0.92, 0.94, 0.96);
+  out.lerp(_nc2, snowW);
+  // Beach fringe rings every shore — ocean and lake alike
+  _nc2.setRGB(0.80, 0.73, 0.55);
+  out.lerp(_nc2, (1 - _natSmooth(0.00004, 0.0005, h)) * 0.85);
+}
+
+// ---- tree eligibility ----------------------------------------------
+function natTreeAt(lat, lon) {
+  if (lat > 89 || lat < -89) return null;
+  if (!_waterMaskData) return null;               // wait for the real world
+  if (isWaterAt(lat, lon)) return null;
+  const h = natHeight(lat, lon);
+  if (h < 0.00028) return null;                   // beaches & lake beds stay open
+  const absLat = Math.abs(lat);
+  if (h > 0.00205) return null;                   // above the tree line
+  const f = _natFbm(lon * 0.11, lat * 0.11, 17171, 3);
+  if (f < 0.44) return null;                       // open grassland / desert
+  const moist = _natFbm(lon * 0.07, lat * 0.07, 9090, 3);
+  if (moist < 0.33 && absLat < 42) return null;    // deserts are treeless
+  const polar = _natSmooth(60, 71, absLat);
+  if (polar > 0.9) return null;
+  const density = _natSmooth(0.44, 0.72, f) * (1 - polar * 0.75);
+  return { h, density };
+}
+
+// ---- module state ---------------------------------------------------
+let natureGroup = null, natWater = null;
+let natTerrainGeo = null, natSmoothGeo = null;
+let natMaskWater = false, natMaskTopo = false, natCellsStarted = false;
+const natCells = new Map();          // "ci:cj" -> cell
+let natCellQueue = [], natCellTimer = null;
+const natPlotBuckets = new Map();    // "ci:cj" -> [{id, dir}]
+const natPlotCells = new Map();      // plotId -> Set(cellKey)
+let natMicro = null;                 // {lat, lon, meshB, meshP, n}
+let natPatchMesh = null, natPatch = null, natPatchLastBuild = 0;
+let _natLastHeavy = 0, _natCellsShown = false;
+const _natV1 = new THREE.Vector3(), _natV2 = new THREE.Vector3(), _natV3 = new THREE.Vector3();
+const _east = new THREE.Vector3(), _north = new THREE.Vector3();
+const NAT_CELL = 6;                  // coarse forest cell, degrees
+const NAT_TREE_SCALE_B = 0.0089;     // broadleaf instance base scale (geo is ~1.1 units tall)
+const NAT_TREE_SCALE_P = 0.0088;     // pine instance base scale (geo is ~1.27 units tall)
+const NAT_PATCH_TIERS = [
+  { d: 1.12, span: 11.0 },
+  { d: 1.05, span: 4.2 },
+  { d: 1.035, span: 3.0 }
+];
+const NAT_PATCH_G = 128;
+
+// ---- tree geometry (two species, vertex-colored, ~40 tris each) ----
+function natPaintGeo(geo, r, g, b) {
+  const n = geo.attributes.position.count;
+  const col = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { col[i * 3] = r; col[i * 3 + 1] = g; col[i * 3 + 2] = b; }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  return geo;
+}
+let natGeoBroad = null, natGeoPine = null, natTreeMat = null;
+function natNI(geo) {
+  // mergeGeometries needs every part indexed the same way — cylinders
+  // and cones are indexed, icosahedrons are not. Normalize to non-indexed.
+  if (geo.index) {
+    const ni = geo.toNonIndexed();
+    geo.dispose();
+    return ni;
+  }
+  return geo;
+}
+function natEnsureTreeAssets() {
+  if (natGeoBroad) return;
+  const trunk = natNI(new THREE.CylinderGeometry(0.07, 0.11, 0.55, 5, 1, true).translate(0, 0.275, 0));
+  natPaintGeo(trunk, 0.36, 0.26, 0.17);
+  const can = natNI(new THREE.IcosahedronGeometry(0.45, 1).scale(1, 0.88, 1).translate(0, 0.80, 0));
+  natPaintGeo(can, 0.26, 0.52, 0.22);
+  natGeoBroad = mergeGeometries([trunk, can]);
+
+  const trunk2 = natNI(new THREE.CylinderGeometry(0.07, 0.11, 0.45, 5, 1, true).translate(0, 0.225, 0));
+  natPaintGeo(trunk2, 0.32, 0.22, 0.15);
+  const c1 = natNI(new THREE.ConeGeometry(0.42, 0.62, 6).translate(0, 0.66, 0));
+  natPaintGeo(c1, 0.13, 0.34, 0.18);
+  const c2 = natNI(new THREE.ConeGeometry(0.28, 0.5, 6).translate(0, 1.02, 0));
+  natPaintGeo(c2, 0.16, 0.38, 0.20);
+  natGeoPine = mergeGeometries([trunk2, c1, c2]);
+
+  natTreeMat = new THREE.MeshPhongMaterial({
+    vertexColors: true, flatShading: true, shininess: 4,
+    specular: new THREE.Color(0x111111)
+  });
+}
+
+// ---- instanced mesh from a tree list -------------------------------
+const _natM = new THREE.Matrix4(), _natQ = new THREE.Quaternion(),
+      _natQ2 = new THREE.Quaternion(), _natS = new THREE.Vector3();
+function natMakeInstanced(list, geo) {
+  if (!list.length || !geo) return null;   // never let a bad asset kill the pipeline
+  const m = new THREE.InstancedMesh(geo, natTreeMat, list.length);
+  for (let i = 0; i < list.length; i++) {
+    const t = list[i];
+    natLatLonToDir(t.lat, t.lon, _natV1);
+    _natV3.copy(_natV1);
+    _natV1.multiplyScalar(EARTH_RADIUS + t.h + NAT.treeLift);
+    _natQ.setFromUnitVectors(UP_VEC, _natV3);
+    _natQ2.setFromAxisAngle(UP_VEC, t.rot);
+    _natQ.multiply(_natQ2);
+    _natS.set(t.vs, t.vs, t.vs);
+    _natM.compose(_natV1, _natQ, _natS);
+    m.setMatrixAt(i, _natM);
+  }
+  m.instanceMatrix.needsUpdate = true;
+  m.computeBoundingSphere();
+  m.raycast = () => {};          // never intercept anything
+  m.name = 'nature-trees';
+  return m;
+}
+
+// ---- plot buckets: which plots' seeds live near each forest cell ----
+function natBuildPlotBuckets() {
+  natPlotBuckets.clear();
+  natPlotCells.clear();
+  if (!STATE.plots) return;
+  for (const p of STATE.plots) {
+    const ud = p.userData;
+    if (!ud || ud.planet !== 'earth' || !ud.localDir) continue;
+    const ci = Math.floor((ud.lat + 90) / NAT_CELL);
+    const cj = Math.floor((ud.lon + 180) / NAT_CELL);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+      const key = (ci + a) + ':' + (cj + b);
+      let arr = natPlotBuckets.get(key);
+      if (!arr) { arr = []; natPlotBuckets.set(key, arr); }
+      arr.push({ id: ud.id, dir: ud.localDir });
+      let s = natPlotCells.get(ud.id);
+      if (!s) { s = new Set(); natPlotCells.set(ud.id, s); }
+      s.add(key);
+    }
+  }
+}
+
+// ---- coarse forest cells -------------------------------------------
+function natCellKey(ci, cj) { return ci + ':' + cj; }
+function natDisposeCell(cell) {
+  for (const m of [cell.meshB, cell.meshP]) {
+    if (!m) continue;
+    natureGroup.remove(m);
+    m.dispose();
+  }
+  cell.meshB = cell.meshP = null;
+}
+function natBuildCellInto(cell) {
+  const bucket = natPlotBuckets.get(cell.key) || [];
+  const listB = [], listP = [];
+  const owned = new Set();
+  const step = NAT_CELL / 11;
+  for (let gy = 0; gy < 11; gy++) {
+    for (let gx = 0; gx < 11; gx++) {
+      const hx = cell.ci * 131 + gx, hy = cell.cj * 197 + gy;
+      const lat = cell.la - 3 + (gy + (_natHash(hx, hy, 7001) - 0.5) * 0.85) * step;
+      const lon = cell.lo - 3 + (gx + (_natHash(hx, hy, 88001) - 0.5) * 0.85) * step;
+      const t = natTreeAt(lat, lon);
+      if (!t) continue;
+      if (_natHash(hx, hy, 31001) > t.density) continue;   // stochastic thinning
+      // Your land stays clear — it's yours to build on
+      if (bucket.length) {
+        natLatLonToDir(lat, lon, _natV2);
+        let best = null, bd = -2;
+        for (const q of bucket) {
+          const d = _natV2.dot(q.dir);
+          if (d > bd) { bd = d; best = q; }
+        }
+        if (best && STATE.owned.has(best.id)) { owned.add(best.id); continue; }
+      }
+      const absLat = Math.abs(lat);
+      const rType = _natHash(hx, hy, 55001);
+      const pine = absLat > 42 ? rType < 0.85 : (absLat > 25 ? rType < 0.3 : false);
+      const vs = (pine ? NAT_TREE_SCALE_P * (0.9 + 0.25 * _natHash(hx, hy, 66001))
+                       : NAT_TREE_SCALE_B * (0.85 + 0.4 * _natHash(hx, hy, 66001)))
+                 * (1 - 0.45 * _natSmooth(0.001, 0.0026, t.h));   // krummholz up high
+      const rot = _natHash(hx, hy, 77001) * Math.PI * 2;
+      (pine ? listP : listB).push({ lat, lon, h: t.h, vs, rot });
+    }
+  }
+  natDisposeCell(cell);
+  cell.meshB = natMakeInstanced(listB, natGeoBroad);
+  cell.meshP = natMakeInstanced(listP, natGeoPine);
+  if (cell.meshB) { cell.meshB.visible = false; natureGroup.add(cell.meshB); }
+  if (cell.meshP) { cell.meshP.visible = false; natureGroup.add(cell.meshP); }
+  cell.owned = owned;
+  cell.n = listB.length + listP.length;
+}
+function natCellTick() {
+  const t0 = performance.now();
+  while (natCellQueue.length && performance.now() - t0 < 14) {
+    const c = natCellQueue.shift();
+    try {
+      const cell = { key: c.key, ci: c.ci, cj: c.cj, la: c.la, lo: c.lo,
+                     dir: natLatLonToDir(c.la, c.lo, new THREE.Vector3()),
+                     meshB: null, meshP: null, owned: new Set(), n: 0 };
+      natBuildCellInto(cell);
+      natCells.set(c.key, cell);
+    } catch (e) {
+      // one bad cell must never stop the world's forests
+      console.warn('[OpenWorld] Forest cell skipped:', e && e.message);
+    }
+  }
+  if (!natCellQueue.length) {
+    clearInterval(natCellTimer);
+    natCellTimer = null;
+  }
+}
+function natStartCellBuild() {
+  natEnsureTreeAssets();
+  natBuildPlotBuckets();
+  for (const cell of natCells.values()) natDisposeCell(cell);
+  natCells.clear();
+  natCellQueue = [];
+  for (let ci = 0; ci < 180 / NAT_CELL; ci++) {
+    for (let cj = 0; cj < 360 / NAT_CELL; cj++) {
+      const la = ci * NAT_CELL - 90 + 3, lo = cj * NAT_CELL - 180 + 3;
+      // quick all-water skip (5 probes)
+      let anyLand = false;
+      const probes = [[-2.5, -2.5], [2.5, -2.5], [-2.5, 2.5], [2.5, 2.5], [0, 0]];
+      for (const pr of probes) {
+        if (!isWaterAt(la + pr[0], lo + pr[1])) { anyLand = true; break; }
+      }
+      if (!anyLand) continue;
+      natCellQueue.push({ ci, cj, la, lo, key: natCellKey(ci, cj) });
+    }
+  }
+  if (natCellTimer) clearInterval(natCellTimer);
+  natCellTimer = setInterval(natCellTick, 45);
+}
+
+// ---- micro forest: dense near-camera trees for the deepest zoom -----
+function natBuildMicro(lat, lon) {
+  natEnsureTreeAssets();
+  if (natMicro) {
+    for (const m of [natMicro.meshB, natMicro.meshP]) {
+      if (m) { natureGroup.remove(m); m.dispose(); }
+    }
+  }
+  // plot buckets around the region (3x3 cells cover +-4 deg margin)
+  const ci = Math.floor((lat + 90) / NAT_CELL), cj = Math.floor((lon + 180) / NAT_CELL);
+  const bucket = [];
+  for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+    const arr = natPlotBuckets.get((ci + a) + ':' + (cj + b));
+    if (arr) for (const q of arr) bucket.push(q);
+  }
+  const listB = [], listP = [];
+  const N = 17, step = 5.2 / N;                      // +-2.6 deg region
+  for (let sy = 0; sy < N; sy++) {
+    for (let sx = 0; sx < N; sx++) {
+      const hx = sx + 61, hy = sy + 83;               // offset keys: micro trees are
+      const lat0 = lat + (sy - N / 2 + 0.5 + (_natHash(hx, hy, 20101) - 0.5) * 0.8) * step;
+      const lon0 = lon + (sx - N / 2 + 0.5 + (_natHash(hx, hy, 40101) - 0.5) * 0.8) * step;
+      const t = natTreeAt(lat0, lon0);
+      if (!t) {
+        // Lone park trees on open lawns — the reference is full of them
+        if (_natHash(hx, hy, 51001) < 0.22) {
+          const h2 = natHeight(lat0, lon0);
+          if (h2 > 0.0004 && h2 < 0.0018) {
+            listB.push({ lat: lat0, lon: lon0, h: h2,
+                         vs: NAT_TREE_SCALE_B * (0.62 + 0.2 * _natHash(hx, hy, 61001)),
+                         rot: _natHash(hx, hy, 71001) * Math.PI * 2 });
+          }
+        }
+        continue;
+      }
+      const extra = 1 + Math.floor(t.density * 2.2 * _natHash(hx, hy, 99001));
+      for (let k = 0; k < extra; k++) {
+        const latK = lat0 + (_natHash(hx + k * 7, hy, 33001) - 0.5) * step * 0.9;
+        const lonK = lon0 + (_natHash(hx, hy + k * 7, 34001) - 0.5) * step * 0.9;
+        const tK = natTreeAt(latK, lonK);
+        if (!tK || _natHash(hx + k, hy + k, 35001) > tK.density * 1.35) continue;
+        if (bucket.length) {
+          natLatLonToDir(latK, lonK, _natV2);
+          let best = null, bd = -2;
+          for (const q of bucket) {
+            const d = _natV2.dot(q.dir);
+            if (d > bd) { bd = d; best = q; }
+          }
+          if (best && STATE.owned.has(best.id)) continue;
+        }
+        const absLat = Math.abs(latK);
+        const pine = absLat > 42 ? _natHash(hx + k, hy, 56001) < 0.85
+                                  : (absLat > 25 ? _natHash(hx + k, hy, 56001) < 0.3 : false);
+        const vs = (pine ? NAT_TREE_SCALE_P * (0.9 + 0.25 * _natHash(hx + k, hy, 66001))
+                         : NAT_TREE_SCALE_B * (0.85 + 0.4 * _natHash(hx + k, hy, 66001)))
+                   * (1 - 0.45 * _natSmooth(0.001, 0.0026, tK.h));
+        (pine ? listP : listB).push({ lat: latK, lon: lonK, h: tK.h, vs,
+                                      rot: _natHash(hx + k, hy + k, 77001) * Math.PI * 2 });
+      }
+    }
+  }
+  natMicro = { lat, lon, meshB: natMakeInstanced(listB, natGeoBroad),
+               meshP: natMakeInstanced(listP, natGeoPine),
+               n: listB.length + listP.length };
+  if (natMicro.meshB) natureGroup.add(natMicro.meshB);
+  if (natMicro.meshP) natureGroup.add(natMicro.meshP);
+}
+
+// ---- fine ground patch ---------------------------------------------
+function natBasis(c) {
+  const ref = Math.abs(c.y) > 0.97 ? RIGHT_VEC : UP_VEC;
+  _east.crossVectors(ref, c).normalize();
+  _north.crossVectors(c, _east).normalize();
+}
+function natPatchTierFor(dist) {
+  for (let i = NAT_PATCH_TIERS.length - 1; i >= 0; i--) {
+    if (dist <= NAT_PATCH_TIERS[i].d + 0.005) return i;
+  }
+  return -1;
+}
+const _natPC = new THREE.Color();
+function natBuildPatch(tier, cLat, cLon) {
+  const span = NAT_PATCH_TIERS[tier].span;
+  natLatLonToDir(cLat, cLon, _natV1);
+  const c = _natV3.copy(_natV1);
+  natBasis(c);
+  const half = span * Math.PI / 180 / 2;
+  const g = NAT_PATCH_G, n = (g + 1) * (g + 1);
+  if (!natPatchMesh) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+    const idx = new Uint32Array(g * g * 6);
+    let o = 0;
+    for (let iy = 0; iy < g; iy++) {
+      for (let ix = 0; ix < g; ix++) {
+        const a = iy * (g + 1) + ix, b = a + 1, cc = a + g + 1, d2 = cc + 1;
+        idx[o++] = a; idx[o++] = cc; idx[o++] = b;
+        idx[o++] = b; idx[o++] = cc; idx[o++] = d2;
+      }
+    }
+    geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    natPatchMesh = new THREE.Mesh(geo, earthMat);   // same material as the terrain
+    natPatchMesh.raycast = () => {};
+    natPatchMesh.visible = false;
+    natureGroup.add(natPatchMesh);
+  }
+  const pos = natPatchMesh.geometry.attributes.position;
+  const col = natPatchMesh.geometry.attributes.color;
+  let i = 0;
+  for (let iy = 0; iy <= g; iy++) {
+    const w = (iy / g - 0.5) * 2 * half;             // radians north
+    for (let ix = 0; ix <= g; ix++) {
+      const u = (ix / g - 0.5) * 2 * half;           // radians east
+      _natV2.copy(c).addScaledVector(_east, u).addScaledVector(_north, w).normalize();
+      const ll = natDirToLatLon(_natV2, _natLL);
+      const hTrue = natHeight(ll.lat, ll.lon);
+      const r = EARTH_RADIUS + hTrue + NAT.patchLift;
+      pos.setXYZ(i, _natV2.x * r, _natV2.y * r, _natV2.z * r);
+      natColor(ll.lat, ll.lon, hTrue, _natPC);
+      col.setXYZ(i, _natPC.r, _natPC.g, _natPC.b);
+      i++;
+    }
+  }
+  pos.needsUpdate = true; col.needsUpdate = true;
+  natPatchMesh.geometry.computeVertexNormals();
+  natPatchMesh.geometry.computeBoundingSphere();
+  natPatchMesh.visible = true;
+  natPatch = { tier, lat: cLat, lon: cLon };
+}
+
+// ---- global terrain mesh -------------------------------------------
+function natBuildTerrainGeo(segs) {
+  const geo = new THREE.SphereGeometry(EARTH_RADIUS, segs, Math.round(segs * 0.75));
+  const pos = geo.attributes.position;
+  const colors = new Float32Array(pos.count * 3);
+  const c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    _natV1.set(pos.getX(i), pos.getY(i), pos.getZ(i)).normalize();
+    const ll = natDirToLatLon(_natV1, _natLL);
+    const h = natHeight(ll.lat, ll.lon) + NAT.globalBias;
+    const r = EARTH_RADIUS + h;
+    pos.setXYZ(i, _natV1.x * r, _natV1.y * r, _natV1.z * r);
+    natColor(ll.lat, ll.lon, h - NAT.globalBias, c);
+    colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+function natRebuildTerrainNow() {
+  if (!earth || STATE.planet !== 'earth') return null;
+  const q = getEffectiveQuality();
+  const segs = q === 'low' ? 160 : (q === 'balanced' ? 240 : 288);
+  const old = natTerrainGeo;
+  natTerrainGeo = natBuildTerrainGeo(segs);
+  if (old) old.dispose();
+  const cur = earth.geometry;
+  earth.geometry = natTerrainGeo;
+  if (cur && cur !== natSmoothGeo && cur !== old) cur.dispose();
+  return natTerrainGeo;
+}
+
+// ---- ownership refresh ---------------------------------------------
+function natRebuildCellByKey(key) {
+  const cell = natCells.get(key);
+  if (cell) natBuildCellInto(cell);
+}
+function natRefreshPlot(p) {
+  if (!natCellsStarted || !p || !p.userData || p.userData.planet !== 'earth') return;
+  const cells = natPlotCells.get(p.userData.id);
+  if (!cells) return;
+  const owned = STATE.owned.has(p.userData.id);
+  for (const key of cells) {
+    const cell = natCells.get(key);
+    if (!cell) continue;
+    if (cell.owned.has(p.userData.id) === owned) continue;
+    natBuildCellInto(cell);
+  }
+}
+function natRecheckOwnership() {
+  if (!natCellsStarted) return;
+  for (const cell of natCells.values()) {
+    let dirty = false;
+    for (const id of cell.owned) {
+      if (!STATE.owned.has(id)) { dirty = true; break; }
+    }
+    if (!dirty) {
+      const bucket = natPlotBuckets.get(cell.key);
+      if (bucket) {
+        for (const q of bucket) {
+          if (STATE.owned.has(q.id) && !cell.owned.has(q.id)) { dirty = true; break; }
+        }
+      }
+    }
+    if (dirty) natBuildCellInto(cell);
+  }
+}
+
+// ---- mask arrival / loader -----------------------------------------
+function natMaybeFinishMasks() {
+  if (natMaskWater && natMaskTopo) {
+    hideLoader();
+    if (!natCellsStarted) {
+      natCellsStarted = true;
+      natStartCellBuild();
+    }
+  }
+}
+
+// ---- per-frame upkeep (throttled) ----------------------------------
+function natUpdate(now) {
+  if (!camera || !controls || !earth) return;
+  const dist = camera.position.length();
+  // Fine rotation control down at tree level
+  controls.rotateSpeed = 0.45 * Math.max(0.16, Math.min(1, (dist - 1.0) / 0.16));
+  if (STATE.planet !== 'earth') return;
+  if (document.getElementById('game').classList.contains('hidden')) return;
+  if (now - _natLastHeavy < 90) return;
+  _natLastHeavy = now;
+
+  earth.worldToLocal(_natV1.copy(camera.position));
+  const camLen = _natV1.length();
+  _natV1.normalize();                                  // sub-camera dir, earth-local
+  const ll = natDirToLatLon(_natV1, _natLL);
+
+  // --- forest cells: activate within the visible cap of the world ---
+  const treesOn = camLen < 1.36 && natCells.size > 0;
+  if (treesOn) {
+    _natCellsShown = true;
+    const cosT = Math.cos(Math.min(0.9, Math.acos(Math.min(1, 1 / camLen)) + 0.15));
+    for (const cell of natCells.values()) {
+      const vis = cell.dir.dot(_natV1) > cosT;
+      if (cell.meshB) cell.meshB.visible = vis;
+      if (cell.meshP) cell.meshP.visible = vis;
+    }
+  } else if (_natCellsShown) {
+    _natCellsShown = false;
+    for (const cell of natCells.values()) {
+      if (cell.meshB) cell.meshB.visible = false;
+      if (cell.meshP) cell.meshP.visible = false;
+    }
+  }
+
+  // --- micro forest: dense trees once you're down close ---
+  const wantMicro = camLen < 1.08 && natCellsStarted;
+  if (wantMicro) {
+    if (!natMicro || natAngDist(natMicro.lat, natMicro.lon, ll.lat, ll.lon) > 0.5) {
+      natBuildMicro(ll.lat, ll.lon);
+    }
+    if (natMicro) {
+      if (natMicro.meshB) natMicro.meshB.visible = true;
+      if (natMicro.meshP) natMicro.meshP.visible = true;
+    }
+  } else if (natMicro) {
+    if (natMicro.meshB) natMicro.meshB.visible = false;
+    if (natMicro.meshP) natMicro.meshP.visible = false;
+  }
+
+  // --- fine ground patch ---
+  const tier = natPatchTierFor(camLen);
+  if (tier >= 0) {
+    const drift = natPatch ? natAngDist(natPatch.lat, natPatch.lon, ll.lat, ll.lon) : 1e9;
+    if ((!natPatch || natPatch.tier !== tier || drift > NAT_PATCH_TIERS[tier].span * 0.3)
+        && now - natPatchLastBuild > 300) {
+      natPatchLastBuild = now;
+      natBuildPatch(tier, ll.lat, ll.lon);
+    }
+  } else if (natPatchMesh && natPatchMesh.visible) {
+    natPatchMesh.visible = false;
+    natPatch = null;
+  }
+}
+
+// ---- public surface -------------------------------------------------
+const Nature = {
+  init() {
+    natureGroup = new THREE.Group();
+    natureGroup.name = 'nature';
+    earth.add(natureGroup);
+    // Sea-level water shell: oceans + every generated lake, translucent
+    // so sandy shallows glow turquoise through it
+    const waterMat = new THREE.MeshPhongMaterial({
+      color: 0x1e7ec2, transparent: true, opacity: 0.78,
+      shininess: 120, specular: new THREE.Color(0xa8d8ff), depthWrite: false
+    });
+    natWater = new THREE.Mesh(new THREE.SphereGeometry(EARTH_RADIUS, 180, 120), waterMat);
+    natWater.name = 'nature-water';
+    natWater.raycast = () => {};
+    natWater.renderOrder = -1;        // draw before plot fills & clouds
+    natureGroup.add(natWater);
+    // Failsafe: never trap the player behind the loader if the CDN stalls
+    setTimeout(() => { try { hideLoader(); } catch (e) {} }, 7000);
+  },
+  onWaterMask() {
+    natMaskWater = true;
+    natRebuildTerrainNow();
+    natMaybeFinishMasks();
+  },
+  onTopologyMask() {
+    natMaskTopo = true;
+    natRebuildTerrainNow();
+    natMaybeFinishMasks();
+  },
+  rebuildTerrain() { return natRebuildTerrainNow(); },
+  onQualityChange() {
+    if (!earth) return;
+    if (earth.geometry) natSmoothGeo = earth.geometry;   // fresh sphere = new reference
+    if (STATE.planet === 'earth') natRebuildTerrainNow();
+  },
+  setPlanet(planet) {
+    if (!natureGroup) return;
+    const isEarth = !planet || planet.id === 'earth';
+    natureGroup.visible = isEarth;
+    if (!isEarth) {
+      if (earth && natSmoothGeo && earth.geometry !== natSmoothGeo) earth.geometry = natSmoothGeo;
+      if (natPatchMesh) { natPatchMesh.visible = false; natPatch = null; }
+      if (natMicro) {
+        if (natMicro.meshB) natMicro.meshB.visible = false;
+        if (natMicro.meshP) natMicro.meshP.visible = false;
+      }
+      _natCellsShown = false;
+      for (const cell of natCells.values()) {
+        if (cell.meshB) cell.meshB.visible = false;
+        if (cell.meshP) cell.meshP.visible = false;
+      }
+      return;
+    }
+    // Arriving home: terrain + fresh plot buckets (plots were regenerated)
+    natRebuildTerrainNow();
+    natBuildPlotBuckets();
+    natRecheckOwnership();
+  },
+  update: natUpdate,
+  refreshPlot: natRefreshPlot
+};
+
+// QA hooks (used by the automated E2E pass; harmless in production)
+try {
+  window.__NATURE_QA = function() {
+    let trees = 0, cellsOn = 0;
+    for (const c of natCells.values()) {
+      trees += c.n;
+      if ((c.meshB && c.meshB.visible) || (c.meshP && c.meshP.visible)) cellsOn++;
+    }
+    return {
+      planet: STATE.planet,
+      dist: camera ? +camera.position.length().toFixed(4) : null,
+      cells: natCells.size, trees, cellsOn,
+      micro: natMicro ? natMicro.n : 0,
+      patch: natPatch ? { tier: natPatch.tier, lat: +natPatch.lat.toFixed(3), lon: +natPatch.lon.toFixed(3) } : null,
+      terrainVerts: natTerrainGeo ? natTerrainGeo.attributes.position.count : 0,
+      masks: { water: !!_waterMaskData, topo: !!_topologyData },
+      cellsStarted: natCellsStarted
+    };
+  };
+  window.__NATURE_SET_CAM = function(lat, lon, d) {
+    if (!camera || !earth || !controls) return 'no-scene';
+    earth.updateMatrixWorld(true);
+    natLatLonToDir(lat, lon, _natV1).multiplyScalar(d);
+    earth.localToWorld(_natV1);
+    camera.position.copy(_natV1);
+    controls.target.set(0, 0, 0);
+    STATE.zoomTarget = d;
+    camera.lookAt(0, 0, 0);
+    lastInteractionTime = performance.now();
+    return 'ok';
+  };
+} catch (e) {}
+
 function initScene() {
   canvasContainer = document.getElementById('canvas-container');
 
@@ -8196,7 +8955,10 @@ function initScene() {
   // Boot directly onto the saved planet — swap the sphere material before
   // the first frame (Earth keeps its NASA textures, others are procedural)
   const _bootPlanet = PLANET_BY_ID[STATE.planet] || PLANET_BY_ID.earth;
-  if (_bootPlanet.id !== 'earth') earth.material = planetMaterial(_bootPlanet);
+  if (_bootPlanet.id !== 'earth') {
+    earth.material = planetMaterial(_bootPlanet);
+    try { Nature.setPlanet(_bootPlanet); } catch (e) {}   // v1.39 — smooth sphere off-Earth
+  }
   setAtmosphere(_bootPlanet);
   generatePlots(_bootPlanet);
   buildOrbitalRings();
@@ -8386,36 +9148,25 @@ let earthMat = null;   // Earth material — maps attach as scaled textures arri
 
 function buildEarth() {
   const q = QUALITY_LEVELS[getEffectiveQuality()];
-  const geo = new THREE.SphereGeometry(EARTH_RADIUS, q.earthSegments, q.earthSegments);
 
+  // v1.39 — NATURAL EARTH: the satellite-photo ball is retired. The
+  // globe starts smooth and receives its generated terrain (relief +
+  // climate colors + lakes + forests) the moment the water/topology
+  // masks arrive. Every rebuild is deterministic — the same world for
+  // every player on every visit.
+  natSmoothGeo = new THREE.SphereGeometry(EARTH_RADIUS, q.earthSegments, q.earthSegments);
   earthMat = new THREE.MeshPhongMaterial({
-    specular: new THREE.Color(0x2a4a5a),
-    shininess: 18
-  });
-  const TEX = 'https://unpkg.com/three-globe@2.31.0/example/img/';
-  loadScaledTexture(TEX + 'earth-blue-marble.jpg', q.textureWidth, (tex) => {
-    if (!earthMat) return;
-    earthMat.map = tex; earthMat.needsUpdate = true; hideLoader();
-  });
-  if (q.bump) {
-    loadScaledTexture(TEX + 'earth-topology.png', q.textureWidth, (tex) => {
-      if (!earthMat) return;
-      earthMat.bumpMap = tex; earthMat.bumpScale = 0.015; earthMat.needsUpdate = true;
-    });
-  }
-  loadScaledTexture(TEX + 'earth-water.png', q.textureWidth, (tex) => {
-    if (!earthMat) return;
-    earthMat.specularMap = tex; earthMat.needsUpdate = true;
+    vertexColors: true,
+    specular: new THREE.Color(0x1c2a2e),
+    shininess: 7
   });
 
-  // Night-side city lights (NASA black-marble map) — warm glow on the dark limb
-  loadScaledTexture(TEX + 'earth-night.jpg', q.textureWidth, (tex) => {
-    if (!earthMat) return;
-    earthMat.emissiveMap = tex;
-    earthMat.emissive = new THREE.Color(0xffc98a);
-    earthMat.emissiveIntensity = 1.15;
-    earthMat.needsUpdate = true;
-  });
+  earth = new THREE.Mesh(natSmoothGeo, earthMat);
+  earth.name = 'earth';
+  earth.frustumCulled = false;   // never cull — camera gets very close
+  scene.add(earth);
+
+  Nature.init();   // water shell + forest/terrain LOD groups + loader failsafe
 
   // Semi-transparent cloud deck, drifting just above the surface
   loadScaledTexture('https://unpkg.com/three-globe/example/clouds/clouds.png', q.textureWidth, (tex) => {
@@ -8429,12 +9180,8 @@ function buildEarth() {
     scene.add(clouds);
   });
 
-  earth = new THREE.Mesh(geo, earthMat);
-  earth.name = 'earth';
-  earth.frustumCulled = false;   // never cull — camera gets very close
-  scene.add(earth);
-
-  // Load water mask separately for pixel sampling (to determine land vs ocean per plot)
+  // Water + topology masks drive BOTH gameplay classification and the
+  // generated terrain (loadWaterMask chains loadTopologyMask itself).
   loadWaterMask();
 }
 
@@ -8455,6 +9202,8 @@ function loadWaterMask() {
     _waterMaskData = ctx.getImageData(0, 0, w, h);
     // Now that we have the mask, classify all existing plots
     classifyPlotsByTerrain();
+    // v1.39 — regenerate the natural terrain with real coastlines
+    try { Nature.onWaterMask(); } catch (e) { console.warn('[OpenWorld] Terrain rebuild failed:', e); }
     // Load topology mask next (for mountain detection / region bonuses)
     loadTopologyMask();
   };
@@ -8465,6 +9214,8 @@ function loadWaterMask() {
       p.userData.isWater = false;
       p.userData.region = classifyRegion(p);
     }
+    try { Nature.onWaterMask(); } catch (e) {}   // v1.39 — the mask chain is dead here
+    try { Nature.onTopologyMask(); } catch (e) {} // (topology never loads) — finish the world anyway
   };
   img.src = 'https://unpkg.com/three-globe@2.31.0/example/img/earth-water.png';
 }
@@ -8485,10 +9236,12 @@ function loadTopologyMask() {
     _topologyData = ctx.getImageData(0, 0, w, h);
     // Re-classify now that we have elevation data (mountains/highlands)
     classifyPlotsByTerrain();
+    try { Nature.onTopologyMask(); } catch (e) {}   // v1.39 — mountains into the terrain
   };
   img.onerror = () => {
     console.warn('Topology mask failed to load — no mountain detection');
     // Regions already set by water mask classification; mountains won't be detected
+    try { Nature.onTopologyMask(); } catch (e) {}   // v1.39 — finish the world anyway
   };
   img.src = 'https://unpkg.com/three-globe@2.31.0/example/img/earth-topology.png';
 }
@@ -10276,7 +11029,10 @@ function updatePlotVisibility() {
   const dist = camera.position.length();
   // 0 when far (zoomMax), 1 when close (plotFullDist)
   const t = 1 - THREE.MathUtils.clamp((dist - STATE.plotFullDist) / (STATE.plotRevealDist - STATE.plotFullDist), 0, 1);
-  const baseOpacity = t;
+  let baseOpacity = t;
+  // v1.39 — deep in the natural view, ease the plot veil back so the
+  // terrain and forest read through (plot borders stay visible for play)
+  if (dist < 1.16) baseOpacity *= Math.max(0.45, Math.min(1, (dist - 1.03) / 0.13));
   const showAny = t > 0.02;
   const hasClaims = STATE.claimedPlots.length > 0;
   // v1.22: the bright always-visible pool is for RIVAL land only
@@ -11005,7 +11761,6 @@ function openPlotModal(plot) {
         ${propertyEntry}
         ${bizCards}
         ${buildSection}
-        ${roadEntry}
       </div>
     `;
   }
@@ -11267,6 +12022,7 @@ window.travelTo = function(planetId) {
   setAtmosphere(planet);
   STATE.planet = planetId;
   generatePlots(planet);
+  try { Nature.setPlanet(planet); } catch (e) { console.warn('[OpenWorld] Nature travel failed:', e); }
 
   // Re-apply ownership + businesses + other players' claims.
   // The global claims registry is the authority — if one of my plots here
@@ -16369,7 +17125,8 @@ function animate() {
   // (so they can reliably click plots without the world drifting).
   const sinceInteract = now - lastInteractionTime;
   const paused = controls._isInteracting || sinceInteract < 1500;
-  if (earthAutoRotate && !paused) {
+  if (earthAutoRotate && !paused && camera.position.length() > 1.3) {
+    // v1.39 — the world stops drifting once you're down among the trees
     earth.rotation.y += 0.0004;
   }
   // Smooth zoom glide: ease the actual camera distance toward the wheel
@@ -16389,6 +17146,7 @@ function animate() {
     }
   }
   _zoomLastT = now;
+  try { Nature.update(now); } catch (e) { /* v1.39 — terrain/forest LOD upkeep */ }
   controls.update();
   // Free placement upkeep: cancel when a modal/menu takes over, and pulse
   // the ghost ring while the pending spot is armed
