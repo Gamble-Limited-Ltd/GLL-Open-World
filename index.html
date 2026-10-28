@@ -205,7 +205,7 @@
                 </button>
 
                 <!-- Direct Play Button -->
-                <a href="openworld.html" onclick="playSound('click')" class="relative inline-flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-tactical-cyan to-emerald-500 text-black font-orbitron font-extrabold text-xs tracking-widest uppercase rounded shadow-cyan-glow hover:scale-105 transition-all duration-300">
+                <a href="openworld.html?play=1" onclick="playSound('click')" class="relative inline-flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-tactical-cyan to-emerald-500 text-black font-orbitron font-extrabold text-xs tracking-widest uppercase rounded shadow-cyan-glow hover:scale-105 transition-all duration-300">
                     <i class="fa-solid fa-play text-xs"></i>
                     <span>Launch Game</span>
                 </a>
@@ -225,7 +225,7 @@
             <a href="#military" class="block py-2 text-gray-300 hover:text-tactical-cyan">Clans & Armies</a>
             <a href="#admin" id="admin-nav-link-mobile" class="hidden block py-2 text-amber-400 hover:text-amber-300" onclick="event.preventDefault(); openAdminLanding()"><i class="fa-solid fa-crown mr-1"></i>Admin</a>
             <a href="#customizer" class="block py-2 text-gray-300 hover:text-tactical-cyan">Banner Customizer</a>
-            <a href="openworld.html" class="block text-center py-3 bg-tactical-cyan text-black font-bold uppercase rounded">Launch Game In Browser</a>
+            <a href="openworld.html?play=1" class="block text-center py-3 bg-tactical-cyan text-black font-bold uppercase rounded">Launch Game In Browser</a>
             <button id="logout-btn-mobile" onclick="logoutLanding()" class="hidden block w-full text-center py-3 bg-crimson/10 border border-crimson/40 text-crimson font-bold uppercase rounded">Logout</button>
         </div>
     </header>
@@ -265,7 +265,7 @@
 
             <!-- Hero Action Buttons -->
             <div class="flex flex-col sm:flex-row items-center justify-center gap-5 pt-2">
-                <a href="openworld.html" onclick="playSound('tactical')" class="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-tactical-cyan via-teal-400 to-emerald-500 text-black font-orbitron font-black text-sm tracking-widest uppercase rounded shadow-cyan-glow hover:scale-105 transition-all duration-300 flex items-center justify-center space-x-3">
+                <a href="openworld.html?play=1" onclick="playSound('tactical')" class="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-tactical-cyan via-teal-400 to-emerald-500 text-black font-orbitron font-black text-sm tracking-widest uppercase rounded shadow-cyan-glow hover:scale-105 transition-all duration-300 flex items-center justify-center space-x-3">
                     <i class="fa-solid fa-earth-americas text-base"></i>
                     <span>PLAY FREE IN BROWSER</span>
                 </a>
@@ -378,7 +378,7 @@
                 </div>
 
                 <div class="mt-8">
-                    <a href="openworld.html" onclick="playSound('tactical')" class="inline-flex items-center space-x-3 px-6 py-3 bg-gradient-to-r from-tactical-cyan to-emerald-500 text-black font-orbitron font-bold text-sm tracking-widest uppercase rounded shadow-cyan-glow hover:scale-105 transition-all duration-300">
+                    <a href="openworld.html?play=1" onclick="playSound('tactical')" class="inline-flex items-center space-x-3 px-6 py-3 bg-gradient-to-r from-tactical-cyan to-emerald-500 text-black font-orbitron font-bold text-sm tracking-widest uppercase rounded shadow-cyan-glow hover:scale-105 transition-all duration-300">
                         <i class="fa-solid fa-earth-americas"></i>
                         <span>Enter World</span>
                     </a>
@@ -496,7 +496,7 @@
                     <h3 class="font-orbitron text-2xl font-black text-white">READY TO CLAIM EARTH?</h3>
                     <p class="text-gray-400 text-sm font-rajdhani mt-1">No install or download required. Play directly in any modern desktop or mobile browser.</p>
                 </div>
-                <a href="openworld.html" onclick="playSound('tactical')" class="px-8 py-4 bg-gradient-to-r from-tactical-cyan to-emerald-500 text-black font-orbitron font-extrabold text-sm tracking-widest uppercase rounded shadow-cyan-glow hover:scale-105 transition-all duration-300 flex items-center space-x-3">
+                <a href="openworld.html?play=1" onclick="playSound('tactical')" class="px-8 py-4 bg-gradient-to-r from-tactical-cyan to-emerald-500 text-black font-orbitron font-extrabold text-sm tracking-widest uppercase rounded shadow-cyan-glow hover:scale-105 transition-all duration-300 flex items-center space-x-3">
                     <i class="fa-solid fa-play text-sm"></i>
                     <span>LAUNCH GAME NOW</span>
                 </a>
@@ -532,7 +532,7 @@
             <input type="text" id="cmd-input" placeholder="Type a command or jump location..." class="w-full bg-black/70 border border-tactical-border rounded-xl p-3 text-white font-orbitron text-xs focus:outline-none focus:border-tactical-cyan" onkeyup="filterCommands(this.value)">
 
             <div class="space-y-2 font-orbitron text-xs" id="cmd-list">
-                <a href="openworld.html" class="block p-3 glass-card rounded-xl hover:bg-tactical-cyan/20 text-tactical-cyan font-bold flex justify-between">
+                <a href="openworld.html?play=1" class="block p-3 glass-card rounded-xl hover:bg-tactical-cyan/20 text-tactical-cyan font-bold flex justify-between">
                     <span>&gt; Launch Game Application</span>
                     <span class="text-gray-400 font-normal">GitHub Pages</span>
                 </a>
@@ -1654,21 +1654,22 @@
 .ow-ub-x{cursor:pointer;border:1px solid rgba(255,255,255,.18);border-radius:6px;background:transparent;
   color:#aab4bf;font-size:11px;padding:5px 8px}
 </style>
-<div id="ow-build-pill">BUILD V1.36</div>
+<div id="ow-build-pill">BUILD V1.37</div>
 <script>
 (function() {
-  var RUNNING = 'v1.36';
-  // Launch intent: clicking any link into the game (openworld.html) sets the
-  // play-intent flag so the game drops straight into the world after its
-  // auto-login — no second home screen between YOUR home page and the world.
+  var RUNNING = 'v1.37';
+  // Launch intent: clicking any link into the game (openworld.html) means
+  // the player chose to play — the game drops straight into the world after
+  // login (manual OR auto), never onto an in-between screen. Every launch
+  // link also carries ?play=1 in its URL, which survives new tabs and
+  // browsers with blocked storage; these flags are the backup channel.
   document.addEventListener('click', function(e) {
     var a = e.target && e.target.closest ? e.target.closest('a') : null;
     if (!a) return;
     var href = a.getAttribute('href') || '';
     if (href.indexOf('openworld.html') === -1 && href.indexOf('game.html') === -1) return;
-    try {
-      if (sessionStorage.getItem('openworld_session')) sessionStorage.setItem('openworld_play_intent', '1');
-    } catch (err) {}
+    try { sessionStorage.setItem('openworld_play_intent', '1'); } catch (err) {}
+    try { localStorage.setItem('openworld_play_intent_exp', String(Date.now() + 120000)); } catch (err) {}
   }, true);
   // UpdateGuard mini (same system as the game): if a newer build is
   // published, offer a one-tap update. version.json is fetched cache-busted
