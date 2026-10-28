@@ -1530,7 +1530,7 @@ input,select,textarea{font-family:var(--cr-mono)}
       <button class="ow-chip-btn ow-chip-logout" onclick="logout()">⏻ Logout</button>
     </div>
   </div>
-  <div class="ow-build-pill">Build v1.37</div>
+  <div class="ow-build-pill">Build v1.38</div>
 
   <div class="modal" id="settings">
     <div class="panel">
@@ -6020,8 +6020,11 @@ window.WarFx = WarFx;
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.37';
+const GAME_VERSION = 'v1.38';
 const RELEASE_NOTES = [
+  { v: 'v1.38', items: [
+    '🚀 <b>Home page straight into the 3D world</b> — clicking <b>PLAY FREE IN BROWSER</b>, <b>LAUNCH GAME</b> or <b>ENTER WORLD</b> on your home page now takes you <b>directly into the 3D world</b> the moment login completes. The brief stop on the old in-game title screen in between is gone.'
+  ]},
   { v: 'v1.37', items: [
     '🚀 <b>Straight to the world — and home again</b> — every <b>PLAY FREE IN BROWSER</b>, <b>LAUNCH GAME</b> and <b>ENTER WORLD</b> button on your home page now drops you <b>directly into the 3D world</b> — no stop on an in-between screen, even in a new tab or after a fresh login. And the in-game <b>HOME</b> button now takes you <b>back to your tactical home page</b> — the commander dashboard with your live Budget, empire income and the market — the same page you launched from.'
   ]},
@@ -6400,9 +6403,17 @@ window.loginSubmit = async function() {
   setTimeout(() => {
     document.getElementById('login-screen').style.display = 'none';
   }, 600);
-  document.getElementById('menu').classList.remove('hidden');
-  // "What's New" popup — once per account per device after an update
-  setTimeout(maybeShowUpdatePopup, 650);
+  // v1.38 — arriving from the home page's launch buttons means the
+  // player already chose to play: NEVER stop on the artwork menu. The
+  // launch script enters the world the moment this login completes.
+  // The menu (and its What's-New popup) stays for players who opened
+  // the game directly — the popup is not marked seen, so it shows on
+  // their next direct login instead.
+  if (!window.__PLAY_INTENT) {
+    document.getElementById('menu').classList.remove('hidden');
+    // "What's New" popup — once per account per device after an update
+    setTimeout(maybeShowUpdatePopup, 650);
+  }
   // Owner only: badge with open support tickets on the 👑 Admin button
   setTimeout(() => { try { refreshSupportBadge(); } catch (e) {} }, 1400);
 };
@@ -16599,6 +16610,17 @@ window.addEventListener('keydown', (e) => {
   var PLAY_PARAM = false;
   try { PLAY_PARAM = /[?&]play=1\b/.test(window.location.search); } catch (e) {}
 
+  // v1.38 — publish the intent NOW, before any login can happen, so
+  // loginSubmit() knows this player came from the home page's launch
+  // buttons and must NOT be stopped on the artwork menu: they are going
+  // straight into the 3D world.
+  try {
+    var _piExpNow = parseInt(localStorage.getItem('openworld_play_intent_exp') || '0', 10);
+    window.__PLAY_INTENT = PLAY_PARAM ||
+      sessionStorage.getItem('openworld_play_intent') === '1' ||
+      (_piExpNow && Date.now() < _piExpNow);
+  } catch (e) { try { window.__PLAY_INTENT = PLAY_PARAM; } catch (er) {} }
+
   function hashPassword(pwd) {
     var h = 5381;
     for (var i = 0; i < pwd.length; i++) h = ((h << 5) + h + pwd.charCodeAt(i)) | 0;
@@ -16642,7 +16664,11 @@ window.addEventListener('keydown', (e) => {
       console.log('[Launch] Play intent from the home page — entering game');
       setTimeout(function() {
         try { window.enterGame(); }
-        catch (e) { console.error('[Launch] enterGame error:', e); }
+        catch (e) {
+          console.error('[Launch] enterGame error:', e);
+          // Safety net — never strand the player on a blank page
+          try { document.getElementById('menu').classList.remove('hidden'); } catch (er) {}
+        }
       }, 50);
       return;
     }
