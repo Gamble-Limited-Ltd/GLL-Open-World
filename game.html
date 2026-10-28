@@ -1530,7 +1530,7 @@ input,select,textarea{font-family:var(--cr-mono)}
       <button class="ow-chip-btn ow-chip-logout" onclick="logout()">⏻ Logout</button>
     </div>
   </div>
-  <div class="ow-build-pill">Build v1.36</div>
+  <div class="ow-build-pill">Build v1.37</div>
 
   <div class="modal" id="settings">
     <div class="panel">
@@ -6020,8 +6020,11 @@ window.WarFx = WarFx;
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.36';
+const GAME_VERSION = 'v1.37';
 const RELEASE_NOTES = [
+  { v: 'v1.37', items: [
+    '🚀 <b>Straight to the world — and home again</b> — every <b>PLAY FREE IN BROWSER</b>, <b>LAUNCH GAME</b> and <b>ENTER WORLD</b> button on your home page now drops you <b>directly into the 3D world</b> — no stop on an in-between screen, even in a new tab or after a fresh login. And the in-game <b>HOME</b> button now takes you <b>back to your tactical home page</b> — the commander dashboard with your live Budget, empire income and the market — the same page you launched from.'
+  ]},
   { v: 'v1.36', items: [
     '⚙ <b>Machines — every factory is yours to build</b> — every Factory you place now has <b>3 machine bays</b>. Open its ⚙ MACHINE SHOP and install any of <b>12 different machines</b>, each producing a different resource: Hydroponic Trays grow 🌾 Food, Auto-Drill Rigs pull ⛏️ Ore, Kiln Arrays cut 🧱 Stone, Rolling Mills press 🔩 Steel, Spectrometers grind out 🔬 Research, Gem Cutters polish 💎 Luxuries and more. Machines run <b>only inside Factories</b> — not on any other business — their output scales with the plot and rides the factory crew\'s bonus, and each one stands on the factory roof in the world and the 3D viewer. Remove a machine for half its cost back; machines even raise your land\'s development grade.'
   ]},
@@ -16487,12 +16490,13 @@ window.enterGame = function() {
 };
 
 window.exitGame = function() {
-  // v1.28 — HOME button: swap straight back to the home (menu) screen
-  // in-page — no reload round-trip. The world keeps producing behind it,
-  // and Enter World drops you right back where you were.
+  // v1.37 — HOME button: back to the commander's home page — the tactical
+  // dashboard the site opens on and the one you launched from. The save is
+  // written first (beforeunload saves too), the home page's session check
+  // reveals your dashboard instantly, and its LAUNCH GAME button drops you
+  // straight back into the world.
   try { saveGame && saveGame(); } catch (e) {}
-  document.getElementById('game').classList.add('hidden');
-  document.getElementById('menu').classList.remove('hidden');
+  window.location.href = 'index.html';
 };
 
 window.openSettings = function() { renderSettingsQuality(); document.getElementById('settings').classList.add('show'); };
@@ -16588,6 +16592,13 @@ window.addEventListener('keydown', (e) => {
 // Always watches for login completion → calls enterGame().
 // Also auto-fills the form if a session exists.
 (function() {
+  // v1.37 — arriving from the home page's PLAY FREE IN BROWSER / LAUNCH
+  // GAME buttons means the player already chose to play. The intent rides
+  // in the URL (?play=1 — it survives new tabs, blocked storage and stale
+  // caches); the storage flags are the backup channel.
+  var PLAY_PARAM = false;
+  try { PLAY_PARAM = /[?&]play=1\b/.test(window.location.search); } catch (e) {}
+
   function hashPassword(pwd) {
     var h = 5381;
     for (var i = 0; i < pwd.length; i++) h = ((h << 5) + h + pwd.charCodeAt(i)) | 0;
@@ -16608,16 +16619,27 @@ window.addEventListener('keydown', (e) => {
   function onLoginComplete() {
     if (enterGameCalled) return;
     enterGameCalled = true;
-    // v1.33 — arrived from the owner's title screen (home.html) by pressing
-    // PLAY on the artwork: they already chose to play, so enter the world
-    // instead of stopping on a second home screen.
-    var playIntent = false;
-    try {
-      playIntent = sessionStorage.getItem('openworld_play_intent') === '1';
-      sessionStorage.removeItem('openworld_play_intent');
-    } catch (e) {}
+    // v1.37 — arrived from the home page's launch buttons (PLAY FREE IN
+    // BROWSER / LAUNCH GAME / ENTER WORLD): they already chose to play, so
+    // enter the world instead of stopping on an in-between screen. The
+    // intent is read from the URL (?play=1), sessionStorage, or a
+    // fresh localStorage flag — for BOTH auto and manual login.
+    var playIntent = PLAY_PARAM;
+    if (!playIntent) {
+      try {
+        playIntent = sessionStorage.getItem('openworld_play_intent') === '1';
+        if (playIntent) sessionStorage.removeItem('openworld_play_intent');
+      } catch (e) {}
+    }
+    if (!playIntent) {
+      try {
+        var _piExp = parseInt(localStorage.getItem('openworld_play_intent_exp') || '0', 10);
+        if (_piExp && Date.now() < _piExp) playIntent = true;
+        localStorage.removeItem('openworld_play_intent_exp');
+      } catch (e) {}
+    }
     if (playIntent) {
-      console.log('[Launch] Play intent from the title screen — entering game');
+      console.log('[Launch] Play intent from the home page — entering game');
       setTimeout(function() {
         try { window.enterGame(); }
         catch (e) { console.error('[Launch] enterGame error:', e); }
