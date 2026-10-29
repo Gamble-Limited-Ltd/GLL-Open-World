@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.07</title>
+<title>Open World — v2.08</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.07 — NEW WORLD (complete restart) + STARTER GUIDE + TIGHT CONTROLS + CLEAR STREETS
+   OPEN WORLD v2.08 — NEW WORLD (complete restart) + STARTER GUIDE + TIGHT CONTROLS + CLEAR STREETS + HAPPY CUSTOMERS
    Visual system modeled on the Capital Rift reference frame:
    dark glassmorphism fintech UI (panels #1A202C @85%, 1px #4A5568
    borders, 4px radius), money-green #48BB78 prices, link-blue
@@ -482,7 +482,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.07 — streets imported live from the real world</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.08 — streets imported live from the real world</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -504,7 +504,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.07';
+const GAME_VERSION = 'v2.08';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -2820,6 +2820,16 @@ const ACTORS = (() => {
     if (fig.group.parent) fig.group.parent.remove(fig.group);
   }
 
+  // v2.08: shortest-arc smooth turn — figures pivot at a capped rate
+  // instead of snapping 180° the instant their target changes (the old
+  // snap made a shuffling queue look twitchy/glitchy)
+  function turnToward(fig, targ, dt, rate = 9) {
+    let d = targ - fig.group.rotation.y;
+    while (d > Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+    const m = rate * dt;
+    fig.group.rotation.y += Math.max(-m, Math.min(m, d));
+  }
   // move a figure toward a target this frame; returns true on arrival
   function walkTo(fig, tx, tz, speed, dt) {
     const dx = tx - fig.group.position.x, dz = tz - fig.group.position.z;
@@ -2828,9 +2838,13 @@ const ACTORS = (() => {
     const v = Math.min(speed * dt, d);
     fig.group.position.x += dx / d * v;
     fig.group.position.z += dz / d * v;
-    fig.group.rotation.y = Math.atan2(dx, dz);
+    turnToward(fig, Math.atan2(dx, dz), dt);
     fig.setWalk(true);
     return false;
+  }
+  // stand still but rotate to face a point (queue waits facing the cart)
+  function turnTo(fig, tx, tz, dt) {
+    turnToward(fig, Math.atan2(tx - fig.group.position.x, tz - fig.group.position.z), dt, 6);
   }
 
   // ---------------- ambient citizens --------------------------------
@@ -3041,7 +3055,7 @@ const ACTORS = (() => {
   }
 
   return {
-    makeChibi, removeFig, walkTo, makeCart,
+    makeChibi, removeFig, walkTo, turnTo, makeCart,
     spawnCitizens, clearCitizens, updateCitizens,
     initPlayer, placePlayer, updatePlayer, update, reset,
     get player() { return player; },
@@ -3057,6 +3071,13 @@ window.ACTORS = ACTORS;
 // v2.0 — ECONOMY: street plots, food carts, customer queues, star
 // crews, office leasing, live P&L business panels. Capital Rift's
 // street-business loop on real-world streets.
+// v2.08 — HAPPY CUSTOMERS: served customers walk away and despawn
+// (departures list), the queue turns smoothly and waits facing the
+// cart. The v2.0x-2.07 bug: serveCustomer() set state 'leaving' and
+// spliced the customer out of cart.customers in the same breath, so
+// the leaving-updater never saw them again — they froze at the slot
+// with a permanent walk-in-place animation, never despawned, and the
+// next customer walked straight into them (the glitchy pile-up).
 // ====================================================================
 // ---------------- cuisines -------------------------------------------
 const CUISINES = [
@@ -3155,6 +3176,7 @@ const ECO = (() => {
     carts.forEach(c => {
       if (c.mesh && c.mesh.parent) c.mesh.parent.remove(c.mesh);
       (c.customers || []).forEach(cu => ACTORS.removeFig(cu.fig));
+      (c.leaving || []).forEach(cu => ACTORS.removeFig(cu.fig));   // v2.08
       (c.vendors || []).forEach(v => ACTORS.removeFig(v.fig));
     });
     carts = [];
@@ -3171,7 +3193,7 @@ const ECO = (() => {
     CITY.group.add(mesh);
     const cart = {
       plot: plotState, rec: plotRec, cuisine, mesh,
-      customers: [], vendors: [], served: 0, revenueLog: [],
+      customers: [], leaving: [], vendors: [], served: 0, revenueLog: [],
       queueSlots: (() => {
         const off = [];
         for (let i = 0; i < 5; i++) off.push([2.6, 1.0 + i * 1.6]);
@@ -3232,6 +3254,28 @@ const ECO = (() => {
     return cuisine.menu[0];
   }
 
+  // v2.08 — hand a customer to the departures list: they pick a spot
+  // down the street, walk away and despawn. Returns nothing; the
+  // leaving-walker in updateCarts does the rest.
+  function depart(cart, cu) {
+    cu.state = 'leaving';
+    cu.slot = -1;
+    cu.age = 0;
+    const rnd = _mulberry((Math.random() * 1e9) | 0);
+    let tx = null, tz = 0;
+    for (let k = 0; k < 6 && tx === null; k++) {
+      const p = CITY.randomRoadPoint(rnd);
+      const d = Math.hypot(p.x - cart.rec.x, p.z - cart.rec.z);
+      if (d > 24 && d < 90) { tx = p.x; tz = p.z; }
+    }
+    if (tx === null) {           // no road point in range → ring fallback
+      const a = rnd() * 6.28, r = 34 + rnd() * 26;
+      tx = cart.rec.x + Math.cos(a) * r; tz = cart.rec.z + Math.sin(a) * r;
+    }
+    cu.target = [tx, tz];
+    cart.leaving.push(cu);
+  }
+
   function serveCustomer(cart, manual) {
     const cu = cart.customers[0];
     if (!cu || cu.state !== 'waiting') return false;
@@ -3244,8 +3288,7 @@ const ECO = (() => {
     if (manual) window.dispatchEvent(new CustomEvent('ow:tut-serve'));
     cart.revenueLog.push([Date.now(), gross]);
     floatText('+$' + gross.toFixed(2), cart.rec.x + (Math.random() - .5) * 2, cart.rec.z + 1.4);
-    cu.state = 'leaving';
-    cu.fig.setWalk(true);
+    depart(cart, cu);
     // shift queue forward
     cart.customers.splice(0, 1);
     cart.customers.forEach((c, i) => { c.slot = i; c.state = 'toQueue'; });
@@ -3272,22 +3315,23 @@ const ECO = (() => {
           if (ACTORS.walkTo(cu.fig, qx, qz, cu.fig.speed, dt)) cu.state = 'waiting';
         } else if (cu.state === 'waiting') {
           cu.patience -= dt;
+          // v2.08: settle facing the cart — a queue of customers, not
+          // mannequins caught mid-stride facing random directions
+          ACTORS.turnTo(cu.fig, cart.rec.x, cart.rec.z, dt);
           if (cu.patience <= 0) {
-            cu.state = 'leaving';
+            depart(cart, cu);
             cart.customers.splice(i, 1);
             cart.customers.forEach((c, j) => { c.slot = j; if (c.state === 'waiting') c.state = 'toQueue'; });
           }
-        } else if (cu.state === 'leaving') {
-          // wander away and despawn
-          if (!cu.target) {
-            const a = Math.random() * 6.28;
-            cu.target = [cu.fig.group.position.x + Math.cos(a) * 50, cu.fig.group.position.z + Math.sin(a) * 50];
-          }
-          if (ACTORS.walkTo(cu.fig, cu.target[0], cu.target[1], cu.fig.speed, dt) ||
-            Math.hypot(cu.fig.group.position.x - cart.rec.x, cu.fig.group.position.z - cart.rec.z) > 110) {
-            ACTORS.removeFig(cu.fig);
-            cart.customers.splice(i, 1);
-          }
+        }
+      }
+      // v2.08: departures — served / fed-up customers walk away and despawn
+      for (let i = cart.leaving.length - 1; i >= 0; i--) {
+        const cu = cart.leaving[i];
+        cu.age += dt;
+        if (ACTORS.walkTo(cu.fig, cu.target[0], cu.target[1], cu.fig.speed, dt) || cu.age > 45) {
+          ACTORS.removeFig(cu.fig);
+          cart.leaving.splice(i, 1);
         }
       }
       // vendors auto-serve
@@ -3520,6 +3564,7 @@ const ECO = (() => {
         cart.plot.crew = [];
         if (cart.mesh.parent) cart.mesh.parent.remove(cart.mesh);
         cart.customers.forEach(cu => ACTORS.removeFig(cu.fig));
+        cart.leaving.forEach(cu => ACTORS.removeFig(cu.fig));
         cart.vendors.forEach(v => ACTORS.removeFig(v.fig));
         carts = carts.filter(c => c !== cart);
         earn(1000, false);
@@ -3600,11 +3645,22 @@ const ECO = (() => {
 
   function saveGameSafe() { try { saveGame(); } catch (e) { } }
 
+  // v2.08: live queue metrics (QA + E2E)
+  function queueStats() {
+    let inLine = 0, leaving = 0, served = 0;
+    for (const c of carts) {
+      inLine += c.customers.length;
+      leaving += (c.leaving || []).length;
+      served += c.served;
+    }
+    return { inLine, leaving, served };
+  }
+
   function update(dt) { if (STATE.mode === 'city') updateCarts(dt); }
 
   return {
     CUISINES, restoreCity, clearCarts, update, hoverInfo, clickAt,
-    openBusiness, openEmpire, recruit, hireFee, revPerMin,
+    openBusiness, openEmpire, recruit, hireFee, revPerMin, queueStats,
     get serveContext() { return serveContext; },
     get carts() { return carts; },
   };
@@ -4423,7 +4479,7 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
   a.onclick = e => {
     e.preventDefault();
     const k = a.dataset.abt;
-    openModal(k.toUpperCase(), `<p><b>Open World v2.07</b> runs entirely in your browser and saves locally.</p>
+    openModal(k.toUpperCase(), `<p><b>Open World v2.08</b> runs entirely in your browser and saves locally.</p>
       <p>No accounts, no tracking, no payments. Map data © OpenStreetMap contributors (ODbL).</p>
       <p>Support: keep playing and build something big.</p>`);
   };
@@ -4433,11 +4489,11 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.07 — CLEAR STREETS', `
-    <p><b>The roads belong to the cars again.</b></p>
-    <div class="kv"><span class="k">NO TREES ON THE ROAD</span><span class="v">trees — and lamps, benches, bollards, parked cars — now clear every crossing: nothing sprouts in the middle of an intersection</span></div>
-    <div class="kv"><span class="k">STILL GREENERY</span><span class="v">parks, lawns and sidewalk edges keep their trees — only road blockers are gone</span></div>
-    <div class="kv"><span class="k">UNTOUCHED</span><span class="v g">v2.03 variety · v2.04 fast entry · v2.05 starter guide · v2.06 tighter controls</span></div>
+  openModal('Welcome to v2.08 — HAPPY CUSTOMERS', `
+    <p><b>The line is a line again.</b></p>
+    <div class="kv"><span class="k">THEY LEAVE NOW</span><span class="v">every served customer turns and walks off down the street — no more figures frozen in the queue, overlapping the next guest</span></div>
+    <div class="kv"><span class="k">SMOOTHER QUEUE</span><span class="v">customers turn naturally (no instant 180° flips when the line shuffles) and wait facing your cart</span></div>
+    <div class="kv"><span class="k">UNTOUCHED</span><span class="v g">v2.03 variety · v2.04 fast entry · v2.05 starter guide · v2.06 controls · v2.07 clear streets</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">START BUILDING</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); if (!STATE.lastCityKey) toast('Click a glowing city to dive in.'); };
 }
@@ -4464,7 +4520,7 @@ document.getElementById('b-build').addEventListener('click', () => {
 document.getElementById('avatar-chip').addEventListener('click', () => ECO.openEmpire());
 
 function openHelp() {
-  openModal('Open World v2.07 — Help', `
+  openModal('Open World v2.08 — Help', `
     <p><b>Controls</b></p>
     <div class="kv"><span class="k">MOVE</span><span class="v">WASD / arrows · hold Shift = sprint · release = stop</span></div>
     <div class="kv"><span class="k">CAMERA</span><span class="v">Drag to orbit · wheel/pinch to zoom (gentle, glide)</span></div>
@@ -4671,7 +4727,7 @@ EARTH.diveTo = (city, cb) => {
 };
 
 
-console.log('%cOPEN WORLD v2.07 — CLEAR STREETS', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.08 — HAPPY CUSTOMERS', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
