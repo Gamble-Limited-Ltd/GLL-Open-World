@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.05</title>
+<title>Open World — v2.06</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.05 — NEW WORLD (complete restart) + STARTER GUIDE
+   OPEN WORLD v2.06 — NEW WORLD (complete restart) + STARTER GUIDE + TIGHT CONTROLS
    Visual system modeled on the Capital Rift reference frame:
    dark glassmorphism fintech UI (panels #1A202C @85%, 1px #4A5568
    borders, 4px radius), money-green #48BB78 prices, link-blue
@@ -482,7 +482,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.05 — streets imported live from the real world</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.06 — streets imported live from the real world</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -504,7 +504,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.05';
+const GAME_VERSION = 'v2.06';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -2861,12 +2861,36 @@ const ACTORS = (() => {
     player.group.position.set(x, 0, z);
   }
 
-  // input
+  // input — v2.06 CONTROLS FIX
+  // Bug: a keyup lost to window blur (alt-tab, browser chrome, a native
+  // dialog, focus moving to another frame) left keys['w'] stuck true and
+  // the player kept ghost-walking after the key was released. Hardened:
+  //  1. movement keys tracked by PHYSICAL code (e.code) — layout-proof
+  //     WASD and down/up can never disagree via case changes
+  //  2. Shift reconciled from every event's getModifierState — sprint
+  //     engages even if the Shift keydown predates game focus, and
+  //     self-heals the moment state goes stale
+  //  3. ALL input clears on blur / focus / tab-hidden — a lost keyup can
+  //     never leave the avatar moving. You move ONLY while holding a key.
+  const KEYCODE = {
+    KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd',
+    ArrowUp: 'arrowup', ArrowDown: 'arrowdown',
+    ArrowLeft: 'arrowleft', ArrowRight: 'arrowright',
+  };
+  const kName = e => KEYCODE[e.code] || (e.key ? e.key.toLowerCase() : '');
   window.addEventListener('keydown', e => {
     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
-    keys[e.key.toLowerCase()] = true;
+    keys[kName(e)] = true;
+    if (e.getModifierState) keys['shift'] = e.getModifierState('Shift');
   });
-  window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+  window.addEventListener('keyup', e => {
+    keys[kName(e)] = false;
+    if (e.getModifierState) keys['shift'] = e.getModifierState('Shift');
+  });
+  const clearKeys = () => { for (const k in keys) keys[k] = false; };
+  window.addEventListener('blur', clearKeys);
+  window.addEventListener('focus', clearKeys);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) clearKeys(); });
 
   // touch joystick
   function setupJoystick() {
@@ -2896,6 +2920,7 @@ const ACTORS = (() => {
     };
     joyEl.addEventListener('pointerup', up);
     joyEl.addEventListener('pointercancel', up);
+    joyEl.addEventListener('lostpointercapture', up);   // v2.06: stuck-joystick guard
   }
   setupJoystick();
 
@@ -2911,7 +2936,8 @@ const ACTORS = (() => {
     if (joy.active) { mx += joy.dx; mz += joy.dz; }
     const mag = Math.hypot(mx, mz);
     if (mag > .08) {
-      const run = keys['shift'] ? 10.5 : 6.2;
+      const sprinting = !!keys['shift'];
+      const run = sprinting ? 10.5 : 6.2;
       const nx = mx / mag, nz = mz / mag;
       // rotate input by -camAz so W walks away from the camera
       const ca = Math.cos(camAz), sa = Math.sin(camAz);
@@ -2930,7 +2956,8 @@ const ACTORS = (() => {
       player.group.rotation.y = Math.atan2(wx, wz);
       player.setWalk(true);
       player.phaseSpeed = run;
-    } else player.setWalk(false);
+      player.sprint = sprinting;   // v2.06: sprint state (QA/HUD-visible)
+    } else { player.setWalk(false); player.sprint = false; }
   }
 
   // ---------------- animation ----------------------------------------
@@ -2986,6 +3013,7 @@ const ACTORS = (() => {
     spawnCitizens, clearCitizens, updateCitizens,
     initPlayer, placePlayer, updatePlayer, update, reset,
     get player() { return player; },
+    get input() { return keys; },   // v2.06: live view of key state (QA)
     get figures() { return figures; },
   };
 })();
@@ -3284,6 +3312,7 @@ const ECO = (() => {
     } else servebar.classList.add('hidden');
   }
   window.addEventListener('keydown', e => {
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return; // v2.06: typing must not serve
     if (e.key.toLowerCase() === 'e' && serveContext && !e.repeat) {
       if (serveCustomer(serveContext, true)) { /* sale! */ }
     }
@@ -4362,7 +4391,7 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
   a.onclick = e => {
     e.preventDefault();
     const k = a.dataset.abt;
-    openModal(k.toUpperCase(), `<p><b>Open World v2.05</b> runs entirely in your browser and saves locally.</p>
+    openModal(k.toUpperCase(), `<p><b>Open World v2.06</b> runs entirely in your browser and saves locally.</p>
       <p>No accounts, no tracking, no payments. Map data © OpenStreetMap contributors (ODbL).</p>
       <p>Support: keep playing and build something big.</p>`);
   };
@@ -4372,12 +4401,12 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.05 — STARTER GUIDE', `
-    <p><b>New tycoons now get a guided start.</b></p>
-    <div class="kv"><span class="k">SIX STEPS</span><span class="v">walk → find a $ parcel → buy it → park a 🌭 cart → serve the queue → hire a vendor</span></div>
-    <div class="kv"><span class="k">GOLD BEACON</span><span class="v">a bobbing arrow marks each objective in the world</span></div>
-    <div class="kv"><span class="k">SKIP ANYTIME</span><span class="v">the ✕ on the guide chip dismisses it for good</span></div>
-    <div class="kv"><span class="k">REPLAY</span><span class="v g">HELP button → Replay Tutorial</span></div>
+  openModal('Welcome to v2.06 — TIGHTER CONTROLS', `
+    <p><b>Your feet now obey your fingers.</b></p>
+    <div class="kv"><span class="k">NO GHOST WALKING</span><span class="v">release a key — or lose window focus — and you stop on the spot; stuck keys are impossible now</span></div>
+    <div class="kv"><span class="k">SHIFT = SPRINT</span><span class="v">hold Shift while moving to run (works with WASD and arrows)</span></div>
+    <div class="kv"><span class="k">LAYOUT PROOF</span><span class="v">WASD now tracks the physical key — AZERTY and friends welcome</span></div>
+    <div class="kv"><span class="k">UNTOUCHED</span><span class="v g">v2.03 building variety · v2.04 fast entry · v2.05 starter guide</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">START BUILDING</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); if (!STATE.lastCityKey) toast('Click a glowing city to dive in.'); };
 }
@@ -4404,9 +4433,9 @@ document.getElementById('b-build').addEventListener('click', () => {
 document.getElementById('avatar-chip').addEventListener('click', () => ECO.openEmpire());
 
 function openHelp() {
-  openModal('Open World v2.05 — Help', `
+  openModal('Open World v2.06 — Help', `
     <p><b>Controls</b></p>
-    <div class="kv"><span class="k">MOVE</span><span class="v">WASD / arrows · Shift = run</span></div>
+    <div class="kv"><span class="k">MOVE</span><span class="v">WASD / arrows · hold Shift = sprint · release = stop</span></div>
     <div class="kv"><span class="k">CAMERA</span><span class="v">Drag to orbit · wheel/pinch to zoom (gentle, glide)</span></div>
     <div class="kv"><span class="k">SERVE</span><span class="v">[E] when standing at your cart</span></div>
     <div class="kv"><span class="k">MARKET</span><span class="v">📈 button · limit &amp; market orders</span></div>
@@ -4611,7 +4640,7 @@ EARTH.diveTo = (city, cb) => {
 };
 
 
-console.log('%cOPEN WORLD v2.05 — STARTER GUIDE', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.06 — TIGHTER CONTROLS', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
