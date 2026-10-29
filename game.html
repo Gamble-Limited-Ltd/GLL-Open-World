@@ -1546,7 +1546,7 @@ input,select,textarea{font-family:var(--cr-mono)}
       <button class="ow-chip-btn ow-chip-logout" onclick="logout()">⏻ Logout</button>
     </div>
   </div>
-  <div class="ow-build-pill">Build v1.41</div>
+  <div class="ow-build-pill">Build v1.42</div>
 
   <div class="modal" id="settings">
     <div class="panel">
@@ -1600,6 +1600,7 @@ input,select,textarea{font-family:var(--cr-mono)}
       <button class="sf-pill sf-pill-util" id="gamble-btn" onclick="openGambling()" style="display:none" title="Play at your casinos">🎰 CASINO</button>
       <button class="sf-pill sf-pill-util" id="cook-btn" onclick="openCookQuick()" style="display:none" title="Street Kitchen — cook at your food carts for bonus credits">🍳 KITCHEN</button>
       <button class="sf-pill sf-pill-util" id="cities-btn" onclick="openCities()" title="Cities — visit the world's great cities and park your food cart">🌆 CITIES</button>
+      <button class="sf-pill sf-pill-util" id="terminal-btn" onclick="openMarketModal('terminal')" title="Terminal — the live order book: depth ladder, trade tape, limit &amp; market orders">📈 TERMINAL</button>
     </nav>
 
     <!-- ══ RIGHT — COMMS (commander) + NAVIGATION (resources) ══ -->
@@ -6042,8 +6043,14 @@ window.WarFx = WarFx;
 // every ship; players see the popup once per account (per device) after
 // logging in, listing every version newer than the one they last saw.
 // ====================================================================
-const GAME_VERSION = 'v1.41';
+const GAME_VERSION = 'v1.42';
 const RELEASE_NOTES = [
+  { v: 'v1.42', items: [
+    '🖥 <b>The Terminal — a live order book</b> — the Market has a new TERMINAL tab (or hit the 📈 TERMINAL launcher): an animated depth ladder with red asks counting down into the spread and green bids stacking below, size bars and running totals, a live LAST price with tick arrows, and a scrolling trade tape. The exchange crowd works the desk between the book and The Reserve, so the ladder you watch is the ladder you trade — and it moves every second.',
+    '📋 <b>Limit &amp; market orders, terminal-style</b> — MARKET orders fill straight down the ladder with an instant EST-FILL preview before you commit; LIMIT orders rest in the real cloud book (bids escrow credits, asks escrow materials) and show in the ladder with a YOU tag the moment they land.',
+    '📈 <b>Business P&amp;L panels</b> — every business card now opens with a live revenue ticker and a KPI strip: revenue per minute, output, crew, stock and appeal. Food carts show their full menu — every item with its price and appeal rating.',
+    '⭐ <b>Star-rated crews</b> — recruits off the street come with a name, a 1-5 star rating and a hiring price to match: a 5-star hand boosts output up to +49%, a 1-star just +21%. Your existing crews keep working exactly as before — their stars are on their badges now.'
+  ]},
   { v: 'v1.41', items: [
     '🌆 <b>Cities & street life</b> — the world\'s great cities are BUILT now: New York, Tokyo, London, Paris and ~60 more stand at their real spots on the map — concrete blocks, asphalt streets with yellow center lines, windowed towers with real skylines, street trees and floating name labels. City ground is flat and buildable, and coastal cities landfill their own land.',
     '🚶 <b>Fake people (real 3D citizens)</b> — little low-poly people in varied shirts and skin tones walk the streets of every city on seeded patrol routes — the same crowd for every player, every visit. They keep to the right sidewalk and bob as they go.',
@@ -9915,6 +9922,874 @@ const CITY = (() => {
 })();
 window.CITY = CITY;
 
+// ====================================================================
+// v1.42 — THE TERMINAL (market desk + business P&L panels)
+// --------------------------------------------------------------------
+// The terminal prototype's headline features, wired into the live
+// game's real economy:
+//   * TERMINAL tab in the Market modal — an animated depth ladder
+//     (red asks counting down into the spread, green bids below),
+//     size bars + running totals, a live LAST price with tick arrows,
+//     a scrolling trade tape, and LIMIT / MARKET order forms with an
+//     instant EST-FILL preview.
+//   * The street desk — the exchange crowd's market-maker levels that
+//     stand between the real resting book and The Reserve. Desk fills
+//     clear instantly and locally (the Reserve's own trust model) at
+//     better prices than the Reserve's 6% spread, and the desk's sizes
+//     drift every 1.2s so the book visibly breathes.
+//   * Business cards open with a live P&L ticker + KPI strip, and food
+//     carts show their full menu (items / prices / appeal).
+//   * Star-rated crews — recruits come off the street with a name and
+//     a 1-5 star rating; 5-star workers boost output harder (up to
+//     +49% each) and cost more to hire. A 3-star average is exactly
+//     the old flat +35%, so existing balance is preserved on average.
+// Everything deterministic where it matters (crew names/stars hash off
+// plot + slot, so saves reload identically on every machine).
+// ====================================================================
+const TERMINAL = (() => {
+  'use strict';
+
+  // ---------- tiny DOM + hash helpers ----------
+  const $ = (id) => document.getElementById(id);
+  function h32(str) {
+    let h = 2166136261;
+    for (let j = 0; j < str.length; j++) { h ^= str.charCodeAt(j); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+  function hashN() {
+    let h = 2166136261;
+    for (let i = 0; i < arguments.length; i++) {
+      const s = String(arguments[i]);
+      for (let j = 0; j < s.length; j++) { h ^= s.charCodeAt(j); h = Math.imul(h, 16777619); }
+      h ^= 0x1f; h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+  const fmt$ = (n) => '$' + Math.round(n).toLocaleString();
+
+  // ---------- terminal look (injected once) ----------
+  const CSS = `
+/* ============ v1.42 — THE TERMINAL ============ */
+.tm-hint{font-size:10.5px;color:#8b95a1;line-height:1.45;margin:6px 0 2px}
+.tm-rail{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0 2px}
+.tm-chipx{font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace);font-size:10px;color:#94a3b8;
+  border:1px solid #1f2937;background:#0b0f19;padding:3px 7px;cursor:pointer;white-space:nowrap;border-radius:0}
+.tm-chipx b{color:#e2e8f0;font-weight:700}
+.tm-chipx.sel{border-color:#38bdf8;color:#38bdf8;box-shadow:0 0 9px rgba(56,189,248,.38)}
+.tm-chipx .up{color:#34d399}.tm-chipx .dn{color:#f87171}
+.tm-main{display:flex;gap:10px;margin-top:8px;align-items:stretch}
+.tm-bookzone{flex:1.25;min-width:0;border:1px solid #1f2937;background:#0b0f19;align-self:flex-start;width:100%}
+.tm-side{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.tm-colhead{display:grid;grid-template-columns:1fr 74px 84px;gap:6px;padding:3px 8px;font-size:9px;
+  letter-spacing:.14em;color:#64748b;border-bottom:1px solid #1f2937;
+  font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace)}
+.tm-colhead span:nth-child(2),.tm-colhead span:nth-child(3){text-align:right}
+.tm-book{position:relative}
+.tm-row{position:relative;display:grid;grid-template-columns:1fr 74px 84px;gap:6px;padding:2px 8px;
+  font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace);font-size:11px;line-height:1.5;
+  border-radius:0;overflow:hidden;white-space:nowrap}
+.tm-row>span{position:relative;z-index:1}
+.tm-row .tm-sz,.tm-row .tm-cum{text-align:right}
+.tm-row .tm-cum{color:#64748b;font-size:10px}
+.tm-row .tm-depth{position:absolute;left:0;top:0;bottom:0;z-index:0;pointer-events:none}
+.tm-row.a{color:#f87171}.tm-row.a .tm-depth{background:rgba(239,68,68,.14)}
+.tm-row.b{color:#34d399}.tm-row.b .tm-depth{background:rgba(16,185,129,.14)}
+.tm-row.res{color:#7dd3fc;background:rgba(14,30,46,.9);border-top:1px dashed #1f2937;border-bottom:1px dashed #1f2937}
+.tm-row.res .tm-cum{color:#7dd3fc}
+.tm-tagyou{display:inline-block;margin-right:4px;padding:0 3px;font-size:8px;letter-spacing:.08em;
+  color:#38bdf8;border:1px solid rgba(56,189,248,.55);background:rgba(56,189,248,.12)}
+.tm-tagbk{display:inline-block;margin-right:4px;color:#64748b;font-size:9px}
+.tm-lastrow{display:flex;align-items:center;gap:8px;padding:6px 8px;background:#111827;
+  border-top:1px solid #1f2937;border-bottom:1px solid #1f2937;flex-wrap:wrap}
+.tm-lastrow .tm-lastlab{font-size:9px;letter-spacing:.16em;color:#64748b;
+  font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace)}
+.tm-lastpx{font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace);font-size:19px;font-weight:700;
+  font-variant-numeric:tabular-nums}
+.tm-lastpx.up{color:#34d399;text-shadow:0 0 10px rgba(52,211,153,.5)}
+.tm-lastpx.dn{color:#ef4444;text-shadow:0 0 10px rgba(239,68,68,.45)}
+.tm-spread{font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace);font-size:10px;color:#64748b}
+.tm-hold{font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace);font-size:10px;color:#38bdf8;
+  border:1px solid rgba(56,189,248,.4);padding:1px 6px}
+.tm-tapewrap{border:1px solid #1f2937;background:#0b0f19;padding:5px 7px}
+.tm-tapehead{font-size:9px;letter-spacing:.18em;color:#64748b;margin-bottom:3px;
+  font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace)}
+.tm-tape{display:flex;gap:9px;overflow-x:auto;font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace);
+  font-size:10px;white-space:nowrap;padding-bottom:2px}
+.tm-tape span{flex:0 0 auto}
+.tm-tape .tb{color:#34d399}.tm-tape .ts{color:#f87171}.tm-tape .tyou{color:#38bdf8;border-bottom:1px solid #38bdf8}
+.tm-form{border:1px solid #1f2937;background:#0b0f19;padding:8px}
+.tm-modetabs{display:flex;gap:0;margin-bottom:8px}
+.tm-mtab{flex:1;background:#111827;color:#94a3b8;border:1px solid #1f2937;border-bottom:2px solid #1f2937;
+  font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace);font-size:10px;letter-spacing:.14em;
+  padding:4px 0;cursor:pointer;border-radius:0}
+.tm-mtab.on{color:#38bdf8;border-bottom:2px solid #38bdf8;background:#0b0f19}
+.tm-fmarket,.tm-flimit{display:flex;flex-direction:column;gap:6px}
+.tm-form label{font-size:9px;letter-spacing:.14em;color:#64748b;
+  font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace)}
+.tm-form input{background:#111827;border:1px solid #1f2937;color:#e2e8f0;border-radius:0;padding:4px 7px;
+  font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace);font-size:12px;width:100%;box-sizing:border-box}
+.tm-form input:focus{outline:none;border-color:#38bdf8;box-shadow:0 0 8px rgba(56,189,248,.3)}
+.tm-qty{display:flex;gap:0}
+.tm-qty button{background:#111827;border:1px solid #1f2937;color:#94a3b8;width:26px;cursor:pointer;border-radius:0;
+  font-size:13px}
+.tm-qty input{flex:1;border-left:none;border-right:none;text-align:center}
+.tm-chips{display:flex;gap:4px;flex-wrap:wrap}
+.tm-chip{background:#111827;border:1px solid #1f2937;color:#94a3b8;font-size:9px;letter-spacing:.08em;
+  padding:2px 7px;cursor:pointer;border-radius:0;
+  font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace)}
+.tm-chip:hover{color:#38bdf8;border-color:rgba(56,189,248,.5)}
+.tm-estrow{font-size:10px;color:#94a3b8;font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace);
+  border-top:1px dashed #1f2937;padding-top:6px;line-height:1.5}
+.tm-estrow b{color:#e2e8f0}
+.tm-btnrow{display:flex;gap:6px}
+.tm-buy,.tm-sell,.tm-place,.tm-sidebtn{flex:1;border:none;color:#04110c;font-weight:800;letter-spacing:.14em;
+  font-size:11px;padding:7px 0;cursor:pointer;border-radius:0;
+  font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace)}
+.tm-buy{background:#10b981;box-shadow:0 0 12px rgba(16,185,129,.42)}
+.tm-sell{background:#ef4444;color:#fff;box-shadow:0 0 12px rgba(239,68,68,.38)}
+.tm-buy:hover{background:#34d399}.tm-sell:hover{background:#f87171}
+.tm-place.buy,.tm-sidebtn.buy{background:#10b981;box-shadow:0 0 12px rgba(16,185,129,.42);color:#04110c}
+.tm-place.sell,.tm-sidebtn.sell{background:#ef4444;color:#fff;box-shadow:0 0 12px rgba(239,68,68,.38)}
+.tm-pos{margin-top:8px;font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace);font-size:10.5px;
+  color:#94a3b8;border:1px solid #1f2937;background:#0b0f19;padding:5px 8px}
+.tm-pos b{color:#38bdf8}
+.tm-orders{margin-top:8px}
+.tm-orow{display:flex;align-items:center;gap:7px;font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace);
+  font-size:10px;color:#94a3b8;border:1px solid #1f2937;border-top:none;background:#0b0f19;padding:3px 8px}
+.tm-orders .tm-orow:first-child{border-top:1px solid #1f2937}
+.tm-orow .bid{color:#34d399}.tm-orow .ask{color:#f87171}
+.tm-orow .fillbar{flex:1;height:3px;background:#111827;position:relative;min-width:30px}
+.tm-orow .fillbar i{position:absolute;left:0;top:0;bottom:0;background:#38bdf8}
+.tm-orow button{background:none;border:1px solid #1f2937;color:#f87171;cursor:pointer;font-size:9px;
+  padding:1px 5px;border-radius:0}
+@media (max-width:640px){.tm-main{flex-direction:column}.tm-bookzone,.tm-side{width:100%}}
+/* ---- worker slots (business cards) ---- */
+.tmw-row{flex-wrap:wrap;gap:4px}
+.tmw-slots{display:flex;gap:4px;flex-wrap:wrap;flex-basis:100%}
+.tmw-slot{display:inline-flex;align-items:center;gap:5px;border:1px solid #1f2937;background:#0b0f19;
+  padding:2px 7px;font-size:10px;color:#cbd5e1;border-radius:0;white-space:nowrap}
+.tmw-slot b{color:#e2e8f0;font-weight:700;max-width:78px;overflow:hidden;text-overflow:ellipsis}
+.tmw-slot.empty{border-style:dashed;color:#475569;background:transparent}
+.tmw-stars{letter-spacing:1px;white-space:nowrap}
+.tmw-stars i{font-style:normal}
+.tmw-stars i.on{color:#f5cc74;text-shadow:0 0 6px rgba(245,204,116,.45)}
+.tmw-stars i.off{color:#334155}
+.tmw-sum{font-size:10px;color:#8b95a1}
+.tmw-next{font-size:9.5px;color:#7dd3fc;border:1px solid rgba(56,189,248,.3);background:rgba(56,189,248,.06);
+  padding:2px 6px;white-space:nowrap}
+.tmw-next b{color:#bae6fd}
+.tmw-next i{font-style:normal;color:#64748b}
+/* ---- business P&L strip ---- */
+.tmp-strip{border:1px solid #1f2937;background:linear-gradient(180deg,#0b0f19,#0d1424);
+  padding:6px 8px;margin:5px 0 6px;border-radius:0}
+.tmp-pnl{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.tmp-pnl .tmp-lab{font-size:9px;letter-spacing:.16em;color:#64748b;
+  font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace)}
+.tm-pnl-val{font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace);font-size:15px;font-weight:800;
+  color:#34d399;text-shadow:0 0 9px rgba(52,211,153,.5);font-variant-numeric:tabular-nums}
+.tm-pnl-val.dn{color:#f87171;text-shadow:0 0 9px rgba(248,113,113,.4)}
+.tmp-sub{font-size:9.5px;color:#64748b;
+  font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace)}
+.tmp-kpis{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.tmp-kpi{border:1px solid #1f2937;background:#0b0f19;padding:2px 7px;font-size:9px;letter-spacing:.06em;
+  color:#64748b;font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace);white-space:nowrap}
+.tmp-kpi b{color:#e2e8f0;margin-left:4px;font-weight:700}
+.tmp-kpi b.mint{color:#34d399}.tmp-kpi b.cy{color:#38bdf8}.tmp-kpi b.gold{color:#f5cc74}
+.tmp-menu{margin-top:6px;border-top:1px dashed #1f2937;padding-top:5px}
+.tmp-menu .tmp-mhead{display:grid;grid-template-columns:1fr 56px 96px;gap:6px;font-size:8.5px;
+  letter-spacing:.14em;color:#475569;padding:1px 6px;
+  font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace)}
+.tmp-mrow{display:grid;grid-template-columns:1fr 56px 96px;gap:6px;align-items:center;padding:1.5px 6px;
+  font-size:10.5px;color:#cbd5e1}
+.tmp-mrow:nth-child(odd){background:rgba(17,24,39,.55)}
+.tmp-mrow .tmp-mpr{text-align:right;color:#e2e8f0;
+  font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace);font-size:10px}
+.tmp-map{display:flex;align-items:center;gap:5px;justify-content:flex-end}
+.tmp-map span{font-family:var(--cr-mono,ui-monospace,Menlo,Consolas,monospace);font-size:9px;color:#38bdf8}
+.tmp-map .tmp-bar{width:56px;height:3px;background:#1f2937;position:relative}
+.tmp-map .tmp-bar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#38bdf8,#34d399);
+  box-shadow:0 0 5px rgba(56,189,248,.5)}
+`;
+  let styleDone = false;
+  function ensureStyle() {
+    if (styleDone || document.getElementById('tm-style')) { styleDone = true; return; }
+    try {
+      const s = document.createElement('style');
+      s.id = 'tm-style';
+      s.textContent = CSS;
+      document.head.appendChild(s);
+      styleDone = true;
+    } catch (e) {}
+  }
+
+  // ==================================================================
+  // STAR CREWS — names + 1-5 star ratings, deterministic per slot
+  // ==================================================================
+  const NAMES = ['Dakota', 'Marlow', 'Jones', 'Reyes', 'Okafor', 'Lena', 'Vik', 'Priya',
+    'Sole', 'Ivan', 'Mabel', 'Theo', 'Nadia', 'Cruz', 'Hana', 'Bram', 'Zola', 'Ephraim',
+    'Kai', 'Ruth', 'Otto', 'Selma', 'Dario', 'Wren', 'Imani', 'Bo', 'Frida', 'Cyrus',
+    'Noor', 'Elif'];
+  const STAR_BONUS = (s) => 0.14 + s * 0.07;   // 1★ +21% … 3★ +35% … 5★ +49%
+
+  function starList(plotId, idx, meta) {
+    const n = (meta && meta.workers) || 0;
+    if (meta && Array.isArray(meta.stars) && meta.stars.length === n &&
+        meta.stars.every(s => s >= 1 && s <= 5)) return meta.stars.slice();
+    const out = [];
+    for (let i = 0; i < n; i++) out.push(1 + (hashN(plotId, idx, i, 'star') % 5));
+    return out;
+  }
+  function crewBoost(plotId, idx, meta) {
+    const sl = starList(plotId, idx, meta);
+    let b = 0;
+    for (let i = 0; i < sl.length; i++) b += STAR_BONUS(sl[i]);
+    return 1 + b;
+  }
+  function recruit(plotId, idx, slot) {
+    return {
+      name: NAMES[hashN(plotId, idx, slot, 'name') % NAMES.length],
+      stars: 1 + (hashN(plotId, idx, slot, 'star') % 5),
+    };
+  }
+  function starsTxt(n, px) {
+    let out = '';
+    for (let i = 1; i <= 5; i++) out += `<i class="${i <= n ? 'on' : 'off'}">${i <= n ? '★' : '☆'}</i>`;
+    return `<span class="tmw-stars" style="font-size:${px || 10}px">${out}</span>`;
+  }
+
+  function workerRow(plotId, idx, bt, ctx) {
+    ensureStyle();
+    const meta = (typeof bizMetaOf === 'function') ? bizMetaOf(plotId, idx) : null;
+    const stars = starList(plotId, idx, meta);
+    const n = stars.length;
+    let avg = n ? stars.reduce((a, b) => a + b, 0) / n : 0;
+    let slots = '';
+    for (let i = 0; i < (typeof WORKER_MAX !== 'undefined' ? WORKER_MAX : 5); i++) {
+      if (i < n) {
+        const nm = recruit(plotId, idx, i).name;   // same recruit pool the hire button drew from
+        slots += `<span class="tmw-slot" title="${nm} — ${stars[i]}-star hand: output +${Math.round(STAR_BONUS(stars[i]) * 100)}%">`
+          + `👷<b>${nm}</b>${starsTxt(stars[i])}</span>`;
+      } else {
+        slots += `<span class="tmw-slot empty">＋ slot</span>`;
+      }
+    }
+    const rc = recruit(plotId, idx, n);
+    const baseFee = (typeof workerHireFee === 'function') ? workerHireFee(bt) : 400;
+    const fee = Math.round(baseFee * (0.5 + rc.stars * 0.25));
+    const canHire = n < (typeof WORKER_MAX !== 'undefined' ? WORKER_MAX : 5) &&
+      (typeof STATE === 'undefined' || STATE.money >= fee);
+    return `
+  <div class="wk-row tmw-row">
+    <span class="tmw-slots">${slots}</span>
+    <span class="tmw-sum">output <b style="color:#7fffd4">+${Math.round((ctx.boost - 1) * 100)}%</b>${n ? ` · crew avg ${avg.toFixed(1)}★` : ''} · $${ctx.wage.toLocaleString()}/min/worker${ctx.street ? ' · serves the queue' : ''}</span>
+    <span style="flex:1"></span>
+    <span class="tmw-next" title="The next recruit off the street — stars set the boost, the fee follows the stars">NEXT <b>${rc.name}</b> ${starsTxt(rc.stars, 9)} <i>$${fee.toLocaleString()}</i></span>
+    <button class="wk-btn" ${canHire ? '' : 'disabled'} onclick="hireWorker(${ctx.pidArg}, ${idx})" title="One-time hiring fee${ctx.street ? ' — a vendor stands at the cart and serves customers for you' : ''}">+ ${ctx.street ? 'HIRE VENDOR' : 'HIRE'} $${fee.toLocaleString()}</button>
+    <button class="wk-btn" ${n > 0 ? '' : 'disabled'} onclick="fireWorker(${ctx.pidArg}, ${idx})">− Fire</button>
+  </div>`;
+  }
+
+  // ==================================================================
+  // BUSINESS P&L STRIP — live ticker + KPIs (+ food-cart menu)
+  // ==================================================================
+  const MENUS = {
+    hotdog: [['Frankfurter', 6, 3.8], ['Chili Dog', 8, 4.2], ['Corn Dog', 5, 3.1], ['Bacon-Wrapped Frank', 9, 4.5], ['Double Combo Plate', 11, 4.7]],
+    burger: [['Single Smash', 7, 3.9], ['Double Stack', 10, 4.4], ['Bacon Deluxe', 12, 4.6], ['Veggie Flip', 6, 3.4], ['Combo Basket', 13, 4.8]],
+    pizza: [['Margherita Slice', 5, 4.0], ['Pepperoni Slice', 6, 4.3], ['Meat Lovers', 9, 4.5], ['White Truffle Slice', 11, 4.6], ['Whole Pie', 28, 4.9]],
+    taco: [['Street Taco', 4, 3.7], ['Double-Wrapped', 7, 4.2], ['Al Pastor', 6, 4.4], ['Baja Fish', 8, 4.3], ['Party Pack', 22, 4.8]],
+    sushi: [['Salmon Nigiri', 7, 4.1], ['California Roll', 9, 4.0], ['Dragon Roll', 13, 4.6], ['Chef Omakase', 24, 4.9], ['Miso + Combo', 15, 4.4]],
+    donut: [['Glazed Ring', 3, 3.6], ['Sprinkle Tower', 4, 4.0], ['Boston Cream', 5, 4.3], ['Maple Bacon Bar', 6, 4.5], ['Dozen Box', 24, 4.7]],
+    coffee: [['Drip Coffee', 3, 3.5], ['Flat White', 5, 4.1], ['Cold Brew', 5, 4.2], ['Cortado', 4, 4.0], ['Bagel + Coffee', 8, 4.4]],
+  };
+
+  function bizStrip(plotId, idx, bt, mat, entry, info) {
+    try {
+      ensureStyle();
+      const military = mat && mat.military;
+      const stock = (typeof STATE !== 'undefined' && STATE.inventory) ? Math.floor(STATE.inventory[bt.produces] || 0) : 0;
+      const crew = info.crew || 0;
+      const stars = starList(plotId, idx, (typeof bizMetaOf === 'function') ? bizMetaOf(plotId, idx) : null);
+      const avg = stars.length ? stars.reduce((a, b) => a + b, 0) / stars.length : 0;
+      const gross = info.rate * 60 * (info.price || 0);
+      const wages = (info.wage || 0) * crew;
+      const net = gross - wages;
+      const appeal = Math.max(1, Math.min(5, 2.2 + ((info.regionBonus || 1) - 1) * 8 + avg * 0.15));
+
+      let pnl = '';
+      if (military) {
+        pnl = `<div class="tmp-pnl"><span class="tmp-lab">OUTPUT</span>`
+          + `<b class="tm-pnl-val">+${info.rate.toFixed(1)} ${mat.icon}/s</b>`
+          + `<span class="tmp-sub">to your army${crew ? ` · crew ${crew}/5 (${avg.toFixed(1)}★)` : ''}</span></div>`;
+      } else {
+        pnl = `<div class="tmp-pnl"><span class="tmp-lab">P&amp;L</span>`
+          + `<b class="tm-pnl-val${net < 0 ? ' dn' : ''}" data-net="${Math.round(net)}">+${fmt$(Math.max(0, net))}/min</b>`
+          + `<span class="tmp-sub">gross ${fmt$(gross)}/min − wages ${fmt$(wages)}/min · ${mat.icon} @ ${fmt$(info.price)}</span></div>`;
+      }
+      let kpis = `<div class="tmp-kpis">`;
+      if (!military) kpis += `<span class="tmp-kpi">REV/MIN<b class="mint">${fmt$(gross)}</b></span>`;
+      kpis += `<span class="tmp-kpi">OUTPUT<b>${'+' + info.rate.toFixed(2)} ${mat.icon}/s</b></span>`;
+      kpis += `<span class="tmp-kpi">CREW<b>${crew}/${5}${crew ? ` · ${avg.toFixed(1)}★` : ''}</b></span>`;
+      kpis += `<span class="tmp-kpi">STOCK<b class="cy">${stock.toLocaleString()}</b></span>`;
+      if (!military) kpis += `<span class="tmp-kpi">APPEAL<b class="gold">${appeal.toFixed(1)}</b></span>`;
+      kpis += `</div>`;
+
+      let menu = '';
+      if (bt.id === 'foodcart' && entry && MENUS[entry.cuisine]) {
+        const items = MENUS[entry.cuisine];
+        const cui = (typeof getCuisine === 'function') ? getCuisine(entry.cuisine) : null;
+        const rows = items.map(it => `
+      <div class="tmp-mrow"><span>${it[0]}</span><span class="tmp-mpr">$${it[1].toFixed(2)}</span>
+        <span class="tmp-map"><span>${it[2].toFixed(1)}</span><span class="tmp-bar"><i style="width:${Math.round(it[2] / 5 * 100)}%"></i></span></span>
+      </div>`).join('');
+        menu = `<div class="tmp-menu">
+      <div class="tmp-mhead"><span>${cui ? cui.icon + ' ' : ''}MENU — ${cui ? cui.name.toUpperCase() : 'STREET MENU'}</span><span style="text-align:right">PRICE</span><span style="text-align:right">APPEAL</span></div>
+      ${rows}
+      <div class="tmp-sub" style="margin-top:3px">supply: <b style="color:#7fffd4">${Math.floor((typeof STATE !== 'undefined' ? STATE.inventory.food : 0) || 0).toLocaleString()} 🌾 food</b> in storage · 🍳 COOK turns it into credits</div>
+    </div>`;
+      }
+      return `<div class="tmp-strip">${pnl}${kpis}${menu}</div>`;
+    } catch (e) { return ''; }
+  }
+
+  // live P&L jitter — the terminal's breathing ticker (2s cadence)
+  setInterval(() => {
+    try {
+      const els = document.querySelectorAll('.tm-pnl-val[data-net]');
+      for (let i = 0; i < els.length; i++) {
+        const net = parseFloat(els[i].getAttribute('data-net')) || 0;
+        const v = Math.max(0, net) * (0.97 + Math.random() * 0.06);
+        els[i].textContent = (net < 0 ? '−' : '+') + fmt$(v) + '/min';
+      }
+    } catch (e) {}
+  }, 2000);
+
+  // ==================================================================
+  // THE STREET DESK — the exchange crowd's market-maker levels
+  // ==================================================================
+  const desks = {};   // matId -> { asks:[{p,s}], bids:[{p,s}], last, prevLast, tape:[...] }
+
+  function seedLevels(d, rq) {
+    d.asks = [];
+    d.bids = [];
+    const unit = Math.max(1, Math.round((rq.ask - rq.mid) / 6));
+    for (let i = 0; i < 6; i++) {
+      const ap = Math.min(rq.ask - 1, rq.mid + unit * (i + 1));
+      const bp = Math.max(rq.bid + 1, rq.mid - unit * (i + 1));
+      if (ap > rq.mid) d.asks.push({ p: ap, s: 40 + hashN('ask', ap, rq.mid) % 860 });
+      if (bp < rq.mid) d.bids.push({ p: bp, s: 40 + hashN('bid', bp, rq.mid) % 860 });
+    }
+    if (!d.asks.length) d.asks.push({ p: rq.ask - 1, s: 260 });
+    if (!d.bids.length) d.bids.push({ p: rq.bid + 1, s: 260 });
+    d.asks.sort((a, b) => a.p - b.p);
+    d.bids.sort((a, b) => b.p - a.p);
+  }
+  function deskFor(matId) {
+    let d = desks[matId];
+    const rq = (window.Exchange && STATE) ? Exchange.reserveQuote(matId)
+      : { mid: 100, bid: 94, ask: 106 };
+    if (!d) {
+      d = desks[matId] = { asks: [], bids: [], last: Math.round(rq.mid), prevLast: Math.round(rq.mid), tape: [] };
+      seedLevels(d, rq);
+      for (let i = 0; i < 6; i++) simTrade(d);
+    }
+    return d;
+  }
+  function simTrade(d) {
+    const side = Math.random() < 0.5 ? 'buy' : 'sell';
+    let px = d.last;
+    if (side === 'buy' && d.asks.length) px = d.asks[0].p;
+    else if (side === 'sell' && d.bids.length) px = d.bids[0].p;
+    const qty = 5 + Math.floor(Math.random() * 75);
+    d.prevLast = d.last;
+    d.last = px;
+    d.tape.unshift({ side: side, qty: qty, p: px, own: false });
+    if (d.tape.length > 9) d.tape.length = 9;
+  }
+
+  function deskTick() {
+    try {
+      if (!window.Exchange || !STATE) return;
+      for (const matId in desks) {
+        const d = desks[matId];
+        const rq = Exchange.reserveQuote(matId);
+      // prices mean-revert toward the system tape; sizes drift (asks
+      // drain as the crowd sells into buyers, bids stack up)
+      d.prevLast = d.last;
+      d.last = Math.max(1, Math.round(d.last + (rq.mid - d.last) * 0.08 +
+        (Math.random() - 0.5) * Math.max(1, rq.mid * 0.012)));
+      for (let i = 0; i < d.asks.length; i++) {
+        const a = d.asks[i];
+        a.s = Math.max(5, Math.min(2500, Math.round(a.s + (Math.random() - 0.62) * a.s * 0.15)));
+      }
+      for (let i = 0; i < d.bids.length; i++) {
+        const b = d.bids[i];
+        b.s = Math.max(5, Math.min(2500, Math.round(b.s + (Math.random() - 0.38) * b.s * 0.15)));
+      }
+      d.asks = d.asks.filter(a => a.p < rq.ask);
+      d.bids = d.bids.filter(b => b.p > rq.bid);
+      if (Math.random() < 0.10 && d.asks.length) {
+        const hi = d.asks[d.asks.length - 1].p;
+        d.asks.push({ p: Math.min(rq.ask - 1, hi + Math.max(1, Math.round(rq.mid * 0.02))), s: 60 + Math.floor(Math.random() * 400) });
+        if (d.asks.length > 9) d.asks.shift();
+      }
+      if (Math.random() < 0.10 && d.bids.length) {
+        const lo = d.bids[d.bids.length - 1].p;
+        d.bids.push({ p: Math.max(rq.bid + 1, lo - Math.max(1, Math.round(rq.mid * 0.02))), s: 60 + Math.floor(Math.random() * 400) });
+        if (d.bids.length > 9) d.bids.shift();
+      }
+      if (!d.asks.length || !d.bids.length) seedLevels(d, rq);
+      d.asks.sort((a, b) => a.p - b.p);
+      d.bids.sort((a, b) => b.p - a.p);
+      if (Math.random() < 0.55) simTrade(d);
+      }
+    } catch (e) { /* a mid-tick hiccup never kills the desk */ }
+    try { if (tabLive()) renderBook(); } catch (e) {}
+  }
+  setInterval(deskTick, 1200);
+
+  function takeAsks(matId, qty) {
+    const d = deskFor(matId);
+    d.asks.sort((a, b) => a.p - b.p);
+    let need = qty, cost = 0, got = 0;
+    while (need > 0 && d.asks.length) {
+      const a = d.asks[0];
+      const take = Math.min(need, a.s);
+      cost += take * a.p;
+      got += take;
+      a.s -= take;
+      need -= take;
+      if (a.s <= 4) d.asks.shift();
+    }
+    return { qty: got, cost: Math.round(cost) };
+  }
+  function takeBids(matId, qty) {
+    const d = deskFor(matId);
+    d.bids.sort((a, b) => b.p - a.p);
+    let need = qty, cost = 0, got = 0;
+    while (need > 0 && d.bids.length) {
+      const b = d.bids[0];
+      const take = Math.min(need, b.s);
+      cost += take * b.p;
+      got += take;
+      b.s -= take;
+      need -= take;
+      if (b.s <= 4) d.bids.shift();
+    }
+    return { qty: got, cost: Math.round(cost) };
+  }
+  function printOwn(matId, side, qty, px) {
+    try {
+      const d = deskFor(matId);
+      d.tape.unshift({ side: side === 'buy' ? 'buy' : 'sell', qty: qty, p: px, own: true });
+      if (d.tape.length > 9) d.tape.length = 9;
+      d.prevLast = d.last;
+      d.last = px;
+    } catch (e) {}
+  }
+
+  // walk the real book → the desk → The Reserve (the honest fill path)
+  const rem = (o) => (typeof o.remaining === 'number')
+    ? o.remaining
+    : Math.max(0, o.qty0 - (o.fills || []).reduce((a, f) => a + (f.refunded ? 0 : f.qty), 0));
+  function estFill(side, matId, qty) {
+    const bk = Exchange.book(matId);
+    const d = deskFor(matId);
+    const rq = bk.reserve;
+    const me = (typeof CURRENT_USER !== 'undefined') ? CURRENT_USER : null;
+    let need = qty, cost = 0, got = 0, reserveQty = 0;
+    if (side === 'buy') {
+      const lv = [];
+      for (const o of bk.asks) if (o.owner !== me) lv.push({ p: o.price, s: rem(o) });
+      for (const l of d.asks) lv.push({ p: l.p, s: l.s });
+      lv.sort((a, b) => a.p - b.p);
+      for (const l of lv) {
+        if (need <= 0) break;
+        const t = Math.min(need, l.s);
+        cost += t * l.p; got += t; need -= t;
+      }
+      if (need > 0) { reserveQty = need; cost += need * rq.ask; got += need; }
+    } else {
+      const lv = [];
+      for (const o of bk.bids) if (o.owner !== me) lv.push({ p: o.price, s: rem(o) });
+      for (const l of d.bids) lv.push({ p: l.p, s: l.s });
+      lv.sort((a, b) => b.p - a.p);
+      for (const l of lv) {
+        if (need <= 0) break;
+        const t = Math.min(need, l.s);
+        cost += t * l.p; got += t; need -= t;
+      }
+      if (need > 0) { reserveQty = need; cost += need * rq.bid; got += need; }
+    }
+    return { avg: got > 0 ? cost / got : 0, total: Math.round(cost), got: got, reserveQty: reserveQty };
+  }
+
+  // ==================================================================
+  // THE TERMINAL TAB — render
+  // ==================================================================
+  let curMat = null;
+  function tabLive() {
+    try {
+      const mm = document.getElementById('market-modal');
+      return !!(mm && mm.classList.contains('show') && window.__mkTab === 'terminal' &&
+        document.getElementById('tm-asks'));
+    } catch (e) { return false; }
+  }
+  function tradables() { return (typeof MATERIALS !== 'undefined') ? MATERIALS.filter(m => !m.military) : []; }
+  function ensureMat() {
+    const t = tradables();
+    if (!curMat || !getMaterial(curMat) || getMaterial(curMat).military) {
+      curMat = (STATE && STATE.exLastMat && getMaterial(STATE.exLastMat) && !getMaterial(STATE.exLastMat).military)
+        ? STATE.exLastMat : (t.length ? t[0].id : null);
+    }
+    if (STATE) STATE.exLastMat = curMat;
+    return curMat;
+  }
+
+  function render(card) {
+    if (!CURRENT_USER) { card.innerHTML = ''; return; }
+    ensureStyle();
+    ensureMat();
+    const F = window.__tmForm = window.__tmForm || { qty: 10, price: 0, mode: 'market', side: 'bid' };
+    if (!F.price) {
+      const rq = Exchange.reserveQuote(curMat);
+      F.price = Math.max(1, F.side === 'bid' ? rq.bid + 1 : Math.max(1, rq.ask - 1));
+    }
+    const st = Exchange.status() === 'cloud' ? '☁ live desk — cloud book' : '💾 this device — cloud retrying';
+    card.innerHTML = `
+    <span class="badge available">market</span>
+    <h2>🖥 THE TERMINAL</h2>
+    <div class="market-sub">${st} · your credits <b>${fmt$(STATE.money)}</b> · Reserve re-quotes in <b class="market-countdown">${getMarketCountdown()}</b></div>
+    ${marketTabBar()}
+    <div class="tm-hint">One book, live: <b>MARKET</b> orders fill straight down the ladder — other commanders' resting orders first, then the exchange crowd's desk, then <b>The Reserve</b> (6% spread). <b>LIMIT</b> orders rest in the real cloud book — bids escrow credits, asks escrow materials — until someone crosses you. The ladder you see is the ladder you trade.</div>
+    <div class="tm-rail" id="tm-rail"></div>
+    <div class="tm-main">
+      <div class="tm-bookzone">
+        <div class="tm-colhead"><span>PRICE</span><span>SIZE</span><span>TOTAL</span></div>
+        <div class="tm-book" id="tm-asks"></div>
+        <div class="tm-lastrow" id="tm-lastrow"></div>
+        <div class="tm-book" id="tm-bids"></div>
+      </div>
+      <div class="tm-side">
+        <div class="tm-tapewrap"><div class="tm-tapehead">TAPE — LAST TRADES</div><div class="tm-tape" id="tm-tape"></div></div>
+        <div class="tm-form">
+          <div class="tm-modetabs">
+            <button class="tm-mtab ${F.mode === 'market' ? 'on' : ''}" id="tm-mtab-m" onclick="tmMode('market')">MARKET</button>
+            <button class="tm-mtab ${F.mode === 'limit' ? 'on' : ''}" id="tm-mtab-l" onclick="tmMode('limit')">LIMIT</button>
+          </div>
+          <div class="tm-fmarket" id="tm-fmarket" style="display:${F.mode === 'market' ? 'flex' : 'none'}">
+            <label>AMOUNT</label>
+            <div class="tm-qty">
+              <button type="button" onclick="tmNudge(-1)">−</button>
+              <input id="tm-qty" type="number" min="1" step="1" inputmode="numeric" value="${F.qty}">
+              <button type="button" onclick="tmNudge(1)">＋</button>
+            </div>
+            <div class="tm-chips">
+              <button class="tm-chip" onclick="tmQtyPreset(10)">10</button>
+              <button class="tm-chip" onclick="tmQtyPreset(100)">100</button>
+              <button class="tm-chip" onclick="tmQtyMax('buy')">MAX BUY</button>
+              <button class="tm-chip" onclick="tmQtyMax('sell')">MAX SELL</button>
+            </div>
+            <div class="tm-estrow" id="tm-estrow">—</div>
+            <div class="tm-btnrow">
+              <button class="tm-buy" onclick="tmMarket('buy')">BUY</button>
+              <button class="tm-sell" onclick="tmMarket('sell')">SELL</button>
+            </div>
+          </div>
+          <div class="tm-flimit" id="tm-flimit" style="display:${F.mode === 'limit' ? 'flex' : 'none'}">
+            <button class="tm-sidebtn ${F.side === 'bid' ? 'buy' : 'sell'}" id="tm-sidebtn" onclick="tmSide()">${F.side === 'bid' ? 'BUY LIMIT' : 'SELL LIMIT'}</button>
+            <label>PRICE / UNIT ($)</label>
+            <input id="tm-price" type="number" min="1" step="1" inputmode="numeric" value="${F.price}">
+            <div class="tm-chips">
+              <button class="tm-chip" onclick="tmPxPreset('best')">BEST</button>
+              <button class="tm-chip" onclick="tmPxPreset('desk')">DESK</button>
+            </div>
+            <label>AMOUNT</label>
+            <input id="tm-lqty" type="number" min="1" step="1" inputmode="numeric" value="${F.qty}">
+            <div class="tm-estrow" id="tm-lrow">—</div>
+            <button class="tm-place ${F.side === 'bid' ? 'buy' : 'sell'}" id="tm-placebtn" onclick="tmLimit()">PLACE ${F.side === 'bid' ? 'BID' : 'ASK'}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tm-pos" id="tm-pos"></div>
+    <div class="tm-orders" id="tm-orders"></div>
+    <div class="market-actions">
+      <button class="btn" onclick="closeMarketModal()">Close</button>
+    </div>`;
+    renderBook();
+    hookInputs();
+    estPreview();
+    limitPreview();
+  }
+
+  // merged ladder: real resting orders + desk levels (+ Reserve ends)
+  function ladder(matId) {
+    const bk = Exchange.book(matId);
+    const d = deskFor(matId);
+    const me = (typeof CURRENT_USER !== 'undefined') ? CURRENT_USER : null;
+    const asks = [];
+    for (const o of bk.asks) asks.push({ p: o.price, s: rem(o), mine: o.owner === me, book: o.owner !== me });
+    for (const l of d.asks) asks.push({ p: l.p, s: l.s, mine: false, book: false });
+    const bids = [];
+    for (const o of bk.bids) bids.push({ p: o.price, s: rem(o), mine: o.owner === me, book: o.owner !== me });
+    for (const l of d.bids) bids.push({ p: l.p, s: l.s, mine: false, book: false });
+    const merge = (arr, desc) => {
+      arr.sort((a, b) => desc ? b.p - a.p : a.p - b.p);
+      const out = [];
+      for (const r of arr) {
+        const top = out[out.length - 1];
+        if (top && top.p === r.p) {
+          top.s += r.s;
+          top.mine = top.mine || r.mine;
+          top.book = top.book || r.book;
+        } else out.push({ p: r.p, s: r.s, mine: r.mine, book: r.book });
+      }
+      return out;
+    };
+    return { asks: merge(asks, false).slice(0, 7), bids: merge(bids, true).slice(0, 7), reserve: bk.reserve };
+  }
+
+  function rowHTML(r, side, cum, maxS) {
+    const w = maxS > 0 ? Math.max(3, Math.round(r.s / maxS * 100)) : 3;
+    const tag = r.mine ? '<span class="tm-tagyou">YOU</span>' : (r.book ? '<span class="tm-tagbk">●</span>' : '');
+    return `<div class="tm-row ${side}" title="${r.mine ? 'your resting order' : (r.book ? 'a commander\'s resting order' : 'the exchange crowd\'s desk')}">`
+      + `<i class="tm-depth" style="width:${w}%"></i>`
+      + `<span>${tag}$${r.p.toLocaleString()}</span><span class="tm-sz">${r.s.toLocaleString()}</span><span class="tm-cum">${cum.toLocaleString()}</span></div>`;
+  }
+
+  function renderBook() {
+    if (!curMat) return;
+    const rail = $('tm-rail');
+    if (rail) {
+      const me = (typeof CURRENT_USER !== 'undefined') ? CURRENT_USER : null;
+      rail.innerHTML = tradables().map(mm => {
+        const d = desks[mm.id];
+        const px = d ? d.last : null;
+        const up = d ? d.last >= d.prevLast : true;
+        const held = Math.floor((STATE.inventory[mm.id] || 0));
+        return `<div class="tm-chipx ${mm.id === curMat ? 'sel' : ''}" onclick="tmSel('${mm.id}')" title="${mm.name}${held ? ' — hold ' + held : ''}">${mm.code} <b>${px != null ? '$' + px : '—'}</b>${px != null ? ` <span class="${up ? 'up' : 'dn'}">${up ? '▲' : '▼'}</span>` : ''}</div>`;
+      }).join('');
+    }
+    const L = ladder(curMat);
+    const asksBox = $('tm-asks'), bidsBox = $('tm-bids');
+    if (asksBox && bidsBox) {
+      // asks count DOWN toward the spread (best ask sits just above LAST)
+      const dispAsks = L.asks.slice().reverse();
+      const maxA = Math.max.apply(null, L.asks.map(r => r.s).concat([1]));
+      const maxB = Math.max.apply(null, L.bids.map(r => r.s).concat([1]));
+      let cum = 0;
+      let html = dispAsks.map(r => { cum += r.s; return rowHTML(r, 'a', cum, maxA); }).join('');
+      html += `<div class="tm-row res" title="The Reserve — the standing market maker, infinite depth"><span>∞ RESERVE ASK</span><span class="tm-sz">∞</span><span class="tm-cum">$${L.reserve.ask.toLocaleString()}</span></div>`;
+      asksBox.innerHTML = html;
+      cum = 0;
+      html = `<div class="tm-row res" title="The Reserve — the standing market maker, infinite depth"><span>∞ RESERVE BID</span><span class="tm-sz">∞</span><span class="tm-cum">$${L.reserve.bid.toLocaleString()}</span></div>`;
+      html += L.bids.map(r => { cum += r.s; return rowHTML(r, 'b', cum, maxB); }).join('');
+      bidsBox.innerHTML = html;
+    }
+    const lastBox = $('tm-lastrow');
+    if (lastBox) {
+      const d = deskFor(curMat);
+      const up = d.last >= d.prevLast;
+      const bestA = L.asks.length ? L.asks[0].p : L.reserve.ask;
+      const bestB = L.bids.length ? L.bids[0].p : L.reserve.bid;
+      const spread = Math.max(0, bestA - bestB);
+      const stock = Math.floor(STATE.inventory[curMat] || 0);
+      lastBox.innerHTML = `<span class="tm-lastlab">LAST</span>`
+        + `<b class="tm-lastpx ${up ? 'up' : 'dn'}">$${d.last.toLocaleString()}</b>`
+        + `<span class="${up ? 'tb' : 'ts'}" style="font-size:10px">${up ? '▲' : '▼'}</span>`
+        + `<span class="tm-spread">spread <b>$${spread.toLocaleString()}</b></span>`
+        + `<span class="tm-hold">HOLD ${stock.toLocaleString()}</span>`;
+    }
+    const tapeBox = $('tm-tape');
+    if (tapeBox) {
+      const d = deskFor(curMat);
+      tapeBox.innerHTML = d.tape.length ? d.tape.map(t =>
+        `<span class="${t.own ? 'tyou' : (t.side === 'buy' ? 'tb' : 'ts')}">${t.own ? 'YOU ' : (t.side === 'buy' ? 'B' : 'S')} ${t.qty} @ $${t.p.toLocaleString()}</span>`
+      ).join('') : '<span style="color:#475569">no trades yet — be the first</span>';
+    }
+    const posBox = $('tm-pos');
+    if (posBox) {
+      const m = getMaterial(curMat);
+      const stock = Math.floor(STATE.inventory[curMat] || 0);
+      const val = stock * (Exchange.lastPrice(curMat) || Exchange.reserveQuote(curMat).mid);
+      let tot = 0;
+      for (const mm of tradables()) tot += Math.floor(STATE.inventory[mm.id] || 0) * (Exchange.reserveQuote(mm.id).mid);
+      posBox.innerHTML = `POSITIONS — you hold <b>${stock.toLocaleString()} ${m.icon} ${m.name}</b> (≈ ${fmt$(val)}) · all materials ≈ <b>${fmt$(tot)}</b>`;
+    }
+    const ordBox = $('tm-orders');
+    if (ordBox) {
+      const mine = Exchange.myOrders();
+      const rows = mine.map(o => {
+        const om = getMaterial(o.mat);
+        const pct = o.qty0 > 0 ? Math.round(o.filled / o.qty0 * 100) : 0;
+        const live2 = !o.cancelled && o.remaining > 0 && o.expiresAt > Date.now();
+        return `<div class="tm-orow"><span class="${o.side}">${o.side.toUpperCase()}</span><span>${om.icon} ${om.code}</span>`
+          + `<span>${o.remaining.toLocaleString()}/${o.qty0.toLocaleString()} @ $${o.price.toLocaleString()}</span>`
+          + `<span class="fillbar" title="${pct}% filled"><i style="width:${pct}%"></i></span>`
+          + `<span>${live2 ? Exchange.fmtLeft(o.expiresAt) : 'ended'}</span>`
+          + `${live2 ? `<button onclick="exCancel('${o.id}')">✕</button>` : ''}</div>`;
+      }).join('') || '<div class="tm-orow"><span style="color:#475569">no open orders — place a limit bid or ask and it rests in the cloud book</span></div>';
+      ordBox.innerHTML = `<div class="mk-title">Open orders — resting in the real book (${mine.length}/${Exchange.MAX_OWN_OPEN})</div>${rows}`;
+    }
+    estPreview();
+    limitPreview();
+  }
+
+  function softRefresh() { renderBook(); }
+
+  // ---------- form previews ----------
+  function hookInputs() {
+    const q = $('tm-qty'), lq = $('tm-lqty'), lp = $('tm-price');
+    const F = window.__tmForm;
+    if (q) q.addEventListener('input', () => { F.qty = parseInt(q.value, 10) || 0; estPreview(); });
+    if (lq) lq.addEventListener('input', () => { F.qty = parseInt(lq.value, 10) || 0; limitPreview(); });
+    if (lp) lp.addEventListener('input', () => { F.price = parseInt(lp.value, 10) || 0; limitPreview(); });
+  }
+  function estPreview() {
+    const el = $('tm-estrow');
+    if (!el) return;
+    const F = window.__tmForm;
+    const qty = F.mode === 'market' ? F.qty : (parseInt(($('tm-qty') || {}).value, 10) || F.qty);
+    if (!qty || qty < 1) { el.innerHTML = 'Set an amount — market orders fill straight down the ladder.'; return; }
+    const b = estFill('buy', curMat, qty);
+    const stock = Math.floor(STATE.inventory[curMat] || 0);
+    const sellQty = Math.min(qty, stock);
+    const s = sellQty > 0 ? estFill('sell', curMat, sellQty) : null;
+    el.innerHTML = `BUY <b>${qty.toLocaleString()}</b> → avg <b>$${b.avg.toFixed(1)}</b> · total <b>${fmt$(b.total)}</b>`
+      + `${b.reserveQty > 0 ? ` <span style="color:#64748b">(${b.reserveQty.toLocaleString()} from the Reserve)</span>` : ''}`
+      + (s
+        ? `<br>SELL <b>${sellQty.toLocaleString()}</b> → avg <b>$${s.avg.toFixed(1)}</b> · total <b>${fmt$(s.total)}</b>`
+        : `<br>SELL — <span style="color:#f87171">you hold ${stock.toLocaleString()}</span>`)
+      + `${(b.total > STATE.money) ? ' <span style="color:#f87171">— over budget</span>' : ''}`;
+  }
+  function limitPreview() {
+    const el = $('tm-lrow');
+    if (!el) return;
+    const F = window.__tmForm;
+    const p = parseInt(($('tm-price') || {}).value, 10) || F.price || 0;
+    const q = parseInt(($('tm-lqty') || {}).value, 10) || F.qty || 0;
+    if (p < 1 || q < 1) { el.innerHTML = 'Pick a price and an amount — crossing the book fills instantly.'; return; }
+    const bk = Exchange.book(curMat);
+    const stock = Math.floor(STATE.inventory[curMat] || 0);
+    if (F.side === 'bid') {
+      const crosses = bk.asks.length && bk.asks[0].price <= p;
+      el.innerHTML = crosses
+        ? `Crosses the book — fills at the cheaper ask (<b>$${bk.asks[0].price}</b>); the rest rests.`
+        : `Rests in the book: ${q.toLocaleString()} × $${p.toLocaleString()} = <b>${fmt$(q * p)}</b> credits in escrow.`;
+    } else {
+      const crosses = bk.bids.length && bk.bids[0].price >= p;
+      el.innerHTML = crosses
+        ? `Crosses the book — fills at the better bid (<b>$${bk.bids[0].price}</b>); the rest rests.`
+        : `Rests in the book: ${q.toLocaleString()} in escrow${q > stock ? ` <span style="color:#f87171">(you hold ${stock.toLocaleString()})</span>` : ''} — payout on fill.`;
+    }
+  }
+
+  // ---------- window actions (inline onclick) ----------
+  window.tmSel = function(matId) {
+    window.__tmForm = window.__tmForm || {};
+    window.__tmForm.price = 0;    // re-price for the new commodity
+    curMat = matId;
+    if (STATE) STATE.exLastMat = matId;
+    renderMarketModal();
+  };
+  window.tmMode = function(mode) {
+    const F = window.__tmForm = window.__tmForm || {};
+    F.mode = mode === 'limit' ? 'limit' : 'market';
+    const fm = $('tm-fmarket'), fl = $('tm-flimit'), tm = $('tm-mtab-m'), tl = $('tm-mtab-l');
+    if (fm) fm.style.display = F.mode === 'market' ? 'flex' : 'none';
+    if (fl) fl.style.display = F.mode === 'limit' ? 'flex' : 'none';
+    if (tm) tm.classList.toggle('on', F.mode === 'market');
+    if (tl) tl.classList.toggle('on', F.mode === 'limit');
+    estPreview();
+  };
+  window.tmSide = function() {
+    const F = window.__tmForm = window.__tmForm || {};
+    F.side = F.side === 'bid' ? 'ask' : 'bid';
+    const sb = $('tm-sidebtn'), pb = $('tm-placebtn');
+    if (sb) { sb.textContent = F.side === 'bid' ? 'BUY LIMIT' : 'SELL LIMIT'; sb.className = 'tm-sidebtn ' + (F.side === 'bid' ? 'buy' : 'sell'); }
+    if (pb) { pb.textContent = 'PLACE ' + (F.side === 'bid' ? 'BID' : 'ASK'); pb.className = 'tm-place ' + (F.side === 'bid' ? 'buy' : 'sell'); }
+    limitPreview();
+  };
+  window.tmNudge = function(d) {
+    const inp = $('tm-qty');
+    if (!inp) return;
+    const F = window.__tmForm;
+    const cur = parseInt(inp.value, 10) || 0;
+    inp.value = Math.max(1, cur + d);
+    F.qty = Math.max(1, cur + d);
+    estPreview();
+  };
+  window.tmQtyPreset = function(n) {
+    const F = window.__tmForm;
+    const inp = $('tm-qty');
+    if (inp) { inp.value = n; F.qty = n; }
+    estPreview();
+  };
+  window.tmQtyMax = function(which) {
+    const F = window.__tmForm;
+    const inp = $('tm-qty');
+    if (!inp) return;
+    if (which === 'buy') {
+      const rq = Exchange.reserveQuote(curMat);
+      const n = Math.max(1, Math.floor(STATE.money / Math.max(1, rq.ask)));
+      inp.value = n; F.qty = n;
+    } else {
+      const n = Math.max(1, Math.floor(STATE.inventory[curMat] || 0));
+      inp.value = n; F.qty = n;
+    }
+    estPreview();
+  };
+  window.tmPxPreset = function(kind) {
+    const F = window.__tmForm;
+    const inp = $('tm-price');
+    if (!inp) return;
+    const bk = Exchange.book(curMat);
+    if (kind === 'best') {
+      if (F.side === 'bid' && bk.bids.length) inp.value = bk.bids[0].price;
+      else if (F.side === 'ask' && bk.asks.length) inp.value = bk.asks[0].price;
+      else inp.value = F.side === 'bid' ? bk.reserve.bid : bk.reserve.ask;
+    } else {
+      inp.value = F.side === 'bid' ? bk.reserve.bid + 1 : Math.max(1, bk.reserve.ask - 1);
+    }
+    F.price = parseInt(inp.value, 10) || F.price;
+    limitPreview();
+  };
+  window.tmMarket = async function(side) {
+    const F = window.__tmForm;
+    const inp = $('tm-qty');
+    const qty = inp ? inp.value : F.qty;
+    const r = side === 'buy' ? await Exchange.instantBuy(curMat, qty) : await Exchange.instantSell(curMat, qty);
+    showToast(r.msg, r.ok);
+    renderMarketModal();
+  };
+  window.tmLimit = async function() {
+    const F = window.__tmForm;
+    const q = $('tm-lqty'), p = $('tm-price');
+    const r = await Exchange.placeLimit(F.side, curMat, q ? q.value : 0, p ? p.value : 0);
+    showToast(r.msg, r.ok);
+    renderMarketModal();
+  };
+
+  // ---------- QA probe (test builds) ----------
+  function qa() {
+    const d = desks[curMat];
+    return {
+      cur: curMat,
+      desk: d ? { last: d.last, prevLast: d.prevLast, asks: d.asks.map(a => a.p + ':' + a.s), bids: d.bids.map(b => b.p + ':' + b.s), tape: d.tape.length } : null,
+      form: window.__tmForm || null,
+    };
+  }
+
+  return {
+    deskFor: deskFor, takeAsks: takeAsks, takeBids: takeBids, printOwn: printOwn,
+    estFill: estFill, render: render, softRefresh: softRefresh, renderBook: renderBook,
+    crewBoost: crewBoost, starList: starList, recruit: recruit,
+    workerRow: workerRow, bizStrip: bizStrip,
+    __qa: qa,
+  };
+})();
+window.TERMINAL = TERMINAL;
+
 const FW = (() => {
   // ---------- map constants ----------
   const DEG = 20;                          // world units per degree
@@ -13645,7 +14520,7 @@ function openPlotModal(plot) {
       const baseRate = bt.rate * plot.userData.areaMultiplier;
       // v1.25 — workers boost this building's output
       const _wkMeta = bizMetaOf(plot.userData.id, idx);
-      const _wkBoost = 1 + WORKER_OUTPUT * ((_wkMeta && _wkMeta.workers) || 0);
+      const _wkBoost = window.TERMINAL ? TERMINAL.crewBoost(plot.userData.id, idx, _wkMeta) : (1 + WORKER_OUTPUT * ((_wkMeta && _wkMeta.workers) || 0));   // v1.42 — star crews
       const effectiveRate = baseRate * regionBonus * _wkBoost;
       const price = STATE.marketPrices[bt.produces] || mat.basePrice;
       const trend = STATE.marketTrend[bt.produces] || 'stable';
@@ -13704,13 +14579,14 @@ function openPlotModal(plot) {
       const _wkFee = workerHireFee(bt);
       const _wkWage = workerWagePerMin(bt);
       const _pidArg = plot.userData.street ? ("'" + plot.userData.id + "'") : plot.userData.id;   // v1.41 — street ids are strings
-      const workerRow = `
-        <div class="wk-row">
-          <span>👷 <b>${_wkN}</b>/${WORKER_MAX} · output <b style="color:#7fffd4">+${Math.round(_wkBoost * 100 - 100)}%</b> · $${_wkWage.toLocaleString()}/min${plot.userData.street ? ' · serves the queue' : ''}</span>
-          <span style="flex:1"></span>
-          <button class="wk-btn" ${(_wkN < WORKER_MAX && STATE.money >= _wkFee) ? '' : 'disabled'} onclick="hireWorker(${_pidArg}, ${idx})" title="One-time hiring fee${plot.userData.street ? ' — a vendor stands at the cart and serves customers for you' : ''}">+ ${plot.userData.street ? 'Hire VENDOR $' : 'Hire $'}${_wkFee.toLocaleString()}</button>
-          <button class="wk-btn" ${_wkN > 0 ? '' : 'disabled'} onclick="fireWorker(${_pidArg}, ${idx})">− Fire</button>
-        </div>`;
+      const workerRow = (() => {
+        try {
+          return TERMINAL.workerRow(plot.userData.id, idx, bt,
+            { pidArg: _pidArg, crew: _wkN, wage: _wkWage, boost: _wkBoost, street: !!plot.userData.street });
+        } catch (e) {
+          return `<div class="wk-row"><span>👷 <b>${_wkN}</b>/${WORKER_MAX} · output <b style="color:#7fffd4">+${Math.round(_wkBoost * 100 - 100)}%</b> · $${_wkWage.toLocaleString()}/min${plot.userData.street ? ' · serves the queue' : ''}</span><span style="flex:1"></span><button class="wk-btn" ${(_wkN < WORKER_MAX && STATE.money >= _wkFee) ? '' : 'disabled'} onclick="hireWorker(${_pidArg}, ${idx})">+ Hire $${_wkFee.toLocaleString()}</button><button class="wk-btn" ${_wkN > 0 ? '' : 'disabled'} onclick="fireWorker(${_pidArg}, ${idx})">− Fire</button></div>`;
+        }
+      })();
 
       const isMil = !!bt.military;
       return `
@@ -13729,6 +14605,7 @@ function openPlotModal(plot) {
               }</div>
             </div>
           </div>
+          ${(() => { try { return TERMINAL.bizStrip(plot.userData.id, idx, bt, mat, entry, { rate: effectiveRate, price: price, boost: _wkBoost, crew: _wkN, wage: _wkWage, regionBonus: regionBonus, street: !!plot.userData.street }); } catch (e) { return ''; } })()}
           ${casinoPlayBtn}
           ${cookPlayBtn}
           ${bankPanel}
@@ -15474,7 +16351,7 @@ function getMarketCountdown() {
 // refresh re-renders.
 window.__mkTab = 'exchange';
 window.openMarketModal = function(tab) {
-  if (tab === 'exchange' || tab === 'players' || tab === 'stocks') window.__mkTab = tab;
+  if (tab === 'exchange' || tab === 'players' || tab === 'stocks' || tab === 'terminal') window.__mkTab = tab;
   renderMarketModal();
   document.getElementById('market-modal').classList.add('show');
   try { PlayerMarket.refresh(); } catch (e) {}
@@ -15488,6 +16365,7 @@ function marketTabBar() {
   return `
     <div class="mk-tabs">
       <button class="mk-tab ${window.__mkTab === 'exchange' ? 'active' : ''}" onclick="setMarketTab('exchange')"><b>📋 The Exchange</b>the global order book</button>
+      <button class="mk-tab ${window.__mkTab === 'terminal' ? 'active' : ''}" onclick="setMarketTab('terminal')"><b>🖥 Terminal</b>live book &amp; tape</button>
       <button class="mk-tab ${window.__mkTab === 'players' ? 'active' : ''}" onclick="setMarketTab('players')"><b>🤝 Listings</b>direct offers</button>
       <button class="mk-tab ${window.__mkTab === 'stocks' ? 'active' : ''}" onclick="setMarketTab('stocks')"><b>📈 Stock Exchange</b>buy the dips, sell the peaks</button>
     </div>`;
@@ -15497,6 +16375,10 @@ function renderMarketModal() {
   if (!card) return;
   if (window.__mkTab === 'players') { renderPlayerMarket(card); return; }
   if (window.__mkTab === 'stocks') { renderStockMarket(card); return; }
+  if (window.__mkTab === 'terminal') {
+    try { TERMINAL.render(card); return; }
+    catch (e) { console.warn('[TERMINAL] render failed, falling back to the Exchange tab:', e); }
+  }
   renderExchange(card);
 }
 
@@ -16323,12 +17205,24 @@ window.hireWorker = function(plotId, idx) {
   if (!bt) return;
   const meta = ensureBizMeta(plotId, idx, {});
   if ((meta.workers || 0) >= WORKER_MAX) { showToast('That building is fully crewed', false); return; }
-  const fee = workerHireFee(bt);
-  if (STATE.money < fee) { showToast(`Hiring costs $${fee.toLocaleString()} — not enough credits`, false); return; }
+  // v1.42 — recruits come off the street with a name, a star rating and
+  // a price to match (stars set the output boost; wages stay per-worker).
+  let who = 'a recruit', stars = 3, fee = workerHireFee(bt);
+  try {
+    const rc = TERMINAL.recruit(plotId, idx, meta.workers || 0);
+    who = rc.name; stars = rc.stars;
+    fee = Math.round(workerHireFee(bt) * (0.5 + stars * 0.25));
+  } catch (e) {}
+  if (STATE.money < fee) { showToast(`Hiring ${who} costs $${fee.toLocaleString()} — not enough credits`, false); return; }
   STATE.money -= fee;
+  if (!Array.isArray(meta.stars)) { try { meta.stars = TERMINAL.starList(plotId, idx, meta); } catch (e) { meta.stars = []; } }
+  while (meta.stars.length < (meta.workers || 0)) meta.stars.push(3);   // legacy counts: neutral stars
   meta.workers = (meta.workers || 0) + 1;
+  meta.stars.push(stars);
   const plot = ACTIVE_PLOT_BY_ID.get(plotId) || STATE.selectedPlot;
-  showToast(`👷 Crew of ${meta.workers} — ${bt.name} output +${Math.round(meta.workers * WORKER_OUTPUT * 100)}%`, true);
+  let boostPct = Math.round(meta.workers * WORKER_OUTPUT * 100);
+  try { boostPct = Math.round((TERMINAL.crewBoost(plotId, idx, meta) - 1) * 100); } catch (e) {}
+  showToast(`👷 ${who} joins the crew — crew of ${meta.workers}, output +${boostPct}%`, true);
   updateHUD(); saveGame();
   if (plot && STATE.selectedPlot === plot) openPlotModal(plot);
 };
@@ -16338,7 +17232,10 @@ window.fireWorker = function(plotId, idx) {
   const meta = bizMetaOf(plotId, idx);
   if (!bt || !meta || (meta.workers || 0) <= 0) return;
   meta.workers = (meta.workers || 0) - 1;
-  showToast(`A worker left ${bt.name} — output +${Math.round((meta.workers || 0) * WORKER_OUTPUT * 100)}%`, false);
+  if (Array.isArray(meta.stars) && meta.stars.length > (meta.workers || 0)) meta.stars.length = meta.workers;
+  let _leftPct = Math.round((meta.workers || 0) * WORKER_OUTPUT * 100);
+  try { _leftPct = Math.round((TERMINAL.crewBoost(plotId, idx, meta) - 1) * 100); } catch (e) {}
+  showToast(`A worker left ${bt.name} — output +${_leftPct}%`, false);
   updateHUD(); saveGame();
   const plot = ACTIVE_PLOT_BY_ID.get(plotId) || STATE.selectedPlot;
   if (plot && STATE.selectedPlot === plot) openPlotModal(plot);
@@ -16509,7 +17406,7 @@ function renderMachineShop() {
   if (!Array.isArray(meta.machines)) meta.machines = [];
   const _prod = plotProductionInfo(MACH.plotId);
   const am = _prod ? _prod.areaMultiplier : (plot.userData.areaMultiplier || 1);
-  const _wk = 1 + WORKER_OUTPUT * ((meta.workers || 0));
+  const _wk = window.TERMINAL ? TERMINAL.crewBoost(MACH.plotId, MACH.idx, meta) : (1 + WORKER_OUTPUT * ((meta.workers || 0)));   // v1.42 — star crews
 
   const slots = meta.machines.map((mid, i) => {
     const mt = getMachineType(mid);
@@ -17586,8 +18483,10 @@ const Exchange = (() => {
       (!excludeOwner || o.owner !== excludeOwner));
   }
   function book(matId) {
-    const bids = liveSide('bid', matId).sort((a, b) => (b.price - a.price) || (a.placedAt - b.placedAt));
-    const asks = liveSide('ask', matId).sort((a, b) => (a.price - b.price) || (a.placedAt - b.placedAt));
+    // v1.42 — rows are decorated (remaining/filled/earned included):
+    // the ladder + previews read o.remaining, which raw orders lack.
+    const bids = liveSide('bid', matId).sort((a, b) => (b.price - a.price) || (a.placedAt - b.placedAt)).map(decorated);
+    const asks = liveSide('ask', matId).sort((a, b) => (a.price - b.price) || (a.placedAt - b.placedAt)).map(decorated);
     return { bids, asks, reserve: reserveQuote(matId) };
   }
 
@@ -17713,8 +18612,9 @@ const Exchange = (() => {
       botPass();
       reconcile();
       if (auditChanged || dirty) await persist();
-      if (document.getElementById('market-modal').classList.contains('show') && window.__mkTab === 'exchange') {
-        renderMarketModal();
+      if (document.getElementById('market-modal').classList.contains('show') && (window.__mkTab === 'exchange' || window.__mkTab === 'terminal')) {
+        if (window.__mkTab === 'terminal') { try { TERMINAL.softRefresh(); } catch (e) { renderMarketModal(); } }
+        else renderMarketModal();
       }
     } catch (e) { /* best-effort */ }
   }
@@ -17750,6 +18650,14 @@ const Exchange = (() => {
       need -= take;
     }
     const rq = reserveQuote(mat);
+    // v1.42 — the street desk: the exchange crowd's market-maker levels
+    // stand between the resting book and The Reserve. Desk fills clear
+    // instantly and locally (the Reserve's own trust model) at better
+    // prices than the Reserve's 6% spread.
+    if (need > 0 && window.TERMINAL) {
+      const dk = window.TERMINAL.takeAsks(mat, need);
+      need -= dk.qty; spend += dk.cost;
+    }
     const reserveQty = Math.max(0, need);
     if (reserveQty > 0) spend += reserveQty * rq.ask;
     spend = Math.round(spend);
@@ -17788,7 +18696,8 @@ const Exchange = (() => {
       persist();
       return { ok: false, msg: 'The book moved — someone bought it first. Try again' };
     }
-    // success — charge + deliver (the Reserve part clears instantly)
+    // success — charge + deliver (the Reserve + street-desk parts clear instantly)
+    try { if (window.TERMINAL) window.TERMINAL.printOwn(mat, 'buy', q, Math.round(spend / q)); } catch (e) {}
     STATE.money -= spend;
     STATE.inventory[mat] = (STATE.inventory[mat] || 0) + q;
     updateHUD();
@@ -17797,7 +18706,7 @@ const Exchange = (() => {
     return {
       ok: true,
       msg: `Bought ${q} ${m.icon} ${m.name} for $${spend.toLocaleString()}` +
-        (reserveQty > 0 ? ` — ${fromSellers} from the book, ${reserveQty} from The Reserve @ $${rq.ask}` : ''),
+        (reserveQty > 0 ? ` — ${fromSellers} from the book & desk, ${reserveQty} from The Reserve @ $${rq.ask}` : ''),
     };
   }
 
@@ -17827,6 +18736,11 @@ const Exchange = (() => {
       need -= take;
     }
     const rq = reserveQuote(mat);
+    // v1.42 — the street desk on the bid side (see instantBuy).
+    if (need > 0 && window.TERMINAL) {
+      const dk = window.TERMINAL.takeBids(mat, need);
+      need -= dk.qty; gross += dk.cost;
+    }
     const reserveQty = Math.max(0, need);
     if (reserveQty > 0) gross += reserveQty * rq.bid;
     gross = Math.round(gross);
@@ -17861,7 +18775,8 @@ const Exchange = (() => {
       persist();
       return { ok: false, msg: 'The book moved — someone sold first. Try again' };
     }
-    // success — goods out, credits in (the Reserve part clears instantly)
+    // success — goods out, credits in (the Reserve + street-desk parts clear instantly)
+    try { if (window.TERMINAL) window.TERMINAL.printOwn(mat, 'sell', q, Math.round(gross / q)); } catch (e) {}
     STATE.inventory[mat] = stock - q;
     STATE.money += gross;
     recordIncome(gross);   // exchange sales feed Company GDP / world economy
@@ -17871,7 +18786,7 @@ const Exchange = (() => {
     return {
       ok: true,
       msg: `Sold ${q} ${m.icon} ${m.name} for $${gross.toLocaleString()}` +
-        (reserveQty > 0 ? ` — ${toBidders} into the book, ${reserveQty} to The Reserve @ $${rq.bid}` : ''),
+        (reserveQty > 0 ? ` — ${toBidders} into the book & desk, ${reserveQty} to The Reserve @ $${rq.bid}` : ''),
     };
   }
 
@@ -19172,7 +20087,7 @@ function tickProduction() {
       // gambling left in the game is the interactive slot machine).
       // v1.25 — hired crews boost this building's output.
       const _meta = bizMetaOf(plotId, _bi);
-      const _wk = 1 + WORKER_OUTPUT * ((_meta && _meta.workers) || 0);
+      const _wk = window.TERMINAL ? TERMINAL.crewBoost(plotId, _bi, _meta) : (1 + WORKER_OUTPUT * ((_meta && _meta.workers) || 0));   // v1.42 — star crews
       const regionBonus = regionBonusById(bt.id, info.region);
       let produced = bt.rate * info.areaMultiplier * regionBonus * _wk * dt;
       if (produced > 0) {
