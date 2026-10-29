@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.03</title>
+<title>Open World — v2.04</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.03 — NEW WORLD (complete restart)
+   OPEN WORLD v2.04 — NEW WORLD (complete restart) + FAST CITY ENTRY
    Visual system modeled on the Capital Rift reference frame:
    dark glassmorphism fintech UI (panels #1A202C @85%, 1px #4A5568
    borders, 4px radius), money-green #48BB78 prices, link-blue
@@ -460,7 +460,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.03 — streets imported live from the real world</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.04 — streets imported live from the real world</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -482,7 +482,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.03';
+const GAME_VERSION = 'v2.04';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -676,6 +676,7 @@ function veilOff() { veil.classList.remove('on'); }
 // ====================================================================
 // v2.0 — EARTH: the bright toy globe, 64 real city nodes, dive-in
 // ====================================================================
+// v2.04: hover prefetch
 const R = 100;
 
 function latLonToVec3(lat, lon, r = R) {
@@ -817,6 +818,7 @@ const EARTH = (() => {
     // picking
     const ray = new THREE.Raycaster(); const ndc = new THREE.Vector2();
     const dom = renderer.domElement;
+    let hovT = 0;   // v2.04: hover-dwell prefetch timer
     dom.addEventListener('pointermove', e => {
       if (diveT || STATE.mode !== 'globe') return;
       ndc.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
@@ -824,6 +826,12 @@ const EARTH = (() => {
       const hit = ray.intersectObjects(cityMeshes, false)[0];
       hoverCity = hit ? hit.object.userData.city : null;
       dom.style.cursor = hoverCity ? 'pointer' : '';
+      // v2.04: dwell on a node for 400ms → start downloading its streets
+      // now, so the dive is instant by the time the player clicks
+      clearTimeout(hovT);
+      if (hoverCity) hovT = setTimeout(() => {
+        if (hoverCity && !diveT && STATE.mode === 'globe') OSM.prefetch(hoverCity);
+      }, 400);
       if (hoverCity) {
         const popd = { 3: 8 + (hashStr(hoverCity.key) * 14), 2: 2 + (hashStr(hoverCity.key) * 6), 1: .4 + (hashStr(hoverCity.key) * 1.6) }[hoverCity.tier];
         showTooltip(e.clientX, e.clientY, {
@@ -835,6 +843,7 @@ const EARTH = (() => {
     });
     dom.addEventListener('click', e => {
       if (diveT || !hoverCity || STATE.mode !== 'globe') return;
+      clearTimeout(hovT);
       EARTH.diveTo(hoverCity);
     });
     return EARTH;
@@ -905,6 +914,10 @@ window.EARTH = EARTH;
 // project to local meters, cache, and generate a faithful procedural
 // fallback city when the live map can't be reached. Map data
 // © OpenStreetMap contributors (ODbL) — attribution ships in the UI.
+// v2.04 — FAST CITY ENTRY: mirror-racing fetch (primary first, all
+// mirrors after 1.8s, 9.5s cap), an in-flight promise memo so a dive
+// reuses a fetch already started on hover/click, session prefetch
+// dedup, and a 6-city cache. Entry no longer waits mirror-by-mirror.
 // ====================================================================
 const OSM = (() => {
   const M_LAT = 110540, M_LONFN = lat => 111320 * Math.cos(lat * Math.PI / 180);
@@ -926,8 +939,12 @@ const OSM = (() => {
     -(lat - clat) * M_LAT,
   ];
 
-  // ---------------- Overpass fetch ----------------
-  async function fetchOverpass(bbox) {
+  // ---------------- Overpass fetch (v2.04: staggered mirror race) -----
+  // Primary mirror gets a 1.8s head start (polite: the happy path is a
+  // single request). If it hasn't answered by then, ALL mirrors fire and
+  // race — first valid payload wins, losers are aborted. Hard cap 9.5s
+  // → procedural fallback (was: sequential tries × 22s timeout each).
+  function fetchOverpass(bbox) {
     const q = `[out:json][timeout:25];
 (
   way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|pedestrian)$"](${bbox});
@@ -938,23 +955,37 @@ const OSM = (() => {
   way["waterway"="riverbank"](${bbox});
 );
 out geom;`;
-    for (const ep of ENDPOINTS) {
-      try {
-        const ctl = new AbortController();
-        const to = setTimeout(() => ctl.abort(), 22000);
-        const res = await fetch(ep, {
+    return new Promise(resolve => {
+      const ctl = new AbortController();
+      let settled = false, fired = 1, failed = 0, winnerEp = null;
+      const t0 = performance.now();
+      const finish = v => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(stagT); clearTimeout(capT);
+        try { ctl.abort(); } catch (e) { }
+        resolve(v ? { json: v, ms: Math.round(performance.now() - t0), ep: winnerEp } : null);
+      };
+      const attempt = ep => {
+        fetch(ep, {
           method: 'POST',
           body: 'data=' + encodeURIComponent(q),
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           signal: ctl.signal,
-        });
-        clearTimeout(to);
-        if (!res.ok) continue;
-        const json = await res.json();
-        if (json && json.elements && json.elements.length > 5) return json;
-      } catch (e) { /* try next mirror */ }
-    }
-    return null;
+        }).then(r => r.ok ? r.json() : null)
+          .then(j => {
+            if (settled) return;
+            if (j && j.elements && j.elements.length > 5) { winnerEp = ep; finish(j); }
+            else if (++failed >= fired && fired >= ENDPOINTS.length) finish(null);
+          })
+          .catch(() => { if (!settled && ++failed >= fired && fired >= ENDPOINTS.length) finish(null); });
+      };
+      attempt(ENDPOINTS[0]);
+      const stagT = setTimeout(() => {
+        for (let i = 1; i < ENDPOINTS.length; i++) { fired++; attempt(ENDPOINTS[i]); }
+      }, 1800);
+      const capT = setTimeout(() => finish(null), 9500);
+    });
   }
 
   // ---------------- parse + project ----------------
@@ -1029,38 +1060,67 @@ out geom;`;
     try {
       const raw = JSON.stringify({ ...data, fmt: 3, ts: Date.now() });
       if (raw.length > 3.6e6) return;    // too big for localStorage
-      // prune: keep newest 4 ow2-osm-* entries
+      // prune: keep newest 6 ow2-osm-* entries (v2.04: was 4 — faster
+      // re-entry for players hopping between a few cities)
       const keys = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
         if (k && k.startsWith('ow2-osm-')) keys.push([k, JSON.parse(localStorage.getItem(k) || '{}').ts || 0]);
       }
       keys.sort((a, b) => b[1] - a[1]);
-      keys.slice(4).forEach(([k]) => localStorage.removeItem(k));
+      keys.slice(6).forEach(([k]) => localStorage.removeItem(k));
       localStorage.setItem(cacheKey(id), raw);
     } catch (e) { /* quota */ }
   }
 
-  // ---------------- public: build a city ----------------
-  async function buildCity(meta, onStatus) {
-    // meta: {key, name, lat, lon} — either a catalog city or a searched spot
+  // ---------------- in-flight memo (v2.04) ---------------------------
+  // One network fetch per city no matter how many callers ask while it
+  // is running (hover prefetch → dive kick → enterCity all share it).
+  const _inflight = new Map();   // id -> { p, subs }
+  const _prefetched = new Set(); // ids prefetched this session (one shot)
+
+  function buildCity(meta, onStatus) {
     const id = meta.key || ('ll' + meta.lat.toFixed(3) + '_' + meta.lon.toFixed(3));
+    const hit = _inflight.get(id);
+    if (hit) { if (onStatus) hit.subs.push(onStatus); return hit.p; }
+    const subs = onStatus ? [onStatus] : [];
+    const emit = s => subs.forEach(f => { try { f(s); } catch (e) { } });
+    const p = _buildCity(id, meta, emit).finally(() => _inflight.delete(id));
+    _inflight.set(id, { p, subs });
+    return p;
+  }
+
+  // fire-and-forget: warm the cache before the player commits (hover on
+  // the globe, dive kick, boot prefetch of the last visited city)
+  function prefetch(meta) {
+    try {
+      const id = meta.key || ('ll' + meta.lat.toFixed(3) + '_' + meta.lon.toFixed(3));
+      if (_prefetched.has(id) || _inflight.has(id)) return;
+      if (cacheGet(id)) return;             // already local
+      _prefetched.add(id);
+      buildCity(meta).catch(() => { });
+    } catch (e) { }
+  }
+
+  // ---------------- public: build a city ----------------
+  async function _buildCity(id, meta, onStatus) {
+    // meta: {key, name, lat, lon} — either a catalog city or a searched spot
     const cached = cacheGet(id);
-    if (cached) return { ...cached, source: 'osm', fromCache: true };
+    if (cached) return { ...cached, source: 'osm', fromCache: true, net: null };
 
     const mLat = M_LONFN(meta.lat);
     const s = HALF / M_LAT / 2, w = HALF / mLat / 2;
     const bbox = `${(meta.lat - s).toFixed(5)},${(meta.lon - w).toFixed(5)},${(meta.lat + s).toFixed(5)},${(meta.lon + w).toFixed(5)}`;
     onStatus && onStatus('Importing ' + meta.name + ' from the real world…');
-    const json = await fetchOverpass(bbox);
-    if (json) {
-      const d = parseOSM(json, meta.lat, meta.lon);
+    const got = await fetchOverpass(bbox);
+    if (got) {
+      const d = parseOSM(got.json, meta.lat, meta.lon);
       fillHeights(d.buildings, meta.key);
       if (d.roads.length < 8) { /* too sparse — fall through to generator */ }
       else {
         const out = { id, key: meta.key, name: meta.name, lat: meta.lat, lon: meta.lon, half: HALF, ...d };
         cachePut(id, out);
-        return { ...out, source: 'osm', fromCache: false };
+        return { ...out, source: 'osm', fromCache: false, net: { ms: got.ms, ep: got.ep } };
       }
     }
     onStatus && onStatus('Live map unreachable — generating ' + meta.name + '…');
@@ -1145,7 +1205,8 @@ out geom;`;
     } catch (e) { return []; }
   }
 
-  return { buildCity, generateCity, searchPlaces, polyArea, proj, HALF };
+  return { buildCity, prefetch, generateCity, searchPlaces, polyArea, proj, HALF,
+    get inflight() { return _inflight.size; } };
 })();
 
 
@@ -1154,6 +1215,8 @@ window.OSM = OSM;
 
 // ======== section: 40_city.js ========
 // ====================================================================
+// v2.04 — CITY: async progressive build — phases yield to the browser
+// (rAF) with live status text, so entering never freezes the page.
 // v2.03 — CITY: every building is now an individual — 4 facade systems
 // (classic grid / glass curtain / punched residential / pre-war bays),
 // a warm-pastel + earth-tone palette picked by height, per-building
@@ -2508,7 +2571,17 @@ const CITY = (() => {
   }
 
   // ---------- assemble ------------------------------------------------
-  function build(cityData, cityMeta) {
+  // v2.04 — FAST CITY ENTRY: the build now yields to the browser between
+  // phases (rAF, 90ms safety cap) and reports live status, so the veil
+  // shows progress instead of freezing on "Entering…" for a full second+.
+  const _tick = () => new Promise(r => {
+    let done = false;
+    const f = () => { if (!done) { done = true; r(); } };
+    requestAnimationFrame(f);           // visible tab: ~16ms, veil repaints
+    setTimeout(f, 90);                  // hidden/background tab safety cap
+  });
+
+  async function build(cityData, cityMeta, onStatus) {
     dispose();
     cityRec = { ...cityData, ...cityMeta };
     group = new THREE.Group();
@@ -2521,10 +2594,15 @@ const CITY = (() => {
     base.rotation.x = -Math.PI / 2; base.position.y = .012;
     base.receiveShadow = true;
     group.add(base);
+    onStatus && onStatus('Laying out the street grid…'); await _tick();
     buildRoads(cityData);
+    onStatus && onStatus('Raising ' + (cityData.buildings || []).length + ' buildings…'); await _tick();
     buildBuildings(cityData);
+    onStatus && onStatus('Marking real estate…'); await _tick();
     buildPlots(cityRec);          // before greens/props → trees & cars can avoid plots
+    onStatus && onStatus('Planting parks…'); await _tick();
     buildGreensWater(cityData);
+    onStatus && onStatus('Parking cars & street furniture…'); await _tick();
     buildProps(cityRec);
     buildBackdrop();
     return group;
@@ -3837,14 +3915,18 @@ async function enterCity(meta) {
   veilOn('Entering ' + meta.name + '…');
   hideTooltip();
   try {
+    // v2.04: if a fetch for this city is already running (hover prefetch
+    // or the dive kick), buildCity returns THAT promise — no second request
     const data = await OSM.buildCity(meta, s => {
       document.getElementById('veils').textContent = s;
     });
     EARTH.deactivate();
     if (!cityScene) buildCityScene();
-    // swap contents
+    // swap contents — v2.04: async progressive build with live status
     if (CITY.group && CITY.group.parent) CITY.group.parent.remove(CITY.group);
-    cityScene.add(CITY.build(data, meta));
+    cityScene.add(await CITY.build(data, meta, s => {
+      document.getElementById('veils').textContent = s;
+    }));
     ACTORS.reset();
     ACTORS.initPlayer();
     // place player at a road point near center
@@ -3931,6 +4013,12 @@ function doEnter() {
   EARTH.setOwned(new Set(STATE.plots.map(p => p.cityKey)), STATE.lastCityKey);
   uiBalance();
   buildTicker();
+  // v2.04: warm the last-visited city's data while the player is still
+  // on the globe — returning players dive straight in
+  if (STATE.lastCityKey) {
+    const c = CITIES.find(x => x.key === STATE.lastCityKey);
+    if (c) OSM.prefetch(c);
+  }
   if (STATE.seenNews !== GAME_VERSION) setTimeout(openWhatsNew, 600);
   else if (STATE.lastCityKey) toast('Welcome back, <b>' + nm + '</b>. Your empire is waiting.');
   else toast('Welcome, <b>' + nm + '</b>. Click a glowing city to dive in.');
@@ -3941,7 +4029,7 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
   a.onclick = e => {
     e.preventDefault();
     const k = a.dataset.abt;
-    openModal(k.toUpperCase(), `<p><b>Open World v2.03</b> runs entirely in your browser and saves locally.</p>
+    openModal(k.toUpperCase(), `<p><b>Open World v2.04</b> runs entirely in your browser and saves locally.</p>
       <p>No accounts, no tracking, no payments. Map data © OpenStreetMap contributors (ODbL).</p>
       <p>Support: keep playing and build something big.</p>`);
   };
@@ -3951,16 +4039,15 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.03 — NEW WORLD', `
-    <p><b>Every building is an individual now.</b></p>
-    <div class="kv"><span class="k">FACADES</span><span class="v">4 window styles — grid, curtain glass, punched, pre-war bays</span></div>
-    <div class="kv"><span class="k">COLORS</span><span class="v">Pastel &amp; earth-tone palette — creams, terracotta, brick, sage</span></div>
-    <div class="kv"><span class="k">PITCHED ROOFS</span><span class="v">Dormers + chimneys on the low-rise, shingles in 5 tones</span></div>
-    <div class="kv"><span class="k">SETBACKS</span><span class="v">Wedding-cake tiers on the tallest towers</span></div>
-    <div class="kv"><span class="k">TRIM</span><span class="v">Cornices, bulkheads, parapets — rooftops cluttered like the reference</span></div>
-    <div class="kv"><span class="k">LAWNS</span><span class="v g">Bright grass strips + trees around pitched houses</span></div>
+  openModal('Welcome to v2.04 — FAST CITY ENTRY', `
+    <p><b>Cities now load dramatically faster.</b></p>
+    <div class="kv"><span class="k">MIRROR RACE</span><span class="v">4 map servers queried at once — the fastest one wins</span></div>
+    <div class="kv"><span class="k">DIVE OVERLAP</span><span class="v">Streets download while you're still diving in</span></div>
+    <div class="kv"><span class="k">HOVER PRELOAD</span><span class="v">Rest on a city node and its map starts loading</span></div>
+    <div class="kv"><span class="k">LIVE PROGRESS</span><span class="v">The loading screen now shows each build phase</span></div>
+    <div class="kv"><span class="k">SMARTER CACHE</span><span class="v g">Re-entering recent cities is near-instant</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">START BUILDING</button></div>`);
-  document.getElementById('wn-x').onclick = () => { closeModal(); if (!STATE.lastCityKey) toast('Click a glowing city node to dive in.'); };
+  document.getElementById('wn-x').onclick = () => { closeModal(); if (!STATE.lastCityKey) toast('Click a glowing city to dive in.'); };
 }
 
 // ---------------- HUD wiring ------------------------------------------
@@ -3985,7 +4072,7 @@ document.getElementById('b-build').addEventListener('click', () => {
 document.getElementById('avatar-chip').addEventListener('click', () => ECO.openEmpire());
 
 function openHelp() {
-  openModal('Open World v2.03 — Help', `
+  openModal('Open World v2.04 — Help', `
     <p><b>Controls</b></p>
     <div class="kv"><span class="k">MOVE</span><span class="v">WASD / arrows · Shift = run</span></div>
     <div class="kv"><span class="k">CAMERA</span><span class="v">Drag to orbit · wheel/pinch to zoom (gentle, glide)</span></div>
@@ -4176,13 +4263,18 @@ setInterval(() => { if (STATE.mode !== 'boot') saveGame(); }, 10000);
 window.addEventListener('beforeunload', () => { if (STATE.mode !== 'boot') saveGame(); });
 
 // globe dive hook (EARTH calls onArrived)
+// v2.04: kick the street download the INSTANT the dive starts — the
+// 1.25s flight overlaps the network instead of serializing after it
 const _origDive = EARTH.diveTo.bind(EARTH);
-EARTH.diveTo = (city, cb) => _origDive(city, () => enterCity({
-  key: city.key, name: city.name, lat: city.lat, lon: city.lon, tier: city.tier,
-}));
+EARTH.diveTo = (city, cb) => {
+  OSM.prefetch({ key: city.key, name: city.name, lat: city.lat, lon: city.lon });
+  return _origDive(city, () => enterCity({
+    key: city.key, name: city.name, lat: city.lat, lon: city.lon, tier: city.tier,
+  }));
+};
 
 
-console.log('%cOPEN WORLD v2.03 — NEW WORLD', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.04 — FAST CITY ENTRY', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
