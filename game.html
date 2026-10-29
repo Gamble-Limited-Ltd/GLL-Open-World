@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.08</title>
+<title>Open World — v2.09</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.08 — NEW WORLD (complete restart) + STARTER GUIDE + TIGHT CONTROLS + CLEAR STREETS + HAPPY CUSTOMERS
+   OPEN WORLD v2.09 — NEW WORLD (complete restart) + STARTER GUIDE + TIGHT CONTROLS + CLEAR STREETS + HAPPY CUSTOMERS + SIDEWALK SPOTS
    Visual system modeled on the Capital Rift reference frame:
    dark glassmorphism fintech UI (panels #1A202C @85%, 1px #4A5568
    borders, 4px radius), money-green #48BB78 prices, link-blue
@@ -504,7 +504,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.08';
+const GAME_VERSION = 'v2.09';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -1502,7 +1502,7 @@ const CITY = (() => {
   const ROOF_DECKS = [0x3f4347, 0x4a3b2f, 0x3a434d, 0x4d5c51, 0x57504a];
   const SHINGLES = [0x6b4a33, 0x9c4a3c, 0x46505c, 0x3d4043, 0x7a5c48];
   const TRIMS = [0x3a3f44, 0x4a3b2c, 0x5a4a42, 0x39424a, 0x4f4438];
-  let _winTexs = [null, null, null, null], _asphTex = null, _groundTex = null, _shopTex = null, _dollarMat = null;
+  let _winTexs = [null, null, null, null], _asphTex = null, _groundTex = null, _shopTex = null, _dollarTex = null;
   const getWinTex = i => _winTexs[i] || (_winTexs[i] = windowTexture(i));
   const getAsphTex = () => _asphTex || (_asphTex = asphaltTexture());
   const getGroundTex = () => _groundTex || (_groundTex = groundTexture());
@@ -2259,6 +2259,7 @@ const CITY = (() => {
           const x = ax + ux * d - uz * off * side, z = az + uz * d + ux * off * side;
           const s0 = side; side = -side;
           if (pointInBuilding(x, z)) continue;
+          if (plotAt(x, z)) continue;         // v2.09: keep lamps off vendor spots
           if (!offAsphalt(x, z, 1.4)) continue;      // v2.07: poles never in a crossing road
           const tx = uz * s0, tz = -ux * s0;            // toward the road
           lamps.push([x, z, Math.atan2(-tz, tx)]);
@@ -2299,6 +2300,7 @@ const CITY = (() => {
           const off = rd.w / 2 + 3.0;
           const x = ax + ux * d - uz * off * side, z = az + uz * d + ux * off * side;
           if (pointInBuilding(x, z)) continue;
+          if (plotAt(x, z)) continue;       // v2.09: keep hydrants off vendor spots
           hyds.push([x, z]);
         }
       }
@@ -2346,6 +2348,7 @@ const CITY = (() => {
           const off = rd.w / 2 + 2.7;
           const x = ax + ux * d - uz * off * side, z = az + uz * d + ux * off * side;
           if (pointInBuilding(x, z)) continue;
+          if (plotAt(x, z)) continue;       // v2.09: keep benches off vendor spots
           if (!offAsphalt(x, z, 1.4)) continue;      // v2.07: not in a crossing road
           benchScratch.push([x, z, Math.atan2(uz * side, -ux * side)]);   // face the road
         }
@@ -2542,8 +2545,16 @@ const CITY = (() => {
     return !h.rd || h.d > h.rd.w / 2 + m;
   }
 
-  // ---------- purchasable plots (gap sampling along roads) ----------
-  function dollarSprite() {
+  // ---------- purchasable plots (v2.09: SIDEWALK SPOTS) ----------------
+  // Plots used to be big 17x22 lawn lots set back from the street, capped
+  // at 24 per city. Now they are compact food-cart spots marked RIGHT ON
+  // the raised sidewalk beside every road — where a street cart belongs —
+  // and the cap lifts to 150 per city (70 on phones). The whole plot layer
+  // is 3 draw calls: one instanced pad mesh (per-instance green, tints
+  // when owned), one merged dashed-border LineSegments (vertex colors flip
+  // to gold), one Points cloud of $ markers (camera-facing billboards,
+  // sunk below ground once owned).
+  function dollarTex() {
     const cv = document.createElement('canvas'); cv.width = 64; cv.height = 64;
     const ctx = cv.getContext('2d');
     ctx.font = '900 46px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -2552,17 +2563,21 @@ const CITY = (() => {
     ctx.fillText('$', 32, 35);
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace;
-    return new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+    return tex;
   }
+
+  let plotViz = null;   // { pads, dashCol, dollarPos, cGreen, cOwned }
 
   function buildPlots(city) {
     plotRecs = [];
+    plotViz = null;
     plotGroup = new THREE.Group();
     group.add(plotGroup);
     const rnd = _mulberry(hashStr('p' + (city.key || city.name)));
     const tierMult = { 1: 1, 2: 1.35, 3: 1.8 }[city.tier || 2];
     const seen = [];
-    const PW = 17, PD = 22;
+    const PW = 3.4, PD = 9.5;                 // across the walk / along the road
+    const MAXN = isMob ? 70 : 150;            // v2.09: was 24 — way more spots
     let n = 0;
     outer:
     for (let rdx = 0; rdx < city.roads.length; rdx++) {
@@ -2571,62 +2586,128 @@ const CITY = (() => {
       for (let i = 0; i < rd.pts.length - 1; i++) {
         const [ax, az] = rd.pts[i], [bx, bz] = rd.pts[i + 1];
         const len = Math.hypot(bx - ax, bz - az);
-        if (len < 40) continue;
+        if (len < 30) continue;
         const ux = (bx - ax) / len, uz = (bz - az) / len;
-        for (let d = 18; d < len - 18; d += 34) {
-          if (n >= 24) break outer;
-          if (rnd() < .38) continue;
-          const side = rnd() < .5 ? 1 : -1;
-          const off = rd.w / 2 + 3.6 + PW / 2;
-          const cx = ax + ux * d - uz * off * side;
-          const cz = az + uz * d + ux * off * side;
-          if (Math.hypot(cx, cz) > 520) continue;
-          // clear of buildings (sample a 3x3 grid over the rect)
-          let ok = true;
-          for (let sx = -1; sx <= 1 && ok; sx++) for (let sz = -1; sz <= 1 && ok; sz++)
-            if (pointInBuilding(cx + sx * PW * .36, cz + sz * PD * .36)) ok = false;
-          if (!ok) continue;
-          // no other road crossing the plot
-          const near = roadsNear(cx, cz, 10);
-          if (near.some(ri => ri !== rdx)) continue;
-          // not inside greens/waters
-          for (const g of [...(city.greens || []), ...(city.waters || [])])
-            if (g.poly && inPoly(cx, cz, g.poly)) { ok = false; break; }
-          if (!ok) continue;
-          if (seen.some(s => Math.hypot(s[0] - cx, s[1] - cz) < 44)) continue;
-          seen.push([cx, cz]);
-          const rotY = Math.atan2(ux, uz);        // plot's long axis along the road
-          const price = Math.round((ECON.plotBase * tierMult * (1 + Math.hypot(cx, cz) / 900)) / 50) * 50;
-          const mesh = plotMesh(PW, PD);
-          mesh.position.set(cx, 0, cz);
-          mesh.rotation.y = rotY;
-          plotGroup.add(mesh);
-          plotRecs.push({ id: (city.key || 'c') + '-' + n, x: cx, z: cz, rot: rotY, w: PW, d: PD, price, mesh, owned: false, cityKey: city.key });
-          n++;
+        for (let d = 13; d < len - 13; d += 24) {
+          for (const side of [1, -1]) {       // v2.09: both sides of the street
+            if (n >= MAXN) break outer;
+            if (rnd() < .2) continue;
+            const off = rd.w / 2 + 1.75;      // sidewalk centerline
+            const cx = ax + ux * d - uz * off * side;
+            const cz = az + uz * d + ux * off * side;
+            if (Math.hypot(cx, cz) > 640) continue;
+            // every pad corner clears every road's asphalt (bends + crossings)
+            let ok = true;
+            const hw = PW / 2, hd = PD / 2;
+            for (let ci = 0; ci < 4 && ok; ci++) {
+              const sx = (ci & 1 ? hw : -hw), sz = (ci & 2 ? hd : -hd);
+              const px = cx + sx * uz + sz * ux, pz = cz - sx * ux + sz * uz;
+              const h = distToRoad(px, pz);
+              if (h.rd && h.d < h.rd.w / 2 - .12) ok = false;
+            }
+            if (!ok) continue;
+            // keep the spot clear of buildings (3x3 sample over the rect)
+            for (let sx = -1; sx <= 1 && ok; sx++) for (let sz = -1; sz <= 1 && ok; sz++)
+              if (pointInBuilding(cx + sx * PW * .36, cz + sz * PD * .36)) ok = false;
+            if (!ok) continue;
+            // no other road crossing the plot
+            const near = roadsNear(cx, cz, 10);
+            if (near.some(ri => ri !== rdx)) continue;
+            // not inside greens/waters
+            for (const g of [...(city.greens || []), ...(city.waters || [])])
+              if (g.poly && inPoly(cx, cz, g.poly)) { ok = false; break; }
+            if (!ok) continue;
+            if (seen.some(s => Math.hypot(s[0] - cx, s[1] - cz) < 15)) continue;
+            seen.push([cx, cz]);
+            const rotY = Math.atan2(ux, uz);  // spot's long axis along the road
+            const price = Math.round((ECON.plotBase * tierMult * (1 + Math.hypot(cx, cz) / 900) * .3) / 25) * 25;
+            plotRecs.push({ id: (city.key || 'c') + '-' + n, x: cx, z: cz, rot: rotY, w: PW, d: PD, price, owned: false, cityKey: city.key });
+            n++;
+          }
         }
       }
     }
+    if (n) buildPlotViz();
     return plotRecs;
   }
 
-  function plotMesh(w, d) {
-    const g = new THREE.Group();
-    const pad = new THREE.Mesh(new THREE.PlaneGeometry(w, d),
-      new THREE.MeshLambertMaterial({ color: 0x48bb78, transparent: true, opacity: .9 }));
-    pad.rotation.x = -Math.PI / 2; pad.position.y = .125;
-    pad.receiveShadow = true;
-    g.add(pad);
-    const pts = [];
-    const hw = w / 2 - .6, hd = d / 2 - .6;
-    pts.push(new THREE.Vector3(-hw, .17, -hd), new THREE.Vector3(hw, .17, -hd), new THREE.Vector3(hw, .17, hd), new THREE.Vector3(-hw, .17, hd), new THREE.Vector3(-hw, .17, -hd));
-    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
-      new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 1.4, gapSize: .9, transparent: true, opacity: .95 }));
-    line.computeLineDistances();
-    g.add(line);
-    const sp = new THREE.Sprite(_dollarMat || (_dollarMat = dollarSprite()));
-    sp.scale.set(4.4, 4.4, 1); sp.position.y = 4.6;
-    g.add(sp);
-    return g;
+  // instanced plot layer: pads + dashed borders + floating $ markers
+  function buildPlotViz() {
+    const N = plotRecs.length;
+    const cGreen = new THREE.Color(0x48bb78), cOwned = new THREE.Color(0x2f8f5b);
+    // pads — one InstancedMesh, per-instance color
+    const padGeo = new THREE.PlaneGeometry(1, 1); padGeo.rotateX(-Math.PI / 2);
+    const pads = new THREE.InstancedMesh(padGeo,
+      new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: .55 }), N);
+    pads.receiveShadow = true;
+    // dashed borders — one merged LineSegments, vertex colors
+    const dPos = new Float32Array(N * 8 * 3), dCol = new Float32Array(N * 8 * 3);
+    // $ markers — one Points cloud (camera-facing billboards)
+    const $Pos = new Float32Array(N * 3);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+    plotRecs.forEach((p, i) => {
+      p.inst = i; p.v0 = i * 8;
+      const c = Math.cos(p.rot), s = Math.sin(p.rot);
+      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), p.rot);
+      m4.compose(new THREE.Vector3(p.x, .185, p.z), q, sc.set(p.w, 1, p.d));
+      pads.setMatrixAt(i, m4);
+      pads.setColorAt(i, cGreen);
+      const hw = p.w / 2 - .5, hd = p.d / 2 - .5;
+      const cor = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]];
+      for (let k = 0; k < 4; k++) {
+        const [x1, z1] = cor[k], [x2, z2] = cor[(k + 1) % 4];
+        const seg = [[x1, z1], [x2, z2]];
+        for (let v = 0; v < 2; v++) {
+          const vi = p.v0 + k * 2 + v;
+          const lx = seg[v][0], lz = seg[v][1];
+          dPos[vi * 3] = p.x + lx * c + lz * s;
+          dPos[vi * 3 + 1] = .21;
+          dPos[vi * 3 + 2] = p.z - lx * s + lz * c;
+          dCol[vi * 3] = 1; dCol[vi * 3 + 1] = 1; dCol[vi * 3 + 2] = 1;
+        }
+      }
+      $Pos[i * 3] = p.x; $Pos[i * 3 + 1] = 4.4; $Pos[i * 3 + 2] = p.z;
+    });
+    pads.instanceMatrix.needsUpdate = true;
+    plotGroup.add(pads);
+    const dg = new THREE.BufferGeometry();
+    dg.setAttribute('position', new THREE.BufferAttribute(dPos, 3));
+    dg.setAttribute('color', new THREE.BufferAttribute(dCol, 3));
+    const dashes = new THREE.LineSegments(dg,
+      new THREE.LineDashedMaterial({ vertexColors: true, dashSize: 1.1, gapSize: .7, transparent: true, opacity: .95 }));
+    dashes.computeLineDistances();
+    plotGroup.add(dashes);
+    const pg = new THREE.BufferGeometry();
+    const dollarPos = new THREE.BufferAttribute($Pos, 3);
+    pg.setAttribute('position', dollarPos);
+    const dollars = new THREE.Points(pg, new THREE.PointsMaterial({
+      map: _dollarTex || (_dollarTex = dollarTex()), transparent: true, depthWrite: false,
+      size: 8.5, sizeAttenuation: true,
+    }));
+    plotGroup.add(dollars);
+    plotViz = { pads, dashes, dollarPos, cGreen, cOwned };
+  }
+
+  // v2.09: buy-side visual flip — pad tints, dashes go gold, the $ marker
+  // sinks out of sight, and a gold ring marks the cart spot. The ring is
+  // per-plot (owned plots only, a handful at most).
+  function setPlotOwned(rec) {
+    rec.sold = true;
+    if (!plotViz || rec.inst === undefined) return;
+    const i = rec.inst;
+    plotViz.pads.setColorAt(i, plotViz.cOwned);
+    plotViz.pads.instanceColor.needsUpdate = true;
+    const col = plotViz.dashes.geometry.attributes.color;
+    for (let v = rec.v0; v < rec.v0 + 8; v++) col.setXYZ(v, .96, .8, .455);
+    col.needsUpdate = true;
+    plotViz.dollarPos.setY(i, -999);
+    plotViz.dollarPos.needsUpdate = true;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(1.6, 2.15, 26),
+      new THREE.MeshBasicMaterial({ color: 0xf5cc74, transparent: true, opacity: .85, side: THREE.DoubleSide }));
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(rec.x, .2, rec.z);
+    plotGroup.add(ring);
+    rec.ring = ring;
   }
 
   // ---------- assemble ------------------------------------------------
@@ -2674,7 +2755,7 @@ const CITY = (() => {
         if (o.geometry && o.geometry !== undefined) { try { o.geometry.dispose(); } catch (e) { } }
         const mats = Array.isArray(o.material) ? o.material : [o.material];
         mats.forEach(m => {
-          if (m && m.map && !keep.includes(m.map) && m.map !== (_dollarMat && _dollarMat.map)) { try { m.map.dispose(); } catch (e) { } }
+          if (m && m.map && !keep.includes(m.map) && m.map !== _dollarTex) { try { m.map.dispose(); } catch (e) { } }
           if (m && m !== _winMat) { try { m.dispose(); } catch (e) { } }
         });
       });
@@ -2732,7 +2813,7 @@ const CITY = (() => {
     get roads() { return roads; },
     get plots() { return plotRecs; },
     get suites() { return suites; },
-    pointInBuilding, inPoly, distToRoad, roadsNear, nearestRoadName, pointOnRoad, randomRoadPoint, plotAt,
+    pointInBuilding, inPoly, distToRoad, roadsNear, nearestRoadName, pointOnRoad, randomRoadPoint, plotAt, setPlotOwned,
     get stats() { return buildStats; },
     get trees() { return treeList; },          // v2.07: final planted positions
     get treeStats() { return treeStats; },     // v2.07: {kept, dropped} road-clearance census
@@ -3144,28 +3225,21 @@ const ECO = (() => {
 
   // ---------------- owned plot visuals --------------------------------
   function markPlotOwned(rec) {
-    rec.sold = true;
-    if (rec.mesh) {
-      rec.mesh.traverse(o => {
-        if (o instanceof THREE.Sprite) o.visible = false;
-        if (o.material && o.material.color && o.material.opacity === .9) o.material.color.set(0x2f8f5b);
-        if (o instanceof THREE.Line) o.material.color.set(0xf5cc74);
-      });
-      // gold ring for owned plots
-      const ring = new THREE.Mesh(new THREE.RingGeometry(9.2, 10.4, 28),
-        new THREE.MeshBasicMaterial({ color: 0xf5cc74, transparent: true, opacity: .85, side: THREE.DoubleSide }));
-      ring.rotation.x = -Math.PI / 2; ring.position.y = .13;
-      rec.mesh.add(ring);
-    }
+    CITY.setPlotOwned(rec);        // v2.09: the whole flip lives in CITY now
   }
 
   // build runtime carts for active city from save
   function restoreCity() {
     clearCarts();
     const ck = CITY.rec && CITY.rec.key;
+    const taken = new Set();
     STATE.plots.filter(p => p.cityKey === ck).forEach(p => {
-      const rec = CITY.plots.find(r => r.id === p.id);
+      // v2.09: plot ids reshuffled with the sidewalk spots — fall back to
+      // the nearest new spot so older saves keep their carts on the street
+      const rec = CITY.plots.find(r => r.id === p.id) ||
+        CITY.plots.find(r => !taken.has(r.id) && Math.hypot(r.x - p.x, r.z - p.z) < 15);
       if (rec) {
+        taken.add(rec.id);
         markPlotOwned(rec);
         if (p.cart) spawnCart(p, rec);
       }
@@ -3189,14 +3263,15 @@ const ECO = (() => {
     const cuisine = CUISINES.find(c => c.id === plotState.cart.cuisine) || CUISINES[0];
     const mesh = ACTORS.makeCart(cuisine);
     mesh.position.set(plotRec.x, 0, plotRec.z);
-    mesh.rotation.y = plotRec.rot;
+    mesh.rotation.y = plotRec.rot + Math.PI / 2;   // v2.09: cart long axis along the curb
     CITY.group.add(mesh);
     const cart = {
       plot: plotState, rec: plotRec, cuisine, mesh,
       customers: [], leaving: [], vendors: [], served: 0, revenueLog: [],
       queueSlots: (() => {
+        // v2.09 sidewalk layout: the line runs down the walk beside the cart
         const off = [];
-        for (let i = 0; i < 5; i++) off.push([2.6, 1.0 + i * 1.6]);
+        for (let i = 0; i < 5; i++) off.push([1.45, 0.2 - i * 1.5]);
         return off;
       })(),
     };
@@ -3215,7 +3290,7 @@ const ECO = (() => {
   function addVendor(cart, cr, slot) {
     const fig = ACTORS.makeChibi({ shirt: 0xf2f0ee, pants: 0x8a8f96, skin: 0xfdebd0, scale: .98 });
     const c = Math.cos(cart.rec.rot), s = Math.sin(cart.rec.rot);
-    const lx = -2.0, lz = .9 + slot * .55;
+    const lx = -1.35, lz = -.8 + slot * .9;   // v2.09: behind the cart on the walk
     fig.group.position.set(cart.rec.x + lx * c + lz * s, 0, cart.rec.z - lx * s + lz * c);
     fig.group.rotation.y = cart.rec.rot + Math.PI / 2;
     fig.setWalk(false);
@@ -3406,8 +3481,8 @@ const ECO = (() => {
         const cui = CUISINES.find(c => c.id === owned.cart.cuisine);
         return { t: cui.name + ' cart', s: 'Street business · ' + (CITY.rec ? CITY.rec.name : ''), p: revPerMin(owned) >= 0 ? '+$' + revPerMin(owned).toFixed(0) + '/min' : '', a: '✓ Open', l: 'Click to manage' };
       }
-      if (owned) return { t: 'Your street plot', s: (plot.w * plot.d) + ' m² lot', p: '', a: '✓ Owned', l: 'Click to build' };
-      return { t: 'Street plot', s: (plot.w * plot.d) + ' m² · ' + (CITY.rec ? CITY.rec.name : ''), p: fmt$(plot.price), a: '✓ Available to buy', l: 'Click to purchase' };
+      if (owned) return { t: 'Your sidewalk spot', s: 'Food-cart spot · ' + (CITY.rec ? CITY.rec.name : ''), p: '', a: '✓ Owned', l: 'Click to build' };
+      return { t: 'Sidewalk spot', s: Math.round(plot.w * plot.d) + ' m² · ' + (CITY.rec ? CITY.rec.name : ''), p: fmt$(plot.price), a: '✓ Available to buy', l: 'Click to purchase' };
     }
     const b = CITY.pointInBuilding(x, z);
     if (b) {
@@ -3442,8 +3517,8 @@ const ECO = (() => {
 
   // ---------------- modals ---------------------------------------------
   function openBuyPlot(plot) {
-    openModal('Street Plot — ' + (CITY.rec ? CITY.rec.name : 'City'), `
-      <p>A <b>${plot.w * plot.d} m²</b> street lot, ripe for business.</p>
+    openModal('Sidewalk Spot — ' + (CITY.rec ? CITY.rec.name : 'City'), `
+      <p>A <b>${Math.round(plot.w * plot.d)} m²</b> sidewalk vending spot — park your food cart right on the walk.</p>
       <div class="kv"><span class="k">PRICE</span><span class="v g">${fmt$(plot.price)}</span></div>
       <div class="kv"><span class="k">BALANCE</span><span class="v">${fmt$(STATE.money)}</span></div>
       <div style="display:flex;gap:8px;margin-top:16px">
@@ -4479,7 +4554,7 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
   a.onclick = e => {
     e.preventDefault();
     const k = a.dataset.abt;
-    openModal(k.toUpperCase(), `<p><b>Open World v2.08</b> runs entirely in your browser and saves locally.</p>
+    openModal(k.toUpperCase(), `<p><b>Open World v2.09</b> runs entirely in your browser and saves locally.</p>
       <p>No accounts, no tracking, no payments. Map data © OpenStreetMap contributors (ODbL).</p>
       <p>Support: keep playing and build something big.</p>`);
   };
@@ -4489,11 +4564,11 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.08 — HAPPY CUSTOMERS', `
-    <p><b>The line is a line again.</b></p>
-    <div class="kv"><span class="k">THEY LEAVE NOW</span><span class="v">every served customer turns and walks off down the street — no more figures frozen in the queue, overlapping the next guest</span></div>
-    <div class="kv"><span class="k">SMOOTHER QUEUE</span><span class="v">customers turn naturally (no instant 180° flips when the line shuffles) and wait facing your cart</span></div>
-    <div class="kv"><span class="k">UNTOUCHED</span><span class="v g">v2.03 variety · v2.04 fast entry · v2.05 starter guide · v2.06 controls · v2.07 clear streets</span></div>
+  openModal('Welcome to v2.09 — SIDEWALK SPOTS', `
+    <p><b>Your cart belongs on the sidewalk.</b></p>
+    <div class="kv"><span class="k">SPOTS ON THE SIDEWALKS</span><span class="v">plots are now compact food-cart spots marked right on the raised walks beside every road — no more big lawn lots set back from the street</span></div>
+    <div class="kv"><span class="k">6× MORE SPOTS</span><span class="v">up to 150 marked spots per city (70 on phones) — green $ markers all over town, a short walk from wherever you are</span></div>
+    <div class="kv"><span class="k">UNTOUCHED</span><span class="v g">v2.03 variety · v2.04 fast entry · v2.05 starter guide · v2.06 controls · v2.07 clear streets · v2.08 happy customers</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">START BUILDING</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); if (!STATE.lastCityKey) toast('Click a glowing city to dive in.'); };
 }
@@ -4509,7 +4584,7 @@ document.getElementById('b-build').addEventListener('click', () => {
   if (STATE.mode !== 'city') { toast('Dive into a city first.'); return; }
   openModal('How to Build', `
     <p>Everything starts on the street:</p>
-    <div class="kv"><span class="k">GREEN $ PARCELS</span><span class="v">Click to buy a street plot</span></div>
+    <div class="kv"><span class="k">GREEN $ SPOTS</span><span class="v">Click a sidewalk spot to buy it</span></div>
     <div class="kv"><span class="k">YOUR PLOT</span><span class="v">Click again → park a food cart</span></div>
     <div class="kv"><span class="k">TOWERS</span><span class="v">Hover → click to lease office suites</span></div>
     <div class="kv"><span class="k">CARTS</span><span class="v">Stand close → [E] to serve the queue</span></div>
@@ -4520,7 +4595,7 @@ document.getElementById('b-build').addEventListener('click', () => {
 document.getElementById('avatar-chip').addEventListener('click', () => ECO.openEmpire());
 
 function openHelp() {
-  openModal('Open World v2.08 — Help', `
+  openModal('Open World v2.09 — Help', `
     <p><b>Controls</b></p>
     <div class="kv"><span class="k">MOVE</span><span class="v">WASD / arrows · hold Shift = sprint · release = stop</span></div>
     <div class="kv"><span class="k">CAMERA</span><span class="v">Drag to orbit · wheel/pinch to zoom (gentle, glide)</span></div>
@@ -4727,7 +4802,7 @@ EARTH.diveTo = (city, cb) => {
 };
 
 
-console.log('%cOPEN WORLD v2.08 — HAPPY CUSTOMERS', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.09 — SIDEWALK SPOTS', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
