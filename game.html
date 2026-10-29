@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.0</title>
+<title>Open World — v2.01</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.0 — NEW WORLD (complete restart)
+   OPEN WORLD v2.01 — NEW WORLD (complete restart)
    Visual system modeled on the Capital Rift reference frame:
    dark glassmorphism fintech UI (panels #1A202C @85%, 1px #4A5568
    borders, 4px radius), money-green #48BB78 prices, link-blue
@@ -370,7 +370,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
     </div>
     <div class="fine">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      <span>Your world saves locally in this browser. v2.0 is a fresh start — new map, new streets, new economy.</span>
+      <span>Your world saves locally in this browser. v2 is a fresh start — new map, new streets, new economy.</span>
     </div>
   </div>
   <div class="foot">
@@ -460,7 +460,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.0 — streets imported live from the real world</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.01 — streets imported live from the real world</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -482,7 +482,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.0';
+const GAME_VERSION = 'v2.01';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -596,7 +596,9 @@ function loadGame() {
     if (p.v !== 2) return false;
     STATE.name = p.name || ''; STATE.money = p.money ?? ECON.startMoney;
     STATE.gdp = p.gdp || 0; STATE.lastCityKey = p.lastCityKey || null;
-    STATE.seenNews = !!p.seenNews;
+    // per-version news gate: stores the version whose news was seen
+    // (boolean true = the v2.0 launch news)
+    STATE.seenNews = p.seenNews === true ? 'v2.0' : (p.seenNews || false);
     STATE.plots = (p.plots || []).map(o => ({ ...o, crew: o.crew || [] }));
     STATE.offices = p.offices || [];
     STATE.marketPack = p.market || null;
@@ -807,8 +809,9 @@ const EARTH = (() => {
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enablePan = false;
     controls.enableDamping = true; controls.dampingFactor = .08;
-    controls.minDistance = 118; controls.maxDistance = 460;
+    controls.minDistance = 132; controls.maxDistance = 460;
     controls.rotateSpeed = .55;
+    controls.zoomSpeed = .5;   // gentler wheel zoom on the globe
     camera.position.set(0, 90, 260);
 
     // picking
@@ -887,7 +890,7 @@ const EARTH = (() => {
   function activate() {
     controls.enabled = true;
     camera.position.set(camera.position.x || 0, Math.max(camera.position.y, 60), Math.max(camera.position.z, 200));
-    if (camera.position.length() < 118) camera.position.setLength(240);
+    if (camera.position.length() < 132) camera.position.setLength(240);
     controls.target.set(0, 0, 0);
   }
   function deactivate() { controls.enabled = false; hideTooltip(); }
@@ -2948,7 +2951,7 @@ window.addEventListener('resize', () => {
 
 // ---------------- city scene ----------------------------------------
 let cityScene = null, sun = null;
-const camCtl = { az: Math.PI * .25, el: 1.02, dist: 88, tx: 0, tz: 0 };
+const camCtl = { az: Math.PI * .25, el: 1.02, dist: 88, distT: 88, tx: 0, tz: 0 };
 
 function buildCityScene() {
   cityScene = new THREE.Scene();
@@ -2989,7 +2992,7 @@ async function enterCity(meta) {
     const spot = CITY.randomRoadPoint(rnd);
     ACTORS.placePlayer(spot.x, spot.z);
     cityScene.add(ACTORS.player.group);
-    camCtl.az = Math.PI * .25; camCtl.el = 1.02; camCtl.dist = 88;
+    camCtl.az = Math.PI * .25; camCtl.el = 1.02; camCtl.dist = 88; camCtl.distT = 88;
     camCtl.tx = spot.x; camCtl.tz = spot.z;
     // life
     const isMobile = matchMedia('(pointer:coarse)').matches;
@@ -3068,7 +3071,7 @@ function doEnter() {
   EARTH.setOwned(new Set(STATE.plots.map(p => p.cityKey)), STATE.lastCityKey);
   uiBalance();
   buildTicker();
-  if (!STATE.seenNews) setTimeout(openWhatsNew, 600);
+  if (STATE.seenNews !== GAME_VERSION) setTimeout(openWhatsNew, 600);
   else if (STATE.lastCityKey) toast('Welcome back, <b>' + nm + '</b>. Your empire is waiting.');
   else toast('Welcome, <b>' + nm + '</b>. Click a glowing city to dive in.');
 }
@@ -3078,7 +3081,7 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
   a.onclick = e => {
     e.preventDefault();
     const k = a.dataset.abt;
-    openModal(k.toUpperCase(), `<p><b>Open World v2.0</b> runs entirely in your browser and saves locally.</p>
+    openModal(k.toUpperCase(), `<p><b>Open World v2.01</b> runs entirely in your browser and saves locally.</p>
       <p>No accounts, no tracking, no payments. Map data © OpenStreetMap contributors (ODbL).</p>
       <p>Support: keep playing and build something big.</p>`);
   };
@@ -3086,9 +3089,9 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
 
 // ---------------- What's New ------------------------------------------
 function openWhatsNew() {
-  STATE.seenNews = true;
+  STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.0 — NEW WORLD', `
+  openModal('Welcome to v2.01 — NEW WORLD', `
     <p><b>The game restarted from zero</b> — rebuilt to run on the real world.</p>
     <div class="kv"><span class="k">REAL STREETS</span><span class="v">Cities import live from OpenStreetMap</span></div>
     <div class="kv"><span class="k">FIND MY STREET</span><span class="v">Search any place on Earth and walk it</span></div>
@@ -3097,6 +3100,7 @@ function openWhatsNew() {
     <div class="kv"><span class="k">OFFICES</span><span class="v">Lease suites in real towers for rent income</span></div>
     <div class="kv"><span class="k">OPEN EXCHANGE</span><span class="v">Order book · tape · limit &amp; market orders</span></div>
     <div class="kv"><span class="k">YOU</span><span class="v g">Walk the streets yourself (WASD)</span></div>
+    <div class="kv"><span class="k">v2.01</span><span class="v g">Gentler camera zoom — it glides and stops well short of street level</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">START BUILDING</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); if (!STATE.lastCityKey) toast('Click a glowing city node to dive in.'); };
 }
@@ -3123,10 +3127,10 @@ document.getElementById('b-build').addEventListener('click', () => {
 document.getElementById('avatar-chip').addEventListener('click', () => ECO.openEmpire());
 
 function openHelp() {
-  openModal('Open World v2.0 — Help', `
+  openModal('Open World v2.01 — Help', `
     <p><b>Controls</b></p>
     <div class="kv"><span class="k">MOVE</span><span class="v">WASD / arrows · Shift = run</span></div>
-    <div class="kv"><span class="k">CAMERA</span><span class="v">Drag to orbit · wheel/pinch to zoom</span></div>
+    <div class="kv"><span class="k">CAMERA</span><span class="v">Drag to orbit · wheel/pinch to zoom (gentle, glide)</span></div>
     <div class="kv"><span class="k">SERVE</span><span class="v">[E] when standing at your cart</span></div>
     <div class="kv"><span class="k">MARKET</span><span class="v">📈 button · limit &amp; market orders</span></div>
     <p style="margin-top:12px"><b>The loop</b></p>
@@ -3212,15 +3216,24 @@ canvas.addEventListener('pointerup', e => {
   if (dragging && moved < 6) clickPick(e.clientX, e.clientY);
   dragging = false;
 });
+// gentle zoom: the step scales with the ACTUAL wheel delta (small trackpad
+// deltas = tiny steps), each event is speed-capped, and the camera GLIDES
+// toward the target in the main loop instead of snapping. The floor (45)
+// keeps it from zooming all the way down to street level.
 canvas.addEventListener('wheel', e => {
   if (STATE.mode !== 'city') return;
-  camCtl.dist = THREE.MathUtils.clamp(camCtl.dist * (1 + Math.sign(e.deltaY) * .09), 24, 420);
+  let dy = e.deltaY * (e.deltaMode === 1 ? 33 : 1);   // deltaMode 1 = lines
+  dy = THREE.MathUtils.clamp(dy, -180, 180);          // cap single-event jumps
+  camCtl.distT = THREE.MathUtils.clamp(camCtl.distT * Math.exp(dy * .0005), 45, 420);
 }, { passive: true });
-// touch pinch
+// touch pinch (tracks fingers 1:1, same limits)
 canvas.addEventListener('touchmove', e => {
   if (STATE.mode !== 'city' || e.touches.length !== 2) return;
   const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-  if (pinchD) camCtl.dist = THREE.MathUtils.clamp(camCtl.dist * (pinchD / d), 24, 420);
+  if (pinchD) {
+    camCtl.distT = THREE.MathUtils.clamp(camCtl.distT * (pinchD / d), 45, 420);
+    camCtl.dist = camCtl.distT;
+  }
   pinchD = d;
 }, { passive: true });
 canvas.addEventListener('touchend', () => { pinchD = 0; });
@@ -3269,6 +3282,9 @@ function loop() {
     const p = ACTORS.player.group.position;
     camCtl.tx += (p.x - camCtl.tx) * Math.min(1, dt * 5);
     camCtl.tz += (p.z - camCtl.tz) * Math.min(1, dt * 5);
+    // zoom glides toward its target — no snapping
+    camCtl.dist += (camCtl.distT - camCtl.dist) * Math.min(1, dt * 9);
+    camCtl.dist = THREE.MathUtils.clamp(camCtl.dist, 45, 420);
     const ce = Math.cos(camCtl.el), se = Math.sin(camCtl.el);
     camera.position.set(
       camCtl.tx + Math.sin(camCtl.az) * camCtl.dist * ce,
@@ -3308,7 +3324,7 @@ EARTH.diveTo = (city, cb) => _origDive(city, () => enterCity({
 }));
 
 
-console.log('%cOPEN WORLD v2.0 — NEW WORLD', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.01 — NEW WORLD', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
