@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.06</title>
+<title>Open World — v2.07</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.06 — NEW WORLD (complete restart) + STARTER GUIDE + TIGHT CONTROLS
+   OPEN WORLD v2.07 — NEW WORLD (complete restart) + STARTER GUIDE + TIGHT CONTROLS + CLEAR STREETS
    Visual system modeled on the Capital Rift reference frame:
    dark glassmorphism fintech UI (panels #1A202C @85%, 1px #4A5568
    borders, 4px radius), money-green #48BB78 prices, link-blue
@@ -482,7 +482,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.06 — streets imported live from the real world</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.07 — streets imported live from the real world</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -504,7 +504,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.06';
+const GAME_VERSION = 'v2.07';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -1244,6 +1244,12 @@ window.OSM = OSM;
 
 // ======== section: 40_city.js ========
 // ====================================================================
+// v2.07 — CITY: CLEAR STREETS — trees, lamps, benches, bollards and
+// parked cars now check the asphalt of EVERY road (nearest-road test),
+// not just the street they were planted along: nothing spawns in the
+// middle of a crossing road at intersections any more. Lawns got the
+// same width-aware clearance.
+// ====================================================================
 // v2.04 — CITY: async progressive build — phases yield to the browser
 // (rAF) with live status text, so entering never freezes the page.
 // v2.03 — CITY: every building is now an individual — 4 facade systems
@@ -1275,6 +1281,7 @@ const CITY = (() => {
   let benchScratch = [];                // benches collected from parks + walks
   let pitchedRects = [];              // lawn candidates from pitched-roof buildings
   let buildStats = null;               // QA census of the last build (styles/roofs)
+  let treeList = [], treeStats = null; // v2.07: final planted trees + road-clearance census
   const hexOf = c => '#' + c.getHexString();
 
   // ---------- low-level quad/triangle pushers ----------------------
@@ -2144,7 +2151,8 @@ const CITY = (() => {
         if (nLawn >= 80) break;
         let ok = true;
         for (const q of L.checkPts) {
-          if (distToRoad(q[0], q[1]).d < 5.6) { ok = false; break; }   // stay off road+sidewalk
+          const dq = distToRoad(q[0], q[1]);
+          if (dq.d < 5.6 || (dq.rd && dq.d < dq.rd.w / 2 + 3.7)) { ok = false; break; }   // stay off road+sidewalk (any road width)
           if (plotAt(q[0], q[1])) { ok = false; break; }               // stay off purchasable plots
           if (pointInBuilding(q[0], q[1])) { ok = false; break; }      // stay off neighbors
         }
@@ -2172,7 +2180,18 @@ const CITY = (() => {
         group.add(mesh);
       }
     }
-    addTrees(trees);          // single instancing pass — parks + streets + lawns
+    // v2.07 — trees must clear the ASPHALT of every road, not just the
+    // street they were planted along: at intersections a tree set beside
+    // a narrow side street used to land in the middle of the wide road it
+    // crosses (park + lawn trees get the same guarantee here).
+    const keptTrees = [];
+    let droppedTrees = 0;
+    for (const t of trees) {
+      if (offAsphalt(t[0], t[1], 1.4)) keptTrees.push(t); else droppedTrees++;
+    }
+    treeList = keptTrees;
+    treeStats = { kept: keptTrees.length, dropped: droppedTrees };
+    addTrees(keptTrees);      // single instancing pass — parks + streets + lawns
 
     const bolls = [];
     for (const rd of city.roads) {
@@ -2184,7 +2203,9 @@ const CITY = (() => {
         const ux = (bx - ax) / len, uz = (bz - az) / len;
         for (let d = 8; d < len; d += 13) {
           const off = rd.w / 2 + 3.7;
-          bolls.push([ax + ux * d - uz * off, az + uz * d + ux * off]);
+          const qx = ax + ux * d - uz * off, qz = az + uz * d + ux * off;
+          if (!offAsphalt(qx, qz, 1.4)) continue;   // v2.07: never in a crossing road
+          bolls.push([qx, qz]);
         }
       }
     }
@@ -2238,6 +2259,7 @@ const CITY = (() => {
           const x = ax + ux * d - uz * off * side, z = az + uz * d + ux * off * side;
           const s0 = side; side = -side;
           if (pointInBuilding(x, z)) continue;
+          if (!offAsphalt(x, z, 1.4)) continue;      // v2.07: poles never in a crossing road
           const tx = uz * s0, tz = -ux * s0;            // toward the road
           lamps.push([x, z, Math.atan2(-tz, tx)]);
         }
@@ -2324,6 +2346,7 @@ const CITY = (() => {
           const off = rd.w / 2 + 2.7;
           const x = ax + ux * d - uz * off * side, z = az + uz * d + ux * off * side;
           if (pointInBuilding(x, z)) continue;
+          if (!offAsphalt(x, z, 1.4)) continue;      // v2.07: not in a crossing road
           benchScratch.push([x, z, Math.atan2(uz * side, -ux * side)]);   // face the road
         }
       }
@@ -2369,7 +2392,7 @@ const CITY = (() => {
             const side = rnd() < .5 ? 1 : -1;
             const off = rd.w / 2 + 1.25;
             const x = ax + ux * d - uz * off * side, z = az + uz * d + ux * off * side;
-            if (Math.hypot(x, z) < 640 && !pointInBuilding(x, z) && !plotAt(x, z)) {
+            if (Math.hypot(x, z) < 640 && !pointInBuilding(x, z) && !plotAt(x, z) && offAsphalt(x, z, .9)) {
               let inGreen = false;
               for (const g of [...(city.greens || []), ...(city.waters || [])])
                 if (g.poly && inPoly(x, z, g.poly)) { inGreen = true; break; }
@@ -2511,6 +2534,13 @@ const CITY = (() => {
     t = Math.max(0, Math.min(1, t));
     return Math.hypot(px - (ax + t * dx), pz - (az + t * dz));
   }
+  // v2.07 — true when (x,z) clears the asphalt of EVERY road by m meters
+  // (nearest-road test): catches props planted along one street that
+  // would otherwise land inside a crossing street at intersections.
+  function offAsphalt(x, z, m) {
+    const h = distToRoad(x, z);
+    return !h.rd || h.d > h.rd.w / 2 + m;
+  }
 
   // ---------- purchasable plots (gap sampling along roads) ----------
   function dollarSprite() {
@@ -2649,7 +2679,7 @@ const CITY = (() => {
         });
       });
     }
-    group = null; roads = []; plotRecs = []; suites = []; buildingPolys = []; benchScratch = []; pitchedRects = []; bHash = rHash = null;
+    group = null; roads = []; plotRecs = []; suites = []; buildingPolys = []; benchScratch = []; pitchedRects = []; bHash = rHash = null; treeList = []; treeStats = null;
   }
   let _winMat = null;
 
@@ -2704,6 +2734,8 @@ const CITY = (() => {
     get suites() { return suites; },
     pointInBuilding, inPoly, distToRoad, roadsNear, nearestRoadName, pointOnRoad, randomRoadPoint, plotAt,
     get stats() { return buildStats; },
+    get trees() { return treeList; },          // v2.07: final planted positions
+    get treeStats() { return treeStats; },     // v2.07: {kept, dropped} road-clearance census
     get half() { return (cityRec && cityRec.half) || 720; },
     get rec() { return cityRec; },
   };
@@ -4391,7 +4423,7 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
   a.onclick = e => {
     e.preventDefault();
     const k = a.dataset.abt;
-    openModal(k.toUpperCase(), `<p><b>Open World v2.06</b> runs entirely in your browser and saves locally.</p>
+    openModal(k.toUpperCase(), `<p><b>Open World v2.07</b> runs entirely in your browser and saves locally.</p>
       <p>No accounts, no tracking, no payments. Map data © OpenStreetMap contributors (ODbL).</p>
       <p>Support: keep playing and build something big.</p>`);
   };
@@ -4401,12 +4433,11 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.06 — TIGHTER CONTROLS', `
-    <p><b>Your feet now obey your fingers.</b></p>
-    <div class="kv"><span class="k">NO GHOST WALKING</span><span class="v">release a key — or lose window focus — and you stop on the spot; stuck keys are impossible now</span></div>
-    <div class="kv"><span class="k">SHIFT = SPRINT</span><span class="v">hold Shift while moving to run (works with WASD and arrows)</span></div>
-    <div class="kv"><span class="k">LAYOUT PROOF</span><span class="v">WASD now tracks the physical key — AZERTY and friends welcome</span></div>
-    <div class="kv"><span class="k">UNTOUCHED</span><span class="v g">v2.03 building variety · v2.04 fast entry · v2.05 starter guide</span></div>
+  openModal('Welcome to v2.07 — CLEAR STREETS', `
+    <p><b>The roads belong to the cars again.</b></p>
+    <div class="kv"><span class="k">NO TREES ON THE ROAD</span><span class="v">trees — and lamps, benches, bollards, parked cars — now clear every crossing: nothing sprouts in the middle of an intersection</span></div>
+    <div class="kv"><span class="k">STILL GREENERY</span><span class="v">parks, lawns and sidewalk edges keep their trees — only road blockers are gone</span></div>
+    <div class="kv"><span class="k">UNTOUCHED</span><span class="v g">v2.03 variety · v2.04 fast entry · v2.05 starter guide · v2.06 tighter controls</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">START BUILDING</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); if (!STATE.lastCityKey) toast('Click a glowing city to dive in.'); };
 }
@@ -4433,7 +4464,7 @@ document.getElementById('b-build').addEventListener('click', () => {
 document.getElementById('avatar-chip').addEventListener('click', () => ECO.openEmpire());
 
 function openHelp() {
-  openModal('Open World v2.06 — Help', `
+  openModal('Open World v2.07 — Help', `
     <p><b>Controls</b></p>
     <div class="kv"><span class="k">MOVE</span><span class="v">WASD / arrows · hold Shift = sprint · release = stop</span></div>
     <div class="kv"><span class="k">CAMERA</span><span class="v">Drag to orbit · wheel/pinch to zoom (gentle, glide)</span></div>
@@ -4640,7 +4671,7 @@ EARTH.diveTo = (city, cb) => {
 };
 
 
-console.log('%cOPEN WORLD v2.06 — TIGHTER CONTROLS', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.07 — CLEAR STREETS', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
