@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.09</title>
+<title>Open World — v2.10</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.09 — NEW WORLD (complete restart) + STARTER GUIDE + TIGHT CONTROLS + CLEAR STREETS + HAPPY CUSTOMERS + SIDEWALK SPOTS
+   OPEN WORLD v2.10 — NEW WORLD (complete restart) + STARTER GUIDE + TIGHT CONTROLS + CLEAR STREETS + HAPPY CUSTOMERS + SIDEWALK SPOTS + INSTANT TRAVEL
    Visual system modeled on the Capital Rift reference frame:
    dark glassmorphism fintech UI (panels #1A202C @85%, 1px #4A5568
    borders, 4px radius), money-green #48BB78 prices, link-blue
@@ -221,6 +221,9 @@ input{font-family:var(--sans)}
   border-bottom:1px dashed rgba(255,255,255,.06);font-size:12.5px}
 .kv .k{color:var(--dim)}.kv .v{color:var(--txt);font-family:var(--mono)}
 .kv .v.g{color:var(--green2)}.kv .v.r{color:#FCA5A5}
+.tpbtn{padding:7px 12px;border-radius:var(--r);font-size:10.5px;font-weight:800;letter-spacing:.8px;
+  background:rgba(56,189,248,.13);border:1px solid rgba(56,189,248,.5);color:#7DD3FC;cursor:pointer;white-space:nowrap}
+.tpbtn:hover{background:rgba(56,189,248,.26)}
 
 /* plot/business modal specifics */
 .cuisine-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px;margin-top:10px}
@@ -504,7 +507,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.09';
+const GAME_VERSION = 'v2.10';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -602,7 +605,7 @@ function saveGame() {
       lastCityKey: STATE.lastCityKey, seenNews: STATE.seenNews,
       tut: { step: STATE.tut.step, done: STATE.tut.done },
       plots: STATE.plots.map(p => ({
-        id: p.id, cityKey: p.cityKey, x: +p.x.toFixed(2), z: +p.z.toFixed(2),
+        id: p.id, cityKey: p.cityKey, cityName: p.cityName || null, x: +p.x.toFixed(2), z: +p.z.toFixed(2),
         cart: p.cart ? { cuisine: p.cart.cuisine } : null,
         crew: (p.crew || []).map(c => ({ name: c.name, stars: c.stars })),
       })),
@@ -3149,6 +3152,9 @@ window.ACTORS = ACTORS;
 
 // ======== section: 60_economy.js ========
 // ====================================================================
+// v2.10 — INSTANT TRAVEL: every owned plot in the Empire panel gets
+// a TELEPORT button — same city snaps you beside the cart, another
+// city dives you straight in and lands at the spot.
 // v2.0 — ECONOMY: street plots, food carts, customer queues, star
 // crews, office leasing, live P&L business panels. Capital Rift's
 // street-business loop on real-world streets.
@@ -3228,6 +3234,69 @@ const ECO = (() => {
     CITY.setPlotOwned(rec);        // v2.09: the whole flip lives in CITY now
   }
 
+  // ---------------- v2.10 — INSTANT TRAVEL -----------------------------
+  // Every owned plot gets a TELEPORT button in the Empire panel. Same
+  // city: the player + camera snap to a standing spot on the pad beside
+  // the cart (inside serve range). Other city (or orbit): MAIN dives into
+  // that city and lands beside the spot. MAIN installs the hook so ECO
+  // never needs the camera / travel layer.
+  let travelHook = null;
+  function bindTravel(fn) { travelHook = fn; }
+
+  const pulses = [];            // arrival ring pulses (teleport marker)
+  function arrivalPulse(x, z) {
+    if (!CITY.group) return;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(1.1, 1.5, 40),
+      new THREE.MeshBasicMaterial({ color: 0xf6d365, transparent: true, opacity: .95, side: THREE.DoubleSide, depthWrite: false }));
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(x, .27, z);
+    CITY.group.add(ring);
+    pulses.push({ ring, t: 0 });
+  }
+  function updatePulses(dt) {
+    for (let i = pulses.length - 1; i >= 0; i--) {
+      const p = pulses[i]; p.t += dt;
+      const k = p.t / .9;
+      if (k >= 1) { if (p.ring.parent) p.ring.parent.remove(p.ring); p.ring.geometry.dispose(); p.ring.material.dispose(); pulses.splice(i, 1); continue; }
+      p.ring.scale.setScalar(1 + k * 5.5);
+      p.ring.material.opacity = .95 * (1 - k);
+    }
+  }
+  // standing spot on the pad, past the cart's end and clear of the queue
+  // line — inside serve range the instant you land
+  function plotStand(rec) {
+    const c = Math.cos(rec.rot), s = Math.sin(rec.rot);
+    const lx = 0, lz = 2.6;
+    return { x: rec.x + lx * c + lz * s, z: rec.z - lx * s + lz * c };
+  }
+  function cityNameOf(p) {
+    const c = CITIES.find(x => x.key === p.cityKey);
+    return (c && c.name) || p.cityName || p.cityKey;
+  }
+  function plotLabel(p) {
+    const cui = p.cart ? CUISINES.find(c => c.id === p.cart.cuisine) : null;
+    return cui ? cui.emoji + ' ' + cui.name + ' cart' : 'Empty spot';
+  }
+  function teleportToPlot(p) {
+    if (!p) return false;
+    if (!travelHook) { toast('Travel unavailable right now.', 'warn'); return false; }
+    if (STATE.mode === 'diving') { toast('Almost there — hold on…', 'warn'); return false; }
+    const here = CITY.rec && CITY.rec.key;
+    let rec = null;
+    if (here === p.cityKey) {
+      rec = CITY.plots.find(r => r.id === p.id) ||
+        CITY.plots.find(r => !r.sold && Math.hypot(r.x - p.x, r.z - p.z) < 15);
+    }
+    closeModal();
+    if (rec) {
+      const st = plotStand(rec);
+      travelHook({ x: st.x, z: st.z, fx: rec.x, fz: rec.z, plot: p });
+      return true;
+    }
+    travelHook({ cityKey: p.cityKey, plot: p });   // other city / orbit
+    return true;
+  }
+
   // build runtime carts for active city from save
   function restoreCity() {
     clearCarts();
@@ -3256,6 +3325,8 @@ const ECO = (() => {
     carts = [];
     floats.forEach(f => CITY.group.remove(f.sp));
     floats = [];
+    pulses.forEach(p => { if (p.ring.parent) p.ring.parent.remove(p.ring); });   // v2.10: drop travel pulses
+    pulses.length = 0;
   }
 
   // ---------------- cart + customers ---------------------------------
@@ -3527,7 +3598,7 @@ const ECO = (() => {
       </div>`);
     document.getElementById('bp-buy').onclick = () => {
       if (!spend(plot.price)) { toast('<b>Not enough money.</b> Sell some food first.', 'warn'); return; }
-      const st = { id: plot.id, cityKey: CITY.rec.key, x: plot.x, z: plot.z, cart: null, crew: [] };
+      const st = { id: plot.id, cityKey: CITY.rec.key, cityName: CITY.rec.name, x: plot.x, z: plot.z, cart: null, crew: [] };   // v2.10: cityName for travel
       STATE.plots.push(st);
       markPlotOwned(plot);
       saveGameSafe();
@@ -3700,21 +3771,28 @@ const ECO = (() => {
   }
 
   function openEmpire() {
-    const rows = STATE.plots.map(p => {
-      const cui = p.cart ? CUISINES.find(c => c.id === p.cart.cuisine) : null;
-      return `<div class="kv"><span class="k">${cui ? cui.emoji + ' ' + cui.name + ' cart' : 'Empty plot'} · ${p.cityKey}</span>
-        <span class="v ${cui ? 'g' : ''}">${cui ? 'active' : 'idle'}</span></div>`;
+    const here = CITY.rec && CITY.rec.key;
+    const pp = ACTORS.player ? ACTORS.player.group.position : null;
+    const rows = STATE.plots.map((p, i) => {
+      const local = here === p.cityKey && STATE.mode === 'city';
+      const d = local && pp ? Math.round(Math.hypot(p.x - pp.x, p.z - pp.z)) : 0;
+      return `<div class="kv"><span class="k">${plotLabel(p)} · ${cityNameOf(p)}${local ? ' · ' + d + 'm away' : ''}</span>
+        <button class="tpbtn" data-tp="${i}">${local ? 'TELEPORT' : 'TRAVEL'}</button></div>`;
     }).join('');
     const ofc = STATE.offices.map(o => `<div class="kv"><span class="k">${o.name} · ${o.cityKey}</span><span class="v g">$${o.rate}/day</span></div>`).join('');
     const officeRate = STATE.offices.reduce((s, o) => s + o.rate / 90 * 60, 0);
     openModal('Your Empire — ' + STATE.name, `
       <div id="pl"><span class="l">Holdings</span><span class="v">${STATE.plots.length} plots · ${STATE.offices.length} offices</span></div>
+      <div class="msec" style="margin-top:14px">Street plots — one-click travel</div>
       ${rows || '<p>No street plots yet. Find a green <b>$</b> parcel and click it.</p>'}
       <div class="msec" style="margin-top:14px">Offices — passive rent</div>
       ${ofc || '<p>No offices leased. Hover a tower and click to lease.</p>'}
       <div class="kv" style="margin-top:10px"><span class="k">OFFICE INCOME</span><span class="v g">+$${officeRate.toFixed(2)}/min</span></div>
       <div class="kv"><span class="k">WORLD GDP (YOU)</span><span class="v">$${Math.round(STATE.gdp).toLocaleString()}</span></div>
       <div style="display:flex;gap:8px;margin-top:16px"><button class="btn" id="em-x" style="flex:1">CLOSE</button></div>`);
+    document.querySelectorAll('[data-tp]').forEach(b => {
+      b.onclick = () => { teleportToPlot(STATE.plots[+b.dataset.tp]); };
+    });
     document.getElementById('em-x').onclick = closeModal;
   }
 
@@ -3731,11 +3809,12 @@ const ECO = (() => {
     return { inLine, leaving, served };
   }
 
-  function update(dt) { if (STATE.mode === 'city') updateCarts(dt); }
+  function update(dt) { if (STATE.mode === 'city') { updateCarts(dt); updatePulses(dt); } }
 
   return {
     CUISINES, restoreCity, clearCarts, update, hoverInfo, clickAt,
     openBusiness, openEmpire, recruit, hireFee, revPerMin, queueStats,
+    bindTravel, teleportToPlot, plotStand, plotLabel, cityNameOf, arrivalPulse,   // v2.10
     get serveContext() { return serveContext; },
     get carts() { return carts; },
   };
@@ -4390,6 +4469,9 @@ window.MARKET = MARKET;
 // ======== section: 90_main.js ========
 window.addEventListener('error', e => { (window.__errs = window.__errs || []).push((e.message || 'err') + ' @line' + (e.lineno || '?') + ':' + (e.colno || '?')); });
 // ====================================================================
+// v2.10 — INSTANT TRAVEL: ECO binds a travel hook here — same-city
+// teleports snap player+camera to the plot; cross-city ones dive via
+// enterCity (which can now leave a city cleanly) and land at the spot.
 // v2.0 — MAIN: boot landing, globe↔city travel, city camera, picking,
 // HUD wiring, the game loop, saves, QA probe.
 // ====================================================================
@@ -4434,8 +4516,21 @@ function buildCityScene() {
 // ---------------- travel ---------------------------------------------
 async function enterCity(meta) {
   if (STATE.mode === 'diving') return;
+  // v2.10: INSTANT TRAVEL dives city→city without returning to orbit —
+  // leave the active city exactly the way returnToGlobe does, or the old
+  // scene leaks into the new one
+  if (STATE.mode === 'city') {
+    saveGame();
+    ECO.clearCarts();
+    TUT.onLeaveCity();
+    ACTORS.reset();
+    if (ACTORS.player && ACTORS.player.group.parent) ACTORS.player.group.parent.remove(ACTORS.player.group);
+    CITY.dispose();
+    if (cityScene) { cityScene.clear(); cityScene = null; }
+    document.getElementById('servebar').classList.add('hidden');
+  }
   STATE.mode = 'diving';
-  veilOn('Entering ' + meta.name + '…');
+  veilOn((pendingArrival ? '⚡ Traveling to your plot in ' : 'Entering ') + meta.name + '…');
   hideTooltip();
   try {
     // v2.04: if a fetch for this city is already running (hover prefetch
@@ -4452,17 +4547,28 @@ async function enterCity(meta) {
     }));
     ACTORS.reset();
     ACTORS.initPlayer();
-    // place player at a road point near center
+        // place player at a road point near center — or v2.10: land beside the
+    // owned plot we teleported to (resolve the regenerated spot by id,
+    // falling back to nearest within 15m like restoreCity does)
     const rnd = (n => () => (n = (n * 2654435761) % 4294967296) / 4294967296)(hashStr(meta.key || meta.name) + 7);
-    const spot = CITY.randomRoadPoint(rnd);
+    let spot = null, arrived = null;
+    if (pendingArrival) {
+      const pa = pendingArrival; pendingArrival = null;
+      const rec = CITY.plots.find(r => r.id === pa.id) ||
+        CITY.plots.find(r => Math.hypot(r.x - pa.x, r.z - pa.z) < 15);
+      if (rec) { spot = ECO.plotStand(rec); arrived = { pa, rec }; }
+    }
+    if (!spot) spot = CITY.randomRoadPoint(rnd);
     ACTORS.placePlayer(spot.x, spot.z);
+    if (arrived) ACTORS.player.group.rotation.y = Math.atan2(arrived.rec.x - spot.x, arrived.rec.z - spot.z);   // face the cart
     cityScene.add(ACTORS.player.group);
-    camCtl.az = Math.PI * .25; camCtl.el = 1.02; camCtl.dist = 88; camCtl.distT = 88;
+    camCtl.az = Math.PI * .25; camCtl.el = 1.02; camCtl.dist = 88; camCtl.distT = arrived ? 64 : 88;
     camCtl.tx = spot.x; camCtl.tz = spot.z;
     // life
     const isMobile = matchMedia('(pointer:coarse)').matches;
     ACTORS.spawnCitizens(isMobile ? 22 : 46, meta.key || meta.name);
     ECO.restoreCity();
+    if (arrived) ECO.arrivalPulse(spot.x, spot.z);   // v2.10: ring marks the landing spot
     // HUD
     document.getElementById('cityname').textContent = meta.name;
     STATE.city = meta;
@@ -4471,12 +4577,14 @@ async function enterCity(meta) {
     TUT.onEnterCity();          // v2.05: starter guide records its spawn point
     EARTH.setOwned(new Set(STATE.plots.map(p => p.cityKey)), STATE.lastCityKey);
     uiBalance();
-    toast('Welcome to <b>' + meta.name + '</b>' +
+    if (arrived) toast('⚡ Teleported to your <b>' + (arrived.pa.cart ? ECO.plotLabel(arrived.pa) : 'sidewalk spot') + '</b> in ' + meta.name + '.', 'warn');
+    else toast('Welcome to <b>' + meta.name + '</b>' +
       (data.source === 'osm' && !data.fromCache ? ' — real streets imported live from OpenStreetMap' :
         data.fromCache ? ' — cached real streets' : ' — street grid generated (live map unreachable)'), 'warn');
   } catch (e) {
     console.error('[enterCity]', e);
     toast('<b>Could not enter the city.</b> ' + (e && e.message || ''), 'err');
+    pendingArrival = null;   // v2.10: never land a stale teleport in the wrong city
     STATE.mode = 'globe';
     EARTH.activate();
   }
@@ -4505,6 +4613,31 @@ function returnToGlobe() {
     veilOff();
   }, 350);
 }
+
+// ---------------- v2.10: instant travel to owned plots ----------------
+// ECO's Empire panel calls this hook: same city → snap player + camera;
+// other city / orbit → resolve the city, remember the plot, dive.
+let pendingArrival = null;   // STATE plot to land beside after the city builds
+ECO.bindTravel(req => {
+  if (req.cityKey === undefined) {
+    ACTORS.placePlayer(req.x, req.z);
+    if (req.fx !== undefined) ACTORS.player.group.rotation.y = Math.atan2(req.fx - req.x, req.fz - req.z);
+    camCtl.tx = req.x; camCtl.tz = req.z;          // camera cuts with you
+    camCtl.distT = Math.min(camCtl.distT, 70);     // glide in for a look at the cart
+    toast('⚡ Teleported to your <b>' + (req.plot && req.plot.cart ? ECO.plotLabel(req.plot) : 'sidewalk spot') + '</b>.', 'warn');
+    ECO.arrivalPulse(req.x, req.z);
+    return;
+  }
+  const c = CITIES.find(x => x.key === req.cityKey);
+  let meta = c ? { key: c.key, name: c.name, lat: c.lat, lon: c.lon, tier: c.tier } : null;
+  if (!meta) {   // searched cities keep their coords in the key itself
+    const m = /^ll(-?[0-9]+(?:[.][0-9]+)?)_(-?[0-9]+(?:[.][0-9]+)?)$/.exec(req.cityKey || '');
+    if (m) meta = { key: req.cityKey, name: (req.plot && req.plot.cityName) || req.cityKey, lat: +m[1], lon: +m[2], searched: true };
+  }
+  if (!meta) { toast('<b>That city can no longer be found</b> — search for it again.', 'warn'); return; }
+  pendingArrival = req.plot;
+  enterCity(meta);
+});
 
 // ---------------- boot ------------------------------------------------
 const bootEl = document.getElementById('boot');
@@ -4554,7 +4687,7 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
   a.onclick = e => {
     e.preventDefault();
     const k = a.dataset.abt;
-    openModal(k.toUpperCase(), `<p><b>Open World v2.09</b> runs entirely in your browser and saves locally.</p>
+    openModal(k.toUpperCase(), `<p><b>Open World v2.10</b> runs entirely in your browser and saves locally.</p>
       <p>No accounts, no tracking, no payments. Map data © OpenStreetMap contributors (ODbL).</p>
       <p>Support: keep playing and build something big.</p>`);
   };
@@ -4564,11 +4697,11 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.09 — SIDEWALK SPOTS', `
-    <p><b>Your cart belongs on the sidewalk.</b></p>
-    <div class="kv"><span class="k">SPOTS ON THE SIDEWALKS</span><span class="v">plots are now compact food-cart spots marked right on the raised walks beside every road — no more big lawn lots set back from the street</span></div>
-    <div class="kv"><span class="k">6× MORE SPOTS</span><span class="v">up to 150 marked spots per city (70 on phones) — green $ markers all over town, a short walk from wherever you are</span></div>
-    <div class="kv"><span class="k">UNTOUCHED</span><span class="v g">v2.03 variety · v2.04 fast entry · v2.05 starter guide · v2.06 controls · v2.07 clear streets · v2.08 happy customers</span></div>
+  openModal('Welcome to v2.10 — INSTANT TRAVEL', `
+        <p><b>Your empire, one click away.</b></p>
+    <div class="kv"><span class="k">TELEPORT TO YOUR PLOTS</span><span class="v">Your Empire (click your avatar, top right) now lists every plot you own with a TELEPORT button — one click and you're standing beside that cart</span></div>
+    <div class="kv"><span class="k">WORKS ACROSS THE WORLD</span><span class="v">spots in other cities get TRAVEL — you dive straight into that city and land at the spot</span></div>
+    <div class="kv"><span class="k">UNTOUCHED</span><span class="v g">v2.03 variety · v2.04 fast entry · v2.05 starter guide · v2.06 controls · v2.07 clear streets · v2.08 happy customers · v2.09 sidewalk spots</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">START BUILDING</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); if (!STATE.lastCityKey) toast('Click a glowing city to dive in.'); };
 }
@@ -4595,10 +4728,11 @@ document.getElementById('b-build').addEventListener('click', () => {
 document.getElementById('avatar-chip').addEventListener('click', () => ECO.openEmpire());
 
 function openHelp() {
-  openModal('Open World v2.09 — Help', `
+  openModal('Open World v2.10 — Help', `
     <p><b>Controls</b></p>
     <div class="kv"><span class="k">MOVE</span><span class="v">WASD / arrows · hold Shift = sprint · release = stop</span></div>
     <div class="kv"><span class="k">CAMERA</span><span class="v">Drag to orbit · wheel/pinch to zoom (gentle, glide)</span></div>
+    <div class="kv"><span class="k">EMPIRE</span><span class="v">avatar (top right) → TELEPORT to any plot you own, in any city</span></div>
     <div class="kv"><span class="k">SERVE</span><span class="v">[E] when standing at your cart</span></div>
     <div class="kv"><span class="k">MARKET</span><span class="v">📈 button · limit &amp; market orders</span></div>
     <p style="margin-top:12px"><b>The loop</b></p>
@@ -4802,7 +4936,7 @@ EARTH.diveTo = (city, cb) => {
 };
 
 
-console.log('%cOPEN WORLD v2.09 — SIDEWALK SPOTS', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.10 — INSTANT TRAVEL', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
