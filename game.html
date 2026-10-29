@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.02</title>
+<title>Open World — v2.03</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.02 — NEW WORLD (complete restart)
+   OPEN WORLD v2.03 — NEW WORLD (complete restart)
    Visual system modeled on the Capital Rift reference frame:
    dark glassmorphism fintech UI (panels #1A202C @85%, 1px #4A5568
    borders, 4px radius), money-green #48BB78 prices, link-blue
@@ -460,7 +460,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.02 — streets imported live from the real world</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.03 — streets imported live from the real world</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -482,7 +482,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.02';
+const GAME_VERSION = 'v2.03';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -1154,6 +1154,15 @@ window.OSM = OSM;
 
 // ======== section: 40_city.js ========
 // ====================================================================
+// v2.03 — CITY: every building is now an individual — 4 facade systems
+// (classic grid / glass curtain / punched residential / pre-war bays),
+// a warm-pastel + earth-tone palette picked by height, per-building
+// window pattern shifts, pitched hip + gable roofs with dormers and
+// chimneys on the low-rise, wedding-cake setbacks on the towers,
+// cornices, roof-access bulkheads, parapets, water tanks, antennas —
+// plus bright lawn strips with trees around pitched houses. v2.02's
+// street detail (curbs, crosswalks, shopfronts, lamps, cars) stays.
+// ====================================================================
 // v2.02 — CITY: renders imported street data in the Capital Rift look,
 // with the full STREET DETAIL pass: raised curbs and slab-seamed
 // sidewalks, zebra crosswalks at intersections, manhole covers,
@@ -1172,6 +1181,9 @@ const CITY = (() => {
   let cityRec = null;
   let isMob = false;                    // touch device → lighter densities
   let benchScratch = [];                // benches collected from parks + walks
+  let pitchedRects = [];              // lawn candidates from pitched-roof buildings
+  let buildStats = null;               // QA census of the last build (styles/roofs)
+  const hexOf = c => '#' + c.getHexString();
 
   // ---------- low-level quad/triangle pushers ----------------------
   // p1..p4 = [x,y,z]; uv1..4 = [u,v]; triangles (p1,p2,p3),(p1,p3,p4)
@@ -1189,29 +1201,106 @@ const CITY = (() => {
     arr.pos.push(a[0], a[1], a[2], c[0], c[1], c[2], b[0], b[1], b[2]);
     for (let i = 0; i < 3; i++) { arr.norm.push(0, 1, 0); arr.uv.push(0, 0); if (arr.col && col) arr.col.push(col.r, col.g, col.b); }
   }
+  // triangle with auto normal (hint flips winding so the face is visible)
+  function pushTri(arr, a, b, c, col, hint) {
+    let ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    let n = [ab[1] * ac[2] - ab[2] * ac[1], ab[2] * ac[0] - ab[0] * ac[2], ab[0] * ac[1] - ab[1] * ac[0]];
+    if (hint && n[0] * hint[0] + n[1] * hint[1] + n[2] * hint[2] < 0) {
+      const t = b; b = c; c = t; n = [-n[0], -n[1], -n[2]];
+    }
+    const l = Math.hypot(n[0], n[1], n[2]) || 1;
+    for (const q of [a, b, c]) {
+      arr.pos.push(q[0], q[1], q[2]); arr.norm.push(n[0] / l, n[1] / l, n[2] / l); arr.uv.push(0, 0);
+      if (arr.col && col) arr.col.push(col.r, col.g, col.b);
+    }
+  }
+  // quad with auto normal from winding (hint flips if back-facing)
+  function pushQuadN(arr, p1, p2, p3, p4, col, hint) {
+    pushTri(arr, p1, p2, p3, col, hint);
+    pushTri(arr, p1, p3, p4, col, hint);
+  }
+  // oriented bounding rect via PCA — pitched roofs + lawns
+  function obbOf(p) {
+    let mx = 0, mz = 0;
+    for (const v of p) { mx += v[0]; mz += v[1]; }
+    mx /= p.length; mz /= p.length;
+    let xx = 0, xz = 0, zz = 0;
+    for (const v of p) { const dx = v[0] - mx, dz = v[1] - mz; xx += dx * dx; xz += dx * dz; zz += dz * dz; }
+    const tr = xx + zz, det = xx * zz - xz * xz;
+    const disc = Math.sqrt(Math.max(0, tr * tr / 4 - det));
+    const lam = tr / 2 + disc;
+    let ux, uz;
+    if (Math.abs(xz) > 1e-9) { ux = xz; uz = lam - xx; } else { ux = 1; uz = 0; }
+    const ul = Math.hypot(ux, uz) || 1; ux /= ul; uz /= ul;
+    const vx = -uz, vz = ux;
+    let u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9;
+    for (const q of p) {
+      const du = (q[0] - mx) * ux + (q[1] - mz) * uz;
+      const dv = (q[0] - mx) * vx + (q[1] - mz) * vz;
+      u0 = Math.min(u0, du); u1 = Math.max(u1, du); v0 = Math.min(v0, dv); v1 = Math.max(v1, dv);
+    }
+    return { cx: mx, cz: mz, ux, uz, vx, vz, u0, u1, v0, v1, Lu: u1 - u0, Lv: v1 - v0, area: (u1 - u0) * (v1 - v0) };
+  }
   const colOf = hex => new THREE.Color(hex);   // r160: hex is auto-converted to linear
+  const jit = (c, f) => c.clone().multiplyScalar(f);   // brightness jitter
 
   // ---------- textures (module singletons; dispose() skips) ---------
-  function windowTexture() {
-    const N = 16, S = 32, PX = N * S;
+  // 4 facade systems — every building rolls one, so no two neighbors read
+  // the same: 0 classic grid · 1 glass curtain wall · 2 punched openings
+  // (residential) · 3 pre-war vertical bays.
+  function windowTexture(variant) {
+    const N = 16, S = 48, PX = N * S;
     const cv = document.createElement('canvas'); cv.width = PX; cv.height = PX;
     const ctx = cv.getContext('2d');
     ctx.fillStyle = '#f4f2ef'; ctx.fillRect(0, 0, PX, PX);   // near-white wall (tinted per building)
+    const glassFor = (r, darkA, darkB) =>
+      r < .10 ? '#ffedbe' : r < .16 ? '#ffe3a6' : r < .28 ? darkA : darkB;
+    // large-scale architecture baked into the tile: vertical expansion
+    // joints every 4th column + a darker mechanical belt floor every 5th
+    // row — breaks the "one repeating swatch" read on big facades
+    const joint = (x, y) => { if (x % 4 === 3) { ctx.fillStyle = 'rgba(40,42,46,.35)'; ctx.fillRect(x * S + S - 3, y * S, 3, S); } };
+    const belt = (x, y) => { if (y % 5 === 4) { ctx.fillStyle = 'rgba(40,42,46,.22)'; ctx.fillRect(x * S, y * S + S - 7, S, 7); } };
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-      const r = _ihash(x, y, 91);
-      const wx = x * S + 8, wy = y * S + 6.5, ww = S - 14, wh = S - 12;
-      // floor-slab shadow line at the top of every cell
-      ctx.fillStyle = 'rgba(70,70,74,.18)'; ctx.fillRect(x * S, y * S, S, 2);
-      if (r < .13) ctx.fillStyle = '#ffedbe';                 // lit windows (two warmths)
-      else if (r < .21) ctx.fillStyle = '#ffe3a6';
-      else if (r < .30) ctx.fillStyle = '#3d434c';
-      else if (r > .955) ctx.fillStyle = '#262b31';           // blinds drawn
-      else ctx.fillStyle = (r * 7 % 1) < .5 ? '#333941' : '#373d46';
-      ctx.fillRect(wx, wy, ww, wh);
-      ctx.fillStyle = 'rgba(255,255,255,.18)';
-      ctx.fillRect(wx, wy, ww, 2);                            // glass top sheen
-      ctx.fillStyle = 'rgba(255,255,255,.35)';
-      ctx.fillRect(wx - 1, wy + wh, ww + 2, 3);               // window sill
+      const r = _ihash(x, y, 91 + variant * 17);
+      const wx = x * S, wy = y * S;
+      joint(x, y); belt(x, y);
+      if (variant === 1) {                                  // glass curtain wall
+        ctx.fillStyle = 'rgba(58,62,68,.30)'; ctx.fillRect(wx, wy, S, 3);              // spandrel line
+        ctx.fillStyle = glassFor(r, '#39424d', (r * 7 % 1) < .5 ? '#2e353e' : '#333a44');
+        ctx.fillRect(wx + 2, wy + 3, S - 4, S - 6);
+        ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.fillRect(wx + 2, wy + 3, S - 4, 2); // sky reflection
+        ctx.fillStyle = 'rgba(244,242,239,.9)'; ctx.fillRect(wx + S / 2 - 1, wy + 3, 2, S - 6); // mullion
+        ctx.fillStyle = 'rgba(244,242,239,.55)';
+        ctx.fillRect(wx, wy + 3, 2, S - 6); ctx.fillRect(wx + S - 2, wy + 3, 2, S - 6);
+      } else if (variant === 2) {                           // punched openings (residential)
+        ctx.fillStyle = 'rgba(70,70,74,.14)'; ctx.fillRect(wx, wy, S, 2);
+        const pw = 21, ph = 22, ox = (S - pw) / 2, oy = 10;
+        ctx.fillStyle = glassFor(r, '#3d434c', '#343a42');
+        ctx.fillRect(wx + ox, wy + oy, pw, ph);
+        ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fillRect(wx + ox, wy + oy, pw, 2);
+        ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.fillRect(wx + ox - 1, wy + oy + ph, pw + 2, 2);
+      } else if (variant === 3) {                           // pre-war vertical bays
+        ctx.fillStyle = 'rgba(0,0,0,.10)';
+        ctx.fillRect(wx, wy, 3, S); ctx.fillRect(wx + S - 3, wy, 3, S);   // pilaster shade
+        ctx.fillStyle = 'rgba(255,255,255,.28)';
+        ctx.fillRect(wx + 3, wy, 2, S); ctx.fillRect(wx + S - 5, wy, 2, S); // pilaster edges
+        const bw = 20, bh = S - 18, ox = (S - bw) / 2, oy = 9;
+        ctx.fillStyle = glassFor(r, '#3d434c', '#363c45');
+        ctx.fillRect(wx + ox, wy + oy, bw, bh);
+        ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.fillRect(wx + ox, wy + oy, bw, 2);
+        ctx.fillStyle = 'rgba(70,70,74,.2)'; ctx.fillRect(wx, wy, S, 2);
+      } else {                                              // 0 classic grid
+        const gx = x * S + 12, gy = y * S + 10, gw = S - 21, gh = S - 18;
+        ctx.fillStyle = 'rgba(70,70,74,.18)'; ctx.fillRect(wx, wy, S, 2);
+        if (r < .13) ctx.fillStyle = '#ffedbe';                 // lit windows (two warmths)
+        else if (r < .21) ctx.fillStyle = '#ffe3a6';
+        else if (r < .30) ctx.fillStyle = '#3d434c';
+        else if (r > .955) ctx.fillStyle = '#262b31';           // blinds drawn
+        else ctx.fillStyle = (r * 7 % 1) < .5 ? '#333941' : '#373d46';
+        ctx.fillRect(gx, gy, gw, gh);
+        ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(gx, gy, gw, 2);       // glass sheen
+        ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(gx - 1, gy + gh, gw + 2, 3); // sill
+      }
     }
     const tex = new THREE.CanvasTexture(cv);
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -1252,7 +1341,7 @@ const CITY = (() => {
     const PX = 256;
     const cv = document.createElement('canvas'); cv.width = PX; cv.height = PX;
     const ctx = cv.getContext('2d');
-    ctx.fillStyle = '#a19c94'; ctx.fillRect(0, 0, PX, PX);
+    ctx.fillStyle = '#b3aea5'; ctx.fillRect(0, 0, PX, PX);
     const rnd = _mulberry(777);
     for (let i = 0; i < 26; i++) {                             // soil blotches
       ctx.fillStyle = rnd() < .5 ? 'rgba(143,138,128,.09)' : 'rgba(176,171,162,.08)';
@@ -1273,7 +1362,7 @@ const CITY = (() => {
 
   // street-level storefronts: glass panes, doors, striped awnings
   function shopTexture() {
-    const W = 512, H = 128, C = 64;
+    const W = 1024, H = 256, C = 128;                          // 2x res — crisp at gameplay zoom
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const ctx = cv.getContext('2d');
     ctx.fillStyle = '#cfc9c0'; ctx.fillRect(0, 0, W, H);       // light base (tinted per building)
@@ -1281,23 +1370,23 @@ const CITY = (() => {
     for (let i = 0; i < W / C; i++) {
       const x0 = i * C;
       ctx.fillStyle = '#bdb6ac';                               // pilaster dividers
-      ctx.fillRect(x0, 0, 5, H); ctx.fillRect(x0 + C - 5, 0, 5, H);
+      ctx.fillRect(x0, 0, 10, H); ctx.fillRect(x0 + C - 10, 0, 10, H);
       // awning valance (canvas top = texture top)
       const [a, b] = AWN[i % 4];
-      ctx.fillStyle = b; ctx.fillRect(x0 + 5, 0, C - 10, 30);
+      ctx.fillStyle = b; ctx.fillRect(x0 + 10, 0, C - 20, 60);
       ctx.fillStyle = a;
-      for (let s = 0; s < 4; s++) ctx.fillRect(x0 + 5 + s * 15, 0, 8, 30);
-      ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fillRect(x0 + 5, 30, C - 10, 4);   // valance shadow
+      for (let s = 0; s < 4; s++) ctx.fillRect(x0 + 10 + s * 30, 0, 16, 60);
+      ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fillRect(x0 + 10, 60, C - 20, 8);   // valance shadow
       // storefront glass
-      ctx.fillStyle = '#222b34'; ctx.fillRect(x0 + 5, 34, C - 10, H - 34);
-      ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(x0 + 5, 34, C - 10, 24); // sky reflection band
+      ctx.fillStyle = '#222b34'; ctx.fillRect(x0 + 10, 68, C - 20, H - 68);
+      ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(x0 + 10, 68, C - 20, 48); // sky reflection band
       ctx.fillStyle = '#4b545e';                               // mullions
-      ctx.fillRect(x0 + 21, 34, 3, H - 34); ctx.fillRect(x0 + 38, 34, 3, H - 34);
+      ctx.fillRect(x0 + 42, 68, 6, H - 68); ctx.fillRect(x0 + 76, 68, 6, H - 68);
       if (i % 3 === 2) {                                       // a door
-        ctx.fillStyle = '#4a3b2c'; ctx.fillRect(x0 + 42, 44, 17, H - 44);
-        ctx.fillStyle = '#c9c2b6'; ctx.fillRect(x0 + 44, 70, 2, 7); ctx.fillRect(x0 + 55, 70, 2, 7);
+        ctx.fillStyle = '#4a3b2c'; ctx.fillRect(x0 + 84, 88, 34, H - 88);
+        ctx.fillStyle = '#c9c2b6'; ctx.fillRect(x0 + 88, 140, 4, 14); ctx.fillRect(x0 + 110, 140, 4, 14);
       }
-      ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fillRect(x0 + 5, H - 9, C - 10, 9); // damp base
+      ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fillRect(x0 + 10, H - 18, C - 20, 18); // damp base
     }
     const tex = new THREE.CanvasTexture(cv);
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -1306,9 +1395,16 @@ const CITY = (() => {
     return tex;
   }
 
-  const TINTS = [0x938e88, 0x9a948e, 0x8d8880, 0x9e9996, 0x88837e, 0xa39d97, 0x8e99a6, 0x96857c, 0x8b8f93, 0x9c9789];
-  let _winTex = null, _asphTex = null, _groundTex = null, _shopTex = null, _dollarMat = null;
-  const getWinTex = () => _winTex || (_winTex = windowTexture());
+  // ---- the building-color system: muted pastels + earth tones (the
+  // reference look), picked warm-or-cool by height so towers read cooler
+  // and low-rise blocks read warm ----
+  const PAL_WARM = [0xf2e6d0, 0xf2ead0, 0xe8dcc0, 0xcfb37f, 0xcd9488, 0xc4907f, 0xb08d76, 0xa05252, 0xe0dcd4, 0xc8beac, 0x9db5a0];
+  const PAL_COOL = [0xe1e3e6, 0xb5bdc2, 0x9aa2a8, 0x8e99a6, 0x9a9c9e, 0x4f4f52];
+  const ROOF_DECKS = [0x3f4347, 0x4a3b2f, 0x3a434d, 0x4d5c51, 0x57504a];
+  const SHINGLES = [0x6b4a33, 0x9c4a3c, 0x46505c, 0x3d4043, 0x7a5c48];
+  const TRIMS = [0x3a3f44, 0x4a3b2c, 0x5a4a42, 0x39424a, 0x4f4438];
+  let _winTexs = [null, null, null, null], _asphTex = null, _groundTex = null, _shopTex = null, _dollarMat = null;
+  const getWinTex = i => _winTexs[i] || (_winTexs[i] = windowTexture(i));
   const getAsphTex = () => _asphTex || (_asphTex = asphaltTexture());
   const getGroundTex = () => _groundTex || (_groundTex = groundTexture());
   const getShopTex = () => _shopTex || (_shopTex = shopTexture());
@@ -1330,8 +1426,8 @@ const CITY = (() => {
     const asph = { pos: [], norm: [], uv: [], col: [] };
     const mark = { pos: [], norm: [], uv: [], col: [] };
     const walk = { pos: [], norm: [], uv: [], col: [] };
-    const cAsph = colOf(0xffffff), cYel = colOf(0xe8c243), cWht = colOf(0xe8e4dc), cWalk = colOf(0xa89f8e);
-    const cCurb = colOf(0x9a9182), cSeam = colOf(0x8d8474), cCW = colOf(0xeceae2);
+    const cAsph = colOf(0xffffff), cYel = colOf(0xe8c243), cWht = colOf(0xe8e4dc), cWalk = colOf(0xc4bcb0);
+    const cCurb = colOf(0xb3ab9e), cSeam = colOf(0xa39a8b), cCW = colOf(0xeceae2);
     const UP = [0, 1, 0];
     const mobF = isMob ? .5 : 1;
 
@@ -1503,96 +1599,256 @@ const CITY = (() => {
     }
   }
 
-  // ---------- buildings (shopfronts + window grids + roofs) --------
+  // ---------- buildings (per-building style: 4 facade systems, pitched
+  // roofs with dormers + chimneys, wedding-cake setbacks, cornices,
+  // bulkheads, parapets, water tanks, antennas) -----------------------
   function buildBuildings(city) {
-    const walls = { pos: [], norm: [], uv: [], col: [] };
+    const wallArrs = [0, 1, 2, 3].map(() => ({ pos: [], norm: [], uv: [], col: [] }));
     const shops = { pos: [], norm: [], uv: [], col: [] };
-    const roofs = { pos: [], norm: [], uv: [], col: [] };
+    const roofs = { pos: [], norm: [], uv: [], col: [] };    // decks, parapets, cornices
+    const pitched = { pos: [], norm: [], uv: [], col: [] };  // hip/gable roof faces
+    const trim = { pos: [], norm: [], uv: [], col: [] };     // dormers, chimneys, bulkheads
     const hvac = [], tanks = [], antennas = [];
     buildingPolys = [];
+    pitchedRects = [];
     const rnd = _mulberry(hashStr('b' + (city.key || city.name)));
-    let si = 0;
-    for (const b of city.buildings) {
-      let p = b.poly;
-      if (p.length < 4 || Math.abs(_polyArea(p)) < 30) continue;
-      if (p[0][0] === p[p.length - 1][0] && p[0][1] === p[p.length - 1][1]) p = p.slice(0, -1);
-      if (p.length < 3) continue;
-      if (_polyArea(p) < 0) p = [...p].reverse();      // normalize CCW (positive shoelace)
-      const tint = colOf(TINTS[Math.floor(rnd() * TINTS.length)]);
-      const shopTint = tint.clone().lerp(new THREE.Color(0xffffff), .55);
-      const h = b.h;
-      const useShop = h >= 8.5;
-      const y0 = useShop ? 3.55 : .15;                 // shopfront band height
+    let si = 0, nTier = 0;
+    const tintsUsed = [], roofsUsed = [];
+
+    // ---- shared builders -------------------------------------------
+    // one band of perimeter walls (with optional shopfront ground floor)
+    const wallBand = (p, yA, yB, tint, style, uOff, vOff, shopTint) => {
       let per = 0;
       for (let i = 0; i < p.length; i++) {
         const a = p[i], c = p[(i + 1) % p.length];
         const dx = c[0] - a[0], dz = c[1] - a[1], len = Math.hypot(dx, dz);
         if (len < .05) continue;
-        const nx = dz / len, nz = -dx / len;           // outward for CCW
-        const u0 = per / WIN, u1 = (per + len) / WIN;
-        pushQuad(walls,
-          [a[0], y0, a[1]], [a[0], .15 + h, a[1]], [c[0], .15 + h, c[1]], [c[0], y0, c[1]],
-          [nx, 0, nz], [u0, 0], [u0, (h + .15 - y0) / WIN], [u1, (h + .15 - y0) / WIN], [u1, 0], tint);
-        if (useShop && len > 5.5) {
+        const nx = dz / len, nz = -dx / len;               // outward for CCW
+        const u0 = per / WIN + uOff, u1 = (per + len) / WIN + uOff;
+        pushQuad(wallArrs[style],
+          [a[0], yA, a[1]], [a[0], yB, a[1]], [c[0], yB, c[1]], [c[0], yA, c[1]],
+          [nx, 0, nz], [u0, vOff], [u0, (yB - yA) / WIN + vOff], [u1, (yB - yA) / WIN + vOff], [u1, vOff], tint);
+        if (shopTint && len > 5.5) {
+          const s0 = per / (WIN * 8), s1 = (per + len) / (WIN * 8);  // one storefront per window cell
           pushQuad(shops,
-            [a[0], .15, a[1]], [a[0], y0, a[1]], [c[0], y0, c[1]], [c[0], .15, c[1]],
-            [nx, 0, nz], [u0, 0], [u0, 1], [u1, 1], [u1, 0], shopTint);
+            [a[0], .15, a[1]], [a[0], yA, a[1]], [c[0], yA, c[1]], [c[0], .15, c[1]],
+            [nx, 0, nz], [s0, 0], [s0, 1], [s1, 1], [s1, 0], shopTint);
         }
         per += len;
       }
-      // roof (concave-safe triangulation)
-      const cx = p.reduce((s, v) => s + v[0], 0) / p.length;
-      const cz = p.reduce((s, v) => s + v[1], 0) / p.length;
-      const yTop = .15 + h;
-      const rc = colOf(0x56524e), rimC = colOf(0x615c58), topC = colOf(0x67635e);
+    };
+    // flat roof deck (concave-safe triangulation)
+    const roofDeck = (p, y, col) => {
+      const ccx = p.reduce((s, v) => s + v[0], 0) / p.length;
+      const ccz = p.reduce((s, v) => s + v[1], 0) / p.length;
       const v2 = p.map(v => new THREE.Vector2(v[0], v[1]));
       let tris = null;
       try { tris = THREE.ShapeUtils.triangulateShape(v2, []); } catch (e) { tris = null; }
       if (tris && tris.length) {
         for (const t of tris) {
           const [a, b2, c2] = [p[t[0]], p[t[1]], p[t[2]]];
-          roofs.pos.push(a[0], yTop, a[1], c2[0], yTop, c2[1], b2[0], yTop, b2[1]);
-          for (let k = 0; k < 3; k++) { roofs.norm.push(0, 1, 0); roofs.uv.push(0, 0); roofs.col.push(rc.r, rc.g, rc.b); }
+          roofs.pos.push(a[0], y, a[1], c2[0], y, c2[1], b2[0], y, b2[1]);
+          for (let k = 0; k < 3; k++) { roofs.norm.push(0, 1, 0); roofs.uv.push(0, 0); roofs.col.push(col.r, col.g, col.b); }
         }
       } else {
-        for (let i = 0; i < p.length; i++) {
-          const a = p[i], c = p[(i + 1) % p.length];
-          pushFlat(roofs, a, c, [cx, yTop, cz], rc);
-        }
+        for (let i = 0; i < p.length; i++) pushFlat(roofs, p[i], p[(i + 1) % p.length], [ccx, y, ccz], col);
       }
-      const area = Math.abs(_polyArea(p));
-      // roof parapet rim
-      if (area > 140 && h > 7) {
-        for (let i = 0; i < p.length; i++) {
-          const a = p[i], c = p[(i + 1) % p.length];
-          const dx = c[0] - a[0], dz = c[1] - a[1], len = Math.hypot(dx, dz);
-          if (len < .05) continue;
-          const nx = dz / len, nz = -dx / len;         // outward
-          const ix = -nx * .15, iz = -nz * .15;        // inward lip half-width
-          pushQuad(roofs,
-            [a[0], yTop, a[1]], [a[0], yTop + .55, a[1]], [c[0], yTop + .55, c[1]], [c[0], yTop, c[1]],
-            [nx, 0, nz], [0, 0], [0, 1], [1, 1], [1, 0], rimC);
-          pushQuad(roofs,
-            [a[0] + ix, yTop + .55, a[1] + iz], [c[0] + ix, yTop + .55, c[1] + iz],
-            [c[0] - ix, yTop + .55, c[1] - iz], [a[0] - ix, yTop + .55, a[1] - iz],
-            [0, 1, 0], [0, 0], [1, 0], [1, 1], [0, 1], topC);
-        }
+    };
+    // parapet rim ring (tall roofs + tier ledges)
+    const parapet = (p, yTop, col, lipCol) => {
+      for (let i = 0; i < p.length; i++) {
+        const a = p[i], c = p[(i + 1) % p.length];
+        const dx = c[0] - a[0], dz = c[1] - a[1], len = Math.hypot(dx, dz);
+        if (len < .05) continue;
+        const nx = dz / len, nz = -dx / len;               // outward
+        const ix = -nx * .15, iz = -nz * .15;              // inward lip half-width
+        pushQuad(roofs,
+          [a[0], yTop, a[1]], [a[0], yTop + .78, a[1]], [c[0], yTop + .78, c[1]], [c[0], yTop, c[1]],
+          [nx, 0, nz], [0, 0], [0, 1], [1, 1], [1, 0], col);
+        pushQuad(roofs,
+          [a[0] + ix, yTop + .78, a[1] + iz], [c[0] + ix, yTop + .78, c[1] + iz],
+          [c[0] - ix, yTop + .78, c[1] - iz], [a[0] - ix, yTop + .78, a[1] - iz],
+          [0, 1, 0], [0, 0], [1, 0], [1, 1], [0, 1], lipCol);
       }
-      // rooftop clutter
-      if (area > 500) {
-        const n = Math.min(5, Math.floor(area / 650) + 1);
-        let maxR = 1e9;
-        p.forEach(v => maxR = Math.min(maxR, Math.hypot(v[0] - cx, v[1] - cz)));
-        const rr = Math.min(maxR * .55, 12);
+    };
+    // pre-war cornice trim band + protruding lip (mid-rise)
+    const cornice = (p, yTop, col) => {
+      for (let i = 0; i < p.length; i++) {
+        const a = p[i], c = p[(i + 1) % p.length];
+        const dx = c[0] - a[0], dz = c[1] - a[1], len = Math.hypot(dx, dz);
+        if (len < .05) continue;
+        const nx = dz / len, nz = -dx / len;
+        const ox = nx * .03, oz = nz * .03;               // proud of the wall (no z-fight)
+        pushQuad(roofs,
+          [a[0] + ox, yTop - .8, a[1] + oz], [a[0] + ox, yTop + .1, a[1] + oz],
+          [c[0] + ox, yTop + .1, c[1] + oz], [c[0] + ox, yTop - .8, c[1] + oz],
+          [nx, 0, nz], [0, 0], [0, 1], [1, 1], [1, 0], col);
+        pushQuadN(roofs,
+          [a[0] + ox, yTop + .1, a[1] + oz], [c[0] + ox, yTop + .1, c[1] + oz],
+          [c[0] + nx * .3, yTop + .1, c[1] + nz * .3], [a[0] + nx * .3, yTop + .1, a[1] + nz * .3],
+          col, [0, 1, 0]);
+      }
+    };
+    // small axis-aligned box (bulkheads, dormer bodies, chimneys)
+    const boxInto = (arr, x, z, y0, y1, hw, hd, col) => {
+      pushQuadN(arr, [x + hw, y0, z - hd], [x + hw, y0, z + hd], [x + hw, y1, z + hd], [x + hw, y1, z - hd], col, [1, 0, 0]);
+      pushQuadN(arr, [x - hw, y0, z + hd], [x - hw, y0, z - hd], [x - hw, y1, z - hd], [x - hw, y1, z + hd], col, [-1, 0, 0]);
+      pushQuadN(arr, [x - hw, y0, z + hd], [x + hw, y0, z + hd], [x + hw, y1, z + hd], [x - hw, y1, z + hd], col, [0, 0, 1]);
+      pushQuadN(arr, [x + hw, y0, z - hd], [x - hw, y0, z - hd], [x - hw, y1, z - hd], [x + hw, y1, z - hd], col, [0, 0, -1]);
+      pushQuadN(arr, [x - hw, y1, z + hd], [x + hw, y1, z + hd], [x + hw, y1, z - hd], [x - hw, y1, z - hd], col, [0, 1, 0]);
+    };
+    // rooftop clutter (HVAC, water tanks, antennas)
+    const clutter = (poly, areaFor, yTop) => {
+      if (areaFor <= 500) return;
+      const ccx = poly.reduce((s, v) => s + v[0], 0) / poly.length;
+      const ccz = poly.reduce((s, v) => s + v[1], 0) / poly.length;
+      const n = Math.min(5, Math.floor(areaFor / 650) + 1);
+      let maxR = 1e9;
+      poly.forEach(v => maxR = Math.min(maxR, Math.hypot(v[0] - ccx, v[1] - ccz)));
+      const rr = Math.min(maxR * .55, 12);
+      for (let i = 0; i < n; i++) {
+        const a = i * 2.399 + rnd() * .8;
+        hvac.push([ccx + Math.cos(a) * rr * rnd(), yTop, ccz + Math.sin(a) * rr * rnd(), 2.2 + rnd() * 2.4, 1.1 + rnd() * 1.3]);
+      }
+      if (yTop >= 26.15 && rnd() < .42 && maxR > 3) {
+        const a = rnd() * 6.28, tr = maxR * .3;
+        tanks.push([ccx + Math.cos(a) * tr, yTop, ccz + Math.sin(a) * tr]);
+      }
+      if (yTop >= 30.15 && rnd() < .3) antennas.push([ccx, yTop, ccz, 4 + rnd() * 3.5]);
+    };
+    // hip or gable roof over an OBB, with dormers + chimney; returns lawn info
+    const hipRoof = (obb, wallTop, tint, shinC) => {
+      let ux = obb.ux, uz = obb.uz, vx = obb.vx, vz = obb.vz, Lu = obb.Lu, Lv = obb.Lv;
+      if (Lu < Lv) { const tx = ux; ux = vx; vx = tx; const tz = uz; uz = vz; vz = tz; const tl = Lu; Lu = Lv; Lv = tl; }
+      const ovh = .4;
+      const hU = Lu / 2 + ovh, hV = Lv / 2 + ovh;
+      const P = (du, dv, y) => [obb.cx + ux * du + vx * dv, y, obb.cz + uz * du + vz * dv];
+      let ridgeHalf = hU - hV;
+      const gable = ridgeHalf < .35;
+      if (gable) ridgeHalf = hU;
+      const rise = Math.min(3.4, hV * .6);
+      const E1 = P(hU, hV, wallTop), E2 = P(-hU, hV, wallTop), E3 = P(-hU, -hV, wallTop), E4 = P(hU, -hV, wallTop);
+      const R1 = P(ridgeHalf, 0, wallTop + rise), R2 = P(-ridgeHalf, 0, wallTop + rise);
+      pushQuadN(pitched, E1, R1, R2, E2, shinC, [vx, .4, vz]);       // +v slope
+      pushQuadN(pitched, E3, R2, R1, E4, shinC, [-vx, .4, -vz]);     // -v slope
+      const gableC = jit(tint, .93);
+      if (gable) {
+        pushTri(pitched, E1, E4, R1, gableC, [ux, .4, uz]);          // gable end walls
+        pushTri(pitched, E2, E3, R2, gableC, [-ux, .4, -uz]);
+      } else {
+        pushTri(pitched, E1, E4, R1, shinC, [ux, .4, uz]);           // hip ends
+        pushTri(pitched, E2, E3, R2, shinC, [-ux, .4, -uz]);
+      }
+      // dormers on the long slopes
+      const sr = _mulberry(hashStr('d' + obb.cx + ',' + obb.cz));
+      if (Lu >= 9.5 && sr() < .72) {
+        const n = Lu >= 18 ? 3 : Lu >= 13 ? 2 : 1;
         for (let i = 0; i < n; i++) {
-          const a = i * 2.399 + rnd() * .8;
-          hvac.push([cx + Math.cos(a) * rr * rnd(), yTop, cz + Math.sin(a) * rr * rnd(), 2.2 + rnd() * 2.4, 1.1 + rnd() * 1.3]);
+          const du = (i - (n - 1) / 2) * Math.min(4.2, Lu / (n + .6));
+          const sgn = i % 2 === 0 ? 1 : -1;                          // alternate slopes
+          const dv = hV * .48 * sgn;
+          const base = wallTop + rise * (1 - Math.abs(dv) / hV) - .22;
+          const [bx, , bz] = P(du, dv, 0);
+          const [fx, , fz] = P(du, dv + sgn * .64, 0);               // downhill face center
+          boxInto(trim, bx, bz, base, base + 1.85, .58, .62, jit(tint, 1));
+          pushQuadN(trim,
+            [fx - ux * .4, base + .38, fz - uz * .4], [fx + ux * .4, base + .38, fz + uz * .4],
+            [fx + ux * .4, base + 1.4, fz + uz * .4], [fx - ux * .4, base + 1.4, fz - uz * .4],
+            colOf(0x2c333d), [vx * sgn, .2, vz * sgn]);              // dormer window
+          pushQuadN(trim,                                           // shingle cap
+            [bx - ux * .66 - vx * .66, base + 1.95, bz - uz * .66 - vz * .66],
+            [bx + ux * .66 - vx * .66, base + 1.95, bz + uz * .66 - vz * .66],
+            [bx + ux * .66 + vx * .66, base + 1.95, bz + uz * .66 + vz * .66],
+            [bx - ux * .66 + vx * .66, base + 1.95, bz - uz * .66 + vz * .66],
+            shinC, [0, 1, 0]);
         }
-        if (h >= 26 && rnd() < .32 && maxR > 3) {
-          const a = rnd() * 6.28, tr = maxR * .3;
-          tanks.push([cx + Math.cos(a) * tr, yTop, cz + Math.sin(a) * tr]);
+      }
+      // chimney near the ridge
+      if (sr() < .5 && hU > 2.6) {
+        const cu = (sr() < .5 ? 1 : -1) * hU * .55;
+        const [chx, , chz] = P(cu, 0, 0);
+        const base = wallTop + rise - .35;
+        boxInto(trim, chx, chz, base, base + 1.9, .34, .34, jit(colOf(0x8a4a3c), .9 + sr() * .2));
+        pushQuadN(trim, [chx - .38, base + 1.9, chz - .38], [chx + .38, base + 1.9, chz - .38],
+          [chx + .38, base + 2.05, chz - .38], [chx - .38, base + 2.05, chz - .38], colOf(0x3a3a3c), [0, 1, 0]);
+      }
+      // lawn candidate rect (expanded pad, world corners + check points)
+      const pad = 1.7;
+      const corners = [P(hU + pad, hV + pad, 0), P(-hU - pad, hV + pad, 0), P(-hU - pad, -hV - pad, 0), P(hU + pad, -hV - pad, 0)];
+      const mids = [P(0, hV + pad, 0), P(-hU - pad, 0, 0), P(0, -hV - pad, 0), P(hU + pad, 0, 0)];
+      return {
+        corners, checkPts: corners.concat(mids), cx: obb.cx, cz: obb.cz,
+        area: (Lu + 2 * pad) * (Lv + 2 * pad), Lu: Lu + 2 * pad, Lv: Lv + 2 * pad, ux, uz
+      };
+    };
+
+    // ---- main building loop ----------------------------------------
+    for (const b of city.buildings) {
+      let p = b.poly;
+      if (p.length < 4 || Math.abs(_polyArea(p)) < 30) continue;
+      if (p[0][0] === p[p.length - 1][0] && p[0][1] === p[p.length - 1][1]) p = p.slice(0, -1);
+      if (p.length < 3) continue;
+      if (_polyArea(p) < 0) p = [...p].reverse();      // normalize CCW (positive shoelace)
+      const area = Math.abs(_polyArea(p));
+      const cx = p.reduce((s, v) => s + v[0], 0) / p.length;
+      const cz = p.reduce((s, v) => s + v[1], 0) / p.length;
+      const h = b.h;
+      // ---- per-building style roll (deterministic by bkey) ----
+      const srnd = _mulberry(hashStr('s' + b.bkey));
+      const warmP = Math.min(.94, Math.max(.34, 1.15 - h / 44));
+      const PAL = srnd() < warmP ? PAL_WARM : PAL_COOL;
+      // walls push past white (vertex colors >1 are legal) so the pastel
+      // palette reads BRIGHT against the reference, not muted mid-tone
+      const tint = jit(colOf(PAL[Math.floor(srnd() * PAL.length)]), 1.28 + srnd() * .14);
+      const shopTint = h >= 8.5 ? tint.clone().lerp(colOf(0xffffff), .5) : null;
+      const y0 = shopTint ? 3.55 : .15;
+      const sr = srnd();
+      let style;                                        // facade system by scale
+      if (h >= 26) style = sr < .58 ? 1 : 3;            // towers: curtain or pre-war bays
+      else if (h >= 12) style = sr < .38 ? 0 : sr < .68 ? 3 : 2;
+      else style = sr < .55 ? 0 : 2;                    // low-rise: classic or punched
+      const uOff = Math.floor(srnd() * 16);             // shift lit-window pattern
+      const vOff = Math.floor(srnd() * 4);
+      const deckC = jit(colOf(ROOF_DECKS[Math.floor(srnd() * ROOF_DECKS.length)]), .84 + srnd() * .18);
+      const rimC = jit(colOf(TRIMS[Math.floor(srnd() * TRIMS.length)]), .9 + srnd() * .2);
+      const trimC = jit(rimC, 1.1);
+      const shinC = jit(colOf(SHINGLES[Math.floor(srnd() * SHINGLES.length)]), .9 + srnd() * .2);
+      // ---- silhouette roll ----
+      let obb = null;
+      if (h <= 16.5 && area >= 60 && p.length <= 8) obb = obbOf(p);
+      const isPitched = !!(obb && obb.area && area / obb.area >= .78 && Math.min(obb.Lu, obb.Lv) >= 3.6);
+      const tiered = h >= 40 && area >= 900 && srnd() < .55;
+      if (tintsUsed.length < 60) tintsUsed.push(hexOf(tint) + (isPitched ? ' p' : tiered ? ' t' : ''));
+      if (roofsUsed.length < 60) roofsUsed.push(hexOf(isPitched ? shinC : deckC));
+      // ---- build ----
+      if (tiered) {                                     // wedding-cake setback tower
+        nTier++;
+        const h1 = h * .62;
+        wallBand(p, y0, .15 + h1, tint, style, uOff, vOff, shopTint);
+        const p2 = p.map(v => [cx + (v[0] - cx) * .68, cz + (v[1] - cz) * .68]);
+        if (_polyArea(p2) < 0) p2.reverse();
+        wallBand(p2, .15 + h1, .15 + h, tint, style, uOff, vOff + 2, null);
+        roofDeck(p, .15 + h1, deckC);
+        parapet(p, .15 + h1, rimC, jit(deckC, 1.1));
+        roofDeck(p2, .15 + h, deckC);
+        parapet(p2, .15 + h, rimC, jit(deckC, 1.1));
+        clutter(p2, area * .46, .15 + h);
+      } else {
+        wallBand(p, y0, .15 + h, tint, style, uOff, vOff, shopTint);
+        if (isPitched) {                                // pitched roof + dormers + chimney
+          const L = hipRoof(obb, .15 + h, tint, shinC);
+          L.col = jit(colOf(0x5cb85a), .9 + srnd() * .18);
+          pitchedRects.push(L);
+        } else {                                        // flat roof finish
+          roofDeck(p, .15 + h, deckC);
+          if (h >= 40) parapet(p, .15 + h, rimC, jit(deckC, 1.1));
+          else if (h > 7) cornice(p, .15 + h, trimC);
+          if (h < 26 && area >= 140 && srnd() < .75) {  // roof-access bulkhead
+            const a = srnd() * 6.28, rr = Math.sqrt(area / Math.PI) * .38;
+            boxInto(trim, cx + Math.cos(a) * rr, cz + Math.sin(a) * rr, .15 + h, .15 + h + 2.6, 1.15, 1.0, jit(tint, .74));
+          }
+          clutter(p, area, .15 + h);
         }
-        if (h >= 30 && rnd() < .3) antennas.push([cx, yTop, cz, 4 + rnd() * 3.5]);
       }
       const rec = { poly: p, h, bkey: b.bkey, area, x: cx, z: cz };
       buildingPolys.push(rec);
@@ -1606,6 +1862,8 @@ const CITY = (() => {
         si++;
       }
     }
+
+    // ---- assemble meshes -------------------------------------------
     const mk = (arr, tex) => {
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(arr.pos, 3));
@@ -1614,21 +1872,34 @@ const CITY = (() => {
       g.setAttribute('color', new THREE.Float32BufferAttribute(arr.col, 3));
       return new THREE.Mesh(g, new THREE.MeshLambertMaterial(tex ? { map: tex, vertexColors: true } : { vertexColors: true }));
     };
-    const wallMesh = mk(walls, getWinTex());
-    wallMesh.castShadow = true; wallMesh.receiveShadow = true;
-    const shopMesh = mk(shops, getShopTex());
-    shopMesh.castShadow = true; shopMesh.receiveShadow = true;
-    const roofMesh = mk(roofs, null);
-    roofMesh.castShadow = true;
-    group.add(wallMesh, shopMesh, roofMesh);
+    wallArrs.forEach((arr, i) => {                       // one mesh per facade system
+      if (!arr.pos.length) return;
+      const m = mk(arr, getWinTex(i));
+      m.castShadow = true; m.receiveShadow = true;
+      group.add(m);
+    });
+    if (shops.pos.length) {
+      const shopMesh = mk(shops, getShopTex());
+      shopMesh.castShadow = true; shopMesh.receiveShadow = true;
+      group.add(shopMesh);
+    }
+    if (roofs.pos.length) { const roofMesh = mk(roofs, null); roofMesh.castShadow = true; group.add(roofMesh); }
+    if (pitched.pos.length) {
+      const pm = mk(pitched, null); pm.castShadow = true; pm.receiveShadow = true; group.add(pm);
+    }
+    if (trim.pos.length) {
+      const tm = mk(trim, null); tm.castShadow = true; group.add(tm);
+    }
     if (hvac.length) {
       const inst = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1),
-        new THREE.MeshLambertMaterial({ color: 0xdfdfdf }), hvac.length);
-      const mat4 = new THREE.Matrix4();
+        new THREE.MeshLambertMaterial({ color: 0xffffff }), hvac.length);
+      const mat4 = new THREE.Matrix4(), hc = new THREE.Color();
+      const HCOLS = [0xd8d4cc, 0xc4beb4, 0xb8b2a6, 0xcfc9bf, 0xb0aaa0];
       hvac.forEach((v, i) => {
         mat4.makeScale(v[3], v[4], v[3] * .8);
         mat4.setPosition(v[0], v[1] + v[4] / 2, v[2]);
         inst.setMatrixAt(i, mat4);
+        inst.setColorAt(i, hc.set(HCOLS[i % HCOLS.length]));
       });
       inst.castShadow = true;
       group.add(inst);
@@ -1659,6 +1930,16 @@ const CITY = (() => {
       });
       group.add(inst);
     }
+    buildStats = {
+      pitched: pitchedRects.length, tiered: nTier, suites: suites.length,
+      wallStyleVerts: wallArrs.map(a => a.pos.length / 3 | 0),
+      pitchedVerts: pitched.pos.length / 3 | 0,
+      trimVerts: trim.pos.length / 3 | 0,
+      roofsVerts: roofs.pos.length / 3 | 0,
+      shopVerts: shops.pos.length / 3 | 0,
+      hvac: hvac.length, tanks: tanks.length, antennas: antennas.length,
+      tints: tintsUsed, roofs: roofsUsed,
+    };
     buildSpatialHash();
   }
 
@@ -1686,7 +1967,7 @@ const CITY = (() => {
       mesh.receiveShadow = true;
       group.add(mesh);
     };
-    flat(city.greens, 0x5faf72, .065);
+    flat(city.greens, 0x5fbf6f, .065);
     flat(city.waters, 0x3e86c0, .02);
 
     // walking-path rings through the parks + benches facing the center
@@ -1758,7 +2039,48 @@ const CITY = (() => {
         }
       }
     }
-    addTrees(trees);
+    // (trees list still accumulating — lawns below may add more before instancing)
+
+    // bright residential lawns around pitched-roof houses (reference look:
+    // saturated green strips hugging the buildings) + a tree or two
+    if (pitchedRects.length) {
+      const lawns = { pos: [], norm: [], uv: [], col: [] };
+      const UP = [0, 1, 0];
+      const lrnd = _mulberry(hashStr('L' + (city.key || city.name)));
+      let nLawn = 0;
+      for (const L of pitchedRects) {
+        if (nLawn >= 80) break;
+        let ok = true;
+        for (const q of L.checkPts) {
+          if (distToRoad(q[0], q[1]).d < 5.6) { ok = false; break; }   // stay off road+sidewalk
+          if (plotAt(q[0], q[1])) { ok = false; break; }               // stay off purchasable plots
+          if (pointInBuilding(q[0], q[1])) { ok = false; break; }      // stay off neighbors
+        }
+        if (!ok) continue;
+        const c = [L.corners[0][0], .07, L.corners[0][1]], c1 = [L.corners[1][0], .07, L.corners[1][1]],
+              c2 = [L.corners[2][0], .07, L.corners[2][1]], c3 = [L.corners[3][0], .07, L.corners[3][1]];
+        pushQuad(lawns, c, c1, c2, c3, UP, [0, 0], [1, 0], [1, 1], [0, 1],
+          jit(colOf(0x6cc066), .92 + lrnd() * .16));
+        nLawn++;
+        if (L.area >= 130 && lrnd() < .8) {                           // lawn trees
+          const s1 = lrnd() < .5 ? 1 : -1, s2 = lrnd() < .5 ? 1 : -1;
+          trees.push([L.cx + L.ux * L.Lu * .3 * s1, L.cz + L.uz * L.Lu * .3 * s1]);
+          if (L.area >= 240 && lrnd() < .6)
+            trees.push([L.cx - L.ux * L.Lu * .3 * s2, L.cz - L.uz * L.Lu * .3 * s2]);
+        }
+      }
+      if (lawns.pos.length) {
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(lawns.pos, 3));
+        g.setAttribute('normal', new THREE.Float32BufferAttribute(lawns.norm, 3));
+        g.setAttribute('uv', new THREE.Float32BufferAttribute(lawns.uv, 2));
+        g.setAttribute('color', new THREE.Float32BufferAttribute(lawns.col, 3));
+        const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
+        mesh.receiveShadow = true;
+        group.add(mesh);
+      }
+    }
+    addTrees(trees);          // single instancing pass — parks + streets + lawns
 
     const bolls = [];
     for (const rd of city.roads) {
@@ -1789,7 +2111,7 @@ const CITY = (() => {
     const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(.22, .3, 2.3, 6),
       new THREE.MeshLambertMaterial({ color: 0x6b4f3a }), list.length);
     const can = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(2.0, 1),
-      new THREE.MeshLambertMaterial({ color: 0x3e8e52 }), list.length);
+      new THREE.MeshLambertMaterial({ color: 0x4db062 }), list.length);
     const mat4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3();
     list.forEach((v, i) => {
       const sc = .8 + (i % 5) * .12;
@@ -2210,7 +2532,7 @@ const CITY = (() => {
 
   function dispose() {
     if (group) {
-      const keep = [_winTex, _asphTex, _groundTex, _shopTex];
+      const keep = [..._winTexs.filter(Boolean), _asphTex, _groundTex, _shopTex];
       group.traverse(o => {
         if (o.geometry && o.geometry !== undefined) { try { o.geometry.dispose(); } catch (e) { } }
         const mats = Array.isArray(o.material) ? o.material : [o.material];
@@ -2220,7 +2542,7 @@ const CITY = (() => {
         });
       });
     }
-    group = null; roads = []; plotRecs = []; suites = []; buildingPolys = []; benchScratch = []; bHash = rHash = null;
+    group = null; roads = []; plotRecs = []; suites = []; buildingPolys = []; benchScratch = []; pitchedRects = []; bHash = rHash = null;
   }
   let _winMat = null;
 
@@ -2274,6 +2596,7 @@ const CITY = (() => {
     get plots() { return plotRecs; },
     get suites() { return suites; },
     pointInBuilding, inPoly, distToRoad, roadsNear, nearestRoadName, pointOnRoad, randomRoadPoint, plotAt,
+    get stats() { return buildStats; },
     get half() { return (cityRec && cityRec.half) || 720; },
     get rec() { return cityRec; },
   };
@@ -3475,7 +3798,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(2, window.deviceRatio || window.devicePixelRatio || 1));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;   // v2.03: soft toy-matte shadows
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, .5, 4000);
@@ -3493,15 +3816,16 @@ function buildCityScene() {
   cityScene = new THREE.Scene();
   cityScene.background = new THREE.Color(0x9fc7e8);
   cityScene.fog = new THREE.Fog(0x9fc7e8, 380, 1500);
-  cityScene.add(new THREE.HemisphereLight(0xeaf6ff, 0x9aa8b0, 1.38));
-  sun = new THREE.DirectionalLight(0xfff6e8, 1.85);
-  sun.position.set(-220, 340, 120);
+  cityScene.add(new THREE.HemisphereLight(0xeaf6ff, 0x9aa8b0, 2.4));   // v2.03: soft matte look — shadows stay airy
+  sun = new THREE.DirectionalLight(0xfff6e8, 2.45);            // v2.03: lower late-afternoon sun, softer contrast
+  sun.position.set(-170, 180, 95);   // el ~42deg — longer shadows, lit verticals
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.left = -240; sun.shadow.camera.right = 240;
   sun.shadow.camera.top = 240; sun.shadow.camera.bottom = -240;
   sun.shadow.camera.near = 20; sun.shadow.camera.far = 1200;
   sun.shadow.bias = -0.0006;
+  sun.shadow.radius = 5;
   cityScene.add(sun);
   cityScene.add(sun.target);
 }
@@ -3617,7 +3941,7 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
   a.onclick = e => {
     e.preventDefault();
     const k = a.dataset.abt;
-    openModal(k.toUpperCase(), `<p><b>Open World v2.02</b> runs entirely in your browser and saves locally.</p>
+    openModal(k.toUpperCase(), `<p><b>Open World v2.03</b> runs entirely in your browser and saves locally.</p>
       <p>No accounts, no tracking, no payments. Map data © OpenStreetMap contributors (ODbL).</p>
       <p>Support: keep playing and build something big.</p>`);
   };
@@ -3627,16 +3951,14 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.02 — NEW WORLD', `
-    <p><b>The game restarted from zero</b> — rebuilt to run on the real world.</p>
-    <div class="kv"><span class="k">REAL STREETS</span><span class="v">Cities import live from OpenStreetMap</span></div>
-    <div class="kv"><span class="k">FIND MY STREET</span><span class="v">Search any place on Earth and walk it</span></div>
-    <div class="kv"><span class="k">STREET BUSINESS</span><span class="v">Buy plots · park food carts · serve queues</span></div>
-    <div class="kv"><span class="k">CREWS</span><span class="v">Hire star-rated vendors off the street</span></div>
-    <div class="kv"><span class="k">OFFICES</span><span class="v">Lease suites in real towers for rent income</span></div>
-    <div class="kv"><span class="k">OPEN EXCHANGE</span><span class="v">Order book · tape · limit &amp; market orders</span></div>
-    <div class="kv"><span class="k">YOU</span><span class="v g">Walk the streets yourself (WASD)</span></div>
-    <div class="kv"><span class="k">v2.02</span><span class="v g">STREET DETAIL — crosswalks, curbs, shopfronts, lamps, parked cars &amp; more</span></div>
+  openModal('Welcome to v2.03 — NEW WORLD', `
+    <p><b>Every building is an individual now.</b></p>
+    <div class="kv"><span class="k">FACADES</span><span class="v">4 window styles — grid, curtain glass, punched, pre-war bays</span></div>
+    <div class="kv"><span class="k">COLORS</span><span class="v">Pastel &amp; earth-tone palette — creams, terracotta, brick, sage</span></div>
+    <div class="kv"><span class="k">PITCHED ROOFS</span><span class="v">Dormers + chimneys on the low-rise, shingles in 5 tones</span></div>
+    <div class="kv"><span class="k">SETBACKS</span><span class="v">Wedding-cake tiers on the tallest towers</span></div>
+    <div class="kv"><span class="k">TRIM</span><span class="v">Cornices, bulkheads, parapets — rooftops cluttered like the reference</span></div>
+    <div class="kv"><span class="k">LAWNS</span><span class="v g">Bright grass strips + trees around pitched houses</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">START BUILDING</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); if (!STATE.lastCityKey) toast('Click a glowing city node to dive in.'); };
 }
@@ -3663,7 +3985,7 @@ document.getElementById('b-build').addEventListener('click', () => {
 document.getElementById('avatar-chip').addEventListener('click', () => ECO.openEmpire());
 
 function openHelp() {
-  openModal('Open World v2.02 — Help', `
+  openModal('Open World v2.03 — Help', `
     <p><b>Controls</b></p>
     <div class="kv"><span class="k">MOVE</span><span class="v">WASD / arrows · Shift = run</span></div>
     <div class="kv"><span class="k">CAMERA</span><span class="v">Drag to orbit · wheel/pinch to zoom (gentle, glide)</span></div>
@@ -3829,7 +4151,7 @@ function loop() {
     camera.lookAt(camCtl.tx, 1.4, camCtl.tz);
     // sun follows player for crisp shadows
     if (sun) {
-      sun.position.set(camCtl.tx - 220, 340, camCtl.tz + 120);
+      sun.position.set(camCtl.tx - 170, 180, camCtl.tz + 95);
       sun.target.position.set(camCtl.tx, 0, camCtl.tz);
       sun.target.updateMatrixWorld();
     }
@@ -3860,7 +4182,7 @@ EARTH.diveTo = (city, cb) => _origDive(city, () => enterCity({
 }));
 
 
-console.log('%cOPEN WORLD v2.02 — NEW WORLD', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.03 — NEW WORLD', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
