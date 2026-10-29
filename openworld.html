@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.04</title>
+<title>Open World — v2.05</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.04 — NEW WORLD (complete restart) + FAST CITY ENTRY
+   OPEN WORLD v2.05 — NEW WORLD (complete restart) + STARTER GUIDE
    Visual system modeled on the Capital Rift reference frame:
    dark glassmorphism fintech UI (panels #1A202C @85%, 1px #4A5568
    borders, 4px radius), money-green #48BB78 prices, link-blue
@@ -138,6 +138,20 @@ input{font-family:var(--sans)}
 #servebar .q b{color:var(--green2)}
 #servebar .p{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin:4px 0 9px}
 #servebar .go{width:100%;padding:11px}
+
+/* v2.05 — starter-guide quest chip (left edge, under the balance) */
+#tut{position:absolute;top:112px;left:12px;width:266px;padding:12px 14px}
+#tut .th{display:flex;align-items:center;gap:8px}
+#tut .n{font-family:var(--mono);font-size:10px;font-weight:800;color:#0D1117;
+  background:var(--gold);border-radius:3px;padding:2px 7px;letter-spacing:.5px;flex:none}
+#tut .t{font-size:12px;font-weight:800;letter-spacing:.7px;color:#F7FAFC;flex:1;
+  text-transform:uppercase;line-height:1.25}
+#tut #tut-x{color:var(--dim);font-size:13px;padding:1px 4px;flex:none}
+#tut #tut-x:hover{color:#FCA5A5}
+#tut .b{font-size:11.5px;line-height:1.55;color:var(--mut);margin-top:8px}
+#tut .b b{color:var(--green2)}
+#tut .o{font-family:var(--mono);font-size:10.5px;line-height:1.5;color:var(--gold);
+  margin-top:9px;border-top:1px solid var(--line2);padding-top:8px}
 
 /* ================= BOTTOM BAR (Capital Rift layout) ================= */
 #bottombar{position:absolute;left:0;right:0;bottom:26px;display:flex;flex-direction:column;
@@ -349,6 +363,8 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
   #avatar-chip{width:46px;height:46px}
   #market{width:100vw;bottom:26px}
   #servebar{bottom:126px;min-width:240px}
+  #tut{top:96px;left:8px;width:226px;padding:10px 12px}
+  #tut .b{font-size:11px}
   #modal .mb{padding:14px}
   #tooltip{display:none}
 }
@@ -363,7 +379,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
   <div class="sub">The Open-World Economy Simulator</div>
   <div class="card">
     <div class="headline">Found something big.</div>
-    <div class="note">A whole planet of real streets to do business on. Enter your name to claim your place in it.</div>
+    <div class="note">A whole planet of real streets to do business on. Enter your name to claim your place in it. New here? A short starter guide walks you to your first hot dog stand.</div>
     <div class="row">
       <input id="pname" maxlength="18" placeholder="Your name" autocomplete="off">
       <button class="go" id="enter">ENTER WORLD</button>
@@ -396,6 +412,12 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
     <div class="q" id="sq"></div>
     <div class="p" id="sp"></div>
     <button class="btn good go" id="servebtn">SERVE&nbsp;&nbsp;[E]</button>
+  </div>
+
+  <div id="tut" class="glass hidden">
+    <div class="th"><span class="n" id="tut-n">1/6</span><span class="t" id="tut-t">—</span><button id="tut-x" title="Skip the starter guide">✕</button></div>
+    <div class="b" id="tut-b">—</div>
+    <div class="o" id="tut-o">—</div>
   </div>
 
   <div id="bottombar">
@@ -460,7 +482,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.04 — streets imported live from the real world</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.05 — streets imported live from the real world</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -482,7 +504,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.04';
+const GAME_VERSION = 'v2.05';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -569,6 +591,7 @@ const STATE = {
   market: null,                  // MARKET module state (positions/orders)
   lastCityKey: null,
   seenNews: false,
+  tut: { step: 0, done: false },   // v2.05 starter-guide progress
 };
 
 // ---- save / load ---------------------------------------------------
@@ -577,6 +600,7 @@ function saveGame() {
     const pack = {
       v: 2, name: STATE.name, money: STATE.money, gdp: STATE.gdp,
       lastCityKey: STATE.lastCityKey, seenNews: STATE.seenNews,
+      tut: { step: STATE.tut.step, done: STATE.tut.done },
       plots: STATE.plots.map(p => ({
         id: p.id, cityKey: p.cityKey, x: +p.x.toFixed(2), z: +p.z.toFixed(2),
         cart: p.cart ? { cuisine: p.cart.cuisine } : null,
@@ -602,6 +626,11 @@ function loadGame() {
     STATE.plots = (p.plots || []).map(o => ({ ...o, crew: o.crew || [] }));
     STATE.offices = p.offices || [];
     STATE.marketPack = p.market || null;
+    // v2.05 starter guide: fresh players start at step 0; returning
+    // players who already own a business are exempt
+    STATE.tut = p.tut ? { step: Math.max(0, Math.min(5, p.tut.step | 0)), done: !!p.tut.done }
+      : { step: 0, done: false };
+    if (!STATE.tut.done && (STATE.plots.length || STATE.offices.length)) STATE.tut.done = true;
     return true;
   } catch (e) { return false; }
 }
@@ -3151,6 +3180,8 @@ const ECO = (() => {
     const gross = item[1] + tip;
     earn(gross);
     cart.served++;
+    // v2.05 starter guide: signal a successful MANUAL serve (E / SERVE btn)
+    if (manual) window.dispatchEvent(new CustomEvent('ow:tut-serve'));
     cart.revenueLog.push([Date.now(), gross]);
     floatText('+$' + gross.toFixed(2), cart.rec.x + (Math.random() - .5) * 2, cart.rec.z + 1.4);
     cu.state = 'leaving';
@@ -3440,7 +3471,11 @@ const ECO = (() => {
     render();
     if (panelTimer) clearInterval(panelTimer);
     panelTimer = setInterval(() => {
-      if (document.getElementById('modalwrap').classList.contains('hidden')) { clearInterval(panelTimer); panelTimer = null; return; }
+      // stop when the modal closed OR when something else replaced the
+      // business panel (e.g. the tutorial completion modal) — otherwise
+      // this re-render would clobber whatever took its place
+      if (document.getElementById('modalwrap').classList.contains('hidden') ||
+          !document.getElementById('bs-scrap')) { clearInterval(panelTimer); panelTimer = null; return; }
       render();
     }, 2000);
   }
@@ -3515,6 +3550,302 @@ const ECO = (() => {
 })();
 
 window.ECO = ECO;
+
+// ======== section: 65_tutorial.js ========
+// ====================================================================
+// v2.05 — TUTORIAL: the getting-started guide for your first hot dog
+// stand. A six-step quest chip on the left edge plus a bobbing gold
+// beacon in the world that walks a new tycoon from "walk" to "passive
+// income": walk → find a $ parcel → buy it → park a 🌭 cart → serve
+// the queue → hire a vendor. Progress saves with the game, it can be
+// skipped from the chip's ✕, and replayed from HELP at any time.
+// Returning players who already own plots/offices are exempt.
+// ====================================================================
+const TUT = (() => {
+  const isTouch = matchMedia('(pointer:coarse)').matches;
+  let _spawn = [0, 0];        // where the player landed this city
+  let _served = false;        // completed a manual serve (step 5)
+  let _target = null;         // locked beacon target (plot rec) for this step
+  let _renderT = 0;           // panel re-render throttle (real time)
+  let _bcnT = 0;              // beacon re-target throttle (real time)
+  let _animT = 0;             // beacon animation clock (real time)
+  let _lastNow = 0;           // last update timestamp
+
+  // ---------------- world queries ------------------------------------
+  const playerPos = () => ACTORS.player
+    ? [ACTORS.player.group.position.x, ACTORS.player.group.position.z]
+    : [1e9, 1e9];
+
+  function nearestSalePlot() {
+    const [px, pz] = playerPos();
+    let best = null, bd = 1e9;
+    for (const r of CITY.plots) {
+      if (r.sold) continue;
+      const d = Math.hypot(r.x - px, r.z - pz);
+      if (d < bd) { bd = d; best = r; }
+    }
+    return best;
+  }
+  function ownedPlotHere() {
+    const ck = CITY.rec && CITY.rec.key;
+    for (const p of STATE.plots) {
+      if (p.cart || p.cityKey !== ck) continue;
+      const r = CITY.plots.find(x => x.id === p.id);
+      if (r) return r;
+    }
+    return null;
+  }
+  const cartHere = () => (ECO.carts && ECO.carts[0]) || null;
+
+  // ---------------- the six steps -------------------------------------
+  // tgt: which world object the gold beacon locks onto for this step
+  //      'sale'  → a for-sale parcel (locked, hysteresis on relock)
+  //      'owned' → the player's cartless plot in this city
+  //      'cart'  → the player's first cart in this city
+  const STEPS = [
+    {
+      key: 'walk', title: 'Walk the block', tgt: null,
+      body: () => isTouch
+        ? 'Push the <b>joystick</b> (bottom-left) to walk. Drag a finger on the world to swing the camera.'
+        : 'Move with <b>W A S D</b> or the arrow keys — hold <b>Shift</b> to run. Drag the mouse to swing the camera.',
+      obj: () => 'Take a short stroll away from your landing spot.',
+      check: () => {
+        const [px, pz] = playerPos();
+        return Math.hypot(px - _spawn[0], pz - _spawn[1]) > 9;
+      },
+    },
+    {
+      key: 'find', title: 'Find a green parcel', tgt: 'sale',
+      body: () => 'Parcels outlined in <b>green dashes</b> with a floating <b>$</b> are street plots for sale — the only land you can build a business on.',
+      obj: () => 'Follow the gold arrow to the nearest green $ parcel.',
+      check: () => {
+        if (STATE.plots.length > 0) return true;
+        const r = nearestSalePlot();
+        if (!r) return false;
+        const [px, pz] = playerPos();
+        return Math.hypot(r.x - px, r.z - pz) < 26;
+      },
+    },
+    {
+      key: 'buy', title: 'Buy your first plot', tgt: 'sale',
+      body: () => {
+        const r = (_target && !_target.sold) ? _target : nearestSalePlot();
+        return 'Click the parcel, then hit <b>BUY PLOT</b>.' + (r
+          ? ' This one is <b>' + fmt$(r.price) + '</b> — any green parcel works if you\'d rather shop around.'
+          : '');
+      },
+      obj: () => 'Click the green parcel → BUY PLOT.',
+      check: () => STATE.plots.length > 0,
+    },
+    {
+      key: 'cart', title: 'Park a hot dog cart', tgt: 'owned',
+      body: () => {
+        const own = ownedPlotHere();
+        const permit = STATE.plots.some(p => p.cart) ? 0 : ECON.permitCost;
+        return 'Click <b>your</b> plot again and pick <b>🌭 Hot Dog</b> — <b>' + fmt$(ECON.cartCost + permit) + '</b>' +
+          (permit ? ' including your first street-vending permit' : '') + '. Locals queue up within seconds.' +
+          (own ? '' : ' (You don\'t own a plot in this city — grab another green parcel first.)');
+      },
+      obj: () => 'Click your plot → choose the Hot Dog cart.',
+      check: () => STATE.plots.some(p => p.cart),
+    },
+    {
+      key: 'serve', title: 'Serve the queue', tgt: 'cart',
+      body: () => 'Stand beside your cart and press <b>E</b>' + (isTouch
+        ? ' — or tap the <b>SERVE</b> button — '
+        : ' — or click <b>SERVE</b> — ') +
+        'whenever someone is waiting. Every dog sold pays its menu price <b>plus a tip</b>.',
+      obj: () => 'Serve 1 customer at your cart.',
+      check: () => _served,
+    },
+    {
+      key: 'hire', title: 'Hire a vendor', tgt: 'cart',
+      body: () => 'Click the cart to open the <b>business panel</b>, then <b>HIRE</b> a vendor. Star vendors work the line while you\'re away — that\'s <b>passive income</b>.' +
+        (isTouch ? '' : ' (Short on cash? Keep serving by hand until you can afford one.)'),
+      obj: () => 'Open the business panel → HIRE your first vendor.',
+      check: () => STATE.plots.some(p => (p.crew || []).length > 0),
+    },
+  ];
+
+  // ---------------- gold beacon ---------------------------------------
+  let _bcn = null;   // { grp, spr, ring, beam }
+  function buildBeacon() {
+    if (_bcn) return _bcn;
+    const cv = document.createElement('canvas'); cv.width = cv.height = 128;
+    const c = cv.getContext('2d');
+    const tri = () => { c.beginPath(); c.moveTo(30, 26); c.lineTo(98, 26); c.lineTo(64, 96); c.closePath(); };
+    tri(); c.lineWidth = 12; c.lineJoin = 'round'; c.strokeStyle = 'rgba(13,17,23,.85)'; c.stroke();
+    tri(); c.fillStyle = '#F5CC74'; c.fill();
+    tri(); c.lineWidth = 4; c.strokeStyle = '#fff3d6'; c.stroke();
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: tex, transparent: true, depthTest: false, depthWrite: false,
+    }));
+    spr.scale.set(5.2, 5.2, 1); spr.position.y = 8.4; spr.renderOrder = 999;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(2.7, 3.5, 30),
+      new THREE.MeshBasicMaterial({ color: 0xf5cc74, transparent: true, opacity: .85, side: THREE.DoubleSide, depthWrite: false }));
+    ring.rotation.x = -Math.PI / 2; ring.position.y = .17;
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(.65, .65, 26, 10, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xf5cc74, transparent: true, opacity: .10, depthWrite: false, side: THREE.DoubleSide }));
+    beam.position.y = 13;
+    const grp = new THREE.Group();
+    grp.add(spr); grp.add(ring); grp.add(beam);
+    _bcn = { grp, spr, ring, beam };
+    return _bcn;
+  }
+  function setBeacon(x, z) {
+    buildBeacon();
+    _bcn.grp.position.set(x, 0, z);
+    if (!_bcn.grp.parent && CITY.group) CITY.group.add(_bcn.grp);
+  }
+  function clearBeacon() { if (_bcn && _bcn.grp.parent) _bcn.grp.parent.remove(_bcn.grp); }
+
+  // locked target resolution — the arrow stays put instead of jittering
+  // between parcels as the player walks (relocks only when decisive)
+  function resolveTarget() {
+    const s = STEPS[STATE.tut.step];
+    if (!s || !s.tgt) { _target = null; return null; }
+    if (s.tgt === 'sale') {
+      if (_target && _target.sold) _target = null;      // it got bought
+      const near = nearestSalePlot();
+      if (!_target) _target = near;
+      else if (near && near !== _target) {
+        const [px, pz] = playerPos();
+        const dn = Math.hypot(near.x - px, near.z - pz);
+        const dc = Math.hypot(_target.x - px, _target.z - pz);
+        if (dn < dc * .5) _target = near;               // decisively closer
+      }
+    } else if (s.tgt === 'owned') {
+      const ok = _target && _target.sold && STATE.plots.some(p =>
+        p.id === _target.id && !p.cart && p.cityKey === (CITY.rec && CITY.rec.key));
+      if (!ok) _target = ownedPlotHere();
+    } else if (s.tgt === 'cart') {
+      const c = cartHere();
+      return c ? { x: c.rec.x, z: c.rec.z } : null;
+    }
+    return _target ? { x: _target.x, z: _target.z } : null;
+  }
+
+  // ---------------- panel ----------------------------------------------
+  const panel = document.getElementById('tut');
+  function showPanel() {
+    if (panel.classList.contains('hidden')) { panel.classList.remove('hidden'); render(); }
+  }
+  function hidePanel() { if (!panel.classList.contains('hidden')) panel.classList.add('hidden'); }
+  function render() {
+    const s = STEPS[STATE.tut.step];
+    if (!s) return;
+    document.getElementById('tut-n').textContent = (STATE.tut.step + 1) + '/' + STEPS.length;
+    document.getElementById('tut-t').textContent = s.title;
+    document.getElementById('tut-b').innerHTML = s.body();
+    document.getElementById('tut-o').innerHTML = '▸ ' + s.obj();
+  }
+  panel.addEventListener('click', e => {
+    const x = e.target.closest ? e.target.closest('#tut-x') : null;
+    if (x) skip();
+  });
+
+  // manual-serve signal from the economy (E key / SERVE button)
+  window.addEventListener('ow:tut-serve', () => { _served = true; });
+
+  // ---------------- progression ----------------------------------------
+  function advance() {
+    const fin = STEPS[STATE.tut.step];
+    STATE.tut.step++;
+    _target = null; _renderT = 0; _bcnT = 0;   // instant re-render + relock
+    if (STATE.tut.step >= STEPS.length) { finish(false); return; }
+    saveGame();
+    toast('✓ <b>' + fin.title + '</b> — next: ' + STEPS[STATE.tut.step].title);
+  }
+  function finish(skipped) {
+    STATE.tut.step = STEPS.length;
+    STATE.tut.done = true;
+    saveGame();
+    hidePanel(); clearBeacon();
+    if (skipped) { toast('Starter guide skipped — replay it anytime from <b>HELP</b>.', 'warn'); return; }
+    openModal('🌭 You\'re in business!', `
+      <p>Your first <b>hot dog stand</b> is up and running — and it keeps earning while you explore.</p>
+      <div class="kv"><span class="k">YOU LEARNED</span><span class="v">buy a $ plot · park a cart · serve [E] · hire crews</span></div>
+      <div class="kv"><span class="k">MORE CARTS</span><span class="v">next cart ${fmt$(ECON.cartCost)}, no new permit — try 🌮 Tacos in another city</span></div>
+      <div class="kv"><span class="k">TOWERS</span><span class="v">hover a tower → click → lease offices for passive rent</span></div>
+      <div class="kv"><span class="k">THE EXCHANGE</span><span class="v">📈 MARKET button — limit &amp; market orders</span></div>
+      <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="tutfin" style="flex:1">KEEP BUILDING</button></div>`);
+    const b = document.getElementById('tutfin');
+    if (b) b.onclick = () => {
+      closeModal();
+      toast('The streets are yours, <b>' + (STATE.name || 'Tycoon') + '</b>.');
+    };
+  }
+  function skip() { finish(true); }
+  function restart() {
+    STATE.tut = { step: 0, done: false };
+    _served = false; _target = null; _renderT = 0; _bcnT = 0;
+    saveGame();
+    if (STATE.mode === 'city' && ACTORS.player) {
+      _spawn = playerPos();
+      showPanel(); render();
+      toast('Starter guide restarted — follow the gold arrow.');
+    } else {
+      toast('Starter guide queued — enter any city to begin.');
+    }
+  }
+  function go(n) {
+    STATE.tut.step = Math.max(0, Math.min(STEPS.length - 1, n | 0));
+    STATE.tut.done = false;
+    _target = null; _renderT = 0; _bcnT = 0;
+    render();
+  }
+
+  // ---------------- frame update ---------------------------------------
+  // throttles run on REAL time (not capped game dt) so the guide stays
+  // responsive even when the browser throttles rAF (hidden/headless tabs)
+  function update(dt) {
+    const now = performance.now();
+    let rdt = _lastNow ? (now - _lastNow) / 1000 : 0;
+    _lastNow = now;
+    rdt = Math.min(.25, rdt);
+    if (STATE.tut.done || STATE.mode !== 'city' || !CITY.group) { hidePanel(); clearBeacon(); _lastNow = 0; return; }
+    const s = STEPS[STATE.tut.step];
+    if (!s) { hidePanel(); clearBeacon(); return; }
+    showPanel();
+    _renderT -= rdt;
+    if (_renderT <= 0) { _renderT = 1.2; render(); }
+    _bcnT -= rdt;
+    if (_bcnT <= 0) {
+      _bcnT = .4;
+      const t = resolveTarget();
+      if (t) setBeacon(t.x, t.z); else clearBeacon();
+    }
+    if (_bcn && _bcn.grp.parent) {
+      _animT += rdt;
+      _bcn.spr.position.y = 8.4 + Math.sin(_animT * 2.3) * .95;
+      const k = 1 + .22 * Math.sin(_animT * 3.1);
+      _bcn.ring.scale.set(k, k, 1);
+      _bcn.beam.material.opacity = .07 + .05 * (Math.sin(_animT * 2.3) * .5 + .5);
+    }
+    if (s.check()) advance();
+  }
+
+  // ---------------- mode hooks (from 90_main) --------------------------
+  function onEnterCity() {
+    if (ACTORS.player) _spawn = playerPos();
+    _target = null;   // fresh city → fresh plots
+  }
+  function onLeaveCity() { hidePanel(); clearBeacon(); _lastNow = 0; }
+
+  function state() {
+    return {
+      step: STATE.tut.step, done: STATE.tut.done,
+      active: !STATE.tut.done && STATE.mode === 'city',
+      beacon: (_bcn && _bcn.grp.parent)
+        ? [+_bcn.grp.position.x.toFixed(1), +_bcn.grp.position.z.toFixed(1)] : null,
+    };
+  }
+
+  return { update, onEnterCity, onLeaveCity, restart, go, skip, state };
+})();
+
+window.TUT = TUT;
 
 // ======== section: 70_market.js ========
 // ====================================================================
@@ -3945,6 +4276,7 @@ async function enterCity(meta) {
     STATE.city = meta;
     STATE.lastCityKey = meta.key || null;
     STATE.mode = 'city';
+    TUT.onEnterCity();          // v2.05: starter guide records its spawn point
     EARTH.setOwned(new Set(STATE.plots.map(p => p.cityKey)), STATE.lastCityKey);
     uiBalance();
     toast('Welcome to <b>' + meta.name + '</b>' +
@@ -3965,6 +4297,7 @@ function returnToGlobe() {
   setTimeout(() => {
     saveGame();
     ECO.clearCarts();
+    TUT.onLeaveCity();          // v2.05: drop the guide beacon before dispose
     ACTORS.reset();
     if (ACTORS.player && ACTORS.player.group.parent) ACTORS.player.group.parent.remove(ACTORS.player.group);
     CITY.dispose();
@@ -4029,7 +4362,7 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
   a.onclick = e => {
     e.preventDefault();
     const k = a.dataset.abt;
-    openModal(k.toUpperCase(), `<p><b>Open World v2.04</b> runs entirely in your browser and saves locally.</p>
+    openModal(k.toUpperCase(), `<p><b>Open World v2.05</b> runs entirely in your browser and saves locally.</p>
       <p>No accounts, no tracking, no payments. Map data © OpenStreetMap contributors (ODbL).</p>
       <p>Support: keep playing and build something big.</p>`);
   };
@@ -4039,13 +4372,12 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.04 — FAST CITY ENTRY', `
-    <p><b>Cities now load dramatically faster.</b></p>
-    <div class="kv"><span class="k">MIRROR RACE</span><span class="v">4 map servers queried at once — the fastest one wins</span></div>
-    <div class="kv"><span class="k">DIVE OVERLAP</span><span class="v">Streets download while you're still diving in</span></div>
-    <div class="kv"><span class="k">HOVER PRELOAD</span><span class="v">Rest on a city node and its map starts loading</span></div>
-    <div class="kv"><span class="k">LIVE PROGRESS</span><span class="v">The loading screen now shows each build phase</span></div>
-    <div class="kv"><span class="k">SMARTER CACHE</span><span class="v g">Re-entering recent cities is near-instant</span></div>
+  openModal('Welcome to v2.05 — STARTER GUIDE', `
+    <p><b>New tycoons now get a guided start.</b></p>
+    <div class="kv"><span class="k">SIX STEPS</span><span class="v">walk → find a $ parcel → buy it → park a 🌭 cart → serve the queue → hire a vendor</span></div>
+    <div class="kv"><span class="k">GOLD BEACON</span><span class="v">a bobbing arrow marks each objective in the world</span></div>
+    <div class="kv"><span class="k">SKIP ANYTIME</span><span class="v">the ✕ on the guide chip dismisses it for good</span></div>
+    <div class="kv"><span class="k">REPLAY</span><span class="v g">HELP button → Replay Tutorial</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">START BUILDING</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); if (!STATE.lastCityKey) toast('Click a glowing city to dive in.'); };
 }
@@ -4072,7 +4404,7 @@ document.getElementById('b-build').addEventListener('click', () => {
 document.getElementById('avatar-chip').addEventListener('click', () => ECO.openEmpire());
 
 function openHelp() {
-  openModal('Open World v2.04 — Help', `
+  openModal('Open World v2.05 — Help', `
     <p><b>Controls</b></p>
     <div class="kv"><span class="k">MOVE</span><span class="v">WASD / arrows · Shift = run</span></div>
     <div class="kv"><span class="k">CAMERA</span><span class="v">Drag to orbit · wheel/pinch to zoom (gentle, glide)</span></div>
@@ -4081,8 +4413,12 @@ function openHelp() {
     <p style="margin-top:12px"><b>The loop</b></p>
     <p>Buy a green <b>$</b> plot → park a food cart → serve the queue yourself or hire star vendors → lease offices in the towers → trade the exchange → grow your net worth.</p>
     <p style="font-size:11px;color:var(--dim)">Map data © OpenStreetMap contributors (ODbL). This game runs 100% in your browser; your world saves locally.</p>
-    <div style="display:flex;gap:8px;margin-top:14px"><button class="btn" id="hp-x" style="flex:1">CLOSE</button></div>`);
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn" id="hp-tut" style="flex:1">REPLAY TUTORIAL</button>
+      <button class="btn" id="hp-x" style="flex:1">CLOSE</button>
+    </div>`);
   document.getElementById('hp-x').onclick = closeModal;
+  document.getElementById('hp-tut').onclick = () => { closeModal(); TUT.restart(); };
 }
 
 // search box
@@ -4223,6 +4559,7 @@ function loop() {
     ACTORS.updateCitizens(dt);
     ACTORS.update(dt);
     ECO.update(dt);
+    TUT.update(dt);   // v2.05 starter guide: panel + beacon + step checks
     // camera follows player
     const p = ACTORS.player.group.position;
     camCtl.tx += (p.x - camCtl.tx) * Math.min(1, dt * 5);
@@ -4274,7 +4611,7 @@ EARTH.diveTo = (city, cb) => {
 };
 
 
-console.log('%cOPEN WORLD v2.04 — FAST CITY ENTRY', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.05 — STARTER GUIDE', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
