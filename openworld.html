@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.13</title>
+<title>Open World — v2.14</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.13 — NEW WORLD (complete restart) + STARTER GUIDE + TIGHT CONTROLS + CLEAR STREETS + HAPPY CUSTOMERS + SIDEWALK SPOTS + INSTANT TRAVEL + WORLD ATLAS + OPEN FRONTIER (build anywhere, world highways) + CLICK TO WALK (point-and-click streets)
+   OPEN WORLD v2.14 — NEW WORLD (complete restart) + STARTER GUIDE + TIGHT CONTROLS + CLEAR STREETS + HAPPY CUSTOMERS + SIDEWALK SPOTS + INSTANT TRAVEL + WORLD ATLAS + OPEN FRONTIER (build anywhere) + CLICK TO WALK + OPEN COUNTRY (pastures, walkable country roads between land-connected cities, quiet globe)
    Visual system modeled on the Capital Rift reference frame:
    dark glassmorphism fintech UI (panels #1A202C @85%, 1px #4A5568
    borders, 4px radius), money-green #48BB78 prices, link-blue
@@ -485,7 +485,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.13 — build anywhere on Earth; click the street and your tycoon walks</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.14 — build anywhere on Earth; open pastures, walkable country roads between cities</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -509,7 +509,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.13';
+const GAME_VERSION = 'v2.14';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -530,6 +530,77 @@ function _mulberry(seed) {
   };
 }
 const hashStr = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+
+// ---------------- v2.14 — shared LAND mask + land corridor -------------
+// The Natural Earth 1440x720 land mask (embedded by the build as
+// window.__LAND_MASK_B64) decoded once into a bit array. v2.12 kept it in
+// 20_earth.js; v2.14 moves it here so BOTH the globe (hover/settle) and the
+// OSM layer (picking the road-connected cities for pasture gates) answer
+// "is this lat/lon dry land?" from the same single source of truth.
+const LAND = (() => {
+  const W = 1440, H = 720;
+  let bits = null;
+  function init() {
+    if (bits) return true;
+    const b64 = (typeof window !== 'undefined' && window.__LAND_MASK_B64) || '';
+    if (!b64) return false;
+    const bin = atob(b64);
+    bits = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bits[i] = bin.charCodeAt(i);
+    return true;
+  }
+  function at(lat, lon) {
+    if (!init()) return true;              // no mask → never block anything
+    let x = Math.floor(((lon + 180) / 360) * W); if (x < 0) x = 0; if (x >= W) x = W - 1;
+    let y = Math.floor(((90 - lat) / 180) * H); if (y < 0) y = 0; if (y >= H) y = H - 1;
+    const i = y * W + x;
+    return ((bits[i >> 3] >> (7 - (i & 7))) & 1) === 1;
+  }
+  return { at, ok: init };
+})();
+
+// Straight great-circle corridor between two lat/lon points, sampled
+// every ~0.4deg against the land mask (15km of give at each end so
+// coastal cities keep their roads). Plain JS — no THREE — so the OSM
+// module can use it for pasture gate placement.
+function landCorridorLL(lat1, lon1, lat2, lon2) {
+  const v3 = (lat, lon) => {
+    const phi = (lon + 180) * Math.PI / 180, th = (90 - lat) * Math.PI / 180;
+    return [-Math.cos(phi) * Math.sin(th), Math.cos(th), Math.sin(phi) * Math.sin(th)];
+  };
+  const a = v3(lat1, lon1), b = v3(lat2, lon2);
+  const dot = Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]));
+  const deg = Math.acos(dot) * 180 / Math.PI;
+  const km = deg * 111.195;
+  if (km > 9500) return false;            // beyond any land corridor
+  const N = Math.max(16, Math.ceil(deg / .4));
+  const skip = 15 / Math.max(1, km);      // roads reach the city's vicinity
+  for (let i = 1; i < N; i++) {
+    const t = i / N;
+    if (t < skip || t > 1 - skip) continue;
+    const qx = a[0] + (b[0] - a[0]) * t, qy = a[1] + (b[1] - a[1]) * t, qz = a[2] + (b[2] - a[2]) * t;
+    const l = Math.hypot(qx, qy, qz) || 1;
+    const lat = 90 - Math.acos(Math.max(-1, Math.min(1, qy / l))) * 180 / Math.PI;
+    let lon = Math.atan2(qz / l, -qx / l) * 180 / Math.PI - 180;
+    lon = ((lon + 540) % 360) - 180;
+    if (!LAND.at(lat, lon)) return false;
+  }
+  return true;
+}
+
+// great-circle distance in km + initial bearing in degrees (from north)
+function gcKmLL(lat1, lon1, lat2, lon2) {
+  const r = Math.PI / 180;
+  const s = Math.sin((lat2 - lat1) * r / 2) ** 2 +
+    Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin((lon2 - lon1) * r / 2) ** 2;
+  return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(s)));
+}
+function bearingLL(lat1, lon1, lat2, lon2) {
+  const r = Math.PI / 180;
+  const y = Math.sin((lon2 - lon1) * r) * Math.cos(lat2 * r);
+  const x = Math.cos(lat1 * r) * Math.sin(lat2 * r) - Math.sin(lat1 * r) * Math.cos(lat2 * r) * Math.cos((lon2 - lon1) * r);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
 
 // ---- city catalog: [name, lat, lon, tier] (public geographic facts)
 const RAW_CITIES = [
@@ -737,74 +808,36 @@ const frontierName = (lat, lon) =>
   'Frontier ' + Math.abs(lat).toFixed(1) + (lat >= 0 ? 'N ' : 'S ') +
   Math.abs(lon).toFixed(1) + (lon >= 0 ? 'E' : 'W');
 
-// ---------------- v2.12 — LAND MASK SAMPLER --------------------------
-// The same Natural Earth land mask that paints the globe texture, kept
-// as a bit array: one call answers "is this lat/lon dry land?" — both the
-// planet-wide highway network and the settle-anywhere frontier run on it.
-const LAND = (() => {
-  const W = 1440, H = 720;
-  let bits = null;
-  function init() {
-    if (bits) return true;
-    const b64 = (typeof window !== 'undefined' && window.__LAND_MASK_B64) || '';
-    if (!b64) return false;
-    const bin = atob(b64);
-    bits = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bits[i] = bin.charCodeAt(i);
-    return true;
-  }
-  function at(lat, lon) {
-    if (!init()) return true;              // no mask → never block anything
-    let x = Math.floor(((lon + 180) / 360) * W); if (x < 0) x = 0; if (x >= W) x = W - 1;
-    let y = Math.floor(((90 - lat) / 180) * H); if (y < 0) y = 0; if (y >= H) y = H - 1;
-    const i = y * W + x;
-    return ((bits[i >> 3] >> (7 - (i & 7))) & 1) === 1;
-  }
-  return { at, ok: init };
-})();
+// (v2.14) the LAND mask sampler + landCorridorLL now live in 10_core.js —
+// one shared source of truth for the globe hover/settle AND the OSM
+// pasture gate placement.
 
 // bright toy-globe colors (Capital Rift bright-flat daylight direction)
 const COL = { ocean: '#2C7BB9', ocean2: '#24689F', land: '#57A05E', land2: '#4C9255', node: '#22D3EE', owned: '#48BB78', here: '#F5CC74' };
 
-// ---------------- v2.12 — WORLD HIGHWAYS: land-connected city roads ---
-// A road exists between two cities when the straight great-circle corridor
-// between them stays on land (15km of give at each end for coastal cities,
-// sampled every ~0.4deg against the land mask). Island cities stay
-// roadless — Tokyo, London, Dubai, Perth... Each connected group becomes a
-// network: a minimum spanning tree (the trunk system) plus every short
-// (<1100km) direct link that is not already a trunk (the local mesh).
-// Deterministic: the same mask always yields the same highway planet.
+// ---------------- v2.12/v2.14 — WORLD HIGHWAY NETWORK (data only) ----
+// The land-connectivity model: a road exists between two cities when the
+// straight great-circle corridor between them stays on land (15km of give
+// at each end, sampled against the shared land mask). Each connected group
+// becomes a network: MST trunks + short mesh links. Deterministic.
+// v2.14: STILL COMPUTED — it powers the all-land QA invariant and mirrors
+// the corridor test the pasture gates use — but it is NO LONGER DRAWN on
+// the globe. The player asked for a clean planet in orbit; the roads you
+// can actually WALK live at street level in the settled pasture regions.
 const ROUTES = (() => {
   const stats = { direct: 0, edges: 0, km: 0, components: 0, isolated: 0 };
   let edges = [];      // [{a, b, km}] — city keys, km rounded
 
-  function gcKm(a, b) {
-    const r = Math.PI / 180;
-    const s = Math.sin((b.lat - a.lat) * r / 2) ** 2 +
-      Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin((b.lon - a.lon) * r / 2) ** 2;
-    return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(s)));
-  }
-
   function landCorridor(a, b, km) {
-    const va = latLonToVec3(a.lat, a.lon, 1), vb = latLonToVec3(b.lat, b.lon, 1);
-    const deg = Math.acos(THREE.MathUtils.clamp(va.dot(vb), -1, 1)) * 180 / Math.PI;
-    const N = Math.max(16, Math.ceil(deg / .4));
-    const skip = 15 / km;                  // roads reach the city's vicinity
-    for (let i = 1; i < N; i++) {
-      const t = i / N;
-      if (t < skip || t > 1 - skip) continue;
-      const ll = vec3ToLatLon(va.clone().lerp(vb, t));
-      if (!LAND.at(ll.lat, ll.lon)) return false;
-    }
-    return true;
+    return landCorridorLL(a.lat, a.lon, b.lat, b.lon);
   }
 
-  function build(scene) {
+  function build() {
     if (!LAND.ok()) return;
     const n = CITIES.length;
     const direct = [];
     for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
-      const km = gcKm(CITIES[i], CITIES[j]);
+      const km = gcKmLL(CITIES[i].lat, CITIES[i].lon, CITIES[j].lat, CITIES[j].lon);
       if (km > 9500) continue;             // beyond any land corridor
       if (landCorridor(CITIES[i], CITIES[j], km)) direct.push({ i, j, km });
     }
@@ -846,34 +879,20 @@ const ROUTES = (() => {
       const k = e.i + '-' + e.j;
       if (e.km < 1100 && !drawn.has(k)) drawn.add(k);
     });
-    // ---- ONE LineSegments for the whole highway planet ----
-    const RA = R * 1.0035;
-    const v = [];
+    // ---- v2.14: NO DRAWING. The network stays data + QA only; the
+    // walkable roads between cities are built at street level (see the
+    // pasture gates in 30_osm/40_city) instead of painted on the globe ----
     drawn.forEach(k => {
       const p = k.split('-');
       const i = +p[0], j = +p[1];
       const km = direct.find(e => e.i === i && e.j === j).km;
       edges.push({ a: CITIES[i].key, b: CITIES[j].key, km: Math.round(km) });
       stats.km += km;
-      const va = latLonToVec3(CITIES[i].lat, CITIES[i].lon, RA);
-      const vb = latLonToVec3(CITIES[j].lat, CITIES[j].lon, RA);
-      const deg = Math.acos(THREE.MathUtils.clamp(va.clone().normalize().dot(vb.clone().normalize()), -1, 1)) * 180 / Math.PI;
-      const N = Math.max(8, Math.ceil(deg));
-      let prev = va;
-      for (let s = 1; s <= N; s++) {
-        const q = va.clone().lerp(vb, s / N).normalize().multiplyScalar(RA);
-        v.push(prev.x, prev.y, prev.z, q.x, q.y, q.z);
-        prev = q;
-      }
     });
     stats.edges = edges.length;
     stats.km = Math.round(stats.km);
     stats.components = [...comps.values()].filter(l => l.length > 1).length;
     stats.isolated = [...comps.values()].filter(l => l.length === 1).length;
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
-    scene.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({
-      color: 0xFF9E45, transparent: true, opacity: .8, depthWrite: false })));
   }
 
   // E2E invariant: every drawn road joins two catalog cities and its whole
@@ -882,7 +901,7 @@ const ROUTES = (() => {
     let bad = 0;
     edges.forEach(e => {
       const a = CITIES.find(c => c.key === e.a), b = CITIES.find(c => c.key === e.b);
-      if (!a || !b || !landCorridor(a, b, gcKm(a, b))) bad++;
+      if (!a || !b || !landCorridor(a, b, gcKmLL(a.lat, a.lon, b.lat, b.lon))) bad++;
     });
     return { edges: edges.length, bad };
   }
@@ -1116,8 +1135,8 @@ const EARTH = (() => {
 
     // v2.11 — WORLD ATLAS: outlines + names of every country
     COUNTRY.build(scene);
-    // v2.12 — WORLD HIGHWAYS: land corridors between the land-linked cities
-    ROUTES.build(scene);
+    // v2.12/v2.14 — WORLD HIGHWAY NETWORK: computed + verified, NOT drawn
+    ROUTES.build();
 
     // city nodes
     nodeGroup = new THREE.Group(); scene.add(nodeGroup);
@@ -1232,7 +1251,8 @@ const EARTH = (() => {
   // 'll-lat_lon' city key (the same convention as searched places, so the
   // Empire panel's TRAVEL + the teleport fallback chain handle it for free),
   // a Frontier name, tier-1 pricing, and the full street/plot pipeline —
-  // real OSM streets where they exist, a generated grid out in the wilds.
+  // real OSM streets where they exist, open pasture country out in the wilds
+// (v2.14: country roads + city gates, not a fake city grid).
   function settle(lat, lon) {
     if (diveT || STATE.mode !== 'globe') return false;
     if (!LAND.at(lat, lon)) { toast('<b>That\'s open ocean.</b> Pick dry land to settle.', 'warn'); return false; }
@@ -1519,6 +1539,15 @@ out geom;`;
         return { ...out, source: 'osm', fromCache: false, net: { ms: got.ms, ep: got.ep } };
       }
     }
+    // v2.14 OPEN COUNTRY: a catalog city with no map data falls back to a
+    // generated street grid — but an open-land settle (or a searched spot in
+    // the wilds) is PASTURE now: fields, groves, ponds, barns, country roads
+    // out to the nearest land-connected cities. No more fake city in the
+    // middle of nowhere.
+    if (isFrontier(meta)) {
+      onStatus && onStatus('Surveying the open country around ' + meta.name + '…');
+      return generatePasture(meta);
+    }
     onStatus && onStatus('Live map unreachable — generating ' + meta.name + '…');
     return generateCity(meta);
   }
@@ -1587,6 +1616,96 @@ out geom;`;
     return { id: 'gen-' + (meta.key || seed), key: meta.key, name: meta.name, lat: meta.lat, lon: meta.lon, half: HALF, roads, buildings, greens, waters, source: 'gen' };
   }
 
+  // ---------------- v2.14 — OPEN COUNTRY: the pasture generator --------
+  // Far from any mapped streets the world is countryside: grass, hay
+  // fields, groves, a pond, a barn — and walkable country roads that run
+  // from your settle spot out to green city signposts (gates) for the
+  // nearest LAND-CONNECTED catalog cities (the same corridor test the
+  // globe's highway model uses). Walk a road to its sign — or click it —
+  // and you arrive in that city. Everything else (plots, carts, customers,
+  // teleports) runs on the exact same city pipeline as before.
+  function isFrontier(meta) {
+    return meta.frontier === true || /^ll-?\d/.test((meta.key || '') + '');
+  }
+
+  const GATE_D = 460;            // meters from the settle spot to a gate
+
+  function generatePasture(meta) {
+    const seed = hashStr((meta.key || meta.name) + '');
+    const rnd = _mulberry(seed);
+    const roads = [], buildings = [], greens = [], waters = [];
+    // ---- gates: nearest land-linked catalog cities, spread by bearing ----
+    const cands = [];
+    for (const c of CITIES) {
+      const km = gcKmLL(meta.lat, meta.lon, c.lat, c.lon);
+      if (km > 3000 || km < 8) continue;                  // too far / basically on it
+      if (!landCorridorLL(meta.lat, meta.lon, c.lat, c.lon)) continue;
+      cands.push({ c, km, brg: bearingLL(meta.lat, meta.lon, c.lat, c.lon) });
+    }
+    cands.sort((a, b) => a.km - b.km);
+    const picked = [];
+    for (const cd of cands) {
+      if (picked.length >= 3) break;                      // a quiet crossroads, not a hub
+      let okB = true;
+      for (const p of picked) {
+        let d = Math.abs(p.brg - cd.brg) % 360;
+        if (d > 180) d = 360 - d;
+        if (d < 55) { okB = false; break; }               // keep the roads apart
+      }
+      if (okB) picked.push(cd);
+    }
+    const gates = picked.map(p => {
+      const rad = p.brg * Math.PI / 180;
+      return {
+        city: { key: p.c.key, name: p.c.name, lat: p.c.lat, lon: p.c.lon, tier: p.c.tier },
+        x: Math.sin(rad) * GATE_D, z: -Math.cos(rad) * GATE_D,
+        km: Math.round(p.km), brg: Math.round(p.brg),
+      };
+    });
+    if (gates.length) {
+      for (const g of gates) {
+        const L = Math.hypot(g.x, g.z);
+        const ux = g.x / L, uz = g.z / L;                 // unit toward the gate
+        const sx = ux * 14, sz = uz * 14;                 // start just past the junction
+        const bow = (rnd() * 2 - 1) * 34;                 // gentle deterministic curve
+        const mx = g.x * .52 - uz * bow, mz = g.z * .52 + ux * bow;
+        roads.push({ pts: [[sx, sz], [mx, mz], [g.x - ux * 10, g.z - uz * 10]],
+          w: 11.5, cls: 2, country: true, name: g.city.name + ' Road' });
+      }
+    } else {
+      // no land-linked city in range (an island, the deep wilds) — one
+      // quiet country lane through the fields
+      roads.push({ pts: [[-660, 36 - rnd() * 70], [660, 36 - rnd() * 70]],
+        w: 10.5, cls: 2, country: true, name: 'Country Lane' });
+    }
+    // ---- a pond, more often than not ----
+    if (rnd() < .45) {
+      const pa = rnd() * 6.2832, pd = 170 + rnd() * 230, pr = 24 + rnd() * 30;
+      const cx = Math.cos(pa) * pd, cz = Math.sin(pa) * pd;
+      let clear = true;                                    // keep the water off every road
+      for (const rd of roads) for (let i = 0; i < rd.pts.length - 1 && clear; i++) {
+        const [ax, az] = rd.pts[i], [bx, bz] = rd.pts[i + 1];
+        const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1;
+        const t = Math.max(0, Math.min(1, ((cx - ax) * dx + (cz - az) * dz) / L2));
+        if (Math.hypot(cx - (ax + t * dx), cz - (az + t * dz)) < pr + 34) clear = false;
+      }
+      if (clear) {
+        const poly = [];
+        for (let i = 0; i < 9; i++) {
+          const a = i / 9 * 6.2832, rr = pr * (.72 + rnd() * .45);
+          poly.push([cx + Math.cos(a) * rr, cz + Math.sin(a) * rr]);
+        }
+        waters.push({ poly });
+      }
+    }
+    return {
+      id: 'pas-' + (meta.key || seed), key: meta.key, name: meta.name,
+      lat: meta.lat, lon: meta.lon, half: HALF,
+      roads, buildings, greens, waters,
+      source: 'pasture', pasture: true, gates,
+    };
+  }
+
   // ---------------- Nominatim place search ----------------
   async function searchPlaces(q) {
     try {
@@ -1649,6 +1768,8 @@ const CITY = (() => {
   let pitchedRects = [];              // lawn candidates from pitched-roof buildings
   let buildStats = null;               // QA census of the last build (styles/roofs)
   let treeList = [], treeStats = null; // v2.07: final planted trees + road-clearance census
+  let gates = [];            // v2.14: country road gates -> land-connected cities
+  let _grassTex = null;      // v2.14: pasture ground
   const hexOf = c => '#' + c.getHexString();
 
   // ---------- low-level quad/triangle pushers ----------------------
@@ -1873,6 +1994,7 @@ const CITY = (() => {
   const getWinTex = i => _winTexs[i] || (_winTexs[i] = windowTexture(i));
   const getAsphTex = () => _asphTex || (_asphTex = asphaltTexture());
   const getGroundTex = () => _groundTex || (_groundTex = groundTexture());
+  const getGrassTex = () => _grassTex || (_grassTex = grassTexture());
   const getShopTex = () => _shopTex || (_shopTex = shopTexture());
 
   // ---------- 2D segment intersection ------------------------------
@@ -1894,6 +2016,7 @@ const CITY = (() => {
     const walk = { pos: [], norm: [], uv: [], col: [] };
     const cAsph = colOf(0xffffff), cYel = colOf(0xe8c243), cWht = colOf(0xe8e4dc), cWalk = colOf(0xc4bcb0);
     const cCurb = colOf(0xb3ab9e), cSeam = colOf(0xa39a8b), cCW = colOf(0xeceae2);
+    const cVerge = colOf(0x8f8a7c);   // v2.14: country gravel verge
     const UP = [0, 1, 0];
     const mobF = isMob ? .5 : 1;
 
@@ -1914,7 +2037,19 @@ const CITY = (() => {
       const pts = rd.pts;
       const y = rd.cls === 3 ? .030 : rd.cls === 2 ? .034 : .038;
       for (let i = 0; i < pts.length - 1; i++) rib(asph, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], rd.w, y, cAsph, 3.2, 3.2);
-      if (!rd.ped) {
+      if (rd.country) {
+        // v2.14: country highway — no sidewalks, no curbs: gravel verges
+        for (const side of [1, -1]) {
+          const off = rd.w / 2 + 2.1;
+          for (let i = 0; i < pts.length - 1; i++) {
+            const [ax, az] = pts[i], [bx, bz] = pts[i + 1];
+            const dx = bx - ax, dz = bz - az, len = Math.hypot(dx, dz) || 1;
+            const ux = dx / len, uz = dz / len;
+            const px = -uz * off * side, pz = ux * off * side;
+            rib(walk, ax + px, az + pz, bx + px, bz + pz, 3.6, .03, cVerge);
+          }
+        }
+      } else if (!rd.ped) {
         for (const side of [1, -1]) {
           const off = rd.w / 2 + 1.75;
           for (let i = 0; i < pts.length - 1; i++) {
@@ -1971,8 +2106,8 @@ const CITY = (() => {
           }
         }
       }
-      // manhole covers
-      if (rd.cls >= 2 && !rd.ped) {
+      // manhole covers (v2.14: urban plumbing — country roads get none)
+      if (rd.cls >= 2 && !rd.ped && !rd.country) {
         for (let i = 0; i < pts.length - 1; i++) {
           const [ax, az] = pts[i], [bx, bz] = pts[i + 1];
           const len = Math.hypot(bx - ax, bz - az);
@@ -1996,7 +2131,7 @@ const CITY = (() => {
     outer:
     for (let i = 0; i < roads.length; i++) for (let j = i + 1; j < roads.length; j++) {
       const A = roads[i], B = roads[j];
-      if (A.ped || B.ped) continue;
+      if (A.ped || B.ped || A.country || B.country) continue;   // v2.14: no zebras in the country
       const ba = rbbox[i], bb = rbbox[j];
       if (ba[1] < bb[0] || bb[1] < ba[0] || ba[3] < bb[2] || bb[3] < ba[2]) continue;
       for (let s = 0; s < A.pts.length - 1; s++) for (let t = 0; t < B.pts.length - 1; t++) {
@@ -2421,7 +2556,11 @@ const CITY = (() => {
         if (p[0] && p.length > 3 && p[0][0] === p[p.length - 1][0] && p[0][1] === p[p.length - 1][1]) p = p.slice(0, -1);
         if (_polyArea(p) < 0) p = [...p].reverse();
         const cx = p.reduce((s, v) => s + v[0], 0) / p.length, cz = p.reduce((s, v) => s + v[1], 0) / p.length;
-        for (let i = 0; i < p.length; i++) pushFlat(arr, p[i], p[(i + 1) % p.length], [cx, y, cz], c);
+        // v2.14 fix: rim verts were 2D [x,z] — the third slot pushed
+        // undefined → NaN → every greens/waters triangle was silently
+        // dropped by the GPU (parks kept only their paths + trees).
+        for (let i = 0; i < p.length; i++)
+          pushFlat(arr, [p[i][0], 0, p[i][1]], [p[(i + 1) % p.length][0], 0, p[(i + 1) % p.length][1]], [cx, 0, cz], c);
       }
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(arr.pos, 3));
@@ -2562,7 +2701,7 @@ const CITY = (() => {
 
     const bolls = [];
     for (const rd of city.roads) {
-      if (rd.cls < 2 || rd.ped) continue;
+      if (rd.cls < 2 || rd.ped || rd.country) continue;   // v2.14: no bollards in the country
       for (let i = 0; i < rd.pts.length - 1; i++) {
         const [ax, az] = rd.pts[i], [bx, bz] = rd.pts[i + 1];
         const len = Math.hypot(bx - ax, bz - az);
@@ -2613,7 +2752,7 @@ const CITY = (() => {
     // -- street lamps (pole + arm + head, arm reaching over the road) --
     const lamps = [];
     for (const rd of roads) {
-      if (rd.ped) continue;
+      if (rd.ped || rd.country) continue;   // v2.14: lamps are street furniture
       const step = rd.cls >= 2 ? 26 : 38;      // sparser on residential lanes
       for (let i = 0; i < rd.pts.length - 1; i++) {
         const [ax, az] = rd.pts[i], [bx, bz] = rd.pts[i + 1];
@@ -2655,7 +2794,7 @@ const CITY = (() => {
     // -- fire hydrants --
     const hyds = [];
     for (const rd of roads) {
-      if (rd.ped) continue;
+      if (rd.ped || rd.country) continue;   // v2.14: hydrants are urban plumbing
       for (let i = 0; i < rd.pts.length - 1; i++) {
         const [ax, az] = rd.pts[i], [bx, bz] = rd.pts[i + 1];
         const len = Math.hypot(bx - ax, bz - az);
@@ -2703,7 +2842,7 @@ const CITY = (() => {
 
     // -- sidewalk benches (parks already contributed theirs) --
     for (const rd of roads) {
-      if (rd.ped) continue;
+      if (rd.ped || rd.country) continue;   // v2.14: benches wait for sidewalks
       for (let i = 0; i < rd.pts.length - 1; i++) {
         const [ax, az] = rd.pts[i], [bx, bz] = rd.pts[i + 1];
         const len = Math.hypot(bx - ax, bz - az);
@@ -2758,7 +2897,7 @@ const CITY = (() => {
         const ux = (bx - ax) / len, uz = (bz - az) / len;
         let d = 6 + rnd() * 5;
         while (d < len - 8) {
-          if (rnd() < .6) {
+          if (rnd() < (rd.country ? .93 : .6)) {   // v2.14: a farm truck now and then
             const side = rnd() < .5 ? 1 : -1;
             const off = rd.w / 2 + 1.25;
             const x = ax + ux * d - uz * off * side, z = az + uz * d + ux * off * side;
@@ -2959,7 +3098,7 @@ const CITY = (() => {
           for (const side of [1, -1]) {       // v2.09: both sides of the street
             if (n >= MAXN) break outer;
             if (rnd() < .2) continue;
-            const off = rd.w / 2 + 1.75;      // sidewalk centerline
+            const off = rd.w / 2 + (rd.country ? 2.9 : 1.75);   // v2.14: roadside shoulder in the country
             const cx = ax + ux * d - uz * off * side;
             const cz = az + uz * d + ux * off * side;
             if (Math.hypot(cx, cz) > 640) continue;
@@ -3077,7 +3216,317 @@ const CITY = (() => {
     rec.ring = ring;
   }
 
-  // ---------- assemble ------------------------------------------------
+  // ---------- v2.14 — OPEN COUNTRY: pasture renderer -------------------
+  // soft green meadow ground (module singleton)
+  function grassTexture() {
+    const PX = 256;
+    const cv = document.createElement('canvas'); cv.width = PX; cv.height = PX;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#6fae5e'; ctx.fillRect(0, 0, PX, PX);
+    const rnd = _mulberry(4242);
+    for (let i = 0; i < 34; i++) {                            // meadow blotches
+      ctx.fillStyle = rnd() < .5 ? 'rgba(126,190,94,.10)' : 'rgba(92,150,74,.10)';
+      const r = 10 + rnd() * 42;
+      ctx.beginPath(); ctx.ellipse(rnd() * PX, rnd() * PX, r, r * (.5 + rnd() * .5), rnd() * 3, 0, 6.29); ctx.fill();
+    }
+    for (let i = 0; i < 620; i++) {                            // grass speckle
+      ctx.fillStyle = rnd() < .5 ? 'rgba(38,84,32,.07)' : 'rgba(214,232,168,.06)';
+      ctx.fillRect(rnd() * PX, rnd() * PX, 1 + rnd() * 2, 1 + rnd() * 2);
+    }
+    const tex = new THREE.CanvasTexture(cv);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    tex.repeat.set(26, 26);
+    return tex;
+  }
+
+  // green highway signboard texture: CITY NAME + real km by road
+  function gateSignTexture(name, km) {
+    const cv = document.createElement('canvas'); cv.width = 512; cv.height = 168;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#1d6f42'; ctx.fillRect(0, 0, 512, 168);
+    ctx.strokeStyle = '#e8f2e6'; ctx.lineWidth = 8; ctx.strokeRect(10, 10, 492, 148);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#f4faf2';
+    ctx.font = '700 58px -apple-system,Segoe UI,Arial';
+    ctx.fillText(name.toUpperCase(), 256, 66);
+    ctx.font = '600 34px -apple-system,Segoe UI,Arial';
+    ctx.fillStyle = '#bcd8c2';
+    ctx.fillText(Math.round(km).toLocaleString('en-US') + ' km', 256, 126);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    return tex;
+  }
+
+  // city gates: gravel pull-off + two posts + a green signboard facing the
+  // junction. Walk (or click) into the sign and you arrive in that city.
+  function buildGates(city) {
+    gates = (city.gates || []).map(g => ({ ...g, r: 9 }));
+    const postM = new THREE.MeshLambertMaterial({ color: 0x5a6068 });
+    for (const g of gates) {
+      const grp = new THREE.Group();
+      const BW = 6.8, BH = 2.24;
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(BW, BH, .18),
+        new THREE.MeshLambertMaterial({ color: 0x154f30 }));
+      panel.position.y = 3.3;
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(BW - .3, BH - .3),
+        new THREE.MeshLambertMaterial({ map: gateSignTexture(g.city.name, g.km) }));
+      face.position.set(0, 3.3, .1);
+      const back = new THREE.Mesh(new THREE.PlaneGeometry(BW - .3, BH - .3),
+        new THREE.MeshLambertMaterial({ color: 0x1d6f42 }));
+      back.position.set(0, 3.3, -.1); back.rotation.y = Math.PI;
+      const p1 = new THREE.Mesh(new THREE.CylinderGeometry(.09, .12, 4.5, 8), postM);
+      p1.position.set(-(BW / 2 - .5), 2.25, 0);
+      const p2 = new THREE.Mesh(new THREE.CylinderGeometry(.09, .12, 4.5, 8), postM);
+      p2.position.set(BW / 2 - .5, 2.25, 0);
+      [panel, p1, p2].forEach(m => { m.castShadow = true; });
+      grp.add(panel, face, back, p1, p2);
+      // gravel pull-off where the road meets the sign
+      const pad = new THREE.Mesh(new THREE.CircleGeometry(7.5, 22),
+        new THREE.MeshLambertMaterial({ color: 0x8f8a7c }));
+      pad.rotation.x = -Math.PI / 2; pad.position.y = .014;
+      grp.add(pad);
+      grp.position.set(g.x, 0, g.z);
+      grp.rotation.y = Math.atan2(-g.x, -g.z);   // the board faces the junction
+      group.add(grp);
+    }
+  }
+
+  // a barn (or two) set back off a country road — walls join the collision
+  // footprint so you can't walk through them
+  function buildPastureBarns(city) {
+    const rnd = _mulberry(hashStr('B' + (city.key || city.name)));
+    const n = rnd() < .3 ? 2 : 1;
+    for (let b = 0; b < n; b++) {
+      const rd = city.roads[Math.floor(rnd() * city.roads.length)];
+      if (!rd || !rd.pts || rd.pts.length < 2) continue;
+      const i = Math.floor(rnd() * (rd.pts.length - 1));
+      const [ax, az] = rd.pts[i], [bx, bz] = rd.pts[i + 1];
+      const len = Math.hypot(bx - ax, bz - az) || 1;
+      const ux = (bx - ax) / len, uz = (bz - az) / len;
+      const d = Math.min(len - 60, 100 + rnd() * (len - 160 > 0 ? len - 160 : 60));
+      const side = rnd() < .5 ? 1 : -1;
+      const off = 26 + rnd() * 16;
+      const cx = ax + ux * d - uz * off * side;
+      const cz = az + uz * d + ux * off * side;
+      if (Math.hypot(cx, cz) > 640) continue;
+      const W = 9 + rnd() * 3, Dp = 6.5 + rnd() * 2;
+      buildingPolys.push({ poly: [[cx - W / 2, cz - Dp / 2], [cx + W / 2, cz - Dp / 2], [cx + W / 2, cz + Dp / 2], [cx - W / 2, cz + Dp / 2]],
+        h: 7, bkey: 'barn' + b, t: {} });
+      const grp = new THREE.Group();
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(W, 4.6, Dp),
+        new THREE.MeshLambertMaterial({ color: 0xa8402f }));
+      wall.position.y = 2.3; wall.castShadow = true; wall.receiveShadow = true;
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 4),
+        new THREE.MeshLambertMaterial({ color: 0x4d4038 }));
+      roof.rotation.y = Math.PI / 4;
+      roof.scale.set(W * .74, 3, Dp * .92);
+      roof.position.y = 4.6 + 1.5; roof.castShadow = true;
+      const door = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 3.2),
+        new THREE.MeshLambertMaterial({ color: 0xe8e4dc }));
+      door.position.set(0, 1.7, Dp / 2 + .02);
+      grp.add(wall, roof, door);
+      grp.position.set(cx, 0, cz);
+      grp.rotation.y = Math.atan2(ax + ux * d - cx, az + uz * d - cz);   // door faces the road
+      group.add(grp);
+    }
+  }
+
+  // hay fields, groves + lone trees (v2.07 road-clearance guarantee),
+  // rocks, bushes, hay bales, fences along the country roads
+  function buildPastureExtras(city) {
+    const rnd = _mulberry(hashStr('F' + (city.key || city.name)));
+    const mobF = isMob ? .6 : 1;
+    const gateClear = (x, z) => gates.every(g => Math.hypot(x - g.x, z - g.z) > 14);
+
+    // ---- hay field patches: soft color washes over the meadow ----
+    const fields = { pos: [], norm: [], uv: [], col: [] };
+    const FPC = [0x93c46e, 0xa9c96e, 0x86bb62, 0xbac46e, 0x7fb35f, 0xc4bb66].map(colOf);
+    const nF = Math.round((11 + rnd() * 7) * mobF);
+    for (let f = 0; f < nF; f++) {
+      const cx = (rnd() * 2 - 1) * 570, cz = (rnd() * 2 - 1) * 570;
+      const R = 60 + rnd() * 130;
+      if (Math.hypot(cx, cz) < 110) continue;                 // keep the junction open
+      const col = jit(FPC[Math.floor(rnd() * FPC.length)], .93 + rnd() * .14);
+      const n = 9 + Math.floor(rnd() * 4);
+      for (let i = 0; i < n; i++) {
+        const a0 = i / n * 6.2832, a1 = (i + 1) / n * 6.2832;
+        const r0 = R * (.58 + rnd() * .5), r1 = R * (.58 + rnd() * .5);
+        pushFlat(fields, [cx + Math.cos(a0) * r0, .05, cz + Math.sin(a0) * r0],
+          [cx + Math.cos(a1) * r1, .05, cz + Math.sin(a1) * r1], [cx, .05, cz], col);
+      }
+    }
+    if (fields.pos.length) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(fields.pos, 3));
+      g.setAttribute('normal', new THREE.Float32BufferAttribute(fields.norm, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(fields.uv, 2));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(fields.col, 3));
+      const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
+      mesh.receiveShadow = true;
+      group.add(mesh);
+    }
+
+    // ---- groves + lone trees ----
+    const trees = [];
+    const nG = Math.round((6 + rnd() * 4) * mobF);
+    for (let gi = 0; gi < nG; gi++) {
+      const gx = (rnd() * 2 - 1) * 500, gz = (rnd() * 2 - 1) * 500;
+      if (Math.hypot(gx, gz) < 120) continue;
+      const n = 5 + Math.floor(rnd() * 10);
+      for (let i = 0; i < n; i++) {
+        const a = rnd() * 6.2832, rr = 14 + rnd() * 34;
+        trees.push([gx + Math.cos(a) * rr, gz + Math.sin(a) * rr]);
+      }
+    }
+    for (let i = 0; i < Math.round(34 * mobF); i++) {          // lone sentinels
+      const a = rnd() * 6.2832, rr = 130 + rnd() * 430;
+      trees.push([Math.cos(a) * rr, Math.sin(a) * rr]);
+    }
+    const keptTrees = [];
+    let droppedTrees = 0;
+    for (const t of trees) {
+      if (offAsphalt(t[0], t[1], 1.4) && !plotAt(t[0], t[1]) && gateClear(t[0], t[1])) keptTrees.push(t);
+      else droppedTrees++;
+    }
+    treeList = keptTrees;
+    treeStats = { kept: keptTrees.length, dropped: droppedTrees };
+    addTrees(keptTrees);
+
+    // ---- rocks + bushes + hay bales (instanced) ----
+    const rocks = [], bushes = [], bales = [];
+    for (let i = 0; i < Math.round(26 * mobF); i++) {
+      const a = rnd() * 6.2832, rr = 60 + rnd() * 520;
+      const x = Math.cos(a) * rr, z = Math.sin(a) * rr;
+      if (offAsphalt(x, z, 1.6) && !plotAt(x, z) && gateClear(x, z)) rocks.push([x, z, .5 + rnd() * 1.3, rnd() * 6.28]);
+    }
+    for (let i = 0; i < Math.round(46 * mobF); i++) {
+      const a = rnd() * 6.2832, rr = 40 + rnd() * 560;
+      const x = Math.cos(a) * rr, z = Math.sin(a) * rr;
+      if (offAsphalt(x, z, 1.2) && !plotAt(x, z)) bushes.push([x, z, .7 + rnd() * .8]);
+    }
+    for (let i = 0; i < Math.round((6 + rnd() * 8) * mobF); i++) {
+      const a = rnd() * 6.2832, rr = 150 + rnd() * 380;
+      const x = Math.cos(a) * rr, z = Math.sin(a) * rr;
+      if (offAsphalt(x, z, 2.2) && !plotAt(x, z) && gateClear(x, z)) bales.push([x, z, rnd() * 6.28]);
+    }
+    {
+      const mat4 = new THREE.Matrix4(), q = new THREE.Quaternion(), Y = new THREE.Vector3(0, 1, 0), sc = new THREE.Vector3();
+      if (rocks.length) {
+        const inst = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0),
+          new THREE.MeshLambertMaterial({ color: 0x9a9d99 }), rocks.length);
+        rocks.forEach((v, i) => {
+          q.setFromAxisAngle(Y, v[3]);
+          mat4.compose(new THREE.Vector3(v[0], v[2] * .32, v[1]), q, sc.set(v[2], v[2] * .8, v[2]));
+          inst.setMatrixAt(i, mat4);
+        });
+        inst.castShadow = true;
+        group.add(inst);
+      }
+      if (bushes.length) {
+        const inst = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1),
+          new THREE.MeshLambertMaterial({ color: 0x3f7f45 }), bushes.length);
+        bushes.forEach((v, i) => {
+          mat4.compose(new THREE.Vector3(v[0], v[2] * .4, v[1]), q.identity(), sc.set(v[2], v[2] * .66, v[2]));
+          inst.setMatrixAt(i, mat4);
+        });
+        group.add(inst);
+      }
+      if (bales.length) {
+        const geo = new THREE.CylinderGeometry(.8, .8, 1.5, 12); geo.rotateZ(Math.PI / 2);
+        const inst = new THREE.InstancedMesh(geo,
+          new THREE.MeshLambertMaterial({ color: 0xc9a86a }), bales.length);
+        bales.forEach((v, i) => {
+          q.setFromAxisAngle(Y, v[2]);
+          mat4.compose(new THREE.Vector3(v[0], .8, v[1]), q, sc.set(1, 1, 1));
+          inst.setMatrixAt(i, mat4);
+        });
+        inst.castShadow = true;
+        group.add(inst);
+      }
+    }
+
+    // ---- fences along the country roads (posts + two rails per span) ----
+    const posts = [], rails = [];
+    for (const rd of roads) {
+      if (!rd.country) continue;
+      for (let i = 0; i < rd.pts.length - 1; i++) {
+        const [ax, az] = rd.pts[i], [bx, bz] = rd.pts[i + 1];
+        const len = Math.hypot(bx - ax, bz - az);
+        if (len < 40) continue;
+        const ux = (bx - ax) / len, uz = (bz - az) / len;
+        for (const side of [1, -1]) {
+          const off = rd.w / 2 + 6.6;
+          for (let d = 18; d < len - 16; d += 4.3) {
+            const x = ax + ux * d - uz * off * side, z = az + uz * d + ux * off * side;
+            if (plotAt(x, z)) continue;
+            if (gates.some(g => Math.hypot(x - g.x, z - g.z) < 18)) continue;
+            posts.push([x, z]);
+            if (d + 4.3 < len - 16) {
+              const x2 = ax + ux * (d + 4.3) - uz * off * side, z2 = az + uz * (d + 4.3) + ux * off * side;
+              rails.push([x, z, x2, z2]);
+            }
+          }
+        }
+      }
+    }
+    if (posts.length) {
+      const mat4 = new THREE.Matrix4(), q = new THREE.Quaternion(), Y = new THREE.Vector3(0, 1, 0), sc = new THREE.Vector3();
+      const postM = new THREE.MeshLambertMaterial({ color: 0x7a5c44 });
+      const pInst = new THREE.InstancedMesh(new THREE.BoxGeometry(.14, 1.2, .14), postM, posts.length);
+      posts.forEach((v, i) => {
+        mat4.compose(new THREE.Vector3(v[0], .6, v[1]), q.identity(), sc.set(1, 1, 1));
+        pInst.setMatrixAt(i, mat4);
+      });
+      pInst.castShadow = true;
+      group.add(pInst);
+      const railM = new THREE.MeshLambertMaterial({ color: 0x8a6a4e });
+      const rInst = new THREE.InstancedMesh(new THREE.BoxGeometry(1, .07, .09), railM, rails.length * 2);
+      rails.forEach((v, i) => {
+        const th = Math.atan2(v[2] - v[0], v[3] - v[1]);
+        q.setFromAxisAngle(Y, th);
+        for (const h of [.52, .96]) {
+          mat4.compose(new THREE.Vector3((v[0] + v[2]) / 2, h, (v[1] + v[3]) / 2), q, sc.set(4.45, 1, 1));
+          rInst.setMatrixAt(i * 2 + (h > .7 ? 1 : 0), mat4);
+        }
+      });
+      group.add(rInst);
+    }
+  }
+
+  // distant hill ring instead of a skyline — open country to the horizon
+  function buildHills() {
+    const rnd = _mulberry(hashStr('h' + (cityRec.key || cityRec.name || 'x')));
+    const n = isMob ? 26 : 44;
+    const inst = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 12, 8, 0, 6.2832, 0, 1.35),
+      new THREE.MeshLambertMaterial({ color: 0xffffff }), n);
+    const mat4 = new THREE.Matrix4();
+    const fogC = new THREE.Color(0x9fc7e8), base = new THREE.Color(0x5e8f63), c = new THREE.Color();
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * 6.2832 + rnd() * .1;
+      const r = 1050 + rnd() * 380;
+      const w = 190 + rnd() * 300, h = 46 + rnd() * 96;
+      mat4.makeScale(w, h, w * (.7 + rnd() * .5));
+      mat4.setPosition(Math.cos(a) * r, -6, Math.sin(a) * r);
+      inst.setMatrixAt(i, mat4);
+      inst.setColorAt(i, c.copy(base).lerp(fogC, .18 + rnd() * .3));
+    }
+    group.add(inst);
+  }
+
+  // v2.14 gate pickers: click (gateAt) / walk-in (gateNear)
+  function gateAt(x, z) {
+    for (const g of gates) if (Math.hypot(x - g.x, z - g.z) <= g.r) return g;
+    return null;
+  }
+  function gateNear(x, z, r) {
+    for (const g of gates) if (Math.hypot(x - g.x, z - g.z) <= r) return g;
+    return null;
+  }
+
+  // ---------- assemble ---
   // v2.04 — FAST CITY ENTRY: the build now yields to the browser between
   // phases (rAF, 90ms safety cap) and reports live status, so the veil
   // shows progress instead of freezing on "Entering…" for a full second+.
@@ -3096,6 +3545,35 @@ const CITY = (() => {
     suites = [];
     benchScratch = [];
     isMob = matchMedia('(pointer:coarse)').matches;
+
+    // ---------- v2.14 — OPEN COUNTRY: the settle-anywhere pasture --------
+    // No buildings, no skyline, no street grid: grass ground, country roads
+    // with gravel verges, gate signposts to the nearest land-connected
+    // cities, hay fields, groves, ponds, barns, fences — and the same
+    // roadside vendor-spot layer the cities have.
+    if (cityData.pasture) {
+      const base = new THREE.Mesh(new THREE.PlaneGeometry(3400, 3400),
+        new THREE.MeshLambertMaterial({ map: getGrassTex() }));
+      base.rotation.x = -Math.PI / 2; base.position.y = .012;
+      base.receiveShadow = true;
+      group.add(base);
+      onStatus && onStatus('Laying out the country roads…'); await _tick();
+      buildRoads(cityData);
+      buildGates(cityRec);
+      onStatus && onStatus('Raising the barn…'); await _tick();
+      buildPastureBarns(cityData);
+      buildSpatialHash();          // rHash (roads) + barn walls — before plots
+      onStatus && onStatus('Marking roadside spots…'); await _tick();
+      buildPlots(cityRec);
+      onStatus && onStatus('Watering the fields…'); await _tick();
+      buildGreensWater(cityData);  // pond only out here
+      onStatus && onStatus('Growing the pastures…'); await _tick();
+      buildProps(cityRec);
+      buildPastureExtras(cityData);
+      buildHills();
+      return group;
+    }
+
     const base = new THREE.Mesh(new THREE.PlaneGeometry(3400, 3400),
       new THREE.MeshLambertMaterial({ map: getGroundTex() }));
     base.rotation.x = -Math.PI / 2; base.position.y = .012;
@@ -3117,7 +3595,7 @@ const CITY = (() => {
 
   function dispose() {
     if (group) {
-      const keep = [..._winTexs.filter(Boolean), _asphTex, _groundTex, _shopTex];
+      const keep = [..._winTexs.filter(Boolean), _asphTex, _groundTex, _shopTex, _grassTex];
       group.traverse(o => {
         if (o.geometry && o.geometry !== undefined) { try { o.geometry.dispose(); } catch (e) { } }
         const mats = Array.isArray(o.material) ? o.material : [o.material];
@@ -3128,6 +3606,7 @@ const CITY = (() => {
       });
     }
     group = null; roads = []; plotRecs = []; suites = []; buildingPolys = []; benchScratch = []; pitchedRects = []; bHash = rHash = null; treeList = []; treeStats = null;
+    gates = [];   // v2.14
   }
   let _winMat = null;
 
@@ -3181,6 +3660,8 @@ const CITY = (() => {
     get plots() { return plotRecs; },
     get suites() { return suites; },
     pointInBuilding, inPoly, distToRoad, roadsNear, nearestRoadName, pointOnRoad, randomRoadPoint, plotAt, setPlotOwned,
+    gateAt, gateNear,          // v2.14: country gates (click / walk-in)
+    get gates() { return gates; },   // v2.14
     get stats() { return buildStats; },
     get trees() { return treeList; },          // v2.07: final planted positions
     get treeStats() { return treeStats; },     // v2.07: {kept, dropped} road-clearance census
@@ -5005,6 +5486,10 @@ async function enterCity(meta) {
         CITY.plots.find(r => Math.hypot(r.x - pa.x, r.z - pa.z) < 15);
       if (rec) { spot = ECO.plotStand(rec); arrived = { pa, rec }; }
     }
+    if (!spot && data.pasture) {   // v2.14: land at the crossroads
+      const r0 = (CITY.roads[0] || {}).pts;
+      spot = (r0 && r0.length) ? { x: r0[0][0], z: r0[0][1] } : { x: 0, z: 0 };
+    }
     if (!spot) spot = CITY.randomRoadPoint(rnd);
     ACTORS.placePlayer(spot.x, spot.z);
     if (arrived) ACTORS.player.group.rotation.y = Math.atan2(arrived.rec.x - spot.x, arrived.rec.z - spot.z);   // face the cart
@@ -5024,7 +5509,11 @@ async function enterCity(meta) {
     TUT.onEnterCity();          // v2.05: starter guide records its spawn point
     EARTH.setOwned(new Set(STATE.plots.map(p => p.cityKey)), STATE.lastCityKey);
     uiBalance();
+    cityEnteredAt = performance.now();   // v2.14: gates arm 2.5s after landing
     if (arrived) toast('⚡ Teleported to your <b>' + (arrived.pa.cart ? ECO.plotLabel(arrived.pa) : 'sidewalk spot') + '</b> in ' + meta.name + '.', 'warn');
+    else if (data.source === 'pasture') toast('Welcome to <b>' + meta.name + '</b> — open country' +
+      (CITY.gates.length ? '. Roads lead to ' + CITY.gates.map(g => '<b>' + g.city.name + '</b>').join(', ') +
+        ' — walk one, or click the green sign' : ''), 'warn');
     else toast('Welcome to <b>' + meta.name + '</b>' +
       (data.source === 'osm' && !data.fromCache ? ' — real streets imported live from OpenStreetMap' :
         data.fromCache ? ' — cached real streets' : ' — street grid generated (live map unreachable)'), 'warn');
@@ -5134,7 +5623,7 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
   a.onclick = e => {
     e.preventDefault();
     const k = a.dataset.abt;
-    openModal(k.toUpperCase(), `<p><b>Open World v2.13</b> runs entirely in your browser and saves locally.</p>
+    openModal(k.toUpperCase(), `<p><b>Open World v2.14</b> runs entirely in your browser and saves locally.</p>
       <p>No accounts, no tracking, no payments. Map data © OpenStreetMap contributors (ODbL).</p>
       <p>Support: keep playing and build something big.</p>`);
   };
@@ -5144,12 +5633,12 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-    openModal('Welcome to v2.13 — CLICK TO WALK', `
-    <p><b>Point and click — your tycoon does the walking.</b></p>
-    <div class="kv"><span class="k">CLICK TO WALK</span><span class="v">click any spot on the street and your tycoon strolls over on their own — a green ring marks the destination and ripples when you arrive</span></div>
-    <div class="kv"><span class="k">SHIFT EN ROUTE</span><span class="v">hold Shift while auto-walking to jog · WASD, arrows and the touch joystick override the walk instantly, and releasing a key still stops you on the spot</span></div>
-    <div class="kv"><span class="k">SMART CLICKS</span><span class="v">sidewalk spots, carts and towers still open on click — only open street sends you walking, and walls stop the walk politely</span></div>
-    <div class="kv"><span class="k">UNTOUCHED</span><span class="v g">v2.03 variety · v2.04 fast entry · v2.05 starter guide · v2.06 controls · v2.07 clear streets · v2.08 happy customers · v2.09 sidewalk spots · v2.10 instant travel · v2.11 world atlas · v2.12 open frontier</span></div>
+    openModal('Welcome to v2.14 — OPEN COUNTRY', `
+    <p><b>The wilds are wild no more — they're pastures now.</b></p>
+    <div class="kv"><span class="k">OPEN COUNTRY</span><span class="v">settle any open land and you're in real countryside — pasture fields, groves, ponds, barns and roadside vendor spots, not a fake city grid in the middle of nowhere</span></div>
+    <div class="kv"><span class="k">COUNTRY ROADS</span><span class="v">walkable roads run from your settle spot out to green city signposts — walk the highway to the nearest land-connected cities, or click a sign to travel</span></div>
+    <div class="kv"><span class="k">QUIET ORBIT</span><span class="v">the planet in orbit is clean again — country outlines and names only, no road lines painted on the globe</span></div>
+    <div class="kv"><span class="k">UNTOUCHED</span><span class="v g">v2.03 variety · v2.04 fast entry · v2.05 starter guide · v2.06 controls · v2.07 clear streets · v2.08 happy customers · v2.09 sidewalk spots · v2.10 instant travel · v2.11 world atlas · v2.12 open frontier · v2.13 click to walk</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">START BUILDING</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); if (!STATE.lastCityKey) toast('Click a glowing city — or any open land — to settle it.'); };
 }
@@ -5176,11 +5665,11 @@ document.getElementById('b-build').addEventListener('click', () => {
 document.getElementById('avatar-chip').addEventListener('click', () => ECO.openEmpire());
 
 function openHelp() {
-  openModal('Open World v2.13 — Help', `
+  openModal('Open World v2.14 — Help', `
     <p><b>Controls</b></p>
     <div class="kv"><span class="k">MOVE</span><span class="v">click the street to walk there · WASD / arrows · hold Shift = sprint</span></div>
     <div class="kv"><span class="k">CAMERA</span><span class="v">Drag to orbit · wheel/pinch to zoom (gentle, glide)</span></div>
-    <div class="kv"><span class="k">BUILD ANYWHERE</span><span class="v">in orbit, click any open land to settle it — orange highways mark the cities linked over land</span></div>
+    <div class="kv"><span class="k">BUILD ANYWHERE</span><span class="v">in orbit, click any open land to settle it — out there it's open country: pastures, walkable country roads and green signs to the nearest cities</span></div>
     <div class="kv"><span class="k">EMPIRE</span><span class="v">avatar (top right) → TELEPORT to any plot you own, in any city or frontier</span></div>
     <div class="kv"><span class="k">SERVE</span><span class="v">[E] when standing at your cart</span></div>
     <div class="kv"><span class="k">MARKET</span><span class="v">📈 button · limit &amp; market orders</span></div>
@@ -5309,6 +5798,13 @@ function hoverPick(cx, cy) {
   hoverThrottle = now;
   const pt = screenToGround(cx, cy);
   if (!pt) { hideTooltip(); return; }
+  const gate = CITY.gateAt(pt.x, pt.z);   // v2.14: signposts explain themselves
+  if (gate) {
+    showTooltip(cx, cy, { t: '→ ' + gate.city.name, s: gate.km.toLocaleString('en-US') + ' km by country road',
+      p: 'CITY GATE', a: '', l: 'Click to travel — or walk the road there' });
+    canvas.style.cursor = 'pointer';
+    return;
+  }
   const info = ECO.hoverInfo(pt.x, pt.z);
   if (info) showTooltip(cx, cy, info);
   else hideTooltip();
@@ -5317,10 +5813,32 @@ function hoverPick(cx, cy) {
 function clickPick(cx, cy) {
   const pt = screenToGround(cx, cy);
   if (!pt) return;
+  // v2.14: a green city signpost is a travel button — click it to arrive
+  const gate = CITY.gateAt(pt.x, pt.z);
+  if (gate) { travelToGate(gate); return; }
   // v2.13 CLICK TO WALK: interactive clicks (spots, carts, towers) keep
   // their meaning; any plain street point becomes a walk destination
   if (ECO.clickAt(pt.x, pt.z)) return;
   ACTORS.setGoal(pt.x, pt.z);
+}
+
+// ---------------- v2.14: country gates → road-connected cities ---------
+// Walking into a green signpost (or clicking one) hands you to enterCity —
+// the same dive used by the Empire panel's TRAVEL, so the whole teardown /
+// rebuild / land-beside-your-stuff pipeline is shared. Gates arm 2.5s after
+// landing so a spawn point near a road end can never re-trigger entry.
+let cityEnteredAt = 0;
+function travelToGate(g) {
+  if (STATE.mode !== 'city') return;
+  toast('🛣️ Taking the <b>' + g.city.name + ' Road</b> — ' + g.km.toLocaleString('en-US') + ' km to ' + g.city.name + '…', 'warn');
+  ACTORS.clearGoal();
+  // deferred one frame: the trigger fires mid-loop, and enterCity's
+  // teardown would null cityScene before this frame's render — exactly
+  // why returnToGlobe hands off through a setTimeout too
+  setTimeout(() => {
+    if (STATE.mode !== 'city') return;
+    enterCity({ key: g.city.key, name: g.city.name, lat: g.city.lat, lon: g.city.lon, tier: g.city.tier });
+  }, 30);
 }
 
 // ---------------- main loop -------------------------------------------
@@ -5334,6 +5852,12 @@ function loop() {
     renderer.render(EARTH.scene, camera);
   } else if (STATE.mode === 'city' && cityScene) {
     ACTORS.updatePlayer(dt, camCtl.az);
+    // v2.14: walk into a city gate -> arrive in that city
+    if (CITY.gates.length && performance.now() - cityEnteredAt > 2500) {
+      const p0 = ACTORS.player.group.position;
+      const gate = CITY.gateNear(p0.x, p0.z, 8);
+      if (gate) travelToGate(gate);
+    }
     ACTORS.updateCitizens(dt);
     ACTORS.update(dt);
     ECO.update(dt);
@@ -5383,13 +5907,11 @@ window.addEventListener('beforeunload', () => { if (STATE.mode !== 'boot') saveG
 const _origDive = EARTH.diveTo.bind(EARTH);
 EARTH.diveTo = (city, cb) => {
   OSM.prefetch({ key: city.key, name: city.name, lat: city.lat, lon: city.lon });
-  return _origDive(city, () => enterCity({
-    key: city.key, name: city.name, lat: city.lat, lon: city.lon, tier: city.tier,
-  }));
+  return _origDive(city, () => enterCity(city));   // v2.14: whole object — the frontier flag survives
 };
 
 
-console.log('%cOPEN WORLD v2.13 — CLICK TO WALK', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.14 — OPEN COUNTRY', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
