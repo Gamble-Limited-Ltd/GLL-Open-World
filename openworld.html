@@ -3,14 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.18</title>
+<title>Open World — v2.19</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.18 — PLANET EARTH: the one world is the REAL Earth now —
-   true oceans, Natural Earth coastlines, the great lakes, and all 64
-   cities at their true geographic spots; country roads routed over real
-   land (A* across the coastlines at build time) and sea bridges joining
-   the island cities. On top of v2.17 BIRD'S EYE VIEW (free-roam command
+   OPEN WORLD v2.19 — SHORELINE CITIES: cities now FORM AROUND their
+   water the way real ones do — a wet anchor slides to the nearest shore
+   (Toronto sat inside Lake Ontario), the street grid and ground plate are
+   clipped to dry land so the city ends at the waterline, streets stop
+   exactly at the shore, and every great lake gets a sandy rim so a
+   lakeside reads as a waterfront. On top of v2.18 PLANET EARTH (real
+   oceans, coastlines, lakes, true city spots, land-routed roads) + BIRD'S
+   EYE VIEW (free-roam command
    camera + tap-only movement) + CLEAN HORIZON + STARTER GUIDE + TIGHT
    CONTROLS + CLEAR STREETS + HAPPY CUSTOMERS + SIDEWALK SPOTS + INSTANT
    TRAVEL + WORLD ATLAS + OPEN FRONTIER (build anywhere on dry land)
@@ -507,7 +510,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.18 — the real Earth: true oceans, lakes and coasts, cities at their true spots, land-routed roads between them</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.19 — the real Earth: cities form around their lakes and oceans — streets stop at the shore, nothing stands in the water</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -543,7 +546,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.18';
+const GAME_VERSION = 'v2.19';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -776,6 +779,18 @@ const CITIES = RAW_CITIES.map((r, i) => ({
 // coastlines, so the planet you orbit is the planet you walk.
 const DEG_M = 550;
 CITIES.forEach(c => { c.wx = c.lon * DEG_M; c.wz = -c.lat * DEG_M; });
+// ---- v2.19 SHORELINE CITIES -----------------------------------------
+// A few catalog cities sit so close to their water that the exact
+// coordinate lands IN it at this map's resolution (Toronto's center
+// is inside Lake Ontario). Real cities sit ON the shore, hugging the
+// water — so a wet anchor slides to the nearest dry land and stays
+// there. Every other city keeps its true geographic spot untouched.
+if (LANDGEO.ok()) CITIES.forEach(c => {
+  if (LANDGEO.isWaterWorld(c.wx, c.wz)) {
+    const nl = LANDGEO.nearestLandWorld(c.wx, c.wz, 2600);
+    if (nl) { c.wx = nl.x; c.wz = nl.z; }
+  }
+});
 // the old stylized layout — kept ONLY to migrate pre-Earth saves
 const OLD_LAYOUT = [  [-4332, -2319], [-10325, -240], [-7033, -1651], [-5917, -2933],
   [-8213, 1683], [-11064, -1791], [-4988, 627], [-8222, -420],
@@ -2218,6 +2233,36 @@ const WORLD = (() => {
       new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
     if (sh.pos.length) flatMesh(sh.pos, sh.col,
       new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
+    // ---- v2.19: sandy rims just inside every lake waterline --------------
+    // Same read as the ocean coasts: a pale sand shelf hugging each lake's
+    // edge, a hair above the surface — so a city beside a lake reads as a
+    // waterfront, not as a slab over water.
+    const rm = { pos: [], col: [] };
+    const cRim = col(0xd8cfa6);
+    for (const lk of LANDGEO.lakes) {
+      if (lk.ring.length < 4) continue;
+      // ring winding: interior (the water) lies LEFT of travel for
+      // positive signed area — all Natural Earth rings but the Caspian.
+      let sa = 0;
+      for (let i = 0; i < lk.ring.length; i++) {
+        const p = lk.ring[i], q = lk.ring[(i + 1) % lk.ring.length];
+        sa += (p[0] * DEG_M) * (-q[1] * DEG_M) - (q[0] * DEG_M) * (-p[1] * DEG_M);
+      }
+      const sgn = sa > 0 ? 1 : -1;
+      for (let i = 0; i < lk.ring.length; i++) {
+        const a = lk.ring[i], b = lk.ring[(i + 1) % lk.ring.length];
+        const ax = a[0] * DEG_M, az = -a[1] * DEG_M, bx = b[0] * DEG_M, bz = -b[1] * DEG_M;
+        const seg = Math.hypot(bx - ax, bz - az);
+        if (seg < .01 || seg > 3000) continue;          // degenerate seam edges
+        const snx = (bz - az) / seg, snz = -(bx - ax) / seg;   // RIGHT of travel
+        const wx = -snx * sgn, wz = -snz * sgn;         // toward the water
+        const A = [ax, az], B = [bx, bz];
+        const C = [bx + wx * 11, bz + wz * 11], D = [ax + wx * 11, az + wz * 11];
+        for (const p of [A, B, C, A, C, D]) { rm.pos.push(p[0], .068, p[1]); rm.col.push(cRim[0], cRim[1], cRim[2]); }
+      }
+    }
+    if (rm.pos.length) flatMesh(rm.pos, rm.col,
+      new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
   }
   // pre-Earth fallback ground (only if the coastline data failed to load)
   function buildGroundFlat() {
@@ -2632,7 +2677,13 @@ const WORLD = (() => {
   async function setCity(data, meta, onStatus) {
     clearCity();
     const c = CITIES.find(x => x.key === meta.key);
-    const anchor = c ? { x: c.wx, z: c.wz } : (worldAnchorOf(meta.key) || { x: 0, z: 0 });
+    let anchor = c ? { x: c.wx, z: c.wz } : (worldAnchorOf(meta.key) || { x: 0, z: 0 });
+    // v2.19: a searched/settled spot whose anchor is in the water slides
+    // to the nearest shore (catalog cities were snapped at boot)
+    if (LANDGEO.ready && LANDGEO.isWaterWorld(anchor.x, anchor.z)) {
+      const nl = LANDGEO.nearestLandWorld(anchor.x, anchor.z, 1400);
+      if (nl) anchor = nl;
+    }
     const g = await CITY.build(data, meta, anchor, onStatus);
     scene.add(g);
     activeCity = { key: meta.key, meta, anchor };
@@ -4194,6 +4245,8 @@ const CITY = (() => {
             for (const g of [...(city.greens || []), ...(city.waters || [])])
               if (g.poly && inPoly(cx, cz, g.poly)) { ok = false; break; }
             if (!ok) continue;
+            // v2.19: no vendor pads in the water
+            if (LANDGEO.ready && LANDGEO.isWaterWorld(cx, cz)) continue;
             if (seen.some(s => Math.hypot(s[0] - cx, s[1] - cz) < 15)) continue;
             seen.push([cx, cz]);
             const rotY = Math.atan2(ux, uz);  // spot's long axis along the road
@@ -4383,6 +4436,7 @@ const CITY = (() => {
       const cx = ax + ux * d - uz * off * side;
       const cz = az + uz * d + ux * off * side;
       if (Math.hypot(cx - (cityAnchor ? cityAnchor.x : 0), cz - (cityAnchor ? cityAnchor.z : 0)) > 640) continue;
+      if (LANDGEO.ready && LANDGEO.isWaterWorld(cx, cz)) continue;   // v2.19: barn on dry ground
       const W = 9 + rnd() * 3, Dp = 6.5 + rnd() * 2;
       buildingPolys.push({ poly: [[cx - W / 2, cz - Dp / 2], [cx + W / 2, cz - Dp / 2], [cx + W / 2, cz + Dp / 2], [cx - W / 2, cz + Dp / 2]],
         h: 7, bkey: 'barn' + b, t: {} });
@@ -4411,13 +4465,19 @@ const CITY = (() => {
     const rnd = _mulberry(hashStr('F' + (city.key || city.name)));
     const mobF = isMob ? .6 : 1;
     const gateClear = (x, z) => gates.every(g => Math.hypot(x - g.x, z - g.z) > 14);
+    // v2.19: fields/groves/rocks center on the SETTLEMENT (they used to
+    // ring world origin — the Gulf of Guinea — leaving the homestead
+    // bare) and nothing is placed on water.
+    const PAX = cityAnchor ? cityAnchor.x : 0, PAZ = cityAnchor ? cityAnchor.z : 0;
+    const dry = (x, z) => !(LANDGEO.ready && LANDGEO.isWaterWorld(x, z));
 
     // ---- hay field patches: soft color washes over the meadow ----
     const fields = { pos: [], norm: [], uv: [], col: [] };
     const FPC = [0x93c46e, 0xa9c96e, 0x86bb62, 0xbac46e, 0x7fb35f, 0xc4bb66].map(colOf);
     const nF = Math.round((11 + rnd() * 7) * mobF);
     for (let f = 0; f < nF; f++) {
-      const cx = (rnd() * 2 - 1) * 570, cz = (rnd() * 2 - 1) * 570;
+      const cx = PAX + (rnd() * 2 - 1) * 570, cz = PAZ + (rnd() * 2 - 1) * 570;
+      if (!dry(cx, cz)) continue;
       const R = 60 + rnd() * 130;
       if (Math.hypot(cx - (cityAnchor ? cityAnchor.x : 0), cz - (cityAnchor ? cityAnchor.z : 0)) < 110) continue;                 // keep the junction open
       const col = jit(FPC[Math.floor(rnd() * FPC.length)], .93 + rnd() * .14);
@@ -4444,8 +4504,9 @@ const CITY = (() => {
     const trees = [];
     const nG = Math.round((6 + rnd() * 4) * mobF);
     for (let gi = 0; gi < nG; gi++) {
-      const gx = (rnd() * 2 - 1) * 500, gz = (rnd() * 2 - 1) * 500;
-      if (Math.hypot(gx, gz) < 120) continue;
+      const gx = PAX + (rnd() * 2 - 1) * 500, gz = PAZ + (rnd() * 2 - 1) * 500;
+      if (Math.hypot(gx - PAX, gz - PAZ) < 120) continue;
+      if (!dry(gx, gz)) continue;
       const n = 5 + Math.floor(rnd() * 10);
       for (let i = 0; i < n; i++) {
         const a = rnd() * 6.2832, rr = 14 + rnd() * 34;
@@ -4454,12 +4515,12 @@ const CITY = (() => {
     }
     for (let i = 0; i < Math.round(34 * mobF); i++) {          // lone sentinels
       const a = rnd() * 6.2832, rr = 130 + rnd() * 430;
-      trees.push([Math.cos(a) * rr, Math.sin(a) * rr]);
+      trees.push([PAX + Math.cos(a) * rr, PAZ + Math.sin(a) * rr]);
     }
     const keptTrees = [];
     let droppedTrees = 0;
     for (const t of trees) {
-      if (offAsphalt(t[0], t[1], 1.4) && !plotAt(t[0], t[1]) && gateClear(t[0], t[1])) keptTrees.push(t);
+      if (offAsphalt(t[0], t[1], 1.4) && !plotAt(t[0], t[1]) && gateClear(t[0], t[1]) && dry(t[0], t[1])) keptTrees.push(t);
       else droppedTrees++;
     }
     treeList = keptTrees;
@@ -4470,18 +4531,18 @@ const CITY = (() => {
     const rocks = [], bushes = [], bales = [];
     for (let i = 0; i < Math.round(26 * mobF); i++) {
       const a = rnd() * 6.2832, rr = 60 + rnd() * 520;
-      const x = Math.cos(a) * rr, z = Math.sin(a) * rr;
-      if (offAsphalt(x, z, 1.6) && !plotAt(x, z) && gateClear(x, z)) rocks.push([x, z, .5 + rnd() * 1.3, rnd() * 6.28]);
+      const x = PAX + Math.cos(a) * rr, z = PAZ + Math.sin(a) * rr;
+      if (dry(x, z) && offAsphalt(x, z, 1.6) && !plotAt(x, z) && gateClear(x, z)) rocks.push([x, z, .5 + rnd() * 1.3, rnd() * 6.28]);
     }
     for (let i = 0; i < Math.round(46 * mobF); i++) {
       const a = rnd() * 6.2832, rr = 40 + rnd() * 560;
-      const x = Math.cos(a) * rr, z = Math.sin(a) * rr;
-      if (offAsphalt(x, z, 1.2) && !plotAt(x, z)) bushes.push([x, z, .7 + rnd() * .8]);
+      const x = PAX + Math.cos(a) * rr, z = PAZ + Math.sin(a) * rr;
+      if (dry(x, z) && offAsphalt(x, z, 1.2) && !plotAt(x, z)) bushes.push([x, z, .7 + rnd() * .8]);
     }
     for (let i = 0; i < Math.round((6 + rnd() * 8) * mobF); i++) {
       const a = rnd() * 6.2832, rr = 150 + rnd() * 380;
-      const x = Math.cos(a) * rr, z = Math.sin(a) * rr;
-      if (offAsphalt(x, z, 2.2) && !plotAt(x, z) && gateClear(x, z)) bales.push([x, z, rnd() * 6.28]);
+      const x = PAX + Math.cos(a) * rr, z = PAZ + Math.sin(a) * rr;
+      if (dry(x, z) && offAsphalt(x, z, 2.2) && !plotAt(x, z) && gateClear(x, z)) bales.push([x, z, rnd() * 6.28]);
     }
     {
       const mat4 = new THREE.Matrix4(), q = new THREE.Quaternion(), Y = new THREE.Vector3(0, 1, 0), sc = new THREE.Vector3();
@@ -4572,19 +4633,29 @@ const CITY = (() => {
     const rnd = _mulberry(hashStr('h' + (cityRec.key || cityRec.name || 'x')));
     const hax = cityAnchor ? cityAnchor.x : 0, haz = cityAnchor ? cityAnchor.z : 0;
     const n = isMob ? 26 : 44;
-    const inst = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 12, 8, 0, 6.2832, 0, 1.35),
-      new THREE.MeshLambertMaterial({ color: 0xffffff }), n);
-    const mat4 = new THREE.Matrix4();
-    const fogC = new THREE.Color(0x9fc7e8), base = new THREE.Color(0x5e8f63), c = new THREE.Color();
+    // v2.19: hills stand on dry land only — no rocky islets ringing a
+    // seaside or lakeside city (the water around a shore city is real).
+    const spots = [];
     for (let i = 0; i < n; i++) {
       const a = (i / n) * 6.2832 + rnd() * .1;
       const r = 1050 + rnd() * 380;
+      const x = hax + Math.cos(a) * r, z = haz + Math.sin(a) * r;
       const w = 190 + rnd() * 300, h = 46 + rnd() * 96;
-      mat4.makeScale(w, h, w * (.7 + rnd() * .5));
-      mat4.setPosition(hax + Math.cos(a) * r, -6, haz + Math.sin(a) * r);
-      inst.setMatrixAt(i, mat4);
-      inst.setColorAt(i, c.copy(base).lerp(fogC, .18 + rnd() * .3));
+      const zf = .7 + rnd() * .5, f = .18 + rnd() * .3;
+      if (LANDGEO.ready && LANDGEO.isWaterWorld(x, z)) continue;
+      spots.push({ x, z, w, h, zf, f });
     }
+    if (!spots.length) return;
+    const inst = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 12, 8, 0, 6.2832, 0, 1.35),
+      new THREE.MeshLambertMaterial({ color: 0xffffff }), spots.length);
+    const mat4 = new THREE.Matrix4();
+    const fogC = new THREE.Color(0x9fc7e8), base = new THREE.Color(0x5e8f63), c = new THREE.Color();
+    spots.forEach((s, i) => {
+      mat4.makeScale(s.w, s.h, s.w * s.zf);
+      mat4.setPosition(s.x, -6, s.z);
+      inst.setMatrixAt(i, mat4);
+      inst.setColorAt(i, c.copy(base).lerp(fogC, s.f));
+    });
     group.add(inst);
   }
 
@@ -4596,6 +4667,43 @@ const CITY = (() => {
   function gateNear(x, z, r) {
     for (const g of gates) if (Math.hypot(x - g.x, z - g.z) <= r) return g;
     return null;
+  }
+
+  // ---------- v2.19 SHORELINE CITIES: the ground plate -----------------
+  // The old plate was one full 1490 m square — over a coast or lakeshore
+  // that meant a slab of "city ground" floating on the water. The plate
+  // is tiled now and only dry tiles are laid, so the city's footprint
+  // ends where the water begins — the shore shapes the city, like in the
+  // real world. (The planet's land shield still shows between the last
+  // tile and the waterline, so nothing floats.)
+  function shorePlate(ax, az, size, y, tex) {
+    if (!LANDGEO.ready) {
+      const base = new THREE.Mesh(new THREE.PlaneGeometry(size, size),
+        new THREE.MeshLambertMaterial({ map: tex }));
+      base.rotation.x = -Math.PI / 2; base.position.set(ax, y, az);
+      base.receiveShadow = true;
+      return base;
+    }
+    const N = 20, T = size / N;
+    const pos = [], uv = [];
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      const x0 = ax - size / 2 + i * T, z0 = az - size / 2 + j * T;
+      const x1 = x0 + T, z1 = z0 + T;
+      // a tile is laid only where it is solid ground at every corner + center
+      if (LANDGEO.isWaterWorld(x0, z0) || LANDGEO.isWaterWorld(x1, z0) ||
+          LANDGEO.isWaterWorld(x0, z1) || LANDGEO.isWaterWorld(x1, z1) ||
+          LANDGEO.isWaterWorld((x0 + x1) / 2, (z0 + z1) / 2)) continue;
+      const u0 = i / N, u1 = (i + 1) / N, v0 = j / N, v1 = (j + 1) / N;
+      pos.push(x0, y, z1, x1, y, z1, x1, y, z0, x0, y, z1, x1, y, z0, x0, y, z0);
+      uv.push(u0, v1, u1, v1, u1, v0, u0, v1, u1, v0, u0, v0);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(pos.map((_, i) => i % 3 === 1 ? 1 : 0), 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: tex }));
+    mesh.receiveShadow = true;
+    return mesh;
   }
 
   // ---------- assemble ---
@@ -4621,8 +4729,60 @@ const CITY = (() => {
     const shift = pts => pts.map(p => [p[0] + ax, p[1] + az]);
     roads = cityData.roads.map(r => ({ ...r, pts: shift(r.pts) }));
     buildingPolys = (cityData.buildings || []).map(b => ({ ...b, poly: shift(b.poly) }));
-    const greensShift = (cityData.greens || []).map(g => ({ ...g, poly: shift(g.poly) }));
+    let greensShift = (cityData.greens || []).map(g => ({ ...g, poly: shift(g.poly) }));
     const watersShift = (cityData.waters || []).map(g => ({ ...g, poly: shift(g.poly) }));
+    // ---- v2.19 SHORELINE CITIES: the city forms AROUND its water -------
+    // Streets stop exactly at the shoreline (the crossing is found by
+    // bisection on each wet segment), buildings and parks on wet ground
+    // are dropped, so the city footprint follows the coast or lakeshore
+    // the way a real city does. Everything downstream — plots, cars,
+    // lamps, trees, spatial hashes, NPC routes — derives from these
+    // clipped lists, so nothing is left standing in the water.
+    if (LANDGEO.ready) {
+      const wet = (x, z) => LANDGEO.isWaterWorld(x, z);
+      const shorePt = (p, q) => {              // boundary between wet p and dry q
+        let a = p, b = q, wa = wet(p[0], p[1]);
+        for (let k = 0; k < 8; k++) {
+          const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+          if (wet(m[0], m[1]) === wa) a = m; else b = m;
+        }
+        return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      };
+      const splitDry = pts => {                // maximal runs of dry points
+        const out = [];
+        let run = null;
+        for (let i = 0; i < pts.length; i++) {
+          if (!wet(pts[i][0], pts[i][1])) {
+            if (!run) { run = { i0: i, pts: [] }; out.push(run); }
+            run.pts.push(pts[i]);
+          } else run = null;
+        }
+        return out;
+      };
+      const keptRoads = [];
+      for (const r of roads) {
+        for (const seg of splitDry(r.pts)) {
+          const out = seg.pts.slice();
+          if (seg.i0 > 0) out.unshift(shorePt(r.pts[seg.i0 - 1], r.pts[seg.i0]));
+          const iEnd = seg.i0 + seg.pts.length - 1;
+          if (iEnd < r.pts.length - 1) out.push(shorePt(r.pts[iEnd], r.pts[iEnd + 1]));
+          if (out.length >= 2) keptRoads.push({ ...r, pts: out });
+        }
+      }
+      roads = keptRoads;
+      const solid = poly => {                  // centroid + bbox corners dry
+        let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9, cx = 0, cz = 0;
+        for (const p of poly) {
+          x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]);
+          z0 = Math.min(z0, p[1]); z1 = Math.max(z1, p[1]);
+          cx += p[0]; cz += p[1];
+        }
+        cx /= poly.length; cz /= poly.length;
+        return !wet(x0, z0) && !wet(x1, z0) && !wet(x1, z1) && !wet(x0, z1) && !wet(cx, cz);
+      };
+      buildingPolys = buildingPolys.filter(b => solid(b.poly));
+      greensShift = greensShift.filter(g => solid(g.poly));
+    }
     const shifted = { ...cityData, ...cityMeta, roads, buildings: buildingPolys, greens: greensShift, waters: watersShift };
     suites = [];
     benchScratch = [];
@@ -4634,11 +4794,7 @@ const CITY = (() => {
     // — and the same roadside vendor-spot layer the cities have.
     // (v2.15: no gate signposts — the one world's real roads replaced them.)
     if (cityData.pasture) {
-      const base = new THREE.Mesh(new THREE.PlaneGeometry(1490, 1490),
-        new THREE.MeshLambertMaterial({ map: getGrassTex() }));
-      base.rotation.x = -Math.PI / 2; base.position.set(ax, .012, az);
-      base.receiveShadow = true;
-      group.add(base);
+      group.add(shorePlate(ax, az, 1490, .012, getGrassTex()));
       onStatus && onStatus('Laying out the country roads…'); await _tick();
       buildRoads(shifted);
       onStatus && onStatus('Raising the barn…'); await _tick();
@@ -4655,11 +4811,7 @@ const CITY = (() => {
       return group;
     }
 
-    const base = new THREE.Mesh(new THREE.PlaneGeometry(1490, 1490),
-      new THREE.MeshLambertMaterial({ map: getGroundTex() }));
-    base.rotation.x = -Math.PI / 2; base.position.set(ax, .012, az);
-    base.receiveShadow = true;
-    group.add(base);
+    group.add(shorePlate(ax, az, 1490, .012, getGroundTex()));
     onStatus && onStatus('Laying out the street grid…'); await _tick();
     buildRoads(shifted);
     onStatus && onStatus('Raising ' + (cityData.buildings || []).length + ' buildings…'); await _tick();
@@ -4719,7 +4871,10 @@ const CITY = (() => {
     return { x: bx, z: bz, rd: brd, d: best };
   }
   function randomRoadPoint(rnd) {
-    if (!roads.length) return { x: 0, z: 0, rd: null };
+    // v2.19: no roads at all (everything clipped off at a shoreline) ->
+    // stand beside the anchor, which is on dry land — never at world
+    // origin, which is open ocean on the real Earth.
+    if (!roads.length) return { x: (cityAnchor ? cityAnchor.x : 0) + 24, z: (cityAnchor ? cityAnchor.z : 0), rd: null };
     const rd = roads[Math.floor(rnd() * roads.length)];
     const i = Math.floor(rnd() * (rd.pts.length - 1));
     const t = rnd();
@@ -6757,6 +6912,11 @@ async function enterWorld(meta, opts = {}) {
       spot = (r0 && r0.length) ? { x: r0[0][0], z: r0[0][1] } : { x: 0, z: 0 };
     }
     if (!spot) spot = CITY.randomRoadPoint(rnd);
+    // v2.19: never arrive standing in the water (an old save by a shore)
+    if (spot && LANDGEO.ready && LANDGEO.isWaterWorld(spot.x, spot.z)) {
+      const rp = CITY.randomRoadPoint(rnd);
+      if (rp && !LANDGEO.isWaterWorld(rp.x, rp.z)) spot = rp;
+    }
     ACTORS.placePlayer(spot.x, spot.z);
     if (arrived) ACTORS.player.group.rotation.y = Math.atan2(arrived.rec.x - spot.x, arrived.rec.z - spot.z);
     camCtl.az = Math.PI * .25; camCtl.el = 1.25; camCtl.dist = 110; camCtl.distT = arrived ? 64 : 110;
@@ -7018,7 +7178,7 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
   a.onclick = e => {
     e.preventDefault();
     const k = a.dataset.abt;
-    openModal(k.toUpperCase(), `<p><b>Open World v2.18</b> runs entirely in your browser and saves locally.</p>
+    openModal(k.toUpperCase(), `<p><b>Open World v2.19</b> runs entirely in your browser and saves locally.</p>
       <p>No accounts, no tracking, no payments. Map data © OpenStreetMap contributors (ODbL).</p>
       <p>Support: keep playing and build something big.</p>`);
   };
@@ -7028,13 +7188,13 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.18 — PLANET EARTH', `
-    <p><b>The world is the real Earth now.</b></p>
-    <div class="kv"><span class="k">REAL OCEANS</span><span class="v">Every sea, coast and great lake lies exactly where it does on the planet</span></div>
-    <div class="kv"><span class="k">REAL CITIES</span><span class="v g">All 64 cities sit at their true geographic spots — the globe IS the map now</span></div>
-    <div class="kv"><span class="k">LAND ROUTES</span><span class="v">Country roads follow real land — around seas, over isthmuses, coast to coast</span></div>
-    <div class="kv"><span class="k">SEA BRIDGES</span><span class="v">Island cities (London, Tokyo, Havana…) join the world by long causeways</span></div>
-    <div class="kv"><span class="k">ZOOM OUT</span><span class="v">Scroll far out at bird\u2019s eye — whole continents and oceans come into view</span></div>
+  openModal('Welcome to v2.19 — SHORELINE CITIES', `
+    <p><b>Cities form around their water now.</b></p>
+    <div class="kv"><span class="k">NO CITY IN THE LAKE</span><span class="v g">A city whose spot was in the water now sits ON the shore (Toronto hugs Lake Ontario)</span></div>
+    <div class="kv"><span class="k">SHORELINE STREETS</span><span class="v">Streets stop exactly at the waterline — the coast shapes the city, like in the real world</span></div>
+    <div class="kv"><span class="k">WATERFRONT GROUND</span><span class="v">The city's ground ends at the water — no slabs floating on lakes or seas</span></div>
+    <div class="kv"><span class="k">SANDY LAKE RIMS</span><span class="v">Every great lake gets a pale sand rim at its waterline, like the ocean coasts</span></div>
+    <div class="kv"><span class="k">REAL EARTH</span><span class="v">Oceans, coastlines, lakes and all 64 cities at their true spots</span></div>
     <div class="kv"><span class="k">SAME GAME</span><span class="v">Tap to move · build anywhere on dry land · real streets in every city</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
@@ -7071,7 +7231,7 @@ function recenterOnPlayer() {
 document.getElementById('b-locate').addEventListener('click', recenterOnPlayer);
 
 function openHelp() {
-  openModal('Open World v2.18 — Help', `
+  openModal('Open World v2.19 — Help', `
     <p><b>Controls</b></p>
     <div class="kv"><span class="k">MOVE</span><span class="v g">Tap / click anywhere — your tycoon walks there (the only way they move)</span></div>
     <div class="kv"><span class="k">LOOK AROUND</span><span class="v">Drag or WASD / arrows / joystick to glide the bird\u2019s-eye view across the map</span></div>
@@ -7506,7 +7666,7 @@ EARTH.diveTo = (city, cb) => {
 };
 
 
-console.log('%cOPEN WORLD v2.18 — PLANET EARTH', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.19 — SHORELINE CITIES', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
