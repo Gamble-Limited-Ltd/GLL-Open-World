@@ -3,10 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.16</title>
+<title>Open World — v2.17</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.16 — CLEAN HORIZON (no fake skylines or floating name letters — the horizon is the real one world) + ONE WORLD (all land connected) + STARTER GUIDE + TIGHT CONTROLS + CLEAR STREETS + HAPPY CUSTOMERS + SIDEWALK SPOTS + INSTANT TRAVEL + WORLD ATLAS + OPEN FRONTIER (build anywhere) + CLICK TO WALK (one scene, real roads between cities)
+   OPEN WORLD v2.17 — BIRD'S EYE VIEW (free-roam command camera + tap-only
+   movement) on top of v2.16 CLEAN HORIZON (no fake skylines or floating
+   name letters) + ONE WORLD (all land connected) + STARTER GUIDE + TIGHT
+   CONTROLS + CLEAR STREETS + HAPPY CUSTOMERS + SIDEWALK SPOTS + INSTANT
+   TRAVEL + WORLD ATLAS + OPEN FRONTIER (build anywhere) + CLICK TO WALK
+   (one scene, real roads between cities)
    Visual system modeled on the Capital Rift reference frame:
    dark glassmorphism fintech UI (panels #1A202C @85%, 1px #4A5568
    borders, 4px radius), money-green #48BB78 prices, link-blue
@@ -446,6 +451,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
       <div id="avatar-chip"><span id="bb-loc">—</span><svg viewBox="0 0 24 30"><circle cx="12" cy="6" r="5.4" fill="#F7FAFC"/><path d="M4 14c0-2 3.6-3.6 8-3.6s8 1.6 8 3.6v9c0 3-3.6 5-8 5s-8-2-8-5v-9z" fill="#3182CE"/></svg></div>
       <div class="bb-side">
         <button class="bb-btn" id="b-market"><span class="tip">MARKET</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 14 4-5 3 3 5-7"/></svg></button>
+        <button class="bb-btn" id="b-locate"><span class="tip">FIND ME</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="2"/><path d="M12 1.5v3.2M12 19.3v3.2M1.5 12h3.2M19.3 12h3.2"/></svg></button>
         <button class="bb-btn" id="b-help"><span class="tip">HELP</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.4 2.3c-.8.3-1.4 1-1.4 1.9v.8"/><circle cx="12" cy="17.5" r=".5" fill="currentColor"/></svg></button>
       </div>
     </div>
@@ -499,7 +505,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.16 — one connected world: every city, pasture and road on a single map</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.17 — one connected world: every city, pasture and road on a single map</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -527,7 +533,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.16';
+const GAME_VERSION = 'v2.17';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -4472,7 +4478,8 @@ function _polyArea(poly) {
 // ======== section: 50_actors.js ========
 // ====================================================================
 // v2.0 — ACTORS: chibi figures (blue-body/white-head Capital Rift
-// avatars), the player controller (WASD + touch joystick), ambient
+// avatars), the player controller (v2.17: tap-to-move ONLY — WASD and
+// the touch joystick pan the bird's-eye camera instead), ambient
 // citizens patrolling real sidewalks, cart meshes.
 // ====================================================================
 const ACTORS = (() => {
@@ -4690,15 +4697,17 @@ const ACTORS = (() => {
   setupJoystick();
 
   // ---------------- v2.13 — CLICK TO MOVE -----------------------------
-  // Click a spot on the street and the tycoon walks there on their own:
-  // a green ring marks the destination and ripples once you arrive.
-  // Held keys override the auto-walk instantly (v2.06 stop-on-release
-  // semantics are untouched), Shift mid-walk = jog, walls stop the walk
-  // exactly like walking into them manually, and teleports / city
-  // changes drop the destination so nobody chases a stale coordinate.
+  // v2.17: this is now the ONLY way the character moves. Tap a spot on
+  // the ground and the tycoon walks there on their own: a green ring
+  // marks the destination and ripples once you arrive. Walls slide
+  // instead of cancelling, a no-progress watchdog ends hopeless walks,
+  // taps on rooftops reroute to the nearest street, and teleports /
+  // city changes drop the destination so nobody chases a stale
+  // coordinate. Keys/joystick steer the camera, not the character.
   let goal = null;          // {x, z} walk destination
   let marker = null;        // destination ring+dot group
   let markerDone = 0;       // >0 -> arrival ripple countdown (seconds)
+  let stuckT = 0, progX = 0, progZ = 0;   // v2.17 wall-watchdog
 
   function disposeMarker() {
     if (!marker) return;
@@ -4706,19 +4715,46 @@ const ACTORS = (() => {
     marker.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
     marker = null;
   }
-  function clearGoal() {          // cancel: keys / wall / teleport
+  function clearGoal() {          // cancel: watchdog / teleport
     goal = null; markerDone = 0; disposeMarker();
   }
   function arriveGoal() {         // reached it: play the ripple, stop
     goal = null;
     if (marker) markerDone = .5;
   }
+  // v2.17: tapped a rooftop/footprint → the nearest point on any street
+  // of the active city chunk (full scan — taps are rare)
+  function nearestStreetPoint(x, z) {
+    let best = 1e9, bx = x, bz = z;
+    for (const rd of CITY.roads) {
+      for (let i = 0; i < rd.pts.length - 1; i++) {
+        const [ax, az] = rd.pts[i], [bx2, bz2] = rd.pts[i + 1];
+        const dx = bx2 - ax, dz = bz2 - az, L2 = dx * dx + dz * dz || 1;
+        let t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2));
+        const px = ax + t * dx, pz = az + t * dz;
+        const d = Math.hypot(x - px, z - pz);
+        if (d < best) { best = d; bx = px; bz = pz; }
+      }
+    }
+    return best < 1e9 ? { x: bx, z: bz } : null;
+  }
   function setGoal(x, z) {
     if (!player || !player.group.parent) return false;
     if (!Number.isFinite(x) || !Number.isFinite(z)) return false;   // junk in — no goal out
-    const [gx, gz] = WORLD.clampToBounds(x, z);
-    if (CITY.pointInBuilding(gx, gz)) return false;   // walls are not destinations
-    goal = { x: gx, z: gz };
+    let [gx, gz] = WORLD.clampToBounds(x, z);
+    if (CITY.pointInBuilding(gx, gz)) {
+      // v2.17: walls are not destinations — but their street is
+      const w = nearestStreetPoint(gx, gz);
+      if (!w) return false;
+      gx = w.x; gz = w.z;
+    }
+    const gd0 = Math.hypot(gx - player.group.position.x, gz - player.group.position.z);
+    goal = { x: gx, z: gz, far: gd0 > 60 };   // v2.17: long travel taps are jogged
+    stuckT = 0; progX = player.group.position.x; progZ = player.group.position.z;
+    detour = null;
+    // v2.17: detours may spend this much extra distance on going around
+    // obstacles — pathological walks end instead of cycling forever
+    detourBudget = 250 + 2 * Math.hypot(gx - player.group.position.x, gz - player.group.position.z);
     markerDone = 0;
     disposeMarker();
     const mat = new THREE.MeshBasicMaterial({ color: 0x8ff0ae, transparent: true, opacity: .95, side: THREE.DoubleSide, depthWrite: false });
@@ -4732,61 +4768,104 @@ const ACTORS = (() => {
     return true;
   }
 
-  // camera-relative movement; camAz = camera azimuth around player
-  // (camera offset from player = (sin(az), _, cos(az)) * dist)
-  function updatePlayer(dt, camAz) {
+  // v2.17: combined camera-pan input for the main loop (screen-space:
+  // x = right+, z = down+; W pushes the view up-screen). The character
+  // itself is NOT moved by keys — only by setGoal (tap-to-move).
+  function navInput() {
+    let x = 0, z = 0;
+    if (keys['w'] || keys['arrowup']) z -= 1;
+    if (keys['s'] || keys['arrowdown']) z += 1;
+    if (keys['a'] || keys['arrowleft']) x -= 1;
+    if (keys['d'] || keys['arrowright']) x += 1;
+    if (joy.active) { x += joy.dx; z += joy.dz; }
+    const mag = Math.hypot(x, z);
+    return { x, z, mag: Math.min(1, mag), active: mag > .08, run: !!keys['shift'] };
+  }
+
+  // v2.17 — TAP-ONLY MOVEMENT. No more WASD walking: the character
+  // walks only toward the tapped goal. Buildings block with axis
+  // sliding; when corner-trapped the walker routes around obstacles
+  // (preferring the street point nearest the goal — roads wrap blocks —
+  // then perpendicular sidesteps), and a distance-budgeted watchdog
+  // ends walks that can't get anywhere so no goal runs forever.
+  let detour = null, detourSide = 1, detourBudget = 0;
+  function updatePlayer(dt) {
     if (!player) return;
-    let mx = 0, mz = 0;
-    if (keys['w'] || keys['arrowup']) mz -= 1;
-    if (keys['s'] || keys['arrowdown']) mz += 1;
-    if (keys['a'] || keys['arrowleft']) mx -= 1;
-    if (keys['d'] || keys['arrowright']) mx += 1;
-    if (joy.active) { mx += joy.dx; mz += joy.dz; }
-    const mag = Math.hypot(mx, mz);
-    if (mag > .08) {
-      if (goal) clearGoal();   // v2.13: manual input overrides the auto-walk
-      const sprinting = !!keys['shift'];
-      const run = sprinting ? 10.5 : 6.2;
-      const nx = mx / mag, nz = mz / mag;
-      // rotate input by -camAz so W walks away from the camera
-      const ca = Math.cos(camAz), sa = Math.sin(camAz);
-      const wx = nx * ca + nz * sa;
-      const wz = -nx * sa + nz * ca;
-      const step = run * dt * Math.min(1, mag);
-      const tx = player.group.position.x + wx * step;
-      const tz = player.group.position.z + wz * step;
-      // collision: buildings block; v2.15 clamp to the ONE WORLD bounds
-      const [cx, cz] = WORLD.clampToBounds(tx, tz);
-      if (!CITY.pointInBuilding(cx, cz) && !CITY.pointInBuilding(cx + wx * .5, cz + wz * .5)) {
-        player.group.position.x = cx; player.group.position.z = cz;
-      }
-      player.group.rotation.y = Math.atan2(wx, wz);
-      player.setWalk(true);
-      player.phaseSpeed = run;
-      player.sprint = sprinting;   // v2.06: sprint state (QA/HUD-visible)
-    } else if (goal) {
-      // v2.13 CLICK TO MOVE: no key held -> keep walking to the clicked spot
-      const p = player.group.position;
-      const dx = goal.x - p.x, dz = goal.z - p.z;
-      const d = Math.hypot(dx, dz);
-      if (d < .45) {
+    if (!goal) { detour = null; player.setWalk(false); player.sprint = false; return; }
+    const sprinting = !!keys['shift'];
+    const run = sprinting ? 10.5 : (goal.far ? 8.4 : 6.2);   // v2.17: far taps travel at a jog
+    const p = player.group.position;
+    const wp = detour || goal;
+    let dx = wp.x - p.x, dz = wp.z - p.z;
+    let d = Math.hypot(dx, dz);
+    if (d < (detour ? .6 : .45)) {
+      if (detour) {   // rounded the obstacle — resume the direct line
+        detour = null; stuckT = 0; progX = p.x; progZ = p.z;
+        dx = goal.x - p.x; dz = goal.z - p.z; d = Math.hypot(dx, dz);
+      } else {
         arriveGoal();
         player.setWalk(false); player.sprint = false;
-      } else {
-        const sprinting = !!keys['shift'];
-        const run = sprinting ? 10.5 : 6.2;
-        const step = Math.min(run * dt, d);
-        const wx = dx / d, wz = dz / d;
-        const [cx, cz] = WORLD.clampToBounds(p.x + wx * step, p.z + wz * step);
-        if (!CITY.pointInBuilding(cx, cz) && !CITY.pointInBuilding(cx + wx * .5, cz + wz * .5)) {
-          p.x = cx; p.z = cz;
-          turnToward(player, Math.atan2(wx, wz), dt);
-          player.setWalk(true);
-          player.phaseSpeed = run;
-          player.sprint = sprinting;
-        } else { clearGoal(); player.setWalk(false); player.sprint = false; }   // ran into a wall — stop
+        return;
       }
-    } else { player.setWalk(false); player.sprint = false; }
+    }
+    const step = Math.min(run * dt, d);
+    const ux = dx / d, uz = dz / d;
+    let moved = false;
+    const [cx, cz] = WORLD.clampToBounds(p.x + ux * step, p.z + uz * step);
+    if (!CITY.pointInBuilding(cx, cz) && !CITY.pointInBuilding(cx + ux * .5, cz + uz * .5)) {
+      p.x = cx; p.z = cz; moved = true;
+    } else {
+      // blocked: slide along the wall — try each axis on its own
+      if (Math.abs(ux) > .01) {
+        const [sx] = WORLD.clampToBounds(p.x + Math.sign(ux) * step, p.z);
+        if (!CITY.pointInBuilding(sx, p.z) && !CITY.pointInBuilding(sx + Math.sign(ux) * .5, p.z)) { p.x = sx; moved = true; }
+      }
+      if (!moved && Math.abs(uz) > .01) {
+        const [, sz] = WORLD.clampToBounds(p.x, p.z + Math.sign(uz) * step);
+        if (!CITY.pointInBuilding(p.x, sz) && !CITY.pointInBuilding(p.x, sz + Math.sign(uz) * .5)) { p.z = sz; moved = true; }
+      }
+    }
+    turnToward(player, Math.atan2(dx, dz), dt);
+    player.setWalk(moved);
+    player.phaseSpeed = run;
+    player.sprint = sprinting;
+    // watchdog: no real progress → route around the obstacle. Detours
+    // draw from a distance budget (set in setGoal) so pathological
+    // walks end instead of cycling forever; total dead-stuck time still
+    // hard-cancels at 1.6s.
+    if (Math.hypot(p.x - progX, p.z - progZ) > .5) { progX = p.x; progZ = p.z; stuckT = 0; }
+    else stuckT += dt;
+    if (!moved && !detour && stuckT > .45) {
+      let cand = null;
+      // 1) the street point nearest the GOAL — roads wrap blocks, so it
+      //    is the reliable way around whatever is in the way
+      const rp = nearestStreetPoint(goal.x, goal.z);
+      if (rp && Math.hypot(rp.x - p.x, rp.z - p.z) > 6 &&
+        !CITY.pointInBuilding((rp.x + p.x) / 2, (rp.z + p.z) / 2)) cand = { x: rp.x, z: rp.z };
+      // 2) otherwise sidestep perpendicular, preferring the forward-ish
+      //    walkable side (alternating when both are open)
+      if (!cand) {
+        const gd = Math.hypot(goal.x - p.x, goal.z - p.z) || 1;
+        const gx = (goal.x - p.x) / gd, gz = (goal.z - p.z) / gd;
+        const L = 30;
+        for (const s of [detourSide, -detourSide]) {
+          const [wx, wz] = WORLD.clampToBounds(p.x + (-gz * s) * L, p.z + (gx * s) * L);
+          if (CITY.pointInBuilding(wx, wz)) continue;
+          const midX = p.x + (wx - p.x) * .5, midZ = p.z + (wz - p.z) * .5;
+          if (CITY.pointInBuilding(midX, midZ)) continue;
+          const fwd = (wx - p.x) * gx + (wz - p.z) * gz;
+          if (!cand || fwd > cand.fwd) cand = { x: wx, z: wz, fwd, s };
+        }
+        if (cand) detourSide = -cand.s;
+      }
+      if (cand) {
+        detourBudget -= Math.hypot(cand.x - p.x, cand.z - p.z);
+        if (detourBudget < -60) { clearGoal(); detour = null; player.setWalk(false); player.sprint = false; return; }
+        detour = { x: cand.x, z: cand.z };
+        stuckT = 0; progX = p.x; progZ = p.z;
+      }
+    }
+    if (stuckT > 1.6) { clearGoal(); detour = null; player.setWalk(false); player.sprint = false; }
   }
 
   // ---------------- animation ----------------------------------------
@@ -4851,7 +4930,7 @@ const ACTORS = (() => {
   return {
     makeChibi, removeFig, walkTo, turnTo, makeCart,
     spawnCitizens, clearCitizens, updateCitizens,
-    initPlayer, placePlayer, updatePlayer, update, reset, setGoal, clearGoal,
+    initPlayer, placePlayer, updatePlayer, update, reset, setGoal, clearGoal, navInput,
     get player() { return player; },
     get input() { return keys; },   // v2.06: live view of key state (QA)
     get goal() { return goal; },   // v2.13: click-to-move destination (QA)
@@ -5656,8 +5735,8 @@ const TUT = (() => {
     {
       key: 'walk', title: 'Walk the block', tgt: null,
       body: () => isTouch
-        ? '<b>Tap any spot</b> on the street to walk there — or push the <b>joystick</b> (bottom-left). Drag a finger on the world to swing the camera.'
-        : '<b>Click any spot</b> on the street and you walk right over — or move with <b>W A S D</b> / arrows, hold <b>Shift</b> to run. Drag the mouse to swing the camera.',
+        ? '<b>Tap any spot</b> on the ground and you walk right over. <b>Drag a finger</b> to glide the bird\u2019s-eye view across the map, or push the <b>joystick</b> (bottom-left) to slide it.'
+        : '<b>Click any spot</b> on the ground and you walk right over — that\u2019s the only way you move. <b>Drag</b> (or <b>W A S D</b>) glides the bird\u2019s-eye view across the map; <b>right-drag</b> rotates; <b>C</b> snaps back to you.',
       obj: () => 'Take a short stroll away from your landing spot.',
       check: () => {
         const [px, pz] = playerPos();
@@ -6279,7 +6358,20 @@ window.addEventListener('resize', () => {
 
 // ---------------- the ONE WORLD scene --------------------------------
 let worldScene = null, sun = null;
-const camCtl = { az: Math.PI * .25, el: 1.02, dist: 88, distT: 88, tx: 0, tz: 0 };
+// v2.17 BIRD'S EYE command camera: `follow` keeps the view riding on
+// the character; panning (drag / WASD / joystick) detaches it, and any
+// tap-to-move command — or FIND ME / [C] — re-attaches it.
+const camCtl = { az: Math.PI * .25, el: 1.25, dist: 110, distT: 110, tx: 0, tz: 0, follow: true };
+const PAN_LEASH = 1400;       // free camera roams this far from the character
+// clamp a camera-focus point to the ONE WORLD bounds AND the leash
+function clampPan(x, z) {
+  if (ACTORS.player) {
+    const p = ACTORS.player.group.position;
+    const dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz);
+    if (d > PAN_LEASH) { x = p.x + dx / d * PAN_LEASH; z = p.z + dz / d * PAN_LEASH; }
+  }
+  return WORLD.clampToBounds(x, z);
+}
 
 function buildWorldScene() {
   worldScene = new THREE.Scene();
@@ -6356,7 +6448,8 @@ async function enterWorld(meta, opts = {}) {
     if (!spot) spot = CITY.randomRoadPoint(rnd);
     ACTORS.placePlayer(spot.x, spot.z);
     if (arrived) ACTORS.player.group.rotation.y = Math.atan2(arrived.rec.x - spot.x, arrived.rec.z - spot.z);
-    camCtl.az = Math.PI * .25; camCtl.el = 1.02; camCtl.dist = 88; camCtl.distT = arrived ? 64 : 88;
+    camCtl.az = Math.PI * .25; camCtl.el = 1.25; camCtl.dist = 110; camCtl.distT = arrived ? 64 : 110;
+    camCtl.follow = true;
     camCtl.tx = spot.x; camCtl.tz = spot.z;
     // life
     const isMobile = matchMedia('(pointer:coarse)').matches;
@@ -6409,7 +6502,8 @@ async function landAtWorld(wx, wz, label) {
     if (!ACTORS.player.group.parent) worldScene.add(ACTORS.player.group);
     const [x, z] = WORLD.clampToBounds(wx, wz);
     ACTORS.placePlayer(x, z);
-    camCtl.az = Math.PI * .25; camCtl.el = 1.02; camCtl.dist = 110; camCtl.distT = 110;
+    camCtl.az = Math.PI * .25; camCtl.el = 1.25; camCtl.dist = 110; camCtl.distT = 110;
+    camCtl.follow = true;
     camCtl.tx = x; camCtl.tz = z;
     ECO.setRegion('rural');
     STATE.city = null;
@@ -6507,6 +6601,7 @@ ECO.bindTravel(req => {
     ACTORS.placePlayer(req.x, req.z);
     if (req.fx !== undefined) ACTORS.player.group.rotation.y = Math.atan2(req.fx - req.x, req.fz - req.z);
     camCtl.tx = req.x; camCtl.tz = req.z;          // camera cuts with you
+    camCtl.follow = true;
     camCtl.distT = Math.min(camCtl.distT, 70);     // glide in for a look at the cart
     toast('⚡ Teleported to your <b>' + (req.plot && req.plot.cart ? ECO.plotLabel(req.plot) : 'vending spot') + '</b>.', 'warn');
     ECO.arrivalPulse(req.x, req.z);
@@ -6517,6 +6612,7 @@ ECO.bindTravel(req => {
     ACTORS.clearGoal();
     ACTORS.placePlayer(req.plot.x, req.plot.z);
     camCtl.tx = req.plot.x; camCtl.tz = req.plot.z;
+    camCtl.follow = true;
     camCtl.distT = 70;
     toast('⚡ Teleported to your <b>' + (req.plot.cart ? ECO.plotLabel(req.plot) : 'roadside plot') + '</b> in the countryside.', 'warn');
     ECO.arrivalPulse(req.plot.x, req.plot.z);
@@ -6604,7 +6700,7 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
   a.onclick = e => {
     e.preventDefault();
     const k = a.dataset.abt;
-    openModal(k.toUpperCase(), `<p><b>Open World v2.16</b> runs entirely in your browser and saves locally.</p>
+    openModal(k.toUpperCase(), `<p><b>Open World v2.17</b> runs entirely in your browser and saves locally.</p>
       <p>No accounts, no tracking, no payments. Map data © OpenStreetMap contributors (ODbL).</p>
       <p>Support: keep playing and build something big.</p>`);
   };
@@ -6614,12 +6710,13 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.16 — CLEAN HORIZON', `
-    <p><b>The fake scenery is gone.</b> The big backdrop buildings that ringed every city and the giant floating letters spelling city names across the sky have been removed — what you see on the horizon now is the real one world: the actual next city, the actual country, the actual roads.</p>
-    <div class="kv"><span class="k">NO FAKE SKYLINES</span><span class="v">Distant cities are no longer represented by prop towers</span></div>
-    <div class="kv"><span class="k">NO BIG LETTERS</span><span class="v">City names are off the sky — find them on the map instead</span></div>
-    <div class="kv"><span class="k">YOUR LAND BEACON</span><span class="v">A small green dot still marks cities where you own land</span></div>
-    <div class="kv"><span class="k">ONE WORLD KEPT</span><span class="v g">All 64 cities connected · walkable roads · pastures · build anywhere</span></div>
+  openModal('Welcome to v2.17 — BIRD\u2019S EYE VIEW', `
+    <p><b>You rule the world from above now.</b></p>
+    <div class="kv"><span class="k">BIRD\u2019S EYE</span><span class="v">The camera looks down from above — and roams the whole map freely</span></div>
+    <div class="kv"><span class="k">TAP TO MOVE</span><span class="v g">Tap anywhere — your tycoon walks there. That\u2019s the only way they move now</span></div>
+    <div class="kv"><span class="k">LOOK AROUND</span><span class="v">Drag (or WASD / joystick) glides across the map · right-drag rotates · wheel zooms</span></div>
+    <div class="kv"><span class="k">FIND ME</span><span class="v">[C] or the crosshair button snaps the view back to your tycoon</span></div>
+    <div class="kv"><span class="k">ONE WORLD KEPT</span><span class="v">All 64 cities connected · walkable roads · pastures · build anywhere</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -6645,11 +6742,23 @@ document.getElementById('b-build').addEventListener('click', () => {
 });
 document.getElementById('avatar-chip').addEventListener('click', () => ECO.openEmpire());
 
+// v2.17: recenter on the character — [C] or the FIND ME crosshair button
+function recenterOnPlayer() {
+  if (STATE.mode !== 'city' || !ACTORS.player) return;
+  camCtl.follow = true;
+  const p = ACTORS.player.group.position;
+  camCtl.tx = p.x; camCtl.tz = p.z;
+}
+document.getElementById('b-locate').addEventListener('click', recenterOnPlayer);
+
 function openHelp() {
-  openModal('Open World v2.16 — Help', `
+  openModal('Open World v2.17 — Help', `
     <p><b>Controls</b></p>
-    <div class="kv"><span class="k">MOVE</span><span class="v">click the ground to walk there · WASD / arrows · hold Shift = sprint</span></div>
-    <div class="kv"><span class="k">CAMERA</span><span class="v">Drag to orbit · wheel/pinch to zoom (gentle, glide)</span></div>
+    <div class="kv"><span class="k">MOVE</span><span class="v g">Tap / click anywhere — your tycoon walks there (the only way they move)</span></div>
+    <div class="kv"><span class="k">LOOK AROUND</span><span class="v">Drag or WASD / arrows / joystick to glide the bird\u2019s-eye view across the map</span></div>
+    <div class="kv"><span class="k">ROTATE</span><span class="v">Right-drag (or Ctrl+drag) · touch: pinch zoom</span></div>
+    <div class="kv"><span class="k">ZOOM</span><span class="v">Wheel / pinch (gentle, glide)</span></div>
+    <div class="kv"><span class="k">FIND ME</span><span class="v">[C] or the crosshair button → snap back to your tycoon</span></div>
     <div class="kv"><span class="k">WORLD MAP</span><span class="v">minimap (bottom right) · [M] or click it for the big map</span></div>
     <div class="kv"><span class="k">ONE WORLD</span><span class="v">walk the country roads between cities — or click any open land in orbit to land there</span></div>
     <div class="kv"><span class="k">EMPIRE</span><span class="v">avatar (top right) → TELEPORT to any plot you own</span></div>
@@ -6719,10 +6828,22 @@ function buildTicker() {
 }
 
 // ---------------- world camera + picking -------------------------------
-let dragging = false, moved = 0, lastX = 0, lastY = 0, pinchD = 0, pinched = false;
+// v2.17 BIRD'S EYE command view:
+//   · left-drag (or one finger) GRABS THE MAP and pans the view; the
+//     pan speed scales with how high the camera sits, and the focus
+//     stays leashed to the character's detail neighborhood
+//   · right-drag / middle-drag / Ctrl+drag rotates + tilts
+//   · wheel / pinch zooms gently (unchanged glide, wider 520m ceiling)
+//   · WASD / arrows / the touch joystick pan from the keyboard
+//   · a TAP on the ground sends the character walking there (the only
+//     way it moves now) and re-attaches the follow camera
+let dragging = false, rotating = false, moved = 0, lastX = 0, lastY = 0, pinchD = 0, pinched = false;
+canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('pointerdown', e => {
   if (STATE.mode !== 'city') return;
-  dragging = true; moved = 0; lastX = e.clientX; lastY = e.clientY;
+  dragging = true;
+  rotating = e.button === 2 || e.button === 1 || e.ctrlKey;   // v2.17: rotate on right/middle/ctrl drag
+  moved = 0; lastX = e.clientX; lastY = e.clientY;
   try { canvas.setPointerCapture(e.pointerId); } catch (_) { }   // v2.13: synthetic taps (QA) carry no active pointer
 });
 canvas.addEventListener('pointermove', e => {
@@ -6731,29 +6852,42 @@ canvas.addEventListener('pointermove', e => {
     const dx = e.clientX - lastX, dy = e.clientY - lastY;
     moved += Math.abs(dx) + Math.abs(dy);
     lastX = e.clientX; lastY = e.clientY;
-    camCtl.az -= dx * .0052;
-    camCtl.el = THREE.MathUtils.clamp(camCtl.el + dy * .004, .28, 1.42);
+    if (rotating) {
+      camCtl.az -= dx * .0052;
+      camCtl.el = THREE.MathUtils.clamp(camCtl.el + dy * .004, .28, 1.5);
+    } else {
+      // v2.17 grab-the-map: the ground follows the pointer, so the focus
+      // moves opposite the drag on screen-right and along screen-up
+      camCtl.follow = false;
+      const k = camCtl.dist * .0018;
+      const fx = -Math.sin(camCtl.az), fz = -Math.cos(camCtl.az);   // screen-up on the ground
+      const rx = Math.cos(camCtl.az), rz = -Math.sin(camCtl.az);    // screen-right
+      const [nx, nz] = clampPan(
+        camCtl.tx + (-dx * rx + dy * fx) * k,
+        camCtl.tz + (-dx * rz + dy * fz) * k);
+      camCtl.tx = nx; camCtl.tz = nz;
+    }
   } else {
     hoverPick(e.clientX, e.clientY);
   }
 });
 canvas.addEventListener('pointerup', e => {
   if (STATE.mode !== 'city') return;
-  if (dragging && moved < 6 && !pinched) clickPick(e.clientX, e.clientY);   // v2.13: pinch is not a tap
-  dragging = false;
+  if (dragging && moved < 6 && !pinched && !rotating) clickPick(e.clientX, e.clientY);   // v2.13: pinch is not a tap
+  dragging = false; rotating = false;
 });
 canvas.addEventListener('wheel', e => {
   if (STATE.mode !== 'city') return;
   let dy = e.deltaY * (e.deltaMode === 1 ? 33 : 1);   // deltaMode 1 = lines
   dy = THREE.MathUtils.clamp(dy, -180, 180);          // cap single-event jumps
-  camCtl.distT = THREE.MathUtils.clamp(camCtl.distT * Math.exp(dy * .0005), 45, 460);
+  camCtl.distT = THREE.MathUtils.clamp(camCtl.distT * Math.exp(dy * .0005), 45, 520);
 }, { passive: true });
 canvas.addEventListener('touchmove', e => {
   if (STATE.mode !== 'city' || e.touches.length !== 2) return;
   pinched = true;   // v2.13: two fingers down — a pinch, never a tap
   const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
   if (pinchD) {
-    camCtl.distT = THREE.MathUtils.clamp(camCtl.distT * (pinchD / d), 45, 460);
+    camCtl.distT = THREE.MathUtils.clamp(camCtl.distT * (pinchD / d), 45, 520);
     camCtl.dist = camCtl.distT;
   }
   pinchD = d;
@@ -6783,10 +6917,11 @@ function hoverPick(cx, cy) {
 function clickPick(cx, cy) {
   const pt = screenToGround(cx, cy);
   if (!pt) return;
-  // v2.13 CLICK TO WALK: interactive clicks (spots, carts, towers) keep
-  // their meaning; any plain ground point becomes a walk destination
+  // v2.13 CLICK TO WALK (v2.17: the ONLY movement): interactive clicks
+  // (spots, carts, towers) keep their meaning; any plain ground point
+  // becomes a walk destination — and the camera re-attaches to follow
   if (ECO.clickAt(pt.x, pt.z)) return;
-  ACTORS.setGoal(pt.x, pt.z);
+  if (ACTORS.setGoal(pt.x, pt.z)) camCtl.follow = true;
 }
 
 // ---------------- minimap + big map ------------------------------------
@@ -6903,6 +7038,7 @@ mmCanvas.addEventListener('click', () => { if (STATE.mode === 'city') openBigMap
 window.addEventListener('keydown', e => {
   if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;   // v2.06
   if (e.key.toLowerCase() === 'm' && STATE.mode === 'city' && !e.repeat) openBigMap();
+  if (e.key.toLowerCase() === 'c' && STATE.mode === 'city' && !e.repeat) recenterOnPlayer();   // v2.17 FIND ME
 });
 
 // ---------------- main loop -------------------------------------------
@@ -6915,18 +7051,34 @@ function loop() {
     EARTH.update(dt);
     renderer.render(EARTH.scene, camera);
   } else if (STATE.mode === 'city' && worldScene) {
-    ACTORS.updatePlayer(dt, camCtl.az);
+    ACTORS.updatePlayer(dt);
     ACTORS.updateCitizens(dt);
     ACTORS.update(dt);
     ECO.update(dt);
     TUT.update(dt);   // v2.05 starter guide: panel + beacon + step checks
-    // camera follows player
     const p = ACTORS.player.group.position;
-    camCtl.tx += (p.x - camCtl.tx) * Math.min(1, dt * 5);
-    camCtl.tz += (p.z - camCtl.tz) * Math.min(1, dt * 5);
+    // v2.17 bird's-eye roam: WASD / arrows / joystick pan the camera
+    // focus (zoom-scaled speed — way out = fast, close in = precise)
+    const ni = ACTORS.navInput();
+    if (ni.active) {
+      camCtl.follow = false;
+      const spd = THREE.MathUtils.clamp(camCtl.dist * .9, 18, 480) * (ni.run ? 1.8 : 1);
+      const fx = -Math.sin(camCtl.az), fz = -Math.cos(camCtl.az);   // screen-up on the ground
+      const rx = Math.cos(camCtl.az), rz = -Math.sin(camCtl.az);    // screen-right
+      const [nx, nz] = clampPan(
+        camCtl.tx + (fx * -ni.z + rx * ni.x) * spd * dt,
+        camCtl.tz + (fz * -ni.z + rz * ni.x) * spd * dt);
+      camCtl.tx = nx; camCtl.tz = nz;
+    }
+    // v2.17: while following, the view rides along with the character
+    // (any tap-to-move order or FIND ME re-attaches; panning detaches)
+    if (camCtl.follow) {
+      camCtl.tx += (p.x - camCtl.tx) * Math.min(1, dt * 5);
+      camCtl.tz += (p.z - camCtl.tz) * Math.min(1, dt * 5);
+    }
     // zoom glides toward its target — no snapping
     camCtl.dist += (camCtl.distT - camCtl.dist) * Math.min(1, dt * 9);
-    camCtl.dist = THREE.MathUtils.clamp(camCtl.dist, 45, 460);
+    camCtl.dist = THREE.MathUtils.clamp(camCtl.dist, 45, 520);
     const ce = Math.cos(camCtl.el), se = Math.sin(camCtl.el);
     camera.position.set(
       camCtl.tx + Math.sin(camCtl.az) * camCtl.dist * ce,
@@ -6945,18 +7097,18 @@ function loop() {
       else if (req.type === 'leftCity') leftCity();
       else if (req.type === 'region') ECO.setRegion(req.region);
     }
-    // street/region HUD
+    // street/region HUD — v2.17: tracks where the VIEW is pointed
     streetT += dt;
     if (streetT > .6) {
       streetT = 0;
       let nm = '', loc = '';
       if (CITY.rec && STATE.city) {
-        nm = CITY.nearestRoadName(p.x, p.z);
+        nm = CITY.nearestRoadName(camCtl.tx, camCtl.tz);
         loc = STATE.city.name;
       } else {
-        const r = WORLD.nearestRoadInfo(p.x, p.z);
+        const r = WORLD.nearestRoadInfo(camCtl.tx, camCtl.tz);
         nm = r ? r.name : '';
-        const near = WORLD.nearestCityInfo(p.x, p.z);
+        const near = WORLD.nearestCityInfo(camCtl.tx, camCtl.tz);
         loc = 'Open Country · ' + (near.d < 4000 ? near.city.name + ' ' + (near.d / 1000).toFixed(1) + ' km' : 'the wild');
       }
       document.getElementById('streetname').textContent = nm ? '· ' + nm : '';
@@ -6993,7 +7145,7 @@ EARTH.diveTo = (city, cb) => {
 };
 
 
-console.log('%cOPEN WORLD v2.16 — CLEAN HORIZON', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.17 — BIRD\u2019S EYE VIEW', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
