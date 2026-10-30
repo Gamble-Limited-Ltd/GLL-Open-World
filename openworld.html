@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.15</title>
+<title>Open World — v2.16</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.15 — ONE WORLD (all land connected) + STARTER GUIDE + TIGHT CONTROLS + CLEAR STREETS + HAPPY CUSTOMERS + SIDEWALK SPOTS + INSTANT TRAVEL + WORLD ATLAS + OPEN FRONTIER (build anywhere) + CLICK TO WALK (one scene, real roads between cities)
+   OPEN WORLD v2.16 — CLEAN HORIZON (no fake skylines or floating name letters — the horizon is the real one world) + ONE WORLD (all land connected) + STARTER GUIDE + TIGHT CONTROLS + CLEAR STREETS + HAPPY CUSTOMERS + SIDEWALK SPOTS + INSTANT TRAVEL + WORLD ATLAS + OPEN FRONTIER (build anywhere) + CLICK TO WALK (one scene, real roads between cities)
    Visual system modeled on the Capital Rift reference frame:
    dark glassmorphism fintech UI (panels #1A202C @85%, 1px #4A5568
    borders, 4px radius), money-green #48BB78 prices, link-blue
@@ -499,7 +499,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.15 — one connected world: every city, pasture and road on a single map</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.16 — one connected world: every city, pasture and road on a single map</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -527,7 +527,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.15';
+const GAME_VERSION = 'v2.16';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -1800,15 +1800,17 @@ window.OSM = OSM;
 
 // ======== section: 35_world.js ========
 // ====================================================================
-// v2.15 — WORLD: ONE continuous world. Every city, pasture, and road
+// v2.16 — WORLD: ONE continuous world. Every city, pasture, and road
 // lives in a single scene at fixed world coordinates — you can walk
 // from any point on the map to any other. Contains: the world ground,
 // walkable inter-city country roads, procedural pastures (tree groves,
 // fenced paddocks with cows & sheep, barns, hay bales, rocks, ponds,
 // wildflower meadows), cheap rural business plots along the roads,
-// distant-city skyline markers so the next town is always visible on
-// the horizon, continent labels, city-chunk streaming, and the
-// lat/lon → world mapping used for globe landings.
+// city-chunk streaming, and the lat/lon → world mapping used for globe
+// landings. (v2.16 CLEAN HORIZON: the fake distant-city skylines and
+// the floating city-name / continent letter banners are GONE — the
+// horizon now shows only what is really there; a tiny green beacon
+// still marks cities where you own land.)
 // ====================================================================
 // ---- lat/lon -> world coords -------------------------------------------
 // Affine warp anchored on the 3 nearest catalog cities: keeps globe
@@ -1855,7 +1857,7 @@ const WORLD = (() => {
   const RCELL = 40;
   let chunks = new Map();            // 'cx,cz' -> group
   let chunkQueue = [];
-  let markers = new Map();           // cityKey -> {group, sky, lab, dot}
+  let markers = new Map();           // cityKey -> {group, dot} (owned beacon)
   let lastMarkerUpd = 0, lastChunkUpd = 0;
   let curRegion = 'rural';         // economy region key the player is in
 
@@ -2308,65 +2310,22 @@ const WORLD = (() => {
     chunks.delete(key);
   }
 
-  // ---------------- distant city markers ------------------------------
-  function labelSprite(text, pad, fs, fg) {
-    pad = pad || 26; fs = fs || 30;
-    const cv = document.createElement('canvas');
-    const font = '700 ' + fs + 'px -apple-system,Segoe UI,Arial';
-    const c0 = cv.getContext('2d');
-    c0.font = font;
-    const w = Math.ceil(c0.measureText(text).width) + pad * 2;
-    cv.width = w; cv.height = fs + 22;
-    const ctx = cv.getContext('2d');
-    ctx.font = font;
-    ctx.fillStyle = 'rgba(13,17,23,.6)';
-    ctx.strokeStyle = 'rgba(255,255,255,.16)'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.roundRect(1, 1, w - 2, fs + 20, 9); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = fg || '#E2E8F0';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(text, w / 2, (fs + 20) / 2);
-    const tex = new THREE.CanvasTexture(cv);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false }));
-    sp.userData.aspect = w / (fs + 22);
-    return sp;
-  }
-
+  // ---------------- distant city beacons ------------------------------
+  // v2.16 CLEAN HORIZON: the fake skyline boxes and the big floating
+  // name banners are removed. What remains is a small green beacon
+  // above each city where the player OWNS land — enough to spot your
+  // holdings from afar without dressing the horizon in buildings that
+  // aren't really there. City names live on the minimap / big map [M].
   function buildMarkers() {
     for (const c of CITIES) {
       const g = new THREE.Group();
-      const rnd = _mulberry(hashStr('mk' + c.key));
-      const n = (c.tier === 3 ? 16 : c.tier === 2 ? 11 : 7);
-      const sky = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1),
-        new THREE.MeshLambertMaterial({ color: 0x8fa3b8, transparent: true, opacity: .5, fog: false }), n);
-      const mat4 = new THREE.Matrix4();
-      const spread = 60 + c.tier * 26;
-      const hMax = (c.tier === 3 ? 130 : c.tier === 2 ? 80 : 46);
-      for (let i = 0; i < n; i++) {
-        const a = rnd() * Math.PI * 2, r = rnd() * spread;
-        const w = 18 + rnd() * 34, h = 14 + rnd() * hMax;
-        mat4.makeScale(w, h, w * .8);
-        mat4.setPosition(c.wx + Math.cos(a) * r, h / 2, c.wz + Math.sin(a) * r);
-        sky.setMatrixAt(i, mat4);
-      }
-      g.add(sky);
-      const lab = labelSprite(c.name);
-      lab.position.set(c.wx, hMax + 70, c.wz);
-      g.add(lab);
       const dot = new THREE.Mesh(new THREE.SphereGeometry(7, 10, 8),
         new THREE.MeshBasicMaterial({ color: 0x48bb78, transparent: true, opacity: .9, fog: false }));
-      dot.position.set(c.wx, hMax + 26, c.wz);
+      dot.position.set(c.wx, 14, c.wz);
       dot.visible = false;
       g.add(dot);
       group.add(g);
-      markers.set(c.key, { group: g, sky, lab, dot, city: c });
-    }
-    for (const [name, x, z] of WORLD_CONTS) {
-      const sp = labelSprite(name.toUpperCase(), 40, 44);
-      sp.material.opacity = .3;
-      sp.position.set(x, 250, z);
-      sp.scale.set(2200, 2200 / sp.userData.aspect, 1);
-      group.add(sp);
+      markers.set(c.key, { group: g, dot, city: c });
     }
   }
 
@@ -2454,10 +2413,6 @@ const WORLD = (() => {
         const vis = d > 620;
         mk.group.visible = vis;
         if (!vis) return;
-        const s = THREE.MathUtils.clamp(d * .09, 70, 420);
-        mk.lab.scale.set(s * mk.lab.userData.aspect, s, 1);
-        mk.lab.material.opacity = THREE.MathUtils.clamp(1.15 - d / 7000, .35, .95);
-        mk.sky.material.opacity = THREE.MathUtils.clamp(.62 - d / 9000, .18, .5);
         mk.dot.visible = owned.has(key);
       });
     }
@@ -2590,8 +2545,8 @@ window.WORLD = WORLD;
 // noise-grained asphalt and mottled ground, shop-front ground floors
 // with striped awnings, roof parapets, water tanks and antennas, street
 // lamps, hydrants, benches, trash bins, parked cars (yellow taxis in
-// tier-3 cities), park walking paths, and a distant backdrop skyline
-// that dissolves into the haze.
+// tier-3 cities), park walking paths. (v2.16 CLEAN HORIZON: the fake
+// backdrop skyline ring is GONE — the horizon shows the real one world.)
 // ====================================================================
 const CITY = (() => {
   const WIN = 3.2;                      // meters per window cell
@@ -3778,27 +3733,6 @@ const CITY = (() => {
     }
   }
 
-  // ---------- distant backdrop skyline (dissolves into haze) --------
-  function buildBackdrop() {
-    const rnd = _mulberry(hashStr('bd' + (cityRec.key || cityRec.name || 'x')));
-    const n = isMob ? 80 : 160;
-    const inst = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1),
-      new THREE.MeshLambertMaterial({ color: 0xffffff }), n);
-    const mat4 = new THREE.Matrix4();
-    const fogC = new THREE.Color(0x9fc7e8), base = new THREE.Color(0x6f8296), c = new THREE.Color();
-    const ax = cityAnchor ? cityAnchor.x : 0, az = cityAnchor ? cityAnchor.z : 0;
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2 + rnd() * .06;
-      const r = 780 + rnd() * 400;
-      const w = 26 + rnd() * 38, hgt = 60 + rnd() * 240, dp = 26 + rnd() * 38;
-      mat4.makeScale(w, hgt, dp);
-      mat4.setPosition(ax + Math.cos(a) * r, hgt / 2, az + Math.sin(a) * r);
-      inst.setMatrixAt(i, mat4);
-      inst.setColorAt(i, c.copy(base).lerp(fogC, .12 + rnd() * .26));
-    }
-    group.add(inst);
-  }
-
   // ---------- spatial hashes ----------------------------------------
   const CELL = 26;
   function buildSpatialHash() {
@@ -4439,7 +4373,9 @@ const CITY = (() => {
     buildGreensWater(shifted);
     onStatus && onStatus('Parking cars & street furniture…'); await _tick();
     buildProps(shifted);
-    buildBackdrop();
+    // v2.16 CLEAN HORIZON: no fake backdrop skyline — beyond the city's
+    // ground plane the real one world (country, roads, distant cities)
+    // takes over, exactly as the player asked.
     return group;
   }
 
@@ -6314,7 +6250,7 @@ window.MARKET = MARKET;
 // ======== section: 90_main.js ========
 window.addEventListener('error', e => { (window.__errs = window.__errs || []).push((e.message || 'err') + ' @line' + (e.lineno || '?') + ':' + (e.colno || '?')); });
 // ====================================================================
-// v2.15 — MAIN: the ONE WORLD. Boot landing, globe↔world travel, the
+// v2.16 — MAIN: the ONE WORLD with a CLEAN HORIZON. Boot landing, globe↔world travel, the
 // single world scene, city streaming as you walk between cities, world
 // camera + click-to-walk, minimap + big map, HUD wiring, the game loop,
 // saves, QA probe. Keeps v2.03–v2.14 features: fast entry, starter
@@ -6331,8 +6267,9 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;   // v2.03: soft toy-matte shadows
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-// v2.15: far plane spans the whole one world so distant city skylines
-// stay visible on the horizon (log depth keeps the streets crisp).
+// v2.15: far plane spans the whole one world so real distant land and
+// streaming cities stay visible on the horizon (log depth keeps the
+// streets crisp); v2.16 removed the FAKE distant skylines and letters.
 const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, .5, 26000);
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -6667,7 +6604,7 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
   a.onclick = e => {
     e.preventDefault();
     const k = a.dataset.abt;
-    openModal(k.toUpperCase(), `<p><b>Open World v2.15</b> runs entirely in your browser and saves locally.</p>
+    openModal(k.toUpperCase(), `<p><b>Open World v2.16</b> runs entirely in your browser and saves locally.</p>
       <p>No accounts, no tracking, no payments. Map data © OpenStreetMap contributors (ODbL).</p>
       <p>Support: keep playing and build something big.</p>`);
   };
@@ -6677,16 +6614,12 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.15 — ONE WORLD', `
-    <p><b>The whole planet is now one connected world.</b> No teleport signs, no separate cities — every city, pasture and road lives on the same map, and you can walk from any point to any other.</p>
-    <div class="kv"><span class="k">ALL LAND CONNECTED</span><span class="v">Walk out of any city into open country and keep going</span></div>
-    <div class="kv"><span class="k">REAL ROADS</span><span class="v">88 country roads link every city — follow them on foot</span></div>
-    <div class="kv"><span class="k">PASTURES</span><span class="v">Fenced fields, cows &amp; sheep, barns, groves, ponds</span></div>
-    <div class="kv"><span class="k">BUILD ANYWHERE</span><span class="v">Roadside plots along the country roads, sidewalk spots in cities</span></div>
-    <div class="kv"><span class="k">LAND ANYWHERE</span><span class="v">Click bare land on the globe to land in the wild</span></div>
-    <div class="kv"><span class="k">WORLD MAP</span><span class="v">Minimap + [M] big map — click anywhere to travel</span></div>
-    <div class="kv"><span class="k">DISTANT SKYLINES</span><span class="v">See the next city on the horizon as you travel</span></div>
-    <div class="kv"><span class="k">KEPT</span><span class="v g">starter guide · tight controls · happy customers · sidewalk spots · instant travel · world atlas · click to walk</span></div>
+  openModal('Welcome to v2.16 — CLEAN HORIZON', `
+    <p><b>The fake scenery is gone.</b> The big backdrop buildings that ringed every city and the giant floating letters spelling city names across the sky have been removed — what you see on the horizon now is the real one world: the actual next city, the actual country, the actual roads.</p>
+    <div class="kv"><span class="k">NO FAKE SKYLINES</span><span class="v">Distant cities are no longer represented by prop towers</span></div>
+    <div class="kv"><span class="k">NO BIG LETTERS</span><span class="v">City names are off the sky — find them on the map instead</span></div>
+    <div class="kv"><span class="k">YOUR LAND BEACON</span><span class="v">A small green dot still marks cities where you own land</span></div>
+    <div class="kv"><span class="k">ONE WORLD KEPT</span><span class="v g">All 64 cities connected · walkable roads · pastures · build anywhere</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -6713,7 +6646,7 @@ document.getElementById('b-build').addEventListener('click', () => {
 document.getElementById('avatar-chip').addEventListener('click', () => ECO.openEmpire());
 
 function openHelp() {
-  openModal('Open World v2.15 — Help', `
+  openModal('Open World v2.16 — Help', `
     <p><b>Controls</b></p>
     <div class="kv"><span class="k">MOVE</span><span class="v">click the ground to walk there · WASD / arrows · hold Shift = sprint</span></div>
     <div class="kv"><span class="k">CAMERA</span><span class="v">Drag to orbit · wheel/pinch to zoom (gentle, glide)</span></div>
@@ -7060,7 +6993,7 @@ EARTH.diveTo = (city, cb) => {
 };
 
 
-console.log('%cOPEN WORLD v2.15 — ONE WORLD', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.16 — CLEAN HORIZON', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
