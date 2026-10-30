@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.12</title>
+<title>Open World — v2.13</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.12 — NEW WORLD (complete restart) + STARTER GUIDE + TIGHT CONTROLS + CLEAR STREETS + HAPPY CUSTOMERS + SIDEWALK SPOTS + INSTANT TRAVEL + WORLD ATLAS + OPEN FRONTIER (build anywhere, world highways)
+   OPEN WORLD v2.13 — NEW WORLD (complete restart) + STARTER GUIDE + TIGHT CONTROLS + CLEAR STREETS + HAPPY CUSTOMERS + SIDEWALK SPOTS + INSTANT TRAVEL + WORLD ATLAS + OPEN FRONTIER (build anywhere, world highways) + CLICK TO WALK (point-and-click streets)
    Visual system modeled on the Capital Rift reference frame:
    dark glassmorphism fintech UI (panels #1A202C @85%, 1px #4A5568
    borders, 4px radius), money-green #48BB78 prices, link-blue
@@ -485,7 +485,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.12 — build anywhere on Earth, roads join the land-linked cities</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.13 — build anywhere on Earth; click the street and your tycoon walks</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -509,7 +509,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.12';
+const GAME_VERSION = 'v2.13';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -3353,6 +3353,7 @@ const ACTORS = (() => {
   function placePlayer(x, z) {
     if (!player) initPlayer();
     player.group.position.set(x, 0, z);
+    clearGoal();   // v2.13: a snap/teleport retires any walk destination
   }
 
   // input — v2.06 CONTROLS FIX
@@ -3418,6 +3419,51 @@ const ACTORS = (() => {
   }
   setupJoystick();
 
+  // ---------------- v2.13 — CLICK TO MOVE -----------------------------
+  // Click a spot on the street and the tycoon walks there on their own:
+  // a green ring marks the destination and ripples once you arrive.
+  // Held keys override the auto-walk instantly (v2.06 stop-on-release
+  // semantics are untouched), Shift mid-walk = jog, walls stop the walk
+  // exactly like walking into them manually, and teleports / city
+  // changes drop the destination so nobody chases a stale coordinate.
+  let goal = null;          // {x, z} walk destination
+  let marker = null;        // destination ring+dot group
+  let markerDone = 0;       // >0 -> arrival ripple countdown (seconds)
+
+  function disposeMarker() {
+    if (!marker) return;
+    if (marker.parent) marker.parent.remove(marker);
+    marker.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+    marker = null;
+  }
+  function clearGoal() {          // cancel: keys / wall / teleport
+    goal = null; markerDone = 0; disposeMarker();
+  }
+  function arriveGoal() {         // reached it: play the ripple, stop
+    goal = null;
+    if (marker) markerDone = .5;
+  }
+  function setGoal(x, z) {
+    if (!player || !player.group.parent) return false;
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return false;   // junk in — no goal out
+    const half = CITY.half * .98;
+    const gx = THREE.MathUtils.clamp(x, -half, half);
+    const gz = THREE.MathUtils.clamp(z, -half, half);
+    if (CITY.pointInBuilding(gx, gz)) return false;   // walls are not destinations
+    goal = { x: gx, z: gz };
+    markerDone = 0;
+    disposeMarker();
+    const mat = new THREE.MeshBasicMaterial({ color: 0x8ff0ae, transparent: true, opacity: .95, side: THREE.DoubleSide, depthWrite: false });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(.55, .82, 36), mat);
+    const dot = new THREE.Mesh(new THREE.CircleGeometry(.16, 18), mat);
+    ring.rotation.x = -Math.PI / 2; dot.rotation.x = -Math.PI / 2;
+    marker = new THREE.Group();
+    marker.add(ring, dot);
+    marker.position.set(gx, .18, gz);
+    player.group.parent.add(marker);
+    return true;
+  }
+
   // camera-relative movement; camAz = camera azimuth around player
   // (camera offset from player = (sin(az), _, cos(az)) * dist)
   function updatePlayer(dt, camAz) {
@@ -3430,6 +3476,7 @@ const ACTORS = (() => {
     if (joy.active) { mx += joy.dx; mz += joy.dz; }
     const mag = Math.hypot(mx, mz);
     if (mag > .08) {
+      if (goal) clearGoal();   // v2.13: manual input overrides the auto-walk
       const sprinting = !!keys['shift'];
       const run = sprinting ? 10.5 : 6.2;
       const nx = mx / mag, nz = mz / mag;
@@ -3451,11 +3498,45 @@ const ACTORS = (() => {
       player.setWalk(true);
       player.phaseSpeed = run;
       player.sprint = sprinting;   // v2.06: sprint state (QA/HUD-visible)
+    } else if (goal) {
+      // v2.13 CLICK TO MOVE: no key held -> keep walking to the clicked spot
+      const p = player.group.position;
+      const dx = goal.x - p.x, dz = goal.z - p.z;
+      const d = Math.hypot(dx, dz);
+      if (d < .45) {
+        arriveGoal();
+        player.setWalk(false); player.sprint = false;
+      } else {
+        const sprinting = !!keys['shift'];
+        const run = sprinting ? 10.5 : 6.2;
+        const step = Math.min(run * dt, d);
+        const wx = dx / d, wz = dz / d;
+        const half = CITY.half * .98;
+        const cx = THREE.MathUtils.clamp(p.x + wx * step, -half, half);
+        const cz = THREE.MathUtils.clamp(p.z + wz * step, -half, half);
+        if (!CITY.pointInBuilding(cx, cz) && !CITY.pointInBuilding(cx + wx * .5, cz + wz * .5)) {
+          p.x = cx; p.z = cz;
+          turnToward(player, Math.atan2(wx, wz), dt);
+          player.setWalk(true);
+          player.phaseSpeed = run;
+          player.sprint = sprinting;
+        } else { clearGoal(); player.setWalk(false); player.sprint = false; }   // ran into a wall — stop
+      }
     } else { player.setWalk(false); player.sprint = false; }
   }
 
   // ---------------- animation ----------------------------------------
   function update(dt) {
+    // v2.13: destination marker — pulses while walking, ripples out on arrival
+    if (marker) {
+      if (markerDone > 0) {
+        markerDone -= dt;
+        const k = Math.max(0, markerDone) / .5;
+        marker.scale.setScalar(1 + (1 - k) * 1.8);
+        marker.children.forEach(c => { c.material.opacity = .95 * k; });
+        if (markerDone <= 0) disposeMarker();
+      } else marker.scale.setScalar(1 + Math.sin(performance.now() * .006) * .1);
+    }
     for (const f of figures) {
       if (f.walking) {
         f.phase += dt * (f.phaseSpeed || 6) * 1.6;
@@ -3499,15 +3580,17 @@ const ACTORS = (() => {
 
   function reset() {
     clearCitizens();
+    clearGoal();   // v2.13: retire the walk destination with the city
     figures = figures.filter(f => f === player);
   }
 
   return {
     makeChibi, removeFig, walkTo, turnTo, makeCart,
     spawnCitizens, clearCitizens, updateCitizens,
-    initPlayer, placePlayer, updatePlayer, update, reset,
+    initPlayer, placePlayer, updatePlayer, update, reset, setGoal, clearGoal,
     get player() { return player; },
     get input() { return keys; },   // v2.06: live view of key state (QA)
+    get goal() { return goal; },   // v2.13: click-to-move destination (QA)
     get figures() { return figures; },
   };
 })();
@@ -4241,8 +4324,8 @@ const TUT = (() => {
     {
       key: 'walk', title: 'Walk the block', tgt: null,
       body: () => isTouch
-        ? 'Push the <b>joystick</b> (bottom-left) to walk. Drag a finger on the world to swing the camera.'
-        : 'Move with <b>W A S D</b> or the arrow keys — hold <b>Shift</b> to run. Drag the mouse to swing the camera.',
+        ? '<b>Tap any spot</b> on the street to walk there — or push the <b>joystick</b> (bottom-left). Drag a finger on the world to swing the camera.'
+        : '<b>Click any spot</b> on the street and you walk right over — or move with <b>W A S D</b> / arrows, hold <b>Shift</b> to run. Drag the mouse to swing the camera.',
       obj: () => 'Take a short stroll away from your landing spot.',
       check: () => {
         const [px, pz] = playerPos();
@@ -5051,7 +5134,7 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
   a.onclick = e => {
     e.preventDefault();
     const k = a.dataset.abt;
-    openModal(k.toUpperCase(), `<p><b>Open World v2.12</b> runs entirely in your browser and saves locally.</p>
+    openModal(k.toUpperCase(), `<p><b>Open World v2.13</b> runs entirely in your browser and saves locally.</p>
       <p>No accounts, no tracking, no payments. Map data © OpenStreetMap contributors (ODbL).</p>
       <p>Support: keep playing and build something big.</p>`);
   };
@@ -5061,12 +5144,12 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-    openModal('Welcome to v2.12 — OPEN FRONTIER', `
-        <p><b>The whole planet is yours to build on.</b></p>
-    <div class="kv"><span class="k">BUILD ANYWHERE</span><span class="v">on the globe, click any open land — not just the 64 cities — to settle it; it gets real streets where they exist and a fresh street grid out in the wilds, with sidewalk spots ready to buy</span></div>
-    <div class="kv"><span class="k">WORLD HIGHWAYS</span><span class="v">cities that can be reached over land are now joined by glowing road corridors across the continents — island cities like Tokyo, London and Dubai stay unconnected</span></div>
-    <div class="kv"><span class="k">YOUR OUTPOSTS</span><span class="v">every place you settle gets a gold ring on the globe, and the Empire panel teleports you back to it from anywhere</span></div>
-    <div class="kv"><span class="k">UNTOUCHED</span><span class="v g">v2.03 variety · v2.04 fast entry · v2.05 starter guide · v2.06 controls · v2.07 clear streets · v2.08 happy customers · v2.09 sidewalk spots · v2.10 instant travel · v2.11 world atlas</span></div>
+    openModal('Welcome to v2.13 — CLICK TO WALK', `
+    <p><b>Point and click — your tycoon does the walking.</b></p>
+    <div class="kv"><span class="k">CLICK TO WALK</span><span class="v">click any spot on the street and your tycoon strolls over on their own — a green ring marks the destination and ripples when you arrive</span></div>
+    <div class="kv"><span class="k">SHIFT EN ROUTE</span><span class="v">hold Shift while auto-walking to jog · WASD, arrows and the touch joystick override the walk instantly, and releasing a key still stops you on the spot</span></div>
+    <div class="kv"><span class="k">SMART CLICKS</span><span class="v">sidewalk spots, carts and towers still open on click — only open street sends you walking, and walls stop the walk politely</span></div>
+    <div class="kv"><span class="k">UNTOUCHED</span><span class="v g">v2.03 variety · v2.04 fast entry · v2.05 starter guide · v2.06 controls · v2.07 clear streets · v2.08 happy customers · v2.09 sidewalk spots · v2.10 instant travel · v2.11 world atlas · v2.12 open frontier</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">START BUILDING</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); if (!STATE.lastCityKey) toast('Click a glowing city — or any open land — to settle it.'); };
 }
@@ -5093,9 +5176,9 @@ document.getElementById('b-build').addEventListener('click', () => {
 document.getElementById('avatar-chip').addEventListener('click', () => ECO.openEmpire());
 
 function openHelp() {
-  openModal('Open World v2.12 — Help', `
+  openModal('Open World v2.13 — Help', `
     <p><b>Controls</b></p>
-    <div class="kv"><span class="k">MOVE</span><span class="v">WASD / arrows · hold Shift = sprint · release = stop</span></div>
+    <div class="kv"><span class="k">MOVE</span><span class="v">click the street to walk there · WASD / arrows · hold Shift = sprint</span></div>
     <div class="kv"><span class="k">CAMERA</span><span class="v">Drag to orbit · wheel/pinch to zoom (gentle, glide)</span></div>
     <div class="kv"><span class="k">BUILD ANYWHERE</span><span class="v">in orbit, click any open land to settle it — orange highways mark the cities linked over land</span></div>
     <div class="kv"><span class="k">EMPIRE</span><span class="v">avatar (top right) → TELEPORT to any plot you own, in any city or frontier</span></div>
@@ -5165,11 +5248,11 @@ function buildTicker() {
 }
 
 // ---------------- city camera + picking -------------------------------
-let dragging = false, moved = 0, lastX = 0, lastY = 0, pinchD = 0;
+let dragging = false, moved = 0, lastX = 0, lastY = 0, pinchD = 0, pinched = false;
 canvas.addEventListener('pointerdown', e => {
   if (STATE.mode !== 'city') return;
   dragging = true; moved = 0; lastX = e.clientX; lastY = e.clientY;
-  canvas.setPointerCapture(e.pointerId);
+  try { canvas.setPointerCapture(e.pointerId); } catch (_) { }   // v2.13: synthetic taps (QA) carry no active pointer
 });
 canvas.addEventListener('pointermove', e => {
   if (STATE.mode !== 'city') return;
@@ -5185,7 +5268,7 @@ canvas.addEventListener('pointermove', e => {
 });
 canvas.addEventListener('pointerup', e => {
   if (STATE.mode !== 'city') return;
-  if (dragging && moved < 6) clickPick(e.clientX, e.clientY);
+  if (dragging && moved < 6 && !pinched) clickPick(e.clientX, e.clientY);   // v2.13: pinch is not a tap
   dragging = false;
 });
 // gentle zoom: the step scales with the ACTUAL wheel delta (small trackpad
@@ -5201,6 +5284,7 @@ canvas.addEventListener('wheel', e => {
 // touch pinch (tracks fingers 1:1, same limits)
 canvas.addEventListener('touchmove', e => {
   if (STATE.mode !== 'city' || e.touches.length !== 2) return;
+  pinched = true;   // v2.13: two fingers down — a pinch, never a tap
   const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
   if (pinchD) {
     camCtl.distT = THREE.MathUtils.clamp(camCtl.distT * (pinchD / d), 45, 420);
@@ -5208,7 +5292,7 @@ canvas.addEventListener('touchmove', e => {
   }
   pinchD = d;
 }, { passive: true });
-canvas.addEventListener('touchend', () => { pinchD = 0; });
+canvas.addEventListener('touchend', () => { pinchD = 0; pinched = false; });
 
 const ray = new THREE.Raycaster();
 const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.15);
@@ -5233,7 +5317,10 @@ function hoverPick(cx, cy) {
 function clickPick(cx, cy) {
   const pt = screenToGround(cx, cy);
   if (!pt) return;
-  ECO.clickAt(pt.x, pt.z);
+  // v2.13 CLICK TO WALK: interactive clicks (spots, carts, towers) keep
+  // their meaning; any plain street point becomes a walk destination
+  if (ECO.clickAt(pt.x, pt.z)) return;
+  ACTORS.setGoal(pt.x, pt.z);
 }
 
 // ---------------- main loop -------------------------------------------
@@ -5302,7 +5389,7 @@ EARTH.diveTo = (city, cb) => {
 };
 
 
-console.log('%cOPEN WORLD v2.12 — OPEN FRONTIER', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.13 — CLICK TO WALK', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
