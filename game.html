@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.11</title>
+<title>Open World — v2.12</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.11 — NEW WORLD (complete restart) + STARTER GUIDE + TIGHT CONTROLS + CLEAR STREETS + HAPPY CUSTOMERS + SIDEWALK SPOTS + INSTANT TRAVEL + WORLD ATLAS
+   OPEN WORLD v2.12 — NEW WORLD (complete restart) + STARTER GUIDE + TIGHT CONTROLS + CLEAR STREETS + HAPPY CUSTOMERS + SIDEWALK SPOTS + INSTANT TRAVEL + WORLD ATLAS + OPEN FRONTIER (build anywhere, world highways)
    Visual system modeled on the Capital Rift reference frame:
    dark glassmorphism fintech UI (panels #1A202C @85%, 1px #4A5568
    borders, 4px radius), money-green #48BB78 prices, link-blue
@@ -485,7 +485,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.08 — streets imported live from the real world</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.12 — build anywhere on Earth, roads join the land-linked cities</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -509,7 +509,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.11';
+const GAME_VERSION = 'v2.12';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -722,8 +722,173 @@ function latLonToVec3(lat, lon, r = R) {
     r * Math.sin(phi) * Math.sin(theta));
 }
 
+// inverse of latLonToVec3 — a world point on the globe back to lat/lon
+function vec3ToLatLon(v) {
+  const n = v.clone().normalize();
+  const lat = 90 - Math.acos(THREE.MathUtils.clamp(n.y, -1, 1)) * 180 / Math.PI;
+  let lon = Math.atan2(n.z, -n.x) * 180 / Math.PI - 180;
+  lon = ((lon + 540) % 360) - 180;
+  return { lat, lon };
+}
+const coordStr = (lat, lon) =>
+  Math.abs(lat).toFixed(1) + '°' + (lat >= 0 ? 'N' : 'S') + ' · ' +
+  Math.abs(lon).toFixed(1) + '°' + (lon >= 0 ? 'E' : 'W');
+const frontierName = (lat, lon) =>
+  'Frontier ' + Math.abs(lat).toFixed(1) + (lat >= 0 ? 'N ' : 'S ') +
+  Math.abs(lon).toFixed(1) + (lon >= 0 ? 'E' : 'W');
+
+// ---------------- v2.12 — LAND MASK SAMPLER --------------------------
+// The same Natural Earth land mask that paints the globe texture, kept
+// as a bit array: one call answers "is this lat/lon dry land?" — both the
+// planet-wide highway network and the settle-anywhere frontier run on it.
+const LAND = (() => {
+  const W = 1440, H = 720;
+  let bits = null;
+  function init() {
+    if (bits) return true;
+    const b64 = (typeof window !== 'undefined' && window.__LAND_MASK_B64) || '';
+    if (!b64) return false;
+    const bin = atob(b64);
+    bits = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bits[i] = bin.charCodeAt(i);
+    return true;
+  }
+  function at(lat, lon) {
+    if (!init()) return true;              // no mask → never block anything
+    let x = Math.floor(((lon + 180) / 360) * W); if (x < 0) x = 0; if (x >= W) x = W - 1;
+    let y = Math.floor(((90 - lat) / 180) * H); if (y < 0) y = 0; if (y >= H) y = H - 1;
+    const i = y * W + x;
+    return ((bits[i >> 3] >> (7 - (i & 7))) & 1) === 1;
+  }
+  return { at, ok: init };
+})();
+
 // bright toy-globe colors (Capital Rift bright-flat daylight direction)
 const COL = { ocean: '#2C7BB9', ocean2: '#24689F', land: '#57A05E', land2: '#4C9255', node: '#22D3EE', owned: '#48BB78', here: '#F5CC74' };
+
+// ---------------- v2.12 — WORLD HIGHWAYS: land-connected city roads ---
+// A road exists between two cities when the straight great-circle corridor
+// between them stays on land (15km of give at each end for coastal cities,
+// sampled every ~0.4deg against the land mask). Island cities stay
+// roadless — Tokyo, London, Dubai, Perth... Each connected group becomes a
+// network: a minimum spanning tree (the trunk system) plus every short
+// (<1100km) direct link that is not already a trunk (the local mesh).
+// Deterministic: the same mask always yields the same highway planet.
+const ROUTES = (() => {
+  const stats = { direct: 0, edges: 0, km: 0, components: 0, isolated: 0 };
+  let edges = [];      // [{a, b, km}] — city keys, km rounded
+
+  function gcKm(a, b) {
+    const r = Math.PI / 180;
+    const s = Math.sin((b.lat - a.lat) * r / 2) ** 2 +
+      Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin((b.lon - a.lon) * r / 2) ** 2;
+    return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(s)));
+  }
+
+  function landCorridor(a, b, km) {
+    const va = latLonToVec3(a.lat, a.lon, 1), vb = latLonToVec3(b.lat, b.lon, 1);
+    const deg = Math.acos(THREE.MathUtils.clamp(va.dot(vb), -1, 1)) * 180 / Math.PI;
+    const N = Math.max(16, Math.ceil(deg / .4));
+    const skip = 15 / km;                  // roads reach the city's vicinity
+    for (let i = 1; i < N; i++) {
+      const t = i / N;
+      if (t < skip || t > 1 - skip) continue;
+      const ll = vec3ToLatLon(va.clone().lerp(vb, t));
+      if (!LAND.at(ll.lat, ll.lon)) return false;
+    }
+    return true;
+  }
+
+  function build(scene) {
+    if (!LAND.ok()) return;
+    const n = CITIES.length;
+    const direct = [];
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+      const km = gcKm(CITIES[i], CITIES[j]);
+      if (km > 9500) continue;             // beyond any land corridor
+      if (landCorridor(CITIES[i], CITIES[j], km)) direct.push({ i, j, km });
+    }
+    stats.direct = direct.length;
+    // ---- connected components (union-find over direct edges) ----
+    const par = CITIES.map((_, i) => i);
+    const find = x => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
+    direct.forEach(e => { par[find(e.i)] = find(e.j); });
+    const comps = new Map();
+    CITIES.forEach((c, i) => {
+      const r = find(i);
+      if (!comps.has(r)) comps.set(r, []);
+      comps.get(r).push(i);
+    });
+    // ---- minimum spanning tree per multi-city component (Prim) ----
+    const adj = new Map();
+    direct.forEach(e => {
+      if (!adj.has(e.i)) adj.set(e.i, []);
+      if (!adj.has(e.j)) adj.set(e.j, []);
+      adj.get(e.i).push([e.j, e.km]); adj.get(e.j).push([e.i, e.km]);
+    });
+    const mst = new Set();
+    comps.forEach(list => {
+      if (list.length < 2) return;
+      const inT = [list[0]], inS = new Set(inT);
+      while (inT.length < list.length) {
+        let best = null;
+        for (const u of inT) for (const ev of (adj.get(u) || [])) {
+          if (!inS.has(ev[0]) && (best === null || ev[1] < best[2])) best = [u, ev[0], ev[1]];
+        }
+        if (!best) break;
+        inT.push(best[1]); inS.add(best[1]);
+        mst.add(Math.min(best[0], best[1]) + '-' + Math.max(best[0], best[1]));
+      }
+    });
+    // ---- extras: every short direct link that is not already a trunk ----
+    const drawn = new Set(mst);
+    direct.forEach(e => {
+      const k = e.i + '-' + e.j;
+      if (e.km < 1100 && !drawn.has(k)) drawn.add(k);
+    });
+    // ---- ONE LineSegments for the whole highway planet ----
+    const RA = R * 1.0035;
+    const v = [];
+    drawn.forEach(k => {
+      const p = k.split('-');
+      const i = +p[0], j = +p[1];
+      const km = direct.find(e => e.i === i && e.j === j).km;
+      edges.push({ a: CITIES[i].key, b: CITIES[j].key, km: Math.round(km) });
+      stats.km += km;
+      const va = latLonToVec3(CITIES[i].lat, CITIES[i].lon, RA);
+      const vb = latLonToVec3(CITIES[j].lat, CITIES[j].lon, RA);
+      const deg = Math.acos(THREE.MathUtils.clamp(va.clone().normalize().dot(vb.clone().normalize()), -1, 1)) * 180 / Math.PI;
+      const N = Math.max(8, Math.ceil(deg));
+      let prev = va;
+      for (let s = 1; s <= N; s++) {
+        const q = va.clone().lerp(vb, s / N).normalize().multiplyScalar(RA);
+        v.push(prev.x, prev.y, prev.z, q.x, q.y, q.z);
+        prev = q;
+      }
+    });
+    stats.edges = edges.length;
+    stats.km = Math.round(stats.km);
+    stats.components = [...comps.values()].filter(l => l.length > 1).length;
+    stats.isolated = [...comps.values()].filter(l => l.length === 1).length;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+    scene.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({
+      color: 0xFF9E45, transparent: true, opacity: .8, depthWrite: false })));
+  }
+
+  // E2E invariant: every drawn road joins two catalog cities and its whole
+  // corridor is on land — exactly the promise the network makes
+  function check() {
+    let bad = 0;
+    edges.forEach(e => {
+      const a = CITIES.find(c => c.key === e.a), b = CITIES.find(c => c.key === e.b);
+      if (!a || !b || !landCorridor(a, b, gcKm(a, b))) bad++;
+    });
+    return { edges: edges.length, bad };
+  }
+
+  return { build, check, get stats() { return stats; }, get edges() { return edges; } };
+})();
 // ---------------- v2.11 — WORLD ATLAS: country outlines + names -------
 // Natural Earth 110m country borders (public domain), quantized to int16
 // absolutes, embedded by the build as base64 (same pattern as the land
@@ -858,7 +1023,8 @@ const COUNTRY = (() => {
 const EARTH = (() => {
   let scene, controls, renderer, camera;
   let cityMeshes = [], labelSprites = [], nodeGroup, rings = new Map();
-  let hoverCity = null, clock = 0, diveT = null;
+  let hoverCity = null, hoverLand = null, clock = 0, diveT = null;
+  let globeMesh = null;
 
   // ---- globe texture from the Natural Earth 1440x720 land mask ----
   function buildGlobeTexture() {
@@ -941,6 +1107,7 @@ const EARTH = (() => {
       new THREE.SphereGeometry(R, 96, 64),
       new THREE.MeshLambertMaterial({ map: buildGlobeTexture() }));
     scene.add(globe);
+    globeMesh = globe;   // v2.12: raycast target for settle-anywhere
     // atmosphere rim
     const atmo = new THREE.Mesh(
       new THREE.SphereGeometry(R * 1.045, 64, 48),
@@ -949,6 +1116,8 @@ const EARTH = (() => {
 
     // v2.11 — WORLD ATLAS: outlines + names of every country
     COUNTRY.build(scene);
+    // v2.12 — WORLD HIGHWAYS: land corridors between the land-linked cities
+    ROUTES.build(scene);
 
     // city nodes
     nodeGroup = new THREE.Group(); scene.add(nodeGroup);
@@ -992,7 +1161,16 @@ const EARTH = (() => {
       ray.setFromCamera(ndc, camera);
       const hit = ray.intersectObjects(cityMeshes, false)[0];
       hoverCity = hit ? hit.object.userData.city : null;
-      dom.style.cursor = hoverCity ? 'pointer' : '';
+      // v2.12: OPEN LAND — any dry land on the globe is settleable
+      hoverLand = null;
+      if (!hoverCity && globeMesh) {
+        const gh = ray.intersectObject(globeMesh, false)[0];
+        if (gh) {
+          const ll = vec3ToLatLon(gh.point);
+          if (LAND.at(ll.lat, ll.lon)) hoverLand = ll;
+        }
+      }
+      dom.style.cursor = (hoverCity || hoverLand) ? 'pointer' : '';
       // v2.04: dwell on a node for 400ms → start downloading its streets
       // now, so the dive is instant by the time the player clicks
       clearTimeout(hovT);
@@ -1006,12 +1184,24 @@ const EARTH = (() => {
           s: (popd >= 1 ? popd.toFixed(1) + 'M' : Math.round(popd * 1000) + 'K') + ' people · real streets',
           p: 'OPEN FOR BUSINESS', a: '', l: 'Click to enter the city',
         });
+      } else if (hoverLand) {
+        showTooltip(e.clientX, e.clientY, {
+          t: 'OPEN LAND',
+          s: coordStr(hoverLand.lat, hoverLand.lon) + ' · unclaimed frontier',
+          p: 'BUILD ANYWHERE IN THE WORLD', a: '', l: 'Click to settle this spot',
+        });
       } else hideTooltip();
     });
+    // v2.12: a click that traveled >7px was an orbit drag, not a tap —
+    // never settle or dive by accident after spinning the globe
+    let downX = 0, downY = 0;
+    dom.addEventListener('pointerdown', e => { downX = e.clientX; downY = e.clientY; });
     dom.addEventListener('click', e => {
-      if (diveT || !hoverCity || STATE.mode !== 'globe') return;
+      if (diveT || STATE.mode !== 'globe') return;
+      if (Math.hypot(e.clientX - downX, e.clientY - downY) > 7) return;
       clearTimeout(hovT);
-      EARTH.diveTo(hoverCity);
+      if (hoverCity) { EARTH.diveTo(hoverCity); return; }
+      if (hoverLand) settle(hoverLand.lat, hoverLand.lon);
     });
     return EARTH;
   }
@@ -1037,7 +1227,40 @@ const EARTH = (() => {
     requestAnimationFrame(step);
   }
 
+  // ---- v2.12: settle open land — dive in and make it buildable ----
+  // The whole planet is a buildable area now: any dry-land point gets a
+  // 'll-lat_lon' city key (the same convention as searched places, so the
+  // Empire panel's TRAVEL + the teleport fallback chain handle it for free),
+  // a Frontier name, tier-1 pricing, and the full street/plot pipeline —
+  // real OSM streets where they exist, a generated grid out in the wilds.
+  function settle(lat, lon) {
+    if (diveT || STATE.mode !== 'globe') return false;
+    if (!LAND.at(lat, lon)) { toast('<b>That\'s open ocean.</b> Pick dry land to settle.', 'warn'); return false; }
+    hideTooltip();
+    EARTH.diveTo({
+      key: 'll' + lat.toFixed(3) + '_' + lon.toFixed(3),
+      name: frontierName(lat, lon),
+      lat, lon, tier: 1, frontier: true,
+    });
+    return true;
+  }
+
   function setOwned(keys, hereKey) {
+    // v2.12: settled frontier spots (and searched places) carry their
+    // coords inside the key — give each one a small outpost ring on the
+    // globe so your empire is visible planet-wide
+    keys.forEach(k => {
+      if (rings.has(k) || !nodeGroup) return;
+      const m = /^ll(-?[0-9]+(?:[.][0-9]+)?)_(-?[0-9]+(?:[.][0-9]+)?)$/.exec(k);
+      if (!m) return;
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(2.4, .46, 8, 24),
+        new THREE.MeshBasicMaterial({ color: COL.owned, transparent: true, opacity: .95 }));
+      ring.position.copy(latLonToVec3(+m[1], +m[2], R + 1.2));
+      ring.lookAt(new THREE.Vector3(0, 0, 0));
+      ring.visible = false;
+      nodeGroup.add(ring); rings.set(k, ring);
+    });
     rings.forEach((ring, key) => {
       const owned = keys.has(key);
       ring.visible = owned || key === hereKey;
@@ -1073,7 +1296,11 @@ const EARTH = (() => {
   }
   function deactivate() { controls.enabled = false; hideTooltip(); }
 
-  return { init, update, activate, deactivate, diveTo, setOwned, get scene() { return scene; }, get controls() { return controls; }, get diving() { return !!diveT; }, get countries() { return COUNTRY.stats; } };
+  return { init, update, activate, deactivate, diveTo, setOwned, settle,
+    landAt: (lat, lon) => LAND.at(lat, lon),
+    get scene() { return scene; }, get controls() { return controls; }, get diving() { return !!diveT; }, get countries() { return COUNTRY.stats; },
+    get roads() { return { stats: ROUTES.stats, edges: ROUTES.edges, check: ROUTES.check }; },
+    get rings() { return rings; } };
 })();
 window.EARTH = EARTH;
 
@@ -4816,7 +5043,7 @@ function doEnter() {
   }
   if (STATE.seenNews !== GAME_VERSION) setTimeout(openWhatsNew, 600);
   else if (STATE.lastCityKey) toast('Welcome back, <b>' + nm + '</b>. Your empire is waiting.');
-  else toast('Welcome, <b>' + nm + '</b>. Click a glowing city to dive in.');
+  else toast('Welcome, <b>' + nm + '</b>. Click a glowing city — or any open land — to settle it.');
 }
 enterBtn.addEventListener('click', doEnter);
 pnameEl.addEventListener('keydown', e => { if (e.key === 'Enter') doEnter(); });
@@ -4824,7 +5051,7 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
   a.onclick = e => {
     e.preventDefault();
     const k = a.dataset.abt;
-    openModal(k.toUpperCase(), `<p><b>Open World v2.11</b> runs entirely in your browser and saves locally.</p>
+    openModal(k.toUpperCase(), `<p><b>Open World v2.12</b> runs entirely in your browser and saves locally.</p>
       <p>No accounts, no tracking, no payments. Map data © OpenStreetMap contributors (ODbL).</p>
       <p>Support: keep playing and build something big.</p>`);
   };
@@ -4834,13 +5061,14 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-    openModal('Welcome to v2.11 — WORLD ATLAS', `
-        <p><b>The world has edges — and names.</b></p>
-    <div class="kv"><span class="k">EVERY COUNTRY OUTLINED</span><span class="v">the planet in orbit now draws the borders of all 177 countries — coastlines, islands, enclaves — straight from Natural Earth</span></div>
-    <div class="kv"><span class="k">NAMES ON THE GLOBE</span><span class="v">every country's name floats where the country is: big ones always readable, smaller ones appear as you fly closer</span></div>
-    <div class="kv"><span class="k">UNTOUCHED</span><span class="v g">v2.03 variety · v2.04 fast entry · v2.05 starter guide · v2.06 controls · v2.07 clear streets · v2.08 happy customers · v2.09 sidewalk spots · v2.10 instant travel</span></div>
+    openModal('Welcome to v2.12 — OPEN FRONTIER', `
+        <p><b>The whole planet is yours to build on.</b></p>
+    <div class="kv"><span class="k">BUILD ANYWHERE</span><span class="v">on the globe, click any open land — not just the 64 cities — to settle it; it gets real streets where they exist and a fresh street grid out in the wilds, with sidewalk spots ready to buy</span></div>
+    <div class="kv"><span class="k">WORLD HIGHWAYS</span><span class="v">cities that can be reached over land are now joined by glowing road corridors across the continents — island cities like Tokyo, London and Dubai stay unconnected</span></div>
+    <div class="kv"><span class="k">YOUR OUTPOSTS</span><span class="v">every place you settle gets a gold ring on the globe, and the Empire panel teleports you back to it from anywhere</span></div>
+    <div class="kv"><span class="k">UNTOUCHED</span><span class="v g">v2.03 variety · v2.04 fast entry · v2.05 starter guide · v2.06 controls · v2.07 clear streets · v2.08 happy customers · v2.09 sidewalk spots · v2.10 instant travel · v2.11 world atlas</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">START BUILDING</button></div>`);
-  document.getElementById('wn-x').onclick = () => { closeModal(); if (!STATE.lastCityKey) toast('Click a glowing city to dive in.'); };
+  document.getElementById('wn-x').onclick = () => { closeModal(); if (!STATE.lastCityKey) toast('Click a glowing city — or any open land — to settle it.'); };
 }
 
 // ---------------- HUD wiring ------------------------------------------
@@ -4865,11 +5093,12 @@ document.getElementById('b-build').addEventListener('click', () => {
 document.getElementById('avatar-chip').addEventListener('click', () => ECO.openEmpire());
 
 function openHelp() {
-  openModal('Open World v2.11 — Help', `
+  openModal('Open World v2.12 — Help', `
     <p><b>Controls</b></p>
     <div class="kv"><span class="k">MOVE</span><span class="v">WASD / arrows · hold Shift = sprint · release = stop</span></div>
     <div class="kv"><span class="k">CAMERA</span><span class="v">Drag to orbit · wheel/pinch to zoom (gentle, glide)</span></div>
-    <div class="kv"><span class="k">EMPIRE</span><span class="v">avatar (top right) → TELEPORT to any plot you own, in any city</span></div>
+    <div class="kv"><span class="k">BUILD ANYWHERE</span><span class="v">in orbit, click any open land to settle it — orange highways mark the cities linked over land</span></div>
+    <div class="kv"><span class="k">EMPIRE</span><span class="v">avatar (top right) → TELEPORT to any plot you own, in any city or frontier</span></div>
     <div class="kv"><span class="k">SERVE</span><span class="v">[E] when standing at your cart</span></div>
     <div class="kv"><span class="k">MARKET</span><span class="v">📈 button · limit &amp; market orders</span></div>
     <p style="margin-top:12px"><b>The loop</b></p>
@@ -5073,7 +5302,7 @@ EARTH.diveTo = (city, cb) => {
 };
 
 
-console.log('%cOPEN WORLD v2.11 — WORLD ATLAS', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.12 — OPEN FRONTIER', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
