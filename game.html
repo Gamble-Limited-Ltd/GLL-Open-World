@@ -3,27 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.26</title>
+<title>Open World — v2.27</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.26 — THE WHOLE WORLD: every city already stands in
-   the world before you get there. All 64 catalog cities are pre-
-   built at their real spots — true street footprints and building
-   heights (the real OSM data when this browser has it cached, the
-   deterministic local generator otherwise — never a network call),
-   dry-land gated like the full build and fog-free like the city
-   beacons, so a panned or zoomed-out view sees cities on the
-   horizon instead of empty markers. Walking into a city upgrades
-   that spot to the fully detailed city (plots, props, citizens);
-   leaving hands the horizon back to the skyline — the world never
-   empties behind you. (v2.25 THE LONG WALK: cross-city walks
-   actually work. The WALK-TO pill now measures the TYCOON'S distance (a panned
-   bird's-eye view used to claim "0.9 KM" while the tycoon stood
-   4.7 km away and the city ahead never streamed in — "no other city
-   loads"); far walks leave downtown ALONG THE STREETS (street-hop
-   routing prepended to the road route — the straight line to the
-   first road vertex crossed building blocks, dead-stuck-cancelled
-   the goal within seconds and the walk died SILENTLY); a walk that
+   OPEN WORLD v2.27 — TRUE SCALE: the whole world is now 1:1 with the
+   real Earth — 111,320 meters per degree, 40,007 km around. Every
+   static chunk of the planet (coasts, lakes, roads, bridges) builds
+   in a LOCAL frame — 8° world tiles, city anchors, chunk centers —
+   because world coordinates reach ±20 million meters, past float32
+   vertex precision; the land/water gate now answers from the vector
+   coastlines the player actually sees. Cities stand at metro scale
+   on the horizon (v2.26 pre-built world, kept) and walking in still
+   upgrades the true downtown core. Older saves migrate to the new
+   scale: city plots keep their offset from their city's anchor,
+   everything else keeps its lat/lon.
+   ================================================================== */
+/* (release history, kept for the record)
    gives up now says so; enterWorld's teardown is guarded so a bug
    there can never silently swallow a travel. (v2.24 FRESH BUILD: the
    game checks its own build against the site's version.json feed and
@@ -580,7 +575,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.26';
+const GAME_VERSION = 'v2.27';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -637,7 +632,50 @@ const LAND = (() => {
 // world builder its rings.
 const LANDGEO = (() => {
   const rings = [], lakes = [], routes = [];
-  let lakeBB = [];
+  let lakeBB = [], ringBB = [], coastMask = null;
+  // v2.27 TRUE SCALE: the 1440x720 land raster has 0.25° cells — 27.8 km
+  // at 1:1 — while the coastline MESH is built from these rings at ~1 km
+  // resolution. Gating generation on the raster alone would put streets
+  // tens of km out over a bay the player can clearly see. So: a boot-time
+  // "coast proximity" bitmap (raster cells whose 3-cell neighborhood
+  // touches any ring segment) splits every water question into a fast
+  // raster opinion (open ocean / deep interior — where the raster cannot
+  // be wrong) and the exact vector rings (near any coast — what the
+  // player actually sees). Lakes were always vector-exact.
+  const CM_R = 3;                       // coast-proximity stamp radius, cells
+  let ringHash = new Map();             // 10° cell -> ring indices (bbox overlap)
+  function buildCoastIndex() {
+    ringBB = rings.map(ring => {
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+      for (const p of ring) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
+      return [x0, x1, y0, y1];
+    });
+    const RC = 10;                       // ring-hash cell, degrees
+    ringHash = new Map();
+    ringBB.forEach((b, ri) => {
+      for (let gx = Math.floor(b[0] / RC); gx <= Math.floor(b[1] / RC); gx++)
+        for (let gy = Math.floor(b[2] / RC); gy <= Math.floor(b[3] / RC); gy++) {
+          const k = gx + ',' + gy;
+          if (!ringHash.has(k)) ringHash.set(k, []);
+          ringHash.get(k).push(ri);
+        }
+    });
+    const W = 1440, H = 720;
+    coastMask = new Uint8Array(W * H);
+    const px = (lon, lat) => [Math.min(W - 1, Math.max(0, Math.floor((lon + 180) / 360 * W))),
+      Math.min(H - 1, Math.max(0, Math.floor((90 - lat) / 180 * H)))];
+    for (const ring of rings) {
+      for (let i = 0; i < ring.length; i++) {
+        const a = ring[i], b = ring[(i + 1) % ring.length];
+        const [ax, ay] = px(a[0], a[1]), [bx, by] = px(b[0], b[1]);
+        // stamp the segment's cell neighborhood (segments are short; the
+        // bbox walk covers the segment itself)
+        for (let gx = Math.min(ax, bx) - CM_R; gx <= Math.max(ax, bx) + CM_R; gx++)
+          for (let gy = Math.min(ay, by) - CM_R; gy <= Math.max(ay, by) + CM_R; gy++)
+            if (gx >= 0 && gx < W && gy >= 0 && gy < H) coastMask[gy * W + gx] = 1;
+      }
+    }
+  }
   function dec(b64) {
     const bin = atob(b64);
     const dv = new DataView(new ArrayBuffer(bin.length));
@@ -685,6 +723,7 @@ const LANDGEO = (() => {
       }
       routes.push({ a: r.a, b: r.b, bridge: !!r.br, pts });
     }
+    buildCoastIndex();   // v2.27: vector coast truth for the 1:1 world
     return true;
   }
   function pipLL(ring, lon, lat) {          // ray cast over a [lon,lat] ring
@@ -704,14 +743,45 @@ const LANDGEO = (() => {
     }
     return false;
   }
-  function isWaterLL(lat, lon) { return !LAND.at(lat, lon) || isLakeLL(lat, lon); }
+  function coastNearLL(lat, lon) {
+    if (!coastMask) return false;
+    const W = 1440, H = 720;
+    let gx = Math.floor((lon + 180) / 360 * W); if (gx < 0) gx = 0; if (gx >= W) gx = W - 1;
+    let gy = Math.floor((90 - lat) / 180 * H); if (gy < 0) gy = 0; if (gy >= H) gy = H - 1;
+    return coastMask[gy * W + gx] === 1;
+  }
+  function landLL(lat, lon) {
+    // exact point-in-ring, over only the rings whose bbox overlaps the
+    // point's 10° hash cell (usually one or two)
+    const arr = ringHash.get(Math.floor(lon / 10) + ',' + Math.floor(lat / 10));
+    if (!arr) return false;
+    for (const ri of arr) {
+      const b = ringBB[ri];
+      if (lon < b[0] || lon > b[1] || lat < b[2] || lat > b[3]) continue;
+      if (pipLL(rings[ri], lon, lat)) return true;
+    }
+    return false;
+  }
+  function isWaterLL(lat, lon) {
+    // v2.27 TRUE SCALE: near a coast the VECTOR rings decide — they are
+    // the coast the player sees. Far from any coast the 0.25° raster
+    // settles it (open ocean / deep interior — its half-cell error can't
+    // matter there). Lakes stay vector-exact everywhere.
+    if (!coastMask) return !LAND.at(lat, lon) || isLakeLL(lat, lon);
+    if (!coastNearLL(lat, lon)) return !LAND.at(lat, lon) || isLakeLL(lat, lon);
+    return !landLL(lat, lon) || isLakeLL(lat, lon);
+  }
   function isWaterWorld(x, z) { return isWaterLL(-z / DEG_M, x / DEG_M); }
-  // nearest dry land to a world point — spiral out in 30 m rings
+  // nearest dry land to a world point — spiral out in rings one land-raster
+  // cell wide (v2.27: the step tracks DEG_M, so the snap travels the same
+  // GEOGRAPHIC distance at any world scale — the shoreline a 550 m/° world
+  // found 30 m away is the same shoreline 1:1 finds ~6 km away)
   function nearestLandWorld(x, z, maxR) {
     if (!isWaterWorld(x, z)) return { x, z };
-    const R = maxR || 900;
-    for (let r = 30; r <= R; r += 30) {
-      const n = Math.max(8, Math.round(6.2832 * r / 30));
+    const STEP = DEG_M * 0.0545;
+    const R = maxR || DEG_M * 1.64;
+    for (let r = STEP; r <= R; r += STEP) {
+      const n = Math.max(8, Math.round(6.2832 * r / STEP));
       for (let i = 0; i < n; i++) {
         const a = i / n * 6.2832;
         const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
@@ -809,9 +879,20 @@ const CITIES = RAW_CITIES.map((r, i) => ({
 
 // ---- v2.18 PLANET EARTH: real positions -------------------------------
 // wx/wz = world meters on a true equirectangular projection of the whole
-// planet (550 m per degree, both axes) — the same projection as the
-// coastlines, so the planet you orbit is the planet you walk.
-const DEG_M = 550;
+// planet — the same projection as the coastlines, so the planet you
+// orbit is the planet you walk.
+// v2.27 TRUE SCALE: DEG_M is the real size of one degree — 111,320 m.
+// The world is now 1:1 with the actual Earth: 40,007 km around the
+// equator, Chicago really ~940 km from Toronto, and the OSM city
+// inserts (which were ALWAYS true meters) finally sit on the same
+// scale as the planet under them. World coordinates run to
+// ±20 million meters, so every chunk of geometry is built in a
+// LOCAL frame (tile / chunk / anchor) and positioned in double
+// precision — see the per-tile land builder and CITY's AX/AZ.
+const DEG_M = 111320;
+// v2.26 and earlier built the world at 550 m per degree; saves from
+// those builds are migrated by multiplying world coordinates by K.
+const DEG_M_OLD = 550, DEG_M_K = DEG_M / DEG_M_OLD;
 CITIES.forEach(c => { c.wx = c.lon * DEG_M; c.wz = -c.lat * DEG_M; });
 // ---- v2.19 SHORELINE CITIES -----------------------------------------
 // A few catalog cities sit so close to their water that the exact
@@ -821,7 +902,7 @@ CITIES.forEach(c => { c.wx = c.lon * DEG_M; c.wz = -c.lat * DEG_M; });
 // there. Every other city keeps its true geographic spot untouched.
 if (LANDGEO.ok()) CITIES.forEach(c => {
   if (LANDGEO.isWaterWorld(c.wx, c.wz)) {
-    const nl = LANDGEO.nearestLandWorld(c.wx, c.wz, 2600);
+    const nl = LANDGEO.nearestLandWorld(c.wx, c.wz, DEG_M * 4.73);
     if (nl) { c.wx = nl.x; c.wz = nl.z; }
   }
 });
@@ -919,7 +1000,7 @@ const STATE = {
 function saveGame() {
   try {
     const pack = {
-      v: 4, name: STATE.name, money: STATE.money, gdp: STATE.gdp,
+      v: 5, name: STATE.name, money: STATE.money, gdp: STATE.gdp,
       lastCityKey: STATE.lastCityKey, seenNews: STATE.seenNews,
       tut: { step: STATE.tut.step, done: STATE.tut.done },
       wx: ACTORS.player ? +ACTORS.player.group.position.x.toFixed(1) : null,
@@ -949,26 +1030,47 @@ function loadGame() {
     // v3-era world coordinates no longer mean anything. City plots ride
     // their city's new anchor; rural plots snap to the nearest dry land;
     // the old standing spot is dropped so you re-land somewhere real.
+    // (v2.27: the v3 remap below works in OLD 550 m/° coordinates — the
+    // TRUE-SCALE rescale right after moves everything to 1:1.)
     if (p.v === 3) {
       p.wx = null; p.wz = null;
       (p.plots || []).forEach(q => {
         if (q.cityKey && q.cityKey !== 'rural') {
-          const was = OLD_ANCHOR(q.cityKey), now = worldAnchorOf(q.cityKey);
+          const was = OLD_ANCHOR(q.cityKey), now0 = worldAnchorOf(q.cityKey);
+          const now = now0 ? { x: now0.x / DEG_M_K, z: now0.z / DEG_M_K } : null;
           if (was && now) { q.x = now.x + (q.x - was.x); q.z = now.z + (q.z - was.z); }
-        } else {
-          const nl = LANDGEO.nearestLandWorld(q.x || 0, q.z || 0, 5000);
-          if (nl) { q.x = nl.x; q.z = nl.z; }
         }
       });
+    }
+    // v2.27 TRUE SCALE: v3/v4 packs were written on the 550 m/° world.
+    // City plots keep their offset from their city's anchor (the anchor
+    // itself moved to its true-scale position); rural plots, searched
+    // 'll…' sites and the saved standing spot keep their lat/lon (world
+    // coords × K). Fresh v5 packs need nothing.
+    if (p.v === 3 || p.v === 4) {
+      (p.plots || []).forEach(q => {
+        const a = (q.cityKey && q.cityKey !== 'rural') ? worldAnchorOf(q.cityKey) : null;
+        if (a) {
+          const ao = { x: a.x / DEG_M_K, z: a.z / DEG_M_K };   // old-scale anchor
+          q.x = a.x + (q.x - ao.x);
+          q.z = a.z + (q.z - ao.z);
+        } else {
+          q.x = (q.x || 0) * DEG_M_K; q.z = (q.z || 0) * DEG_M_K;
+        }
+      });
+      if (typeof p.wx === 'number') p.wx *= DEG_M_K;
+      if (typeof p.wz === 'number') p.wz *= DEG_M_K;
     }
     STATE.playerW = (typeof p.wx === 'number') ? p.wx : null;
     STATE.playerZ = (typeof p.wz === 'number') ? p.wz : null;
     STATE.plots = (p.plots || []).map(o => {
       const q = { ...o, crew: o.crew || [] };
       // v2 (city-local) -> v3 (world) migration via the city's world anchor
-      if (p.v !== 3 && p.v !== 4 && q.cityKey) {
+      // (v2.27: in old-scale coordinates; the true-scale rescale above
+      // has already run, so divide back — ancient saves, best effort)
+      if (p.v !== 3 && p.v !== 4 && p.v !== 5 && q.cityKey) {
         const a = worldAnchorOf(q.cityKey);
-        if (a) { q.x = a.x + (q.x || 0); q.z = a.z + (q.z || 0); }
+        if (a) { q.x = a.x + (q.x || 0) * DEG_M_K; q.z = a.z + (q.z || 0) * DEG_M_K; }
       }
       return q;
     });
@@ -2012,8 +2114,12 @@ const WORLD = (() => {
   let activeCity = null;             // { key, meta, anchor }
   let pendingCity = null;            // suppress re-requests while fetching
   let edges = [];                    // runtime edge recs
-  let roadHash = new Map();          // cell -> [sample points]
-  const RCELL = 40;
+  let roadHash = new Map();          // cell -> [ax,az,bx,bz] road segments (v2.27)
+  // v2.27: 1 km cells hold road SEGMENTS (rasterized along their length)
+  // — at true scale poly points sit ~2.6 km apart, so point hashing
+  // would miss the road between them. nearRoad does exact
+  // point-to-segment distance over the 3×3 neighborhood.
+  const RCELL = 1024;
   let chunks = new Map();            // 'cx,cz' -> group
   let chunkQueue = [];
   let markers = new Map();           // cityKey -> {group, dot} (owned beacon)
@@ -2075,8 +2181,14 @@ const WORLD = (() => {
   }
 
   // ---------------- merged-geometry builder ---------------------------
+  // v2.27: optional (ox, oz) builds the merged geometry in a LOCAL frame
+  // around that origin (float32-safe at 1:1 world scale); the caller
+  // positions the returned mesh at (ox, 0, oz).
   const _nm3 = new THREE.Matrix3(), _v3a = new THREE.Vector3(), _v3b = new THREE.Vector3();
-  function GeoBuilder() {
+  const _mShift = new THREE.Matrix4();
+  function GeoBuilder(ox, oz) {
+    const off = (ox || 0) !== 0 || (oz || 0) !== 0;
+    if (off) _mShift.makeTranslation(-(ox || 0), 0, -(oz || 0));
     const pos = [], norm = [], uv = [], colr = [];
     function addGeo(geo, mat4, color) {
       const p = geo.attributes.position, n = geo.attributes.normal, u = geo.attributes.uv;
@@ -2087,6 +2199,7 @@ const WORLD = (() => {
       for (let i = 0; i < count; i++) {
         const vi = idx ? idx[i] : i;
         _v3a.fromBufferAttribute(p, vi).applyMatrix4(mat4);
+        if (off) _v3a.applyMatrix4(_mShift);
         _v3b.fromBufferAttribute(n, vi).applyMatrix3(_nm3).normalize();
         pos.push(_v3a.x, _v3a.y, _v3a.z);
         norm.push(_v3b.x, _v3b.y, _v3b.z);
@@ -2101,6 +2214,7 @@ const WORLD = (() => {
       g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
       g.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3));
       const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
+      if (off) m.position.set(ox, 0, oz);   // v2.27: chunk-local frame
       m.castShadow = true; m.receiveShadow = true;
       return m;
     }
@@ -2140,92 +2254,204 @@ const WORLD = (() => {
     _seaTex = t;
     return t;
   }
+  // ---------------- v2.27 TRUE SCALE: world tiles ------------------------
+  // At 1:1 the world spans ±20 million meters — far past float32 vertex
+  // precision — so the static planet builds as 8°×8° tiles (889 km each).
+  // Every tile's geometry is TILE-LOCAL (|coords| ≤ ~460 km → centimeter
+  // exact in float32) and the tile group carries the tile's absolute
+  // position in double precision, where three.js keeps its matrices.
+  // Coasts, lakes, rural roads, bridges and guard pylons all stream into
+  // the tiles they pass through; buildEdges fills t.road/t.mark/t.pyl
+  // after buildGround fills the land, then finalizeTiles() makes meshes.
+  const TILE_DEG = 8;
+  const tiles = new Map();       // 'tx,tz' -> tile record
+  function tileRec(tx, tz) {
+    const key = tx + ',' + tz;
+    let t = tiles.get(key);
+    if (t) return t;
+    const clon = -180 + (tx + .5) * TILE_DEG, clat = 90 - (tz + .5) * TILE_DEG;
+    t = {
+      g: new THREE.Group(),
+      ox: clon * DEG_M, oz: -clat * DEG_M,   // tile center, world meters (doubles)
+      sk: { pos: [], norm: [], uv: [], col: [] },
+      bh: { pos: [], col: [] }, sh: { pos: [], col: [] }, rm: { pos: [], col: [] },
+      road: { pos: [], norm: [], uv: [], col: [] },
+      mark: { pos: [], norm: [], uv: [], col: [] },
+      pyl: [],
+    };
+    t.g.position.set(t.ox, 0, t.oz);
+    group.add(t.g);
+    tiles.set(key, t);
+    return t;
+  }
+  function tileOfLL(lon, lat) {
+    const tx = Math.min(44, Math.max(0, Math.floor((lon + 180) / TILE_DEG)));
+    const tz = Math.min(22, Math.max(0, Math.floor((90 - lat) / TILE_DEG)));
+    return [tx, tz];
+  }
+  // Sutherland–Hodgman: clip a [lon,lat] ring to a tile rectangle
+  function clipRing(ring, lon0, lon1, lat0, lat1) {
+    let pts = ring;
+    const planes = [
+      [p => p[0] >= lon0, (a, b) => [lon0, a[1] + (b[1] - a[1]) * (lon0 - a[0]) / (b[0] - a[0])]],
+      [p => p[0] <= lon1, (a, b) => [lon1, a[1] + (b[1] - a[1]) * (lon1 - a[0]) / (b[0] - a[0])]],
+      [p => p[1] >= lat0, (a, b) => [a[0] + (b[0] - a[0]) * (lat0 - a[1]) / (b[1] - a[1]), lat0]],
+      [p => p[1] <= lat1, (a, b) => [a[0] + (b[0] - a[0]) * (lat1 - a[1]) / (b[1] - a[1]), lat1]],
+    ];
+    for (const [inside, xing] of planes) {
+      if (pts.length < 3) return [];
+      const out = [];
+      for (let i = 0; i < pts.length; i++) {
+        const cur = pts[i], nxt = pts[(i + 1) % pts.length];
+        const ci = inside(cur), ni = inside(nxt);
+        if (ci) out.push(cur);
+        if (ci !== ni) out.push(xing(cur, nxt));
+      }
+      pts = out;
+    }
+    return pts.length >= 3 ? pts : [];
+  }
+  function ringTiles(ring) {
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    for (const p of ring) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
+    const [tx0, tz0] = tileOfLL(x0, y1), [tx1, tz1] = tileOfLL(x1, y0);
+    const out = [];
+    for (let tx = tx0; tx <= tx1; tx++) for (let tz = tz0; tz <= tz1; tz++) out.push([tx, tz]);
+    return out;
+  }
+  function finalizeTiles() {
+    const skirtMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+    const beachMat = new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const shelfMat = new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+    const rimMat = new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+    const roadMat = new THREE.MeshLambertMaterial({ map: ruralRoadTexture(), vertexColors: true });
+    const markMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+    const pylGeo = new THREE.BoxGeometry(1.25, 3.9, 1.25);
+    const pylMat = new THREE.MeshLambertMaterial({ color: 0x9aa2a9 });
+    const fullMesh = (t, arr, mat) => {      // pos + norm + uv + col
+      if (!arr.pos.length) return;
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(arr.pos, 3));
+      g.setAttribute('normal', new THREE.Float32BufferAttribute(arr.norm, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(arr.uv, 2));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(arr.col, 3));
+      const m = new THREE.Mesh(g, mat);
+      m.receiveShadow = true;
+      t.g.add(m);
+    };
+    const flatMesh = (t, arr, mat) => {      // pos + col only, normals up
+      if (!arr.pos.length) return;
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(arr.pos, 3));
+      g.setAttribute('normal', new THREE.Float32BufferAttribute(arr.pos.map((_, i) => i % 3 === 1 ? 1 : 0), 3));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(arr.col, 3));
+      const m = new THREE.Mesh(g, mat);
+      m.receiveShadow = true;
+      t.g.add(m);
+    };
+    tiles.forEach(t => {
+      fullMesh(t, t.sk, skirtMat);
+      flatMesh(t, t.bh, beachMat);
+      flatMesh(t, t.sh, shelfMat);
+      flatMesh(t, t.rm, rimMat);
+      fullMesh(t, t.road, roadMat);
+      fullMesh(t, t.mark, markMat);
+      if (t.pyl.length) {
+        const inst = new THREE.InstancedMesh(pylGeo, pylMat, t.pyl.length);
+        const m4 = new THREE.Matrix4();
+        t.pyl.forEach((p, i) => { m4.makeTranslation(p[0], -1.55, p[1]); inst.setMatrixAt(i, m4); });
+        inst.receiveShadow = true;
+        t.g.add(inst);
+      }
+      t.sk = t.bh = t.sh = t.rm = t.road = t.mark = t.pyl = null;   // build arrays freed
+    });
+  }
   function buildGround() {
     if (!LANDGEO.ok()) { buildGroundFlat(); return; }
     const WB = WORLD_BOUNDS;
     const W = WB.x1 - WB.x0, H = WB.z1 - WB.z0;
     const cx = (WB.x0 + WB.x1) / 2, cz = (WB.z0 + WB.z1) / 2;
     // ---- the ocean: one plane over the whole planet, a step below land --
+    // (v2.27: a UNIT plane scaled in the transform — the vertex buffer
+    // stays exactly representable in float32 at true world scale)
     const sea = seaTexture();
     sea.repeat.set(W / 64, H / 64);
-    const ocean = new THREE.Mesh(new THREE.PlaneGeometry(W, H),
+    const ocean = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
       new THREE.MeshLambertMaterial({ map: sea, color: 0xa8d8f0 }));
     ocean.rotation.x = -Math.PI / 2;
+    ocean.scale.set(W, 1, H);
     ocean.position.set(cx, -1.35, cz);
     group.add(ocean);
     // ---- the land: coastlines as flat shields at y = 0 ------------------
-    // polygonOffset pushes the land a hair deeper so every overlay built
-    // on it (roads 2 cm up, plots, lakes 6 cm up) wins the depth test at
-    // any zoom — no shimmering coastlines when you study the planet.
+    // v2.27: every ring is clipped to each 8° tile it crosses and
+    // triangulated in tile-local meters. polygonOffset still pushes the
+    // land a hair deeper so overlays built on it win the depth test.
     const tex = grassTexture();
     tex.repeat.set(1 / 46, 1 / 46);
     const landMat = new THREE.MeshLambertMaterial({
       map: tex, side: THREE.DoubleSide,
       polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
     });
-    // ---- coast skirts: a sand ribbon from the shore into the sea -------
-    const sk = { pos: [], norm: [], uv: [], col: [] };
     const cTop = col(0xd9c48f), cBot = col(0x86744e);
     const SEA = -3.4;
-    // ---- beaches + shallow shelves (v2.18): a bright sand band crossing
-    // the waterline and a light turquoise shelf hugging every coast —
-    // both read clearly from bird's-eye altitude ----
-    const bh = { pos: [], col: [] }, sh = { pos: [], col: [] };
     const cBeach = col(0xe6d5a8), cShelf = col(0x5fb8d4);
-    const pipRingLL = (ring, lon, lat) => {
-      let inside = false;
-      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-        const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
-        if ((yi > lat) !== (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside;
-      }
-      return inside;
-    };
     for (const ring of LANDGEO.rings) {
       if (ring.length < 4) continue;
-      const shape = new THREE.Shape();
-      for (let i = 0; i < ring.length; i++) {
-        const sx = ring[i][0] * DEG_M, sy = ring[i][1] * DEG_M;
-        if (i) shape.lineTo(sx, sy); else shape.moveTo(sx, sy);
+      for (const [tx, tz] of ringTiles(ring)) {
+        const t = tileRec(tx, tz);
+        const lon0 = -180 + tx * TILE_DEG, lon1 = lon0 + TILE_DEG;
+        const lat1 = 90 - tz * TILE_DEG, lat0 = lat1 - TILE_DEG;
+        const poly = clipRing(ring, lon0, lon1, lat0, lat1);
+        if (poly.length < 3) continue;
+        const shape = new THREE.Shape();
+        for (let i = 0; i < poly.length; i++) {
+          // shape (x, y) -> tile-local world (x, -y=z): x = lon-ox, z = lat+oz
+          const sx = poly[i][0] * DEG_M - t.ox, sy = poly[i][1] * DEG_M + t.oz;
+          if (i) shape.lineTo(sx, sy); else shape.moveTo(sx, sy);
+        }
+        const m = new THREE.Mesh(new THREE.ShapeGeometry(shape), landMat);
+        m.rotation.x = -Math.PI / 2;        // shape (x,y) -> world (x, -y=z)
+        m.receiveShadow = true;
+        t.g.add(m);
       }
-      const m = new THREE.Mesh(new THREE.ShapeGeometry(shape), landMat);
-      m.rotation.x = -Math.PI / 2;          // shape (x,y) -> world (x, -y=z)
-      m.receiveShadow = true;
-      group.add(m);
-      // world-space ring. All Natural Earth outer rings wind the same way
-      // (positive signed area in world space): the interior lies LEFT of
-      // travel, so SEAWARD is always the RIGHT perpendicular — one rule
-      // for every segment of every coast, and the (A, B, C) triangle
-      // order always faces up.
+      // world-space ring segments. All Natural Earth outer rings wind the
+      // same way (positive signed area in world space): the interior lies
+      // LEFT of travel, so SEAWARD is always the RIGHT perpendicular — one
+      // rule for every segment of every coast, and the (A, B, C) triangle
+      // order always faces up. v2.27: each segment's skirt/beach/shelf
+      // live in the tile of its midpoint, in tile-local meters.
       for (let i = 0; i < ring.length; i++) {
         const a = ring[i], b = ring[(i + 1) % ring.length];
         const ax = a[0] * DEG_M, az = -a[1] * DEG_M, bx = b[0] * DEG_M, bz = -b[1] * DEG_M;
         const seg = Math.hypot(bx - ax, bz - az);
-        if (seg < .01 || seg > 3000) continue;   // degenerate seam edges
+        if (seg < .01 || seg > DEG_M * 5.45) continue;   // degenerate seam edges
+        const t = tileRec(...tileOfLL((a[0] + b[0]) / 2, (a[1] + b[1]) / 2));
+        const lx = ax - t.ox, lz = az - t.oz, lbx = bx - t.ox, lbz = bz - t.oz;
         // coast skirt (DoubleSide — winding irrelevant)
-        const P = [[ax, .04, az], [bx, .04, bz], [bx, SEA, bz],
-                   [ax, .04, az], [bx, SEA, bz], [ax, SEA, az]];
+        const P = [[lx, .04, lz], [lbx, .04, lbz], [lbx, SEA, lbz],
+                   [lx, .04, lz], [lbx, SEA, lbz], [lx, SEA, lz]];
         const C = [cTop, cTop, cBot, cTop, cBot, cBot];
         for (let k = 0; k < 6; k++) {
-          sk.pos.push(P[k][0], P[k][1], P[k][2]);
-          sk.norm.push(0, 1, 0);
-          sk.uv.push(0, 0);
-          sk.col.push(C[k][0], C[k][1], C[k][2]);
+          t.sk.pos.push(P[k][0], P[k][1], P[k][2]);
+          t.sk.norm.push(0, 1, 0);
+          t.sk.uv.push(0, 0);
+          t.sk.col.push(C[k][0], C[k][1], C[k][2]);
         }
         // segment seaward normal = right perpendicular of travel
         const dx = bx - ax, dz = bz - az, dl = seg;
         const snx = dz / dl, snz = -dx / dl;
         const yb = .05 + (i % 2) * .013, ys = -1.30 + (i % 2) * .009;
         // beach: 26 m inland .. 14 m into the sea (straddles the waterline)
-        const A = [ax - snx * 26, az - snz * 26], B = [bx - snx * 26, bz - snz * 26];
-        const Cc = [bx + snx * 14, bz + snz * 14], D = [ax + snx * 14, az + snz * 14];
+        const A = [lx - snx * 26, lz - snz * 26], B = [lbx - snx * 26, lbz - snz * 26];
+        const Cc = [lbx + snx * 14, lbz + snz * 14], D = [lx + snx * 14, lz + snz * 14];
         // shallow shelf: 12 m .. 85 m seaward, just above the ocean plane
-        const A2 = [ax + snx * 12, az + snz * 12], B2 = [bx + snx * 12, bz + snz * 12];
-        const C2 = [bx + snx * 85, bz + snz * 85], D2 = [ax + snx * 85, az + snz * 85];
+        const A2 = [lx + snx * 12, lz + snz * 12], B2 = [lbx + snx * 12, lbz + snz * 12];
+        const C2 = [lbx + snx * 85, lbz + snz * 85], D2 = [lx + snx * 85, lz + snz * 85];
         const push = (arr, cArr, pts, y, Cc2) => {
           for (const p of pts) { arr.push(p[0], y, p[1]); cArr.push(Cc2[0], Cc2[1], Cc2[2]); }
         };
-        push(bh.pos, bh.col, [A, B, Cc, A, Cc, D], yb, cBeach);
-        push(sh.pos, sh.col, [A2, B2, C2, A2, C2, D2], ys, cShelf);
+        push(t.bh.pos, t.bh.col, [A, B, Cc, A, Cc, D], yb, cBeach);
+        push(t.sh.pos, t.sh.col, [A2, B2, C2, A2, C2, D2], ys, cShelf);
       }
     }
     // ---- the great lakes: inset water just above the land --------------
@@ -2233,49 +2459,29 @@ const WORLD = (() => {
       color: 0x3e8cbb, side: THREE.DoubleSide,
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
     });
-    for (const lk of LANDGEO.lakes) {
-      if (lk.ring.length < 4) continue;
-      const shape = new THREE.Shape();
-      for (let i = 0; i < lk.ring.length; i++) {
-        const sx = lk.ring[i][0] * DEG_M, sy = lk.ring[i][1] * DEG_M;
-        if (i) shape.lineTo(sx, sy); else shape.moveTo(sx, sy);
-      }
-      const m = new THREE.Mesh(new THREE.ShapeGeometry(shape), lakeMat);
-      m.rotation.x = -Math.PI / 2;
-      m.position.y = .06;
-      group.add(m);
-    }
-    if (sk.pos.length) {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(sk.pos, 3));
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(sk.norm, 3));
-      g.setAttribute('uv', new THREE.Float32BufferAttribute(sk.uv, 2));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(sk.col, 3));
-      const skirt = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
-      skirt.receiveShadow = true;
-      group.add(skirt);
-    }
-    const flatMesh = (pos, colr, mat) => {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(pos.map((_, i) => i % 3 === 1 ? 1 : 0), 3));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3));
-      const m = new THREE.Mesh(g, mat);
-      m.receiveShadow = true;
-      group.add(m);
-    };
-    if (bh.pos.length) flatMesh(bh.pos, bh.col,
-      new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
-    if (sh.pos.length) flatMesh(sh.pos, sh.col,
-      new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
     // ---- v2.19: sandy rims just inside every lake waterline --------------
     // Same read as the ocean coasts: a pale sand shelf hugging each lake's
     // edge, a hair above the surface — so a city beside a lake reads as a
     // waterfront, not as a slab over water.
-    const rm = { pos: [], col: [] };
     const cRim = col(0xd8cfa6);
     for (const lk of LANDGEO.lakes) {
       if (lk.ring.length < 4) continue;
+      for (const [tx, tz] of ringTiles(lk.ring)) {
+        const t = tileRec(tx, tz);
+        const lon0 = -180 + tx * TILE_DEG, lon1 = lon0 + TILE_DEG;
+        const lat1 = 90 - tz * TILE_DEG, lat0 = lat1 - TILE_DEG;
+        const poly = clipRing(lk.ring, lon0, lon1, lat0, lat1);
+        if (poly.length < 3) continue;
+        const shape = new THREE.Shape();
+        for (let i = 0; i < poly.length; i++) {
+          const sx = poly[i][0] * DEG_M - t.ox, sy = poly[i][1] * DEG_M + t.oz;
+          if (i) shape.lineTo(sx, sy); else shape.moveTo(sx, sy);
+        }
+        const m = new THREE.Mesh(new THREE.ShapeGeometry(shape), lakeMat);
+        m.rotation.x = -Math.PI / 2;
+        m.position.y = .06;
+        t.g.add(m);
+      }
       // ring winding: interior (the water) lies LEFT of travel for
       // positive signed area — all Natural Earth rings but the Caspian.
       let sa = 0;
@@ -2288,24 +2494,25 @@ const WORLD = (() => {
         const a = lk.ring[i], b = lk.ring[(i + 1) % lk.ring.length];
         const ax = a[0] * DEG_M, az = -a[1] * DEG_M, bx = b[0] * DEG_M, bz = -b[1] * DEG_M;
         const seg = Math.hypot(bx - ax, bz - az);
-        if (seg < .01 || seg > 3000) continue;          // degenerate seam edges
+        if (seg < .01 || seg > DEG_M * 5.45) continue;    // degenerate seam edges
+        const t = tileRec(...tileOfLL((a[0] + b[0]) / 2, (a[1] + b[1]) / 2));
+        const lx = ax - t.ox, lz = az - t.oz, lbx = bx - t.ox, lbz = bz - t.oz;
         const snx = (bz - az) / seg, snz = -(bx - ax) / seg;   // RIGHT of travel
         const wx = -snx * sgn, wz = -snz * sgn;         // toward the water
-        const A = [ax, az], B = [bx, bz];
-        const C = [bx + wx * 11, bz + wz * 11], D = [ax + wx * 11, az + wz * 11];
-        for (const p of [A, B, C, A, C, D]) { rm.pos.push(p[0], .068, p[1]); rm.col.push(cRim[0], cRim[1], cRim[2]); }
+        const A = [lx, lz], B = [lbx, lbz];
+        const C = [lbx + wx * 11, lbz + wz * 11], D = [lx + wx * 11, lz + wz * 11];
+        for (const p of [A, B, C, A, C, D]) { t.rm.pos.push(p[0], .068, p[1]); t.rm.col.push(cRim[0], cRim[1], cRim[2]); }
       }
     }
-    if (rm.pos.length) flatMesh(rm.pos, rm.col,
-      new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
   }
   // pre-Earth fallback ground (only if the coastline data failed to load)
   function buildGroundFlat() {
     const W = WORLD_BOUNDS.x1 - WORLD_BOUNDS.x0, H = WORLD_BOUNDS.z1 - WORLD_BOUNDS.z0;
     const cx = (WORLD_BOUNDS.x0 + WORLD_BOUNDS.x1) / 2, cz = (WORLD_BOUNDS.z0 + WORLD_BOUNDS.z1) / 2;
-    const geo = new THREE.PlaneGeometry(W, H, 96, 50);
+    const geo = new THREE.PlaneGeometry(1, 1);
     geo.rotateX(-Math.PI / 2);
     const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: grassTexture() }));
+    m.scale.set(W, 1, H);   // v2.27: unit plane scaled — float32-exact verts
     m.position.set(cx, .006, cz);
     m.receiveShadow = true;
     group.add(m);
@@ -2313,13 +2520,18 @@ const WORLD = (() => {
 
   // ---------------- rural roads + rural plots -------------------------
   // v2.18: every road is a REAL land route — A*-routed across the planet's
-  // coastlines at build time, projected to world meters and resampled to
-  // ≤11 m. Island cities are joined by sea bridges (pylons, no plots).
+  // coastlines at build time, projected to world meters. v2.27 TRUE SCALE:
+  // resampling and hashing track DEG_M (a ~2.6 km cadence at 1:1 — the
+  // same geographic fidelity the 11 m cadence gave the 550 m/° world),
+  // ribbons stream into the world tiles, and any stretch the vector
+  // coast says is water becomes a causeway with guard pylons. Island
+  // cities are joined by sea bridges (pylons, no plots).
+  const RSAMPLE = DEG_M / 50;         // route resample step (~2.2 km at 1:1)
+  const RDECIM = DEG_M * 0.0236;      // polyline decimation (~2.6 km at 1:1)
   function buildEdges() {
     edges = [];
     roadHash = new Map();
     let rn = 1;
-    const tex = ruralRoadTexture();
     for (const e of WORLD_EDGES) {
       const A = CITIES[e.a], B = CITIES[e.b];
       if (!A || !B) continue;
@@ -2332,7 +2544,7 @@ const WORLD = (() => {
         if (!i) { full.push([px, pz]); continue; }
         const q = full[full.length - 1];
         const d = Math.hypot(px - q[0], pz - q[1]);
-        const n = Math.max(1, Math.ceil(d / 11));
+        const n = Math.max(1, Math.ceil(d / RSAMPLE));
         for (let k = 1; k <= n; k++) full.push([q[0] + (px - q[0]) * k / n, q[1] + (pz - q[1]) * k / n]);
       }
       const cum = [0];
@@ -2349,7 +2561,7 @@ const WORLD = (() => {
       let acc = 0;
       for (let i = 1; i < pts.length; i++) {
         acc += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-        if (acc >= 13 || i === pts.length - 1) { poly.push(pts[i]); acc = 0; }
+        if (acc >= RDECIM || i === pts.length - 1) { poly.push(pts[i]); acc = 0; }
       }
       const rec = {
         idx: edges.length, A, B, poly, bridge: !!e.bridge,
@@ -2362,34 +2574,58 @@ const WORLD = (() => {
         rec.bbox[0] = Math.min(rec.bbox[0], pt[0]); rec.bbox[1] = Math.max(rec.bbox[1], pt[0]);
         rec.bbox[2] = Math.min(rec.bbox[2], pt[1]); rec.bbox[3] = Math.max(rec.bbox[3], pt[1]);
       });
-      buildEdgeMesh(rec, tex);
-      // hash this road's samples BEFORE placing its plots, so plots keep
-      // clear of every road built so far (including their own — plots sit
-      // 13.9 m off-center, safely past the 9 m clearance)
-      rec.poly.forEach(pt => {
-        const k = Math.floor(pt[0] / RCELL) + ',' + Math.floor(pt[1] / RCELL);
-        if (!roadHash.has(k)) roadHash.set(k, []);
-        roadHash.get(k).push(pt);
-      });
+      // v2.27: the edge group now holds only its roadside plots — the
+      // ribbons themselves live in the world tiles
+      rec.group = new THREE.Group();
+      group.add(rec.group);
+      buildEdgeMesh(rec);
+      // hash this road's segments BEFORE placing its plots, so plots keep
+      // clear of every road built so far. v2.27: at true scale the poly
+      // points are ~2.6 km apart, so the hash stores SEGMENTS — each one
+      // rasterized along its length into 1 km cells — and nearRoad
+      // answers with exact point-to-segment distance.
+      for (let i = 0; i < rec.poly.length - 1; i++) {
+        const seg = [rec.poly[i][0], rec.poly[i][1], rec.poly[i + 1][0], rec.poly[i + 1][1]];
+        const slen = Math.hypot(seg[2] - seg[0], seg[3] - seg[1]) || 1;
+        const nH = Math.max(1, Math.ceil(slen / (RCELL / 2)));
+        const seen = new Set();
+        for (let k = 0; k <= nH; k++) {
+          const hx = seg[0] + (seg[2] - seg[0]) * k / nH, hz = seg[1] + (seg[3] - seg[1]) * k / nH;
+          const k2 = Math.floor(hx / RCELL) + ',' + Math.floor(hz / RCELL);
+          if (seen.has(k2)) continue;
+          seen.add(k2);
+          if (!roadHash.has(k2)) roadHash.set(k2, []);
+          roadHash.get(k2).push(seg);
+        }
+      }
       buildEdgePlots(rec);
       edges.push(rec);
     }
   }
 
   function nearRoad(x, z, r) {
-    const cr = Math.ceil(r / RCELL);
+    // exact distance to the nearest hashed road segment (r must stay
+    // ≤ RCELL; every caller asks for ≤ 26 m)
     const gx = Math.floor(x / RCELL), gz = Math.floor(z / RCELL);
-    for (let i = -cr; i <= cr; i++) for (let j = -cr; j <= cr; j++) {
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
       const arr = roadHash.get((gx + i) + ',' + (gz + j));
       if (!arr) continue;
-      for (const pt of arr) if (Math.hypot(pt[0] - x, pt[1] - z) < r) return true;
+      for (const s of arr) {
+        const dx = s[2] - s[0], dz = s[3] - s[1];
+        const L2 = dx * dx + dz * dz || 1;
+        let t = ((x - s[0]) * dx + (z - s[1]) * dz) / L2;
+        t = Math.max(0, Math.min(1, t));
+        if (Math.hypot(x - (s[0] + t * dx), z - (s[1] + t * dz)) < r) return true;
+      }
     }
     return false;
   }
 
-  function buildEdgeMesh(rec, tex) {
-    const road = { pos: [], norm: [], uv: [], col: [] };
-    const mark = { pos: [], norm: [], uv: [], col: [] };
+  function buildEdgeMesh(rec) {
+    // v2.27: ribbons stream into the world TILES (tile-local meters);
+    // center dashes only within ~8 km of either city end; any segment
+    // the vector coast calls water — bridge or not — gets guard pylons
+    // and its deck rides just above the sea like the sea bridges.
     const cAsph = [1, 1, 1], cShol = col(0x8d8265), cDash = col(0xe8e4dc);
     const rib = (arr, ax, az, bx, bz, ux, uz, w, y, c, vTile) => {
       const px = -uz * w / 2, pz = ux * w / 2;
@@ -2405,56 +2641,39 @@ const WORLD = (() => {
       }
     };
     const poly = rec.poly;
+    const cum = [0];
+    for (let i = 1; i < poly.length; i++) cum.push(cum[i - 1] + Math.hypot(poly[i][0] - poly[i - 1][0], poly[i][1] - poly[i - 1][1]));
+    const L = cum[poly.length - 1] || 1;
+    const lonOf = x => x / DEG_M, latOf = z => -z / DEG_M;
     for (let i = 0; i < poly.length - 1; i++) {
       const [ax, az] = poly[i], [bx, bz] = poly[i + 1];
       const dx = bx - ax, dz = bz - az, len = Math.hypot(dx, dz) || 1;
       const ux = dx / len, uz = dz / len;
-      rib(road, ax, az, bx, bz, ux, uz, 7.5, .019, cAsph, 1.07);
+      const t = tileRec(...tileOfLL(lonOf((ax + bx) / 2), latOf((az + bz) / 2)));
+      const ox = t.ox, oz = t.oz;
+      const lax = ax - ox, laz = az - oz, lbx = bx - ox, lbz = bz - oz;
+      rib(t.road, lax, laz, lbx, lbz, ux, uz, 7.5, .019, cAsph, 1.07);
       for (const s of [1, -1]) {
-        rib(road, ax - uz * 4.6 * s, az + ux * 4.6 * s, bx - uz * 4.6 * s, bz + ux * 4.6 * s, ux, uz, 1.7, .014, cShol, .24);
+        rib(t.road, lax - uz * 4.6 * s, laz + ux * 4.6 * s, lbx - uz * 4.6 * s, lbz + ux * 4.6 * s, ux, uz, 1.7, .014, cShol, .24);
       }
-      for (let d = 2.5; d < len - 2; d += 8) {
-        const mx = ax + ux * d, mz = az + uz * d;
-        rib(mark, mx, mz, mx + ux * 3.4, mz + uz * 3.4, ux, uz, .3, .023, cDash, .04);
-      }
-    }
-    const mk = (arr, tex2) => {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(arr.pos, 3));
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(arr.norm, 3));
-      g.setAttribute('uv', new THREE.Float32BufferAttribute(arr.uv, 2));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(arr.col, 3));
-      const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial(tex2 ? { map: tex2, vertexColors: true } : { vertexColors: true }));
-      m.receiveShadow = true;
-      return m;
-    };
-    const g = new THREE.Group();
-    g.add(mk(road, tex));
-    g.add(mk(mark, null));
-    // v2.18 sea bridges: guard pylons wherever the span crosses water
-    if (rec.bridge && LANDGEO.ready) {
-      const spots = [];
-      for (let i = 0; i < poly.length - 1; i += 3) {
-        const [ax, az] = poly[i], [bx2, bz2] = poly[i + 1];
-        if (!LANDGEO.isWaterWorld(ax, az)) continue;
-        const dx = bx2 - ax, dz = bz2 - az, dl = Math.hypot(dx, dz) || 1;
-        spots.push([ax - dz / dl * 3.4, az + dx / dl * 3.4, ax + dz / dl * 3.4, az - dx / dl * 3.4]);
-      }
-      if (spots.length) {
-        const inst = new THREE.InstancedMesh(new THREE.BoxGeometry(1.25, 3.9, 1.25),
-          new THREE.MeshLambertMaterial({ color: 0x9aa2a9 }), spots.length * 2);
-        const m4 = new THREE.Matrix4();
-        let nn = 0;
-        for (const s of spots) {
-          m4.makeTranslation(s[0], -1.55, s[1]); inst.setMatrixAt(nn++, m4);
-          m4.makeTranslation(s[2], -1.55, s[3]); inst.setMatrixAt(nn++, m4);
+      // v2.27: dashes near the cities only (within ~8 km of either end)
+      if (Math.min(cum[i], L - cum[i]) < 8000) {
+        for (let d = 40; d < len - 40; d += 80) {
+          const mx = lax + ux * d, mz = laz + uz * d;
+          rib(t.mark, mx, mz, mx + ux * 3.4, mz + uz * 3.4, ux, uz, .3, .023, cDash, .04);
         }
-        inst.receiveShadow = true;
-        g.add(inst);
+      }
+      // v2.18 sea bridges / v2.27 causeways: guard pylons wherever the
+      // span crosses water (checked every other segment — the vector
+      // coast gate is exact but not free)
+      if (LANDGEO.ready && (rec.bridge || i % 2 === 0)) {
+        const midWet = LANDGEO.isWaterWorld((ax + bx) / 2, (az + bz) / 2);
+        if (midWet) {
+          t.pyl.push([lax - dz / len * 3.4, laz + dx / len * 3.4]);
+          t.pyl.push([lax + dz / len * 3.4, laz - dx / len * 3.4]);
+        }
       }
     }
-    rec.group = g;
-    group.add(g);
   }
 
   let _dollarMat = null;
@@ -2475,16 +2694,16 @@ const WORLD = (() => {
     const rnd = _mulberry(hashStr('rp' + rec.idx + (rec.A.key || '')));
     const PW = 15, PD = 20;
     let n = 0;
-    // walk the polyline by cumulative arc length (poly is decimated to
-    // ~13 m segments, so per-segment placement would never fire)
-    let dist = 0, next = 16 + rnd() * 22;
+    // walk the polyline by cumulative arc length (v2.27: plot slots sit
+    // every ~250 m so a road's ten plots stay within a ~6 km walk of town)
+    let dist = 0, next = 60 + rnd() * 90;
     for (let i = 0; i < rec.poly.length - 1 && n < 10; i++) {
       const [ax, az] = rec.poly[i], [bx, bz] = rec.poly[i + 1];
       const len = Math.hypot(bx - ax, bz - az) || 1;
       const ux = (bx - ax) / len, uz = (bz - az) / len;
       while (next <= dist + len) {
         const d = next - dist;
-        next += 62;
+        next += 250;
         if (rnd() < .42) continue;                 // not every slot has a plot
         const side = rnd() < .5 ? 1 : -1;
         const off = 6.4 + PW / 2;
@@ -2495,7 +2714,7 @@ const WORLD = (() => {
         if (nearRoad(cx, cz, 9)) continue;         // not on another road
         if (LANDGEO.ready && LANDGEO.isWaterWorld(cx, cz)) continue;   // v2.18: dry land only
         if (rec.plotRecs.some(p => Math.hypot(p.x - cx, p.z - cz) < 55)) continue;
-        const price = Math.round(ECON.plotBase * ECON.ruralFactor * (.8 + near.d / 2600) / 50) * 50;
+        const price = Math.round(ECON.plotBase * ECON.ruralFactor * (.8 + near.d / 10400) / 50) * 50;
         const rotY = Math.atan2(ux, uz);
         const g = new THREE.Group();
         const pad = new THREE.Mesh(new THREE.PlaneGeometry(PW, PD),
@@ -2528,7 +2747,9 @@ const WORLD = (() => {
     if (chunks.has(key)) return;
     const rnd = _mulberry(hashStr('ch' + key));
     const x0 = ccx * CH, z0 = ccz * CH, xm = x0 + CH / 2, zm = z0 + CH / 2;
-    const B = GeoBuilder();
+    // v2.27: chunk-local frame — merged geometry is built around the
+    // chunk center and the group carries the absolute position
+    const B = GeoBuilder(xm, zm);
     const mobF = isMob ? .55 : 1;
     const nearC = distToCity(xm, zm);
     const insideCity = nearC.d < CITY_R + CH * .72;
@@ -2599,7 +2820,7 @@ const WORLD = (() => {
       }
     }
     if (B.count < 6) return;
-    const mesh = B.mesh();
+    const mesh = B.mesh();            // carries (xm, 0, zm) itself — city-local frame
     const cg = new THREE.Group();
     cg.add(mesh);
     group.add(cg);
@@ -2769,6 +2990,14 @@ const WORLD = (() => {
   let skyLastT = 0;                 // throttle: one build per gate window
   let _skyMat = null;
   const SKY_GATE = isMob ? 110 : 45;    // ms between skyline builds
+  // v2.27 TRUE SCALE: a catalog city's walkable core is its true ±360 m
+  // OSM footprint — honest, but a dot on a 1:1 planet. The distant-city
+  // skyline stands at METRO scale instead: the same true streets and
+  // buildings spread ×10 around the anchor (roads and buildings keep
+  // their true widths and heights) so from altitude a city reads as the
+  // real sprawl of a metropolis — and walking in still upgrades the
+  // dense true core you can actually play.
+  const SKY_SPREAD = 10;
 
   function skyEnsure() {
     if (skyRoot) return;
@@ -2806,7 +3035,9 @@ const WORLD = (() => {
     try { data = OSM.cacheData(c.key); } catch (e) { }
     if (!data || !Array.isArray(data.roads) || !data.roads.length) { data = OSM.generateCity(meta); dsrc = 'gen'; }
     const ax = c.wx, az = c.wz;
-    const shift = pts => pts.map(p => [p[0] + ax, p[1] + az]);
+    // v2.27: spread to metro scale AND keep the logic in world coords,
+    // but the mesh itself is emitted ANCHOR-LOCAL (float32-safe at 1:1)
+    const shift = pts => pts.map(p => [p[0] * SKY_SPREAD + ax, p[1] * SKY_SPREAD + az]);
     let roads = (data.roads || []).map(r => ({ ...r, pts: shift(r.pts) }));
     let buildings = (data.buildings || []).map(b => ({ ...b, poly: shift(b.poly) }));
     let greens = (data.greens || []).map(g => ({ ...g, poly: shift(g.poly) }));
@@ -2895,18 +3126,20 @@ const WORLD = (() => {
     // ---- the skyline mesh: ONE vertex-colored geometry per city -------
     // fog:false (like the city beacons) so a distant city reads through
     // the haze from any altitude; buildings keep their true footprints
-    // and heights — downtown towers included.
+    // and heights — downtown towers included. v2.27: all vertices are
+    // ANCHOR-LOCAL; the group carries the absolute anchor position.
     const P = [], N = [], C = [];
     // flat up-facing triangle (plates, roads, parks, roofs)
     const tri = (a, b, c2, y, cc) => {
-      for (const p of [a, b, c2]) { P.push(p[0], y, p[1]); N.push(0, 1, 0); C.push(cc[0], cc[1], cc[2]); }
+      for (const p of [a, b, c2]) { P.push(p[0] - ax, y, p[1] - az); N.push(0, 1, 0); C.push(cc[0], cc[1], cc[2]); }
     };
     const jit = (c2, f) => [c2[0] * f, c2[1] * f, c2[2] * f];
     const BASES = [0xbdb6a8, 0xa9a196, 0x9ba4ac, 0xc4b8a2, 0x8f939a, 0xb3a58f];
     // ground plate: dry tiles only, a hair above the land shield
+    // (v2.27: the plate spans the METRO footprint — SKY_SPREAD × 1490 m)
     const cPlate = col(0x8d887e);
     {
-      const size = 1490, NT = 12, T = size / NT;
+      const size = 1490 * SKY_SPREAD, NT = 12, T = size / NT;
       for (let i = 0; i < NT; i++) for (let j = 0; j < NT; j++) {
         const x0 = ax - size / 2 + i * T, z0 = az - size / 2 + j * T;
         const x1 = x0 + T, z1 = z0 + T;
@@ -2987,9 +3220,9 @@ const WORLD = (() => {
         const nx = ez / el, nz = -ex / el;
         const vb = [wall[0], wall[1], wall[2]], vt = [wall[0] * .94, wall[1] * .94, wall[2] * .94];
         const vTri = (pA, yA, cA, pB, yB, cB, pC2, yC2, cC2) => {
-          P.push(pA[0], yA, pA[1]); N.push(nx, 0, nz); C.push(cA[0], cA[1], cA[2]);
-          P.push(pB[0], yB, pB[1]); N.push(nx, 0, nz); C.push(cB[0], cB[1], cB[2]);
-          P.push(pC2[0], yC2, pC2[1]); N.push(nx, 0, nz); C.push(cC2[0], cC2[1], cC2[2]);
+          P.push(pA[0] - ax, yA, pA[1] - az); N.push(nx, 0, nz); C.push(cA[0], cA[1], cA[2]);
+          P.push(pB[0] - ax, yB, pB[1] - az); N.push(nx, 0, nz); C.push(cB[0], cB[1], cB[2]);
+          P.push(pC2[0] - ax, yC2, pC2[1] - az); N.push(nx, 0, nz); C.push(cC2[0], cC2[1], cC2[2]);
         };
         vTri(p1, y0, vb, p2, y0, vb, p2, y1, vt);
         vTri(p1, y0, vb, p2, y1, vt, p1, y1, vt);
@@ -3004,6 +3237,7 @@ const WORLD = (() => {
     const mesh = new THREE.Mesh(geo, _skyMat);
     const g = new THREE.Group();
     g.add(mesh);
+    g.position.set(ax, 0, az);   // v2.27: anchor-local geometry, absolute group
     g.userData.skySrc = dsrc;
     skyRoot.add(g);
     skyBuilt.set(c.key, g);
@@ -3023,7 +3257,7 @@ const WORLD = (() => {
     // v2.19: a searched/settled spot whose anchor is in the water slides
     // to the nearest shore (catalog cities were snapped at boot)
     if (LANDGEO.ready && LANDGEO.isWaterWorld(anchor.x, anchor.z)) {
-      const nl = LANDGEO.nearestLandWorld(anchor.x, anchor.z, 1400);
+      const nl = LANDGEO.nearestLandWorld(anchor.x, anchor.z, DEG_M * 2.55);
       if (nl) anchor = nl;
     }
     const g = await CITY.build(data, meta, anchor, onStatus);
@@ -3065,7 +3299,7 @@ const WORLD = (() => {
     if (now - lastChunkUpd > 400) {
       lastChunkUpd = now;
       for (const rec of edges) {
-        const vis = px > rec.bbox[0] - 1400 && px < rec.bbox[1] + 1400 && pz > rec.bbox[2] - 1400 && pz < rec.bbox[3] + 1400;
+        const vis = px > rec.bbox[0] - 12000 && px < rec.bbox[1] + 12000 && pz > rec.bbox[2] - 12000 && pz < rec.bbox[3] + 12000;
         if (rec.group.visible !== vis) rec.group.visible = vis;
       }
       const c0x = Math.floor((px - CHUNK_R) / CH), c1x = Math.floor((px + CHUNK_R) / CH);
@@ -3120,6 +3354,10 @@ const WORLD = (() => {
     if (now - lastMarkerUpd > 250) {
       lastMarkerUpd = now;
       const owned = new Set(STATE.plots.map(p => p.cityKey));
+      // v2.27 TRUE SCALE: beacons, pillars and labels scale with ALTITUDE
+      // so they stay readable from a 30 km study view while looking
+      // city-sized from the ground
+      const kf = Math.max(1, Math.min(36, camDist / 850));
       markers.forEach((mk, key) => {
         if (activeCity && key === activeCity.key) { mk.group.visible = false; return; }
         const d = Math.hypot(px - mk.city.wx, pz - mk.city.wz);
@@ -3130,16 +3368,18 @@ const WORLD = (() => {
         mk.dot.visible = true;                      // v2.22: every city has a beacon
         mk.dot.material.color.setHex(own ? 0x48bb78 : 0xffc95e);
         mk.dot.material.opacity = own ? .9 : .78;
-        const ms = Math.min(4.2, 1 + d / 2200);      // far = easier to spot
+        const ms = Math.min(4.2, 1 + d / 2200) * kf;   // far = easier to spot
         mk.dot.scale.setScalar(ms);
         if (mk.pil) {                                 // v2.23: tall light column
           mk.pil.material.color.setHex(own ? 0x48bb78 : 0xffc95e);
           mk.pil.material.opacity = own ? .30 : .22;
-          mk.pil.scale.set(ms, Math.min(2.4, .9 + d / 2600), ms);
+          mk.pil.scale.set(ms, Math.min(2.4 * kf, .9 + d / 2600), ms);
+          mk.pil.position.y = 150 * Math.min(1, kf / 4);
         }
         if (mk.label) {
-          const ls = Math.min(3, 1 + d / 3000);     // tags stay readable far out
+          const ls = Math.min(3, 1 + d / 3000) * kf;    // tags stay readable far out
           mk.label.scale.set(88 * ls, 22 * ls, 1);
+          mk.label.position.y = 44 * Math.min(1, kf / 3);
           mk.label.material.opacity = (camDist > 560 && d > 880) ? .92 : 0;
         }
       });
@@ -3219,6 +3459,7 @@ const WORLD = (() => {
     sc.add(group);
     buildGround();
     buildEdges();
+    finalizeTiles();     // v2.27: the filled tiles become meshes
     buildMarkers();
     skyEnsure();          // v2.26: the pre-built world starts filling in
     inited = true;
@@ -3229,6 +3470,7 @@ const WORLD = (() => {
     chunkQueue = [];
     if (group && group.parent) group.parent.remove(group);
     group = null; inited = false; edges = []; markers = new Map();
+    tiles.clear();      // v2.27: world tiles rebuild with the next ensure
     skyRoot = null; skyBuilt.clear(); skyQueue = CITIES.slice();   // v2.26
   }
 
@@ -3241,15 +3483,15 @@ const WORLD = (() => {
   function routeTo(px, pz, gx, gz) {
     if (!edges.length || !LANDGEO.ready) return null;
     const dist = Math.hypot(gx - px, gz - pz);
-    if (dist < 350) return null;                  // near — walk it straight
+    if (dist < 2000) return null;              // near — walk it straight
     let wet = false;
-    for (let t = .08; t <= .92 && !wet; t += 25 / dist) {
+    for (let t = .08; t <= .92 && !wet; t += (DEG_M * .0455) / dist) {
       if (LANDGEO.isWaterWorld(px + (gx - px) * t, pz + (gz - pz) * t)) wet = true;
     }
     if (!wet) return null;                        // dry straight line — no route needed
     let gc = null, gd = 1e9;
     for (const c of CITIES) { const d = Math.hypot(c.wx - gx, c.wz - gz); if (d < gd) { gd = d; gc = c; } }
-    if (!gc || gd > 2600) return null;            // wilderness goal — no road there
+    if (!gc || gd > DEG_M * 4.73) return null;    // wilderness goal — no road there
     let sc = null, sd = 1e9;
     for (const c of CITIES) { const d = Math.hypot(c.wx - px, c.wz - pz); if (d < sd) { sd = d; sc = c; } }
     if (!sc || sc.key === gc.key) return null;    // same city — shore rules apply
@@ -3359,6 +3601,11 @@ const CITY = (() => {
   let buildingPolys = [];
   let cityRec = null;
   let cityAnchor = null;                // v2.15: world position of this city
+  // v2.27 TRUE SCALE: the current city's anchor, subtracted from every
+  // vertex this module emits — merged geometry is CITY-LOCAL (float32-
+  // safe at 1:1) and each mesh/instanced layer carries the anchor in
+  // double precision. Set in build() before any builder runs.
+  let AX = 0, AZ = 0;
   let isMob = false;                    // touch device → lighter densities
   let benchScratch = [];                // benches collected from parks + walks
   let pitchedRects = [];              // lawn candidates from pitched-roof buildings
@@ -3370,10 +3617,12 @@ const CITY = (() => {
 
   // ---------- low-level quad/triangle pushers ----------------------
   // p1..p4 = [x,y,z]; uv1..4 = [u,v]; triangles (p1,p2,p3),(p1,p3,p4)
+  // v2.27: every pusher subtracts the city anchor (AX, AZ) — callers keep
+  // working in absolute world coordinates, the buffers stay city-local.
   function pushQuad(arr, p1, p2, p3, p4, n, uv1, uv2, uv3, uv4, col) {
     const P = [p1, p2, p3, p1, p3, p4], U = [uv1, uv2, uv3, uv1, uv3, uv4];
     for (let i = 0; i < 6; i++) {
-      arr.pos.push(P[i][0], P[i][1], P[i][2]);
+      arr.pos.push(P[i][0] - AX, P[i][1], P[i][2] - AZ);
       arr.norm.push(n[0], n[1], n[2]);
       arr.uv.push(U[i][0], U[i][1]);
       if (arr.col && col) arr.col.push(col.r, col.g, col.b);
@@ -3381,7 +3630,7 @@ const CITY = (() => {
   }
   // upward-facing triangle a→center→b (CCW seen from +y)
   function pushFlat(arr, a, b, c, col) {
-    arr.pos.push(a[0], a[1], a[2], c[0], c[1], c[2], b[0], b[1], b[2]);
+    arr.pos.push(a[0] - AX, a[1], a[2] - AZ, c[0] - AX, c[1], c[2] - AZ, b[0] - AX, b[1], b[2] - AZ);
     for (let i = 0; i < 3; i++) { arr.norm.push(0, 1, 0); arr.uv.push(0, 0); if (arr.col && col) arr.col.push(col.r, col.g, col.b); }
   }
   // triangle with auto normal (hint flips winding so the face is visible)
@@ -3393,7 +3642,7 @@ const CITY = (() => {
     }
     const l = Math.hypot(n[0], n[1], n[2]) || 1;
     for (const q of [a, b, c]) {
-      arr.pos.push(q[0], q[1], q[2]); arr.norm.push(n[0] / l, n[1] / l, n[2] / l); arr.uv.push(0, 0);
+      arr.pos.push(q[0] - AX, q[1], q[2] - AZ); arr.norm.push(n[0] / l, n[1] / l, n[2] / l); arr.uv.push(0, 0);
       if (arr.col && col) arr.col.push(col.r, col.g, col.b);
     }
   }
@@ -3777,7 +4026,7 @@ const CITY = (() => {
       g.setAttribute('color', new THREE.Float32BufferAttribute(arr.col, 3));
       const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial(
         tex ? { map: tex, vertexColors: true } : { vertexColors: true, side: two ? THREE.DoubleSide : THREE.FrontSide }));
-      m.position.y = 0; m.receiveShadow = true;
+      m.position.set(AX, 0, AZ); m.receiveShadow = true;   // v2.27: city-local geometry
       group.add(m);
       return m;
     };
@@ -3791,7 +4040,8 @@ const CITY = (() => {
       const geo = new THREE.CircleGeometry(.55, 10); geo.rotateX(-Math.PI / 2);
       const inst = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color: 0x2b2f33 }), n);
       const mat4 = new THREE.Matrix4();
-      for (let i = 0; i < n; i++) { mat4.identity(); mat4.setPosition(manholes[i][0], .045, manholes[i][1]); inst.setMatrixAt(i, mat4); }
+      for (let i = 0; i < n; i++) { mat4.identity(); mat4.setPosition(manholes[i][0] - AX, .045, manholes[i][1] - AZ); inst.setMatrixAt(i, mat4); }
+      inst.position.set(AX, 0, AZ);   // v2.27: city-local instances
       group.add(inst);
     }
   }
@@ -3844,7 +4094,7 @@ const CITY = (() => {
       if (tris && tris.length) {
         for (const t of tris) {
           const [a, b2, c2] = [p[t[0]], p[t[1]], p[t[2]]];
-          roofs.pos.push(a[0], y, a[1], c2[0], y, c2[1], b2[0], y, b2[1]);
+          roofs.pos.push(a[0] - AX, y, a[1] - AZ, c2[0] - AX, y, c2[1] - AZ, b2[0] - AX, y, b2[1] - AZ);
           for (let k = 0; k < 3; k++) { roofs.norm.push(0, 1, 0); roofs.uv.push(0, 0); roofs.col.push(col.r, col.g, col.b); }
         }
       } else {
@@ -4067,7 +4317,9 @@ const CITY = (() => {
       g.setAttribute('normal', new THREE.Float32BufferAttribute(arr.norm, 3));
       g.setAttribute('uv', new THREE.Float32BufferAttribute(arr.uv, 2));
       g.setAttribute('color', new THREE.Float32BufferAttribute(arr.col, 3));
-      return new THREE.Mesh(g, new THREE.MeshLambertMaterial(tex ? { map: tex, vertexColors: true } : { vertexColors: true }));
+      const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial(tex ? { map: tex, vertexColors: true } : { vertexColors: true }));
+      m.position.set(AX, 0, AZ);   // v2.27: city-local geometry
+      return m;
     };
     wallArrs.forEach((arr, i) => {                       // one mesh per facade system
       if (!arr.pos.length) return;
@@ -4094,11 +4346,12 @@ const CITY = (() => {
       const HCOLS = [0xd8d4cc, 0xc4beb4, 0xb8b2a6, 0xcfc9bf, 0xb0aaa0];
       hvac.forEach((v, i) => {
         mat4.makeScale(v[3], v[4], v[3] * .8);
-        mat4.setPosition(v[0], v[1] + v[4] / 2, v[2]);
+        mat4.setPosition(v[0] - AX, v[1] + v[4] / 2, v[2] - AZ);
         inst.setMatrixAt(i, mat4);
         inst.setColorAt(i, hc.set(HCOLS[i % HCOLS.length]));
       });
       inst.castShadow = true;
+      inst.position.set(AX, 0, AZ);   // v2.27: city-local instances
       group.add(inst);
     }
     // rooftop water tanks (NYC style)
@@ -4109,10 +4362,11 @@ const CITY = (() => {
         new THREE.MeshLambertMaterial({ color: 0x5a6169 }), tanks.length);
       const mat4 = new THREE.Matrix4();
       tanks.forEach((v, i) => {
-        mat4.identity(); mat4.setPosition(v[0], v[1] + 1.3, v[2]); inst.setMatrixAt(i, mat4);
-        mat4.setPosition(v[0], v[1] + 2.75, v[2]); cap.setMatrixAt(i, mat4);
+        mat4.identity(); mat4.setPosition(v[0] - AX, v[1] + 1.3, v[2] - AZ); inst.setMatrixAt(i, mat4);
+        mat4.setPosition(v[0] - AX, v[1] + 2.75, v[2] - AZ); cap.setMatrixAt(i, mat4);
       });
       inst.castShadow = true;
+      inst.position.set(AX, 0, AZ); cap.position.set(AX, 0, AZ);   // v2.27
       group.add(inst, cap);
     }
     // antenna masts
@@ -4122,9 +4376,10 @@ const CITY = (() => {
       const mat4 = new THREE.Matrix4();
       antennas.forEach((v, i) => {
         mat4.makeScale(1, v[3], 1);
-        mat4.setPosition(v[0], v[1] + v[3] / 2, v[2]);
+        mat4.setPosition(v[0] - AX, v[1] + v[3] / 2, v[2] - AZ);
         inst.setMatrixAt(i, mat4);
       });
+      inst.position.set(AX, 0, AZ);   // v2.27: city-local instances
       group.add(inst);
     }
     buildStats = {
@@ -4164,7 +4419,7 @@ const CITY = (() => {
       g.setAttribute('uv', new THREE.Float32BufferAttribute(arr.uv, 2));
       g.setAttribute('color', new THREE.Float32BufferAttribute(arr.col, 3));
       const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
-      mesh.position.y = y;
+      mesh.position.set(AX, y, AZ);      // v2.27: city-local geometry
       mesh.receiveShadow = true;
       group.add(mesh);
     };
@@ -4205,6 +4460,7 @@ const CITY = (() => {
       g.setAttribute('uv', new THREE.Float32BufferAttribute(paths.uv, 2));
       g.setAttribute('color', new THREE.Float32BufferAttribute(paths.col, 3));
       const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
+      mesh.position.set(AX, 0, AZ);   // v2.27: city-local geometry
       mesh.receiveShadow = true;
       group.add(mesh);
     }
@@ -4253,14 +4509,19 @@ const CITY = (() => {
         if (nLawn >= 80) break;
         let ok = true;
         for (const q of L.checkPts) {
-          const dq = distToRoad(q[0], q[1]);
+          // v2.27: checkPts are 3D [x, y, z] — these gates used to read
+          // the Y slot (always 0), so every lawn "passed" against the
+          // equator and the quads themselves rendered there
+          const dq = distToRoad(q[0], q[2]);
           if (dq.d < 5.6 || (dq.rd && dq.d < dq.rd.w / 2 + 3.7)) { ok = false; break; }   // stay off road+sidewalk (any road width)
-          if (plotAt(q[0], q[1])) { ok = false; break; }               // stay off purchasable plots
-          if (pointInBuilding(q[0], q[1])) { ok = false; break; }      // stay off neighbors
+          if (plotAt(q[0], q[2])) { ok = false; break; }               // stay off purchasable plots
+          if (pointInBuilding(q[0], q[2])) { ok = false; break; }      // stay off neighbors
         }
         if (!ok) continue;
-        const c = [L.corners[0][0], .07, L.corners[0][1]], c1 = [L.corners[1][0], .07, L.corners[1][1]],
-              c2 = [L.corners[2][0], .07, L.corners[2][1]], c3 = [L.corners[3][0], .07, L.corners[3][1]];
+        // v2.27: corners are 3D [x, y, z] — Z lives in slot 2 (the old
+        // code read slot 1 = Y = 0, so lawns rendered at the equator)
+        const c = [L.corners[0][0], .07, L.corners[0][2]], c1 = [L.corners[1][0], .07, L.corners[1][2]],
+              c2 = [L.corners[2][0], .07, L.corners[2][2]], c3 = [L.corners[3][0], .07, L.corners[3][2]];
         pushQuad(lawns, c, c1, c2, c3, UP, [0, 0], [1, 0], [1, 1], [0, 1],
           jit(colOf(0x6cc066), .92 + lrnd() * .16));
         nLawn++;
@@ -4278,6 +4539,7 @@ const CITY = (() => {
         g.setAttribute('uv', new THREE.Float32BufferAttribute(lawns.uv, 2));
         g.setAttribute('color', new THREE.Float32BufferAttribute(lawns.col, 3));
         const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
+        mesh.position.set(AX, 0, AZ);   // v2.27: city-local geometry
         mesh.receiveShadow = true;
         group.add(mesh);
       }
@@ -4316,7 +4578,8 @@ const CITY = (() => {
       const inst = new THREE.InstancedMesh(new THREE.CylinderGeometry(.16, .19, .95, 6),
         new THREE.MeshLambertMaterial({ color: 0xd8d8d6 }), n);
       const mat4 = new THREE.Matrix4();
-      for (let i = 0; i < n; i++) { mat4.identity(); mat4.setPosition(bolls[i][0], .55, bolls[i][1]); inst.setMatrixAt(i, mat4); }
+      for (let i = 0; i < n; i++) { mat4.identity(); mat4.setPosition(bolls[i][0] - AX, .55, bolls[i][1] - AZ); inst.setMatrixAt(i, mat4); }
+      inst.position.set(AX, 0, AZ);   // v2.27: city-local instances
       group.add(inst);
     }
   }
@@ -4330,12 +4593,13 @@ const CITY = (() => {
     const mat4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3();
     list.forEach((v, i) => {
       const sc = .8 + (i % 5) * .12;
-      mat4.compose(new THREE.Vector3(v[0], 1.15, v[1]), q.identity(), s.set(1, 1, 1));
+      mat4.compose(new THREE.Vector3(v[0] - AX, 1.15, v[1] - AZ), q.identity(), s.set(1, 1, 1));
       trunk.setMatrixAt(i, mat4);
-      mat4.compose(new THREE.Vector3(v[0], 2.3 + 1.6 * sc, v[1]), q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), (i * 2.4) % 6.28), s.set(sc, sc * 1.15, sc));
+      mat4.compose(new THREE.Vector3(v[0] - AX, 2.3 + 1.6 * sc, v[1] - AZ), q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), (i * 2.4) % 6.28), s.set(sc, sc * 1.15, sc));
       can.setMatrixAt(i, mat4);
     });
     can.castShadow = true;
+    trunk.position.set(AX, 0, AZ); can.position.set(AX, 0, AZ);   // v2.27
     group.add(trunk, can);
   }
 
@@ -4380,10 +4644,11 @@ const CITY = (() => {
         const [x, z, th] = lamps[i];
         const cs = Math.cos(th), sn = Math.sin(th);
         q.setFromAxisAngle(Y, th);
-        mat4.compose(new THREE.Vector3(x, 2.96, z), q, new THREE.Vector3(1, 1, 1)); pole.setMatrixAt(i, mat4);
-        mat4.compose(new THREE.Vector3(x + .45 * cs, 5.51, z - .45 * sn), q, new THREE.Vector3(1, 1, 1)); arm.setMatrixAt(i, mat4);
-        mat4.compose(new THREE.Vector3(x + .86 * cs, 5.44, z - .86 * sn), q, new THREE.Vector3(1, 1, 1)); head.setMatrixAt(i, mat4);
+        mat4.compose(new THREE.Vector3(x - AX, 2.96, z - AZ), q, new THREE.Vector3(1, 1, 1)); pole.setMatrixAt(i, mat4);
+        mat4.compose(new THREE.Vector3(x + .45 * cs - AX, 5.51, z - .45 * sn - AZ), q, new THREE.Vector3(1, 1, 1)); arm.setMatrixAt(i, mat4);
+        mat4.compose(new THREE.Vector3(x + .86 * cs - AX, 5.44, z - .86 * sn - AZ), q, new THREE.Vector3(1, 1, 1)); head.setMatrixAt(i, mat4);
       }
+      pole.position.set(AX, 0, AZ); arm.position.set(AX, 0, AZ); head.position.set(AX, 0, AZ);   // v2.27
       group.add(pole, arm, head);
     }
 
@@ -4416,9 +4681,10 @@ const CITY = (() => {
         new THREE.MeshLambertMaterial({ color: 0x8f2b22 }), n);
       const mat4 = new THREE.Matrix4();
       for (let i = 0; i < n; i++) {
-        mat4.identity(); mat4.setPosition(hyds[i][0], .52, hyds[i][1]); body.setMatrixAt(i, mat4);
-        mat4.setPosition(hyds[i][0], .96, hyds[i][1]); cap.setMatrixAt(i, mat4);
+        mat4.identity(); mat4.setPosition(hyds[i][0] - AX, .52, hyds[i][1] - AZ); body.setMatrixAt(i, mat4);
+        mat4.setPosition(hyds[i][0] - AX, .96, hyds[i][1] - AZ); cap.setMatrixAt(i, mat4);
       }
+      body.position.set(AX, 0, AZ); cap.position.set(AX, 0, AZ);   // v2.27
       group.add(body, cap);
     }
 
@@ -4433,7 +4699,8 @@ const CITY = (() => {
       const inst = new THREE.InstancedMesh(new THREE.CylinderGeometry(.26, .3, .85, 8),
         new THREE.MeshLambertMaterial({ color: 0x3d444a }), n);
       const mat4 = new THREE.Matrix4();
-      for (let i = 0; i < n; i++) { mat4.identity(); mat4.setPosition(bins[i][0], .58, bins[i][1]); inst.setMatrixAt(i, mat4); }
+      for (let i = 0; i < n; i++) { mat4.identity(); mat4.setPosition(bins[i][0] - AX, .58, bins[i][1] - AZ); inst.setMatrixAt(i, mat4); }
+      inst.position.set(AX, 0, AZ);   // v2.27: city-local instances
       group.add(inst);
     }
 
@@ -4470,15 +4737,16 @@ const CITY = (() => {
         const [x, z, th] = v;
         const fx = Math.sin(th), fz = Math.cos(th);          // bench front
         q.setFromAxisAngle(Y, th);
-        mat4.compose(new THREE.Vector3(x, .48, z), q, new THREE.Vector3(1, 1, 1)); seat.setMatrixAt(i, mat4);
+        mat4.compose(new THREE.Vector3(x - AX, .48, z - AZ), q, new THREE.Vector3(1, 1, 1)); seat.setMatrixAt(i, mat4);
         e.set(-.21, th, 0, 'YXZ');
-        mat4.compose(new THREE.Vector3(x - fx * .24, .84, z - fz * .24),
+        mat4.compose(new THREE.Vector3(x - fx * .24 - AX, .84, z - fz * .24 - AZ),
           new THREE.Quaternion().setFromEuler(e), new THREE.Vector3(1, 1, 1)); back.setMatrixAt(i, mat4);
         const sx = Math.cos(th), sz = -Math.sin(th);         // local +X in world
-        mat4.compose(new THREE.Vector3(x + sx * .72, .24, z + sz * .72), q, new THREE.Vector3(1, 1, 1)); leg.setMatrixAt(i * 2, mat4);
-        mat4.compose(new THREE.Vector3(x - sx * .72, .24, z - sz * .72), q, new THREE.Vector3(1, 1, 1)); leg.setMatrixAt(i * 2 + 1, mat4);
+        mat4.compose(new THREE.Vector3(x + sx * .72 - AX, .24, z + sz * .72 - AZ), q, new THREE.Vector3(1, 1, 1)); leg.setMatrixAt(i * 2, mat4);
+        mat4.compose(new THREE.Vector3(x - sx * .72 - AX, .24, z - sz * .72 - AZ), q, new THREE.Vector3(1, 1, 1)); leg.setMatrixAt(i * 2 + 1, mat4);
       });
       seat.castShadow = true;
+      seat.position.set(AX, 0, AZ); back.position.set(AX, 0, AZ); leg.position.set(AX, 0, AZ);   // v2.27
       group.add(seat, back, leg);
     }
 
@@ -4523,7 +4791,7 @@ const CITY = (() => {
       for (let i = 0; i < n; i++) {
         const [x, z, th, taxi] = spots[i];
         rot.makeRotationY(th);
-        mat4.copy(rot); mat4.setPosition(x, 0, z);
+        mat4.copy(rot); mat4.setPosition(x - AX, 0, z - AZ);
         body.setMatrixAt(i, mat4);
         cab.setMatrixAt(i, mat4);
         body.setColorAt(i, c.set(taxi ? 0xd9b53a : PALETTE[Math.floor(rnd() * PALETTE.length)]));
@@ -4533,6 +4801,7 @@ const CITY = (() => {
         }
       }
       body.castShadow = true;
+      body.position.set(AX, 0, AZ); cab.position.set(AX, 0, AZ); wheels.position.set(AX, 0, AZ);   // v2.27
       group.add(body, cab, wheels);
     }
   }
@@ -4738,7 +5007,7 @@ const CITY = (() => {
       p.inst = i; p.v0 = i * 8;
       const c = Math.cos(p.rot), s = Math.sin(p.rot);
       q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), p.rot);
-      m4.compose(new THREE.Vector3(p.x, .185, p.z), q, sc.set(p.w, 1, p.d));
+      m4.compose(new THREE.Vector3(p.x - AX, .185, p.z - AZ), q, sc.set(p.w, 1, p.d));
       pads.setMatrixAt(i, m4);
       pads.setColorAt(i, cGreen);
       const hw = p.w / 2 - .5, hd = p.d / 2 - .5;
@@ -4749,15 +5018,16 @@ const CITY = (() => {
         for (let v = 0; v < 2; v++) {
           const vi = p.v0 + k * 2 + v;
           const lx = seg[v][0], lz = seg[v][1];
-          dPos[vi * 3] = p.x + lx * c + lz * s;
+          dPos[vi * 3] = (p.x - AX) + lx * c + lz * s;
           dPos[vi * 3 + 1] = .21;
-          dPos[vi * 3 + 2] = p.z - lx * s + lz * c;
+          dPos[vi * 3 + 2] = (p.z - AZ) - lx * s + lz * c;
           dCol[vi * 3] = 1; dCol[vi * 3 + 1] = 1; dCol[vi * 3 + 2] = 1;
         }
       }
-      $Pos[i * 3] = p.x; $Pos[i * 3 + 1] = 4.4; $Pos[i * 3 + 2] = p.z;
+      $Pos[i * 3] = p.x - AX; $Pos[i * 3 + 1] = 4.4; $Pos[i * 3 + 2] = p.z - AZ;
     });
     pads.instanceMatrix.needsUpdate = true;
+    plotGroup.position.set(AX, 0, AZ);   // v2.27: the whole plot layer is city-local
     plotGroup.add(pads);
     const dg = new THREE.BufferGeometry();
     dg.setAttribute('position', new THREE.BufferAttribute(dPos, 3));
@@ -4794,7 +5064,7 @@ const CITY = (() => {
     const ring = new THREE.Mesh(new THREE.RingGeometry(1.6, 2.15, 26),
       new THREE.MeshBasicMaterial({ color: 0xf5cc74, transparent: true, opacity: .85, side: THREE.DoubleSide }));
     ring.rotation.x = -Math.PI / 2;
-    ring.position.set(rec.x, .2, rec.z);
+    ring.position.set(rec.x - AX, .2, rec.z - AZ);   // v2.27: city-local, like the layer
     plotGroup.add(ring);
     rec.ring = ring;
   }
@@ -4955,6 +5225,7 @@ const CITY = (() => {
       g.setAttribute('uv', new THREE.Float32BufferAttribute(fields.uv, 2));
       g.setAttribute('color', new THREE.Float32BufferAttribute(fields.col, 3));
       const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
+      mesh.position.set(AX, 0, AZ);   // v2.27: city-local geometry
       mesh.receiveShadow = true;
       group.add(mesh);
     }
@@ -5010,19 +5281,21 @@ const CITY = (() => {
           new THREE.MeshLambertMaterial({ color: 0x9a9d99 }), rocks.length);
         rocks.forEach((v, i) => {
           q.setFromAxisAngle(Y, v[3]);
-          mat4.compose(new THREE.Vector3(v[0], v[2] * .32, v[1]), q, sc.set(v[2], v[2] * .8, v[2]));
+          mat4.compose(new THREE.Vector3(v[0] - AX, v[2] * .32, v[1] - AZ), q, sc.set(v[2], v[2] * .8, v[2]));
           inst.setMatrixAt(i, mat4);
         });
         inst.castShadow = true;
+        inst.position.set(AX, 0, AZ);   // v2.27: city-local instances
         group.add(inst);
       }
       if (bushes.length) {
         const inst = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1),
           new THREE.MeshLambertMaterial({ color: 0x3f7f45 }), bushes.length);
         bushes.forEach((v, i) => {
-          mat4.compose(new THREE.Vector3(v[0], v[2] * .4, v[1]), q.identity(), sc.set(v[2], v[2] * .66, v[2]));
+          mat4.compose(new THREE.Vector3(v[0] - AX, v[2] * .4, v[1] - AZ), q.identity(), sc.set(v[2], v[2] * .66, v[2]));
           inst.setMatrixAt(i, mat4);
         });
+        inst.position.set(AX, 0, AZ);   // v2.27
         group.add(inst);
       }
       if (bales.length) {
@@ -5031,10 +5304,11 @@ const CITY = (() => {
           new THREE.MeshLambertMaterial({ color: 0xc9a86a }), bales.length);
         bales.forEach((v, i) => {
           q.setFromAxisAngle(Y, v[2]);
-          mat4.compose(new THREE.Vector3(v[0], .8, v[1]), q, sc.set(1, 1, 1));
+          mat4.compose(new THREE.Vector3(v[0] - AX, .8, v[1] - AZ), q, sc.set(1, 1, 1));
           inst.setMatrixAt(i, mat4);
         });
         inst.castShadow = true;
+        inst.position.set(AX, 0, AZ);   // v2.27
         group.add(inst);
       }
     }
@@ -5068,10 +5342,11 @@ const CITY = (() => {
       const postM = new THREE.MeshLambertMaterial({ color: 0x7a5c44 });
       const pInst = new THREE.InstancedMesh(new THREE.BoxGeometry(.14, 1.2, .14), postM, posts.length);
       posts.forEach((v, i) => {
-        mat4.compose(new THREE.Vector3(v[0], .6, v[1]), q.identity(), sc.set(1, 1, 1));
+        mat4.compose(new THREE.Vector3(v[0] - AX, .6, v[1] - AZ), q.identity(), sc.set(1, 1, 1));
         pInst.setMatrixAt(i, mat4);
       });
       pInst.castShadow = true;
+      pInst.position.set(AX, 0, AZ);   // v2.27
       group.add(pInst);
       const railM = new THREE.MeshLambertMaterial({ color: 0x8a6a4e });
       const rInst = new THREE.InstancedMesh(new THREE.BoxGeometry(1, .07, .09), railM, rails.length * 2);
@@ -5079,10 +5354,11 @@ const CITY = (() => {
         const th = Math.atan2(v[2] - v[0], v[3] - v[1]);
         q.setFromAxisAngle(Y, th);
         for (const h of [.52, .96]) {
-          mat4.compose(new THREE.Vector3((v[0] + v[2]) / 2, h, (v[1] + v[3]) / 2), q, sc.set(4.45, 1, 1));
+          mat4.compose(new THREE.Vector3((v[0] + v[2]) / 2 - AX, h, (v[1] + v[3]) / 2 - AZ), q, sc.set(4.45, 1, 1));
           rInst.setMatrixAt(i * 2 + (h > .7 ? 1 : 0), mat4);
         }
       });
+      rInst.position.set(AX, 0, AZ);   // v2.27
       group.add(rInst);
     }
   }
@@ -5111,10 +5387,11 @@ const CITY = (() => {
     const fogC = new THREE.Color(0x9fc7e8), base = new THREE.Color(0x5e8f63), c = new THREE.Color();
     spots.forEach((s, i) => {
       mat4.makeScale(s.w, s.h, s.w * s.zf);
-      mat4.setPosition(s.x, -6, s.z);
+      mat4.setPosition(s.x - AX, -6, s.z - AZ);
       inst.setMatrixAt(i, mat4);
       inst.setColorAt(i, c.copy(base).lerp(fogC, s.f));
     });
+    inst.position.set(AX, 0, AZ);   // v2.27: city-local instances
     group.add(inst);
   }
 
@@ -5153,7 +5430,9 @@ const CITY = (() => {
           LANDGEO.isWaterWorld(x0, z1) || LANDGEO.isWaterWorld(x1, z1) ||
           LANDGEO.isWaterWorld((x0 + x1) / 2, (z0 + z1) / 2)) continue;
       const u0 = i / N, u1 = (i + 1) / N, v0 = j / N, v1 = (j + 1) / N;
-      pos.push(x0, y, z1, x1, y, z1, x1, y, z0, x0, y, z1, x1, y, z0, x0, y, z0);
+      // v2.27: emitted ANCHOR-LOCAL; the mesh carries the anchor
+      const lx0 = x0 - ax, lz0 = z0 - az, lx1 = x1 - ax, lz1 = z1 - az;
+      pos.push(lx0, y, lz1, lx1, y, lz1, lx1, y, lz0, lx0, y, lz1, lx1, y, lz0, lx0, y, lz0);
       uv.push(u0, v1, u1, v1, u1, v0, u0, v1, u1, v0, u0, v0);
     }
     const g = new THREE.BufferGeometry();
@@ -5161,6 +5440,7 @@ const CITY = (() => {
     g.setAttribute('normal', new THREE.Float32BufferAttribute(pos.map((_, i) => i % 3 === 1 ? 1 : 0), 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: tex }));
+    mesh.position.set(ax, 0, az);   // v2.27: city-local geometry
     mesh.receiveShadow = true;
     return mesh;
   }
@@ -5183,6 +5463,7 @@ const CITY = (() => {
     // every city, pasture and road coexists in the single world scene.
     const ax = (anchor && anchor.x) || 0, az = (anchor && anchor.z) || 0;
     cityAnchor = { x: ax, z: az };
+    AX = ax; AZ = az;   // v2.27: every emitted vertex is city-local from here on
     cityRec = { ...cityData, ...cityMeta };
     group = new THREE.Group();
     const shift = pts => pts.map(p => [p[0] + ax, p[1] + az]);
@@ -7392,11 +7673,15 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;   // v2.03: soft toy-matte shadows
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+// v2.27 TRUE SCALE: zoom out to ~34 km and see ~130 km of real Earth —
+// a real horizon for a real planet (log depth keeps streets crisp)
+const ZOOM_MAX = 34000;
+const CAM_FAR = 130000;
 
 // v2.15: far plane spans the whole one world so real distant land and
 // streaming cities stay visible on the horizon (log depth keeps the
 // streets crisp); v2.16 removed the FAKE distant skylines and letters.
-const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 2, 26000);
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 2, CAM_FAR);
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
@@ -7409,7 +7694,7 @@ let worldScene = null, sun = null;
 // the character; panning (drag / WASD / joystick) detaches it, and any
 // tap-to-move command — or FIND ME / [C] — re-attaches it.
 const camCtl = { az: Math.PI * .25, el: 1.25, dist: 110, distT: 110, tx: 0, tz: 0, follow: true };
-const PAN_LEASH = 1400;       // min free-roam radius around the character
+const PAN_LEASH = 4000;       // v2.27: min free-roam radius (grows with zoom)
 // clamp a camera-focus point to the planet's bounds AND the leash — the
 // leash grows as you zoom out so you can really study the Earth (v2.18)
 function clampPan(x, z) {
@@ -7582,7 +7867,7 @@ async function landAtWorld(wx, wz, label) {
   // v2.18: lakes read as land on the coarse globe mask, and nobody
   // lands at sea — a wet pick snaps to the nearest dry shore
   if (LANDGEO.ready && LANDGEO.isWaterWorld(wx, wz)) {
-    const nl = LANDGEO.nearestLandWorld(wx, wz, 650);
+    const nl = LANDGEO.nearestLandWorld(wx, wz, DEG_M * 1.18);
     if (!nl) { toast('<b>That\'s open water.</b> Pick dry land — or a glowing city.', 'warn'); return; }
     wx = nl.x; wz = nl.z;
   }
@@ -7807,7 +8092,7 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
   a.onclick = e => {
     e.preventDefault();
     const k = a.dataset.abt;
-    openModal(k.toUpperCase(), `<p><b>Open World v2.26</b> runs entirely in your browser and saves locally.</p>
+    openModal(k.toUpperCase(), `<p><b>Open World v2.27</b> runs entirely in your browser and saves locally.</p>
       <p>No accounts, no tracking, no payments. Map data © OpenStreetMap contributors (ODbL).</p>
       <p>Support: keep playing and build something big.</p>`);
   };
@@ -7862,12 +8147,13 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.26 — THE WHOLE WORLD', `
-    <p><b>Every city already stands in the world before you get there.</b></p>
-    <div class="kv"><span class="k">THE WORLD COMES PRE-BUILT</span><span class="v g">All 64 cities exist from the moment you enter — roads, towers and parks at their real spots on Earth. Pan the view or zoom out: the horizon is full of cities, not empty markers</span></div>
-    <div class="kv"><span class="k">NO WALK REQUIRED</span><span class="v">A city no longer waits for your tycoon to arrive before it "imports" — it was already there. Walk in and it gains its full detail: real OpenStreetMap streets, vendor plots, crowds</span></div>
-    <div class="kv"><span class="k">THE WORLD NEVER EMPTIES</span><span class="v">Leave a city and its skyline stays on the horizon behind you</span></div>
-    <div class="kv"><span class="k">STILL INSTANT</span><span class="v">Search any city, or click it on the world map [M] — one tap and you are there</span></div>
+  openModal('Welcome to v2.27 — TRUE SCALE', `
+    <p><b>The world is now the real size of the Earth — 1 to 1.</b></p>
+    <div class="kv"><span class="k">A TRUE-SCALE PLANET</span><span class="v g">40,007 km around the equator — one degree really is 111 km, every latitude spans its true width, and the horizon is a real horizon. Zoom out to ~34 km and drink it in</span></div>
+    <div class="kv"><span class="k">REAL DISTANCES</span><span class="v">City-to-city is now the real haul it is on Earth — cross continents by orbit flight, search or the world map [M]; the gold pill always tells the true kilometers to the next city</span></div>
+    <div class="kv"><span class="k">CITIES AT METRO SCALE</span><span class="v">Distant skylines now stand as real sprawl — the same true streets and buildings spread across kilometers of true coastline, so cities read as metropolises from altitude</span></div>
+    <div class="kv"><span class="k">WALK THE REAL CORE</span><span class="v">Each city's walkable heart is its true downtown footprint in real meters — same streets you would walk there</span></div>
+    <div class="kv"><span class="k">YOUR SAVES RIDE ALONG</span><span class="v">Plots keep their spot beside their city; your standing place keeps its lat/lon — everything lands where it always was, at true scale</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -7914,17 +8200,17 @@ document.getElementById('bb-next').addEventListener('click', () => {
 });
 
 function openHelp() {
-  openModal('Open World v2.26 — Help', `
+  openModal('Open World v2.27 — Help', `
     <p><b>Controls</b></p>
     <div class="kv"><span class="k">MOVE</span><span class="v g">Tap / click anywhere — your tycoon walks there (the only way they move)</span></div>
     <div class="kv"><span class="k">LOOK AROUND</span><span class="v">Drag or WASD / arrows / joystick to glide the bird\u2019s-eye view across the map</span></div>
     <div class="kv"><span class="k">ROTATE</span><span class="v">Right-drag (or Ctrl+drag) · touch: pinch zoom</span></div>
     <div class="kv"><span class="k">ZOOM</span><span class="v">Wheel / pinch (gentle, glide)</span></div>
     <div class="kv"><span class="k">FIND ME</span><span class="v">[C] or the crosshair button → snap back to your tycoon</span></div>
-    <div class="kv"><span class="k">THE HORIZON</span><span class="v">Every city already stands in the world — distant skylines are the real footprints; walk in and they gain full detail</span></div>
+    <div class="kv"><span class="k">THE HORIZON</span><span class="v">Every city already stands in the world at metro scale — walk in and the true downtown gains full detail</span></div>
     <div class="kv"><span class="k">WALK TO A CITY</span><span class="v g">The gold pill above the bottom bar walks you to the nearest city — road-routed around lakes and seas, bridges included</span></div>
     <div class="kv"><span class="k">WORLD MAP</span><span class="v">minimap (bottom right) · [M] or click it for the big map</span></div>
-    <div class="kv"><span class="k">THE EARTH</span><span class="v">the real planet — walk country roads between cities (the WALK-TO pill routes you around water), cross straits by sea bridge, or fly anywhere from orbit</span></div>
+    <div class="kv"><span class="k">THE EARTH</span><span class="v">the real planet at TRUE SCALE — 40,007 km around, real distances between cities. Cross continents by orbit flight, search or the world map [M]; sea bridges still span the straits</span></div>
     <div class="kv"><span class="k">EMPIRE</span><span class="v">avatar (top right) → TELEPORT to any plot you own</span></div>
     <div class="kv"><span class="k">SERVE</span><span class="v">[E] when standing at your cart</span></div>
     <div class="kv"><span class="k">MARKET</span><span class="v">📈 button · limit &amp; market orders</span></div>
@@ -8057,14 +8343,14 @@ canvas.addEventListener('wheel', e => {
   if (STATE.mode !== 'city') return;
   let dy = e.deltaY * (e.deltaMode === 1 ? 33 : 1);   // deltaMode 1 = lines
   dy = THREE.MathUtils.clamp(dy, -180, 180);          // cap single-event jumps
-  camCtl.distT = THREE.MathUtils.clamp(camCtl.distT * Math.exp(dy * .0009), 45, 2600);
+  camCtl.distT = THREE.MathUtils.clamp(camCtl.distT * Math.exp(dy * .0016), 45, ZOOM_MAX);
 }, { passive: true });
 canvas.addEventListener('touchmove', e => {
   if (STATE.mode !== 'city' || e.touches.length !== 2) return;
   pinched = true;   // v2.13: two fingers down — a pinch, never a tap
   const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
   if (pinchD) {
-    camCtl.distT = THREE.MathUtils.clamp(camCtl.distT * (pinchD / d), 45, 2600);
+    camCtl.distT = THREE.MathUtils.clamp(camCtl.distT * (pinchD / d), 45, ZOOM_MAX);
     camCtl.dist = camCtl.distT;
   }
   pinchD = d;
@@ -8275,7 +8561,7 @@ function loop() {
     const ni = ACTORS.navInput();
     if (ni.active) {
       camCtl.follow = false;
-      const spd = THREE.MathUtils.clamp(camCtl.dist * .9, 18, 480) * (ni.run ? 1.8 : 1);
+      const spd = THREE.MathUtils.clamp(camCtl.dist * .9, 18, 30000) * (ni.run ? 1.8 : 1);   // v2.27: altitude-scaled
       const fx = -Math.sin(camCtl.az), fz = -Math.cos(camCtl.az);   // screen-up on the ground
       const rx = Math.cos(camCtl.az), rz = -Math.sin(camCtl.az);    // screen-right
       const [nx, nz] = clampPan(
@@ -8291,12 +8577,14 @@ function loop() {
     }
     // zoom glides toward its target — no snapping
     camCtl.dist += (camCtl.distT - camCtl.dist) * Math.min(1, dt * 9);
-    camCtl.dist = THREE.MathUtils.clamp(camCtl.dist, 45, 2600);
+    camCtl.dist = THREE.MathUtils.clamp(camCtl.dist, 45, ZOOM_MAX);
     // v2.18: zoomed out to study the planet — the fog opens with altitude
+    // (v2.27: scaled for the true Earth — ~90 km of haze at max zoom,
+    // capped just inside the far plane)
     if (worldScene.fog) {
       const z = Math.max(0, camCtl.dist - 480);
-      worldScene.fog.near = 380 + z * 1.4;
-      worldScene.fog.far = 1600 + z * 5.4;
+      worldScene.fog.near = 380 + z * 2.66;
+      worldScene.fog.far = Math.min(1600 + z * 10.26, CAM_FAR * .92);
     }
     const ce = Math.cos(camCtl.el), se = Math.sin(camCtl.el);
     camera.position.set(
@@ -8410,7 +8698,7 @@ EARTH.diveTo = (city, cb) => {
 };
 
 
-console.log('%cOPEN WORLD v2.26 — THE WHOLE WORLD', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.27 — TRUE SCALE', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
