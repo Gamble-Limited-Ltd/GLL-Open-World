@@ -550,7 +550,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.21';
+const GAME_VERSION = 'v2.22';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -2307,9 +2307,12 @@ const WORLD = (() => {
       const cum = [0];
       for (let i = 1; i < full.length; i++) cum.push(cum[i - 1] + Math.hypot(full[i][0] - full[i - 1][0], full[i][1] - full[i - 1][1]));
       const L = cum[cum.length - 1];
+      // v2.22: sea bridges keep (nearly) their full span — a trimmed
+      // bridge strands its deck in open water with no way on from shore
+      const trimEnd = e.bridge ? 60 : ROAD_TRIM;
       let i0 = 0, i1 = full.length - 1;
-      while (i0 < full.length - 1 && cum[i0] < ROAD_TRIM) i0++;
-      while (i1 > 0 && cum[i1] > L - ROAD_TRIM) i1--;
+      while (i0 < full.length - 1 && cum[i0] < trimEnd) i0++;
+      while (i1 > 0 && cum[i1] > L - trimEnd) i1--;
       const pts = full.slice(i0, i1 + 1);
       const poly = [pts[0]];
       let acc = 0;
@@ -2664,16 +2667,47 @@ const WORLD = (() => {
   // above each city where the player OWNS land — enough to spot your
   // holdings from afar without dressing the horizon in buildings that
   // aren't really there. City names live on the minimap / big map [M].
+  // v2.22 WAYFINDING: a small beacon marks EVERY city — green where you
+  // own land, sky-blue everywhere else — so a 5 km walk between cities
+  // always has a visible destination. Beacons grow slightly with distance
+  // (far = easier to spot, near = out of the way). A small map-style name
+  // tag rides above each beacon and fades in ONLY when the camera is
+  // zoomed out to study the region — street level stays clean (the big
+  // letter billboards stay gone).
+  function cityLabelTex(name) {
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = 'rgba(10,22,34,.62)';
+    const r = 12, W = 256, H = 64;
+    ctx.beginPath();
+    ctx.moveTo(r, 2); ctx.lineTo(W - r, 2); ctx.quadraticCurveTo(W - 2, 2, W - 2, r + 2);
+    ctx.lineTo(W - 2, H - r - 2); ctx.quadraticCurveTo(W - 2, H - 2, W - r, H - 2);
+    ctx.lineTo(r, H - 2); ctx.quadraticCurveTo(2, H - 2, 2, H - r - 2);
+    ctx.lineTo(2, r + 2); ctx.quadraticCurveTo(2, 2, r, 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(190,225,255,.5)'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.font = '700 26px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 5;
+    ctx.fillStyle = '#eaf4ff';
+    ctx.fillText(name, W / 2, H / 2 + 1);
+    const t = new THREE.CanvasTexture(cv);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }
   function buildMarkers() {
     for (const c of CITIES) {
       const g = new THREE.Group();
       const dot = new THREE.Mesh(new THREE.SphereGeometry(7, 10, 8),
-        new THREE.MeshBasicMaterial({ color: 0x48bb78, transparent: true, opacity: .9, fog: false }));
+        new THREE.MeshBasicMaterial({ color: 0xffc95e, transparent: true, opacity: .78, fog: false, depthWrite: false }));
       dot.position.set(c.wx, 14, c.wz);
-      dot.visible = false;
       g.add(dot);
+      const label = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: cityLabelTex(c.name), transparent: true, opacity: 0, fog: false, depthWrite: false }));
+      label.scale.set(88, 22, 1);
+      label.position.set(c.wx, 44, c.wz);
+      g.add(label);
       group.add(g);
-      markers.set(c.key, { group: g, dot, city: c });
+      markers.set(c.key, { group: g, dot, label, city: c });
     }
   }
 
@@ -2709,7 +2743,7 @@ const WORLD = (() => {
   }
 
   // ---------------- per-frame -----------------------------------------
-  function update(dt, px, pz) {
+  function update(dt, px, pz, camDist) {
     if (!inited) return null;
     const now = performance.now();
     let req = null;
@@ -2752,6 +2786,17 @@ const WORLD = (() => {
         clearCity();
         dOwn = 1e9;
         req = { type: 'leftCity' };
+      } else if (near.d < BUILD_DIST && near.city && near.city.key !== activeCity.key
+        && dOwn > CITY_R) {
+        // v2.22 CITY SWAP: the player is within sight of a DIFFERENT city
+        // while this one is still active. Leave can never fire here (it
+        // needs near.d > BUILD_DIST), so swap straight to the new city.
+        // Guard dOwn > CITY_R keeps a player standing mid-town from being
+        // yanked to a neighbour — only a player past the edge swaps.
+        clearCity();
+        dOwn = 1e9;
+        pendingCity = near.city;
+        req = { type: 'enterCity', city: near.city };
       }
     } else if (!pendingCity && near.d < BUILD_DIST) {
       pendingCity = near.city;
@@ -2767,7 +2812,17 @@ const WORLD = (() => {
         const vis = d > 620;
         mk.group.visible = vis;
         if (!vis) return;
-        mk.dot.visible = owned.has(key);
+        const own = owned.has(key);
+        mk.dot.visible = true;                      // v2.22: every city has a beacon
+        mk.dot.material.color.setHex(own ? 0x48bb78 : 0xffc95e);
+        mk.dot.material.opacity = own ? .9 : .78;
+        const ms = Math.min(4.2, 1 + d / 2200);      // far = easier to spot
+        mk.dot.scale.setScalar(ms);
+        if (mk.label) {
+          const ls = Math.min(3, 1 + d / 3000);     // tags stay readable far out
+          mk.label.scale.set(88 * ls, 22 * ls, 1);
+          mk.label.material.opacity = (camDist > 560 && d > 880) ? .92 : 0;
+        }
       });
     }
     return req;
@@ -4802,7 +4857,21 @@ const CITY = (() => {
           if (seg.i0 > 0) out.unshift(pulled(shorePt(dp[seg.i0 - 1], dp[seg.i0]), seg.pts[0], r.w));
           const iEnd = seg.i0 + seg.pts.length - 1;
           if (iEnd < dp.length - 1) out.push(pulled(shorePt(dp[iEnd], dp[iEnd + 1]), seg.pts[seg.pts.length - 1], r.w));
-          if (out.length >= 2) keptRoads.push({ ...r, pts: out });
+          if (out.length >= 2) {
+            // v2.22: decimate back to real street-segment lengths (~44 m).
+            // The 12 m densification above exists only for accurate
+            // shoreline clipping — leaked into the road data it starved
+            // every length-gated placer (vendor plots, lamps, cars,
+            // hydrants, benches, trucks, fences), so nothing spawned.
+            const dec = [out[0]];
+            let acc2 = 0;
+            for (let k = 1; k < out.length - 1; k++) {
+              acc2 += Math.hypot(out[k][0] - dec[dec.length - 1][0], out[k][1] - dec[dec.length - 1][1]);
+              if (acc2 >= 44) { dec.push(out[k]); acc2 = 0; }
+            }
+            dec.push(out[out.length - 1]);
+            keptRoads.push({ ...r, pts: dec });
+          }
         }
       }
       roads = keptRoads;
@@ -5241,7 +5310,9 @@ const ACTORS = (() => {
       let shore = null;
       for (let t = 0; t <= 1.0001; t += 22 / dd) {
         const sx = px0 + (gx - px0) * Math.min(t, 1), sz = pz0 + (gz - pz0) * Math.min(t, 1);
-        if (!LANDGEO.isWaterWorld(sx, sz)) shore = { x: sx, z: sz };
+        // v2.22: bridge decks count as walkable — a tap across a sea
+        // bridge targets the far shore instead of stopping at the near one
+        if (!LANDGEO.isWaterWorld(sx, sz) || WORLD.nearRoad(sx, sz, 14)) shore = { x: sx, z: sz };
         else if (shore) break;
       }
       if (!shore) { toast('<b>That\'s open water.</b> Pick a spot on land.', 'warn'); return false; }
@@ -5291,7 +5362,8 @@ const ACTORS = (() => {
   // v2.18: a spot you may not occupy — a wall OR open water. The coast
   // is a wall too: slides and detours respect it like any building.
   const blockedAt = (x, z) =>
-    CITY.pointInBuilding(x, z) || (LANDGEO.ready && LANDGEO.isWaterWorld(x, z));
+    CITY.pointInBuilding(x, z) ||
+    ((LANDGEO.ready && LANDGEO.isWaterWorld(x, z)) && !WORLD.nearRoad(x, z, 14));   // v2.22: bridge decks are walkable (14 m: road samples sit ~22 m apart)
   function updatePlayer(dt) {
     if (!player) return;
     if (!goal) { detour = null; player.setWalk(false); player.sprint = false; return; }
@@ -7257,14 +7329,15 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.21 — REAL CITIES', `
-    <p><b>A searched city is always the real city.</b></p>
-    <div class="kv"><span class="k">SEARCH ANY CITY</span><span class="v">Searching "Chicago", "Toronto", anywhere — lands you in the REAL city, same streets as diving in from orbit</span></div>
-    <div class="kv"><span class="k">NO MORE EMPTY SPOTS</span><span class="v">If the live map server is slow or busy, a city generates its full street grid instead of turning into empty countryside</span></div>
-    <div class="kv"><span class="k">PATIENT IMPORT</span><span class="v">Dense downtowns get up to 13 s (was 9.5) to import their real streets before the fallback</span></div>
-    <div class="kv"><span class="k">LAND DOWNTOWN</span><span class="v">Every city entry now puts you on a street in the dense core — never a random edge road where the fog hides the city</span></div>
-    <div class="kv"><span class="k">WALK THE WORLD</span><span class="v">Country roads still route around the lakes — follow Route 21 from Chicago to Toronto and the city streams in as you approach</span></div>
-    <div class="kv"><span class="k">DRY LAND</span><span class="v">Nothing generates in the water — streets, buildings, props and plots stand on dry land only</span></div>
+  openModal('Welcome to v2.22 — CITY WAYFINDING', `
+    <p><b>Every city is visible on the horizon now.</b></p>
+    <div class="kv"><span class="k">CITY BEACONS</span><span class="v g">A small beacon marks every city on Earth — green where you own land, sky-blue everywhere else — and grows easier to spot the farther it is</span></div>
+    <div class="kv"><span class="k">NAME TAGS</span><span class="v">Zoom out at bird's eye and each beacon carries a small map-style name tag — street level stays clean and billboard-free</span></div>
+    <div class="kv"><span class="k">NEVER LOSE A CITY</span><span class="v">The location chip always names the nearest city and its distance — no more "the wild" guessing on long walks</span></div>
+    <div class="kv"><span class="k">CITY SWAP FIX</span><span class="v">Arriving near one city while another is loaded (or walking between close neighbours) now streams the right city in — no more silent dead zones</span></div>
+    <div class="kv"><span class="k">WALKABLE BRIDGES</span><span class="v">Sea bridges (London, Tokyo, Havana…) can be crossed on foot — tap the far shore and your character takes the causeway</span></div>
+    <div class="kv"><span class="k">CHICAGO → TORONTO</span><span class="v">Route 21 walks dry land the whole way — the beacon is visible from downtown Chicago and the city streams in as you approach</span></div>
+    <div class="kv"><span class="k">STREETS ALIVE AGAIN</span><span class="v g">The dry-land update accidentally silenced every city's vendors — sidewalk $ spots, street lamps, parked cars and benches are back</span></div>
     <div class="kv"><span class="k">SAME GAME</span><span class="v">Tap to move · build anywhere on dry land · real streets in every city</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
@@ -7695,7 +7768,7 @@ function loop() {
       sun.target.updateMatrixWorld();
     }
     // the ONE WORLD: stream pasture chunks, swap city chunks as you walk
-    const req = WORLD.update(dt, p.x, p.z);
+    const req = WORLD.update(dt, p.x, p.z, camCtl.dist);
     if (req) {
       if (req.type === 'enterCity') walkIntoCity(req.city);
       else if (req.type === 'leftCity') leftCity();
@@ -7713,7 +7786,17 @@ function loop() {
         const r = WORLD.nearestRoadInfo(camCtl.tx, camCtl.tz);
         nm = r ? r.name : '';
         const near = WORLD.nearestCityInfo(camCtl.tx, camCtl.tz);
-        loc = 'Open Country · ' + (near.d < 4000 ? near.city.name + ' ' + (near.d / 1000).toFixed(1) + ' km' : 'the wild');
+        // v2.22: the chip always names the nearest city, its distance and
+        // a bearing arrow relative to the view — no more "the wild"
+        {
+          const ddx = near.city.wx - camCtl.tx, ddz = near.city.wz - camCtl.tz;
+          const upx = -Math.sin(camCtl.az), upz = -Math.cos(camCtl.az);
+          const rtx = Math.cos(camCtl.az), rtz = -Math.sin(camCtl.az);
+          const th = Math.atan2(ddx * rtx + ddz * rtz, ddx * upx + ddz * upz);
+          const AR = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
+          loc = 'Open Country · ' + near.city.name + ' ' + (near.d / 1000).toFixed(1) + ' km ' +
+            AR[((Math.round(th / (Math.PI / 4)) % 8) + 8) % 8];
+        }
       }
       document.getElementById('streetname').textContent = nm ? '· ' + nm : '';
       document.getElementById('bb-loc').textContent = loc + (nm ? ' · ' + nm : '');
@@ -7749,7 +7832,7 @@ EARTH.diveTo = (city, cb) => {
 };
 
 
-console.log('%cOPEN WORLD v2.21 — REAL CITIES', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.22 — CITY WAYFINDING', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
