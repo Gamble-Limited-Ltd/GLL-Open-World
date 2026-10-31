@@ -1,0 +1,41 @@
+name: Ops
+
+# Start, stop, restart, check or update the hosted game without server access.
+# Run by hand: Actions tab > Ops > Run workflow, or `gh workflow run ops.yml -f action=restart`.
+# The server only accepts these five actions; nothing else can be run through it.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: What to do
+        required: true
+        type: choice
+        options: [status, restart, start, stop, sync]
+
+permissions:
+  contents: read
+
+concurrency: ops
+
+jobs:
+  ops:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Call the ops endpoint
+        env:
+          ACTION: ${{ inputs.action }}
+          OPS_URL: ${{ secrets.OPS_URL }}
+          OPS_TOKEN: ${{ secrets.OPS_TOKEN }}
+          CF_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          out=$(curl -sS --max-time 90 -X POST "$OPS_URL/ops/$ACTION" \
+            -H "Authorization: Bearer $OPS_TOKEN" \
+            -H "CF-Access-Client-Id: $CF_ID" \
+            -H "CF-Access-Client-Secret: $CF_SECRET" \
+            -H "X-Ops-Actor: $ACTOR" -w '\nHTTP %{http_code}')
+          echo "$out"
+          case "$out" in *'"ok":true'*) ;; *) exit 1 ;; esac

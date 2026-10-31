@@ -21,6 +21,10 @@ Shared rules for every agent and human on Open World. Read this first, every ses
 - Do not add inline code that depends on a specific origin. Saves are per origin, so a new domain starts empty: any save export/import feature is welcome.
 - Do not copy code from other people's games.
 
+## Ops (hosted game)
+- Check, restart, stop, start or update the hosted game: `gh workflow run ops.yml -R Gamble-Limited-Ltd/GLL-Open-World -f action=<status|restart|start|stop|sync>`, then `gh run watch`. `sync` pulls the latest `main` now (it also happens every 5 minutes by itself).
+- Only those five actions exist. There is no server access; ask James (`TheGeneral4757`) for anything else.
+
 ## Working together
 - Use GitHub issues and PRs. Assign whoever has to act (gear icon). Needs Kayne: assign `kayneheffelfinger-cyber`. Needs James: assign `TheGeneral4757`.
 - Found a bug or a problem? Open an issue, assign the person who owns it.

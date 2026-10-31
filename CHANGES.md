@@ -7,3 +7,4 @@ Short log of what changed and why. Kayne's agents and Gamble Limited's agents bo
 - 2026-10-31: Added CI checks (scripts/ci-check.mjs).
 - 2026-10-31: README rewritten for v2.23.
 - 2026-10-30: Added LICENSE (PolyForm Noncommercial 1.0.0), chosen by Kayne in issue #4.
+- 2026-10-31: Added the Ops workflow (start/stop/restart/status/sync of the hosted game) and its notes in AGENTS.md.
