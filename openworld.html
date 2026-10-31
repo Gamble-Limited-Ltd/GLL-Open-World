@@ -3,10 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.27</title>
+<title>Open World — v2.28</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.27 — TRUE SCALE: the whole world is now 1:1 with the
+   OPEN WORLD v2.28 — CONNECTED ROADS: every inter-city road now runs
+   INTO the city it serves. Two v2.27 leftovers kept roads out of
+   town: the baked route ends were raw catalog coordinates (quantized
+   to 0.01° — avg 117 m off at 1:1, worst 7.1 km), and the trim loop,
+   tuned for the old 11 m resample cadence, jumped whole ~2.2 km steps
+   at true scale — so roads stopped up to ~2 km short of streets that
+   end ±360 m from the anchor. Route ends now snap to each city's
+   CURRENT (shoreline-snapped) anchor and the trim cuts at the exact
+   along-route arc length, running land routes all the way to each
+   city's anchor so the ribbon crosses the fringe streets and truly
+   connects to the grid. The ribbon stack was also lifted just above
+   every flat ground layer (city plate, beaches, lakes, skyline
+   plates), whose old 7–19 mm separations lost to float32 depth noise
+   at 1:1 and left the asphalt invisible.
+   v2.27 TRUE SCALE: the whole world is now 1:1 with the
    real Earth — 111,320 meters per degree, 40,007 km around. Every
    static chunk of the planet (coasts, lakes, roads, bridges) builds
    in a LOCAL frame — 8° world tiles, city anchors, chunk centers —
@@ -539,7 +553,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.21 — the real Earth: every searched city is a real city, nothing generates in the water, streets, buildings, props and plots stand on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.28 — the real Earth: every searched city is a real city, nothing generates in the water, streets, buildings, props, plots and roads stand on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -575,7 +589,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.27';
+const GAME_VERSION = 'v2.28';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -2105,7 +2119,10 @@ const WORLD = (() => {
   const CITY_R = 745;                // city import extent radius
   const BUILD_DIST = 950;            // detailed city streams in
   const LEAVE_DIST = 1250;           // detailed city streams out
-  const ROAD_TRIM = 640;             // rural roads stop this far from anchors
+  const ROAD_CITY_REACH = 0;         // v2.28: land routes run all the way
+                                      // to the city ANCHOR — they cross the
+                                      // fringe streets and connect to the
+                                      // grid (bridges keep near-full span)
   const isMob = matchMedia('(pointer:coarse)').matches;
   const CHUNK_R = isMob ? 750 : 1050;
 
@@ -2536,11 +2553,20 @@ const WORLD = (() => {
       const A = CITIES[e.a], B = CITIES[e.b];
       if (!A || !B) continue;
       const ll = (e.ll && e.ll.length > 1) ? e.ll : [[A.lon, A.lat], [B.lon, B.lat]];
+      // v2.28 CONNECTED ROADS (1/2): the encoded route ends are the RAW
+      // catalog coordinates — quantized to 0.01° when the routes were
+      // baked (avg 117 m off at 1:1, worst 7.1 km, e.g. Toronto) — while
+      // the city stands on its CURRENT anchor (shoreline-snapped at
+      // boot). Run every route end to the anchor the city actually
+      // occupies, or the road misses the town it serves.
+      const llr = ll.slice();
+      llr[0] = [A.wx / DEG_M, -A.wz / DEG_M];
+      llr[llr.length - 1] = [B.wx / DEG_M, -B.wz / DEG_M];
       // project the land route (or the straight bridge span) to a fine
       // world polyline — dense points keep plots and road hashing exact
       const full = [];
-      for (let i = 0; i < ll.length; i++) {
-        const px = ll[i][0] * DEG_M, pz = -ll[i][1] * DEG_M;
+      for (let i = 0; i < llr.length; i++) {
+        const px = llr[i][0] * DEG_M, pz = -llr[i][1] * DEG_M;
         if (!i) { full.push([px, pz]); continue; }
         const q = full[full.length - 1];
         const d = Math.hypot(px - q[0], pz - q[1]);
@@ -2550,13 +2576,33 @@ const WORLD = (() => {
       const cum = [0];
       for (let i = 1; i < full.length; i++) cum.push(cum[i - 1] + Math.hypot(full[i][0] - full[i - 1][0], full[i][1] - full[i - 1][1]));
       const L = cum[cum.length - 1];
-      // v2.22: sea bridges keep (nearly) their full span — a trimmed
-      // bridge strands its deck in open water with no way on from shore
-      const trimEnd = e.bridge ? 60 : ROAD_TRIM;
-      let i0 = 0, i1 = full.length - 1;
-      while (i0 < full.length - 1 && cum[i0] < trimEnd) i0++;
-      while (i1 > 0 && cum[i1] > L - trimEnd) i1--;
-      const pts = full.slice(i0, i1 + 1);
+      // v2.28 CONNECTED ROADS (2/2): the trim used to skip whole vertices
+      // while cum < trim — tuned for the old 11 m resample cadence, it
+      // jumped whole ~2.2 km steps at 1:1 and roads really ended up to
+      // ~2.2 km short of town (streets end ±360 m from the anchor — the
+      // "roads never touch the city" report). Cut at the EXACT along-route
+      // arc length instead, and run land routes all the way TO the
+      // anchor: the ribbon crosses the city's fringe streets — a real
+      // connection, whatever the import's street density — then dives
+      // under the downtown blocks (buildings occlude it at true height).
+      // Sea bridges keep (nearly) their full span — a trimmed bridge
+      // strands its deck in open water with no way on from shore (v2.22).
+      const trimEnd = e.bridge ? 60 : ROAD_CITY_REACH;
+      const cutAt = s => {          // exact point + segment at arc length s
+        let i = 0;
+        while (i < full.length - 1 && cum[i + 1] < s) i++;
+        if (i >= full.length - 1) return { p: full[full.length - 1].slice(), i };
+        const t = Math.max(0, (s - cum[i]) / (cum[i + 1] - cum[i] || 1));
+        return { p: [full[i][0] + (full[i + 1][0] - full[i][0]) * t,
+                     full[i][1] + (full[i + 1][1] - full[i][1]) * t], i };
+      };
+      let pts;
+      if (L > trimEnd * 2 + 60) {
+        const a = cutAt(trimEnd), b = cutAt(L - trimEnd);
+        pts = [a.p, ...full.slice(a.i + 1, b.i + 1), b.p];
+      } else {
+        pts = full.slice();         // very short span — keep it whole
+      }
       const poly = [pts[0]];
       let acc = 0;
       for (let i = 1; i < pts.length; i++) {
@@ -2626,6 +2672,16 @@ const WORLD = (() => {
     // center dashes only within ~8 km of either city end; any segment
     // the vector coast calls water — bridge or not — gets guard pylons
     // and its deck rides just above the sea like the sea bridges.
+    // v2.28 CONNECTED ROADS: the ribbon stack sits ABOVE every flat
+    // ground layer it can meet at true scale — the land shield (y 0,
+    // whose polygonOffset is a no-op under the logarithmic depth
+    // buffer), the city ground plate (.012), beaches (.05–.063), lakes
+    // (.06) and lake rims (.068), the skyline plates (.05) — so the
+    // asphalt can never z-fight under them (7–19 mm gaps lose to
+    // float32 depth noise at world scale). It stays BELOW the sidewalk
+    // stack (.16), vendor plots (.105) and every 3D building, so town
+    // still occludes the road where it crosses blocks.
+    const ROAD_Y = .095, SHOL_Y = .09, DASH_Y = .098;
     const cAsph = [1, 1, 1], cShol = col(0x8d8265), cDash = col(0xe8e4dc);
     const rib = (arr, ax, az, bx, bz, ux, uz, w, y, c, vTile) => {
       const px = -uz * w / 2, pz = ux * w / 2;
@@ -2652,15 +2708,15 @@ const WORLD = (() => {
       const t = tileRec(...tileOfLL(lonOf((ax + bx) / 2), latOf((az + bz) / 2)));
       const ox = t.ox, oz = t.oz;
       const lax = ax - ox, laz = az - oz, lbx = bx - ox, lbz = bz - oz;
-      rib(t.road, lax, laz, lbx, lbz, ux, uz, 7.5, .019, cAsph, 1.07);
+      rib(t.road, lax, laz, lbx, lbz, ux, uz, 7.5, ROAD_Y, cAsph, 1.07);
       for (const s of [1, -1]) {
-        rib(t.road, lax - uz * 4.6 * s, laz + ux * 4.6 * s, lbx - uz * 4.6 * s, lbz + ux * 4.6 * s, ux, uz, 1.7, .014, cShol, .24);
+        rib(t.road, lax - uz * 4.6 * s, laz + ux * 4.6 * s, lbx - uz * 4.6 * s, lbz + ux * 4.6 * s, ux, uz, 1.7, SHOL_Y, cShol, .24);
       }
       // v2.27: dashes near the cities only (within ~8 km of either end)
       if (Math.min(cum[i], L - cum[i]) < 8000) {
         for (let d = 40; d < len - 40; d += 80) {
           const mx = lax + ux * d, mz = laz + uz * d;
-          rib(t.mark, mx, mz, mx + ux * 3.4, mz + uz * 3.4, ux, uz, .3, .023, cDash, .04);
+          rib(t.mark, mx, mz, mx + ux * 3.4, mz + uz * 3.4, ux, uz, .3, DASH_Y, cDash, .04);
         }
       }
       // v2.18 sea bridges / v2.27 causeways: guard pylons wherever the
@@ -8698,7 +8754,7 @@ EARTH.diveTo = (city, cb) => {
 };
 
 
-console.log('%cOPEN WORLD v2.27 — TRUE SCALE', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.28 — CONNECTED ROADS', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
