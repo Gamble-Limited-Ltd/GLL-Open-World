@@ -22,8 +22,9 @@ Shared rules for every agent and human on Open World. Read this first, every ses
 - Do not copy code from other people's games.
 
 ## Ops (hosted game)
-- Check, restart, stop, start or update the hosted game: `gh workflow run ops.yml -R Gamble-Limited-Ltd/GLL-Open-World -f action=<status|restart|start|stop|sync>`, then `gh run watch`. `sync` pulls the latest `main` now (it also happens every 5 minutes by itself).
-- Only those five actions exist. There is no server access; ask James (`TheGeneral4757`) for anything else.
+- Check, restart, stop, start or update the hosted game: `gh workflow run ops.yml -R Gamble-Limited-Ltd/GLL-Open-World -f action=<status|restart|start|stop|sync>`. The server notices within about a minute and does it. `sync` pulls the latest `main` now (it also happens every 5 minutes by itself).
+- See the result: https://open-world.taps-holdings.org/__ops/status.json (container state, deployed commit, last action and who asked).
+- Only those five actions exist, and only for Kayne and James. There is no server access; ask James (`TheGeneral4757`) for anything else.
 
 ## Working together
 - Use GitHub issues and PRs. Assign whoever has to act (gear icon). Needs Kayne: assign `kayneheffelfinger-cyber`. Needs James: assign `TheGeneral4757`.
