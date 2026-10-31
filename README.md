@@ -1,8 +1,8 @@
 # Open World
 
-A single-player, in-browser tycoon game set on the real Earth. Current version: **v2.26** ("The Whole World").
+A single-player, in-browser tycoon game set on the real Earth. Current version: **v2.27** ("True Scale").
 
-Search for any real city and the game builds it from OpenStreetMap data: real streets, buildings, greens and plots, all standing on dry land. Then build your business empire there. Since v2.26 the world comes pre-built: every one of the 64 catalog cities already stands at its real spot before you ever walk there — walk in and it upgrades to the fully detailed city.
+Search for any real city and the game builds it from OpenStreetMap data: real streets, buildings, greens and plots, all standing on dry land. Since v2.27 the world is 1:1 with the actual Earth — 111,320 meters per degree, 40,007 km around — with real distances between cities, a real horizon, and whole regions visible when you zoom out. Every one of the 64 catalog cities stands at its real spot as a metro-scale skyline before you ever walk there — walk in and it upgrades to the fully detailed downtown.
 
 ## Play
 
@@ -35,16 +35,17 @@ The loop, as described by the in-game starter guide:
 | Snap back to your tycoon | `C` or the crosshair button |
 | Serve customers | `E` while standing at your cart |
 | World map | `M` or click the minimap |
-| Walk to the nearest city | The gold pill above the bottom bar (routes around water, uses bridges) — the distance shown is always your tycoon's, and it flags when the view is panned far away from them |
+| Walk to the nearest city | The gold pill above the bottom bar (routes around water, uses bridges) — the distance shown is always your tycoon's, and it flags when the view is panned far away from them. At true scale the nearest city can be hundreds of km away: use search, the world map or orbit flight to travel |
 | Help and starter guide | In-game Help — the starter guide can be replayed anytime |
 
 ## Under the hood
 
-- Static HTML and JavaScript. The whole game is `openworld.html` (about 8,000 lines), with `index.html` as the landing page.
+- Static HTML and JavaScript. The whole game is `openworld.html` (about 8,700 lines), with `index.html` as the landing page.
 - 3D with three.js 0.160, loaded from unpkg.
 - Live calls to OpenStreetMap Overpass (map data) and Nominatim (city search); if Overpass is unreachable, a built-in generator lays out the city instead. Map data is (c) OpenStreetMap contributors (ODbL).
-- The world is pre-built (v2.26): all 64 cities stand in the world from the moment you enter — distant skylines use the city's true footprint (cached real map data when available, the local generator otherwise, no boot-time network calls) and are upgraded to full detail when you arrive.
-- On boot the game reads same-origin `version.json` and offers the one-tap self-update described above.
+- True-scale Earth (v2.27): one degree is really 111 km and the world spans 40,007 km. World coordinates reach ±20 million meters — past float32 vertex precision — so the static planet (coasts, lakes, roads, bridges) is built as 8° world tiles and city/chunk-local frames, each positioned in double precision. Near every coast the land/water gate answers from the vector coastlines the player actually sees (the 0.25° land raster only settles open ocean and deep interior), and roads that cross vector water become causeways with guard pylons.
+- The world is pre-built (v2.26): all 64 cities stand in the world from the moment you enter — distant skylines use the city's true footprint spread to metro scale (true building sizes, no boot-time network calls) and are upgraded to full detail when you arrive.
+- On boot the game reads same-origin `version.json` and offers the one-tap self-update described above. Saves from earlier versions migrate to the true-scale world: plots keep their spot beside their city, everything else keeps its lat/lon.
 - No accounts. Your world is saved in your browser's localStorage under the key `openworld-v2`, so it stays on that browser and device.
 
 ## Planned (not built yet)
