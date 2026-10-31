@@ -6,6 +6,7 @@ Shared notes for every agent and human working on Open World. Read this first. E
 - Open World: 3D Earth strategy game by Kayne (`kayneheffelfinger-cyber`), who owns it and is the main dev. Gamble Limited Ltd. hosts and helps (hosting, error fixing, repo cleanup, docs).
 - Plain HTML/JS, no build step. The game is `openworld.html`; `game.html` must stay an identical copy. `index.html` is the homepage, `admin.html` the owner panel, `version.json` the update feed.
 - Backend for Kayne's dev: Supabase (`supabase-setup.sql`) on GitHub Pages. Gamble Limited's prod runs on its own server with its own simple database and GATE sign-in; that code lives outside this repo.
+- License: PolyForm Noncommercial 1.0.0 (see LICENSE). Hosting by Gamble Limited is covered by the owner's separate agreement with James.
 - Play money only. No real-money features.
 
 ## Branches
