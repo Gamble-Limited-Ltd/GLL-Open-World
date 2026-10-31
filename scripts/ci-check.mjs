@@ -39,6 +39,7 @@ let hits = [];
 let files = [];
 try { files = execFileSync('git', ['ls-files', '-z'], { cwd: root }).toString().split('\0').filter(Boolean); } catch { say('WARN', 'secrets', 'not a git checkout'); }
 for (const f of files) {
+  if (f === 'scripts/ci-check.mjs') continue; // this file contains the patterns themselves
   let b; try { b = readFileSync(join(root, f)); } catch { continue; }
   if (b.includes(0)) continue; // binary
   const t = b.toString('utf8');

@@ -1,5 +1,7 @@
 @AGENTS.md
 
 ## Claude-specific
-- Claude runs only when James (`TheGeneral4757`) mentions `@claude` on an issue or PR. It works on a branch and opens a PR; it never pushes to `main`.
-- Keep changes small. Split the big HTML only when asked.
+- Runs only when James (`TheGeneral4757`) mentions `@claude` on an issue or PR. Work on a branch, open a PR into `main`, never push to `main`. Reply as Claude, assign Kayne when he must act.
+- Before changing the game, diff against the dev branch: `main` can lag it by many commits. Fetch first.
+- Keep PRs small and say what you checked. No big refactors (splitting the big HTML, TypeScript) unless asked.
+- Check AGENTS.md "Rules that keep it hostable" on every PR.
