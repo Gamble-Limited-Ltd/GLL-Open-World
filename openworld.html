@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.21</title>
+<title>Open World — v2.23</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.21 — REAL CITIES: a searched city is always the real
+   OPEN WORLD v2.23 — FOLLOW THE ROAD: a searched city is always the real
    city (same streets as a globe dive — never an empty pasture when the
    live map server is slow), and the map import waits longer for dense
    downtowns. (v2.20 DRY LAND: nothing generates in the water —
@@ -190,6 +190,12 @@ input{font-family:var(--sans)}
 #bb-loc{position:absolute;top:-22px;left:50%;transform:translateX(-50%);white-space:nowrap;
   font-size:10px;color:var(--mut);font-family:var(--mono);letter-spacing:.5px;
   background:rgba(13,17,23,.75);padding:3px 10px;border-radius:3px}
+#bb-next{position:absolute;bottom:132px;left:50%;transform:translateX(-50%);white-space:nowrap;
+  font-family:var(--mono);font-size:11px;color:#ffd27d;background:rgba(13,17,23,.85);
+  border:1px solid rgba(255,201,94,.5);border-radius:999px;padding:6px 16px;cursor:pointer;
+  letter-spacing:.6px;z-index:6;transition:background .12s,color .12s}
+#bb-next:hover{background:rgba(255,201,94,.2);color:#ffe9c0}
+@media (max-width:760px){#bb-next{bottom:150px;font-size:10px;padding:5px 12px}}
 
 /* stats ticker */
 #ticker{position:absolute;left:0;right:0;bottom:0;height:26px;background:#171923;
@@ -452,6 +458,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
   </div>
 
   <div id="bottombar">
+    <button id="bb-next" style="display:none">WALK TO THE NEXT CITY</button>
     <div id="bb-row">
       <div class="bb-side">
         <button class="bb-btn" id="b-globe"><span class="tip">WORLD</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg></button>
@@ -550,7 +557,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.22';
+const GAME_VERSION = 'v2.23';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -2701,13 +2708,21 @@ const WORLD = (() => {
         new THREE.MeshBasicMaterial({ color: 0xffc95e, transparent: true, opacity: .78, fog: false, depthWrite: false }));
       dot.position.set(c.wx, 14, c.wz);
       g.add(dot);
+      // v2.23: a tall light column too — the sphere sits at ground level,
+      // which a bird's-eye camera pitched down never sees at multi-km
+      // range. The pillar is visible from ANY angle and distance.
+      const pil = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.0, 300, 8, 1, true),
+        new THREE.MeshBasicMaterial({ color: 0xffc95e, transparent: true, opacity: .22,
+          fog: false, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+      pil.position.set(c.wx, 150, c.wz);
+      g.add(pil);
       const label = new THREE.Sprite(new THREE.SpriteMaterial({
         map: cityLabelTex(c.name), transparent: true, opacity: 0, fog: false, depthWrite: false }));
       label.scale.set(88, 22, 1);
       label.position.set(c.wx, 44, c.wz);
       g.add(label);
       group.add(g);
-      markers.set(c.key, { group: g, dot, label, city: c });
+      markers.set(c.key, { group: g, dot, pil, label, city: c });
     }
   }
 
@@ -2818,6 +2833,11 @@ const WORLD = (() => {
         mk.dot.material.opacity = own ? .9 : .78;
         const ms = Math.min(4.2, 1 + d / 2200);      // far = easier to spot
         mk.dot.scale.setScalar(ms);
+        if (mk.pil) {                                 // v2.23: tall light column
+          mk.pil.material.color.setHex(own ? 0x48bb78 : 0xffc95e);
+          mk.pil.material.opacity = own ? .30 : .22;
+          mk.pil.scale.set(ms, Math.min(2.4, .9 + d / 2600), ms);
+        }
         if (mk.label) {
           const ls = Math.min(3, 1 + d / 3000);     // tags stay readable far out
           mk.label.scale.set(88 * ls, 22 * ls, 1);
@@ -2911,8 +2931,75 @@ const WORLD = (() => {
     group = null; inited = false; edges = []; markers = new Map();
   }
 
+  // ---------------- v2.23: road routing for long walks -----------------
+  // A far tap (or the WALK-TO pill) whose straight line crosses real
+  // water follows the inter-city roads instead of stopping at the shore:
+  // cities are graph nodes, the routed road polylines are the edges, and
+  // the walker gets the concatenated waypoint list — bridges included,
+  // their decks are walkable. Returns null when a route can't help.
+  function routeTo(px, pz, gx, gz) {
+    if (!edges.length || !LANDGEO.ready) return null;
+    const dist = Math.hypot(gx - px, gz - pz);
+    if (dist < 350) return null;                  // near — walk it straight
+    let wet = false;
+    for (let t = .08; t <= .92 && !wet; t += 25 / dist) {
+      if (LANDGEO.isWaterWorld(px + (gx - px) * t, pz + (gz - pz) * t)) wet = true;
+    }
+    if (!wet) return null;                        // dry straight line — no route needed
+    let gc = null, gd = 1e9;
+    for (const c of CITIES) { const d = Math.hypot(c.wx - gx, c.wz - gz); if (d < gd) { gd = d; gc = c; } }
+    if (!gc || gd > 2600) return null;            // wilderness goal — no road there
+    let sc = null, sd = 1e9;
+    for (const c of CITIES) { const d = Math.hypot(c.wx - px, c.wz - pz); if (d < sd) { sd = d; sc = c; } }
+    if (!sc || sc.key === gc.key) return null;    // same city — shore rules apply
+    const adj = new Map();
+    for (const e of edges) {
+      const a = e.A.key, b = e.B.key;
+      if (!adj.has(a)) adj.set(a, []);
+      if (!adj.has(b)) adj.set(b, []);
+      adj.get(a).push({ to: b, e });
+      adj.get(b).push({ to: a, e });
+    }
+    if (!adj.has(sc.key) || !adj.has(gc.key)) return null;
+    const seen = new Set([sc.key]);
+    let seq = null;
+    const q = [{ city: sc.key, seq: [] }];
+    while (q.length && !seq) {
+      const cur = q.shift();
+      for (const n of (adj.get(cur.city) || [])) {
+        if (seen.has(n.to)) continue;
+        seen.add(n.to);
+        const ns = cur.seq.concat(n.e);
+        if (n.to === gc.key) { seq = ns; break; }
+        q.push({ city: n.to, seq: ns });
+      }
+    }
+    if (!seq || !seq.length) return null;
+    // waypoints along the edge sequence, entering the first road at the
+    // vertex nearest the player
+    const wps = [];
+    let prev = sc.key;
+    for (const e of seq) {
+      let poly = e.poly;
+      const fwd = e.A.key === prev;
+      if (!fwd) poly = poly.slice().reverse();
+      prev = fwd ? e.B.key : e.A.key;
+      let start = 0;
+      if (!wps.length) {
+        let bd = 1e9;
+        for (let i = 0; i < poly.length; i++) {
+          const d = Math.hypot(poly[i][0] - px, poly[i][1] - pz);
+          if (d < bd) { bd = d; start = i; }
+        }
+      }
+      for (let i = start; i < poly.length; i++) wps.push({ x: poly[i][0], z: poly[i][1] });
+    }
+    wps.push({ x: gx, z: gz });
+    return wps;
+  }
+
   return {
-    ensure, update, setCity, clearCity, disposeAll,
+    ensure, update, setCity, clearCity, disposeAll, routeTo,
     plotAt, plots, randomRoadPoint, nearestRoadInfo, clampToBounds,
     nearestCityInfo, mapData, nearRoad,
     set pending(v) { pendingCity = v; },
@@ -5320,11 +5407,20 @@ const ACTORS = (() => {
     }
     const gd0 = Math.hypot(gx - player.group.position.x, gz - player.group.position.z);
     goal = { x: gx, z: gz, far: gd0 > 60 };   // v2.17: long travel taps are jogged
+    // v2.23: a far goal across water follows the inter-city roads — the
+    // straight line would end at the shore. Bridges count (walkable decks).
+    goal.route = WORLD.routeTo(player.group.position.x, player.group.position.z, gx, gz);
     stuckT = 0; progX = player.group.position.x; progZ = player.group.position.z;
     detour = null;
     // v2.17: detours may spend this much extra distance on going around
     // obstacles — pathological walks end instead of cycling forever
-    detourBudget = 250 + 2 * Math.hypot(gx - player.group.position.x, gz - player.group.position.z);
+    let budgetD = gd0;
+    if (goal.route) {
+      budgetD = 0;
+      let lx = player.group.position.x, lz = player.group.position.z;
+      for (const w of goal.route) { budgetD += Math.hypot(w.x - lx, w.z - lz); lx = w.x; lz = w.z; }
+    }
+    detourBudget = 250 + 2 * budgetD;
     markerDone = 0;
     disposeMarker();
     const mat = new THREE.MeshBasicMaterial({ color: 0x8ff0ae, transparent: true, opacity: .95, side: THREE.DoubleSide, depthWrite: false });
@@ -5370,13 +5466,18 @@ const ACTORS = (() => {
     const sprinting = !!keys['shift'];
     const run = sprinting ? 10.5 : (goal.far ? 8.4 : 6.2);   // v2.17: far taps travel at a jog
     const p = player.group.position;
-    const wp = detour || goal;
+    const routed = !detour && goal.route && goal.route.length;
+    const wp = detour || (routed ? goal.route[0] : goal);
     let dx = wp.x - p.x, dz = wp.z - p.z;
     let d = Math.hypot(dx, dz);
-    if (d < (detour ? .6 : .45)) {
+    if (d < (detour ? .6 : routed ? 2.2 : .45)) {
       if (detour) {   // rounded the obstacle — resume the direct line
         detour = null; stuckT = 0; progX = p.x; progZ = p.z;
         dx = goal.x - p.x; dz = goal.z - p.z; d = Math.hypot(dx, dz);
+      } else if (goal.route && goal.route.length) {   // v2.23: next waypoint
+        goal.route.shift(); stuckT = 0; progX = p.x; progZ = p.z;
+        const nw = goal.route.length ? goal.route[0] : goal;
+        dx = nw.x - p.x; dz = nw.z - p.z; d = Math.hypot(dx, dz);
       } else {
         arriveGoal();
         player.setWalk(false); player.sprint = false;
@@ -7160,9 +7261,16 @@ async function walkIntoCity(city) {
     await WORLD.setCity(data, meta, s => {
       document.getElementById('veils').textContent = s;
     });
+    // v2.23: streaming a city in used to CANCEL the walk (ACTORS.reset
+    // clears the goal) — a cross-country trip died at the city limits.
+    const keepGoal = ACTORS.goal ? { x: ACTORS.goal.x, z: ACTORS.goal.z } : null;
     ACTORS.reset();
     ACTORS.initPlayer();
     if (!ACTORS.player.group.parent) worldScene.add(ACTORS.player.group);
+    if (keepGoal && Math.hypot(keepGoal.x - ACTORS.player.group.position.x,
+        keepGoal.z - ACTORS.player.group.position.z) > 120) {
+      ACTORS.setGoal(keepGoal.x, keepGoal.z);
+    }
     const isMobile = matchMedia('(pointer:coarse)').matches;
     ACTORS.spawnCitizens(isMobile ? 22 : 46, meta.key);
     ECO.setRegion(meta.key);
@@ -7329,16 +7437,13 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.22 — CITY WAYFINDING', `
-    <p><b>Every city is visible on the horizon now.</b></p>
-    <div class="kv"><span class="k">CITY BEACONS</span><span class="v g">A small beacon marks every city on Earth — green where you own land, sky-blue everywhere else — and grows easier to spot the farther it is</span></div>
-    <div class="kv"><span class="k">NAME TAGS</span><span class="v">Zoom out at bird's eye and each beacon carries a small map-style name tag — street level stays clean and billboard-free</span></div>
-    <div class="kv"><span class="k">NEVER LOSE A CITY</span><span class="v">The location chip always names the nearest city and its distance — no more "the wild" guessing on long walks</span></div>
-    <div class="kv"><span class="k">CITY SWAP FIX</span><span class="v">Arriving near one city while another is loaded (or walking between close neighbours) now streams the right city in — no more silent dead zones</span></div>
-    <div class="kv"><span class="k">WALKABLE BRIDGES</span><span class="v">Sea bridges (London, Tokyo, Havana…) can be crossed on foot — tap the far shore and your character takes the causeway</span></div>
-    <div class="kv"><span class="k">CHICAGO → TORONTO</span><span class="v">Route 21 walks dry land the whole way — the beacon is visible from downtown Chicago and the city streams in as you approach</span></div>
-    <div class="kv"><span class="k">STREETS ALIVE AGAIN</span><span class="v g">The dry-land update accidentally silenced every city's vendors — sidewalk $ spots, street lamps, parked cars and benches are back</span></div>
-    <div class="kv"><span class="k">SAME GAME</span><span class="v">Tap to move · build anywhere on dry land · real streets in every city</span></div>
+  openModal('Welcome to v2.23 — FOLLOW THE ROAD', `
+    <p><b>Every city is reachable on foot now — from anywhere.</b></p>
+    <div class="kv"><span class="k">WALK TO …</span><span class="v g">A gold pill above the bottom bar always names the nearest city, its distance and a bearing arrow — tap it and your tycoon sets off</span></div>
+    <div class="kv"><span class="k">ROADS ARE THE ROUTE</span><span class="v">Long walks across water follow the inter-city roads — Chicago → Toronto walks Route 21 south around the lake instead of stopping at the shore</span></div>
+    <div class="kv"><span class="k">CITY LIGHTS</span><span class="v">Every city raises a tall light column — visible from any distance and any camera angle, green where you own land</span></div>
+    <div class="kv"><span class="k">NO MORE DEAD STOPS</span><span class="v">A city streaming in around you no longer cancels the trip — the walk continues to your destination</span></div>
+    <div class="kv"><span class="k">SAME GAME</span><span class="v">Tap to move · build anywhere on dry land · real streets in every city · the big map still travels instantly</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -7373,16 +7478,28 @@ function recenterOnPlayer() {
 }
 document.getElementById('b-locate').addEventListener('click', recenterOnPlayer);
 
+// v2.23: WALK-TO pill — one tap and your tycoon walks to the nearest
+// city; setGoal road-routes around water automatically (bridges included)
+document.getElementById('bb-next').addEventListener('click', () => {
+  if (!nextCityRef || STATE.mode !== 'city') return;
+  const ok = ACTORS.setGoal(nextCityRef.wx, nextCityRef.wz);
+  if (ok) {
+    camCtl.follow = true;
+    toast('Walking to <b>' + nextCityRef.name + '</b> — following the road the whole way. Tap anywhere else to change plans.', 'warn');
+  }
+});
+
 function openHelp() {
-  openModal('Open World v2.21 — Help', `
+  openModal('Open World v2.23 — Help', `
     <p><b>Controls</b></p>
     <div class="kv"><span class="k">MOVE</span><span class="v g">Tap / click anywhere — your tycoon walks there (the only way they move)</span></div>
     <div class="kv"><span class="k">LOOK AROUND</span><span class="v">Drag or WASD / arrows / joystick to glide the bird\u2019s-eye view across the map</span></div>
     <div class="kv"><span class="k">ROTATE</span><span class="v">Right-drag (or Ctrl+drag) · touch: pinch zoom</span></div>
     <div class="kv"><span class="k">ZOOM</span><span class="v">Wheel / pinch (gentle, glide)</span></div>
     <div class="kv"><span class="k">FIND ME</span><span class="v">[C] or the crosshair button → snap back to your tycoon</span></div>
+    <div class="kv"><span class="k">WALK TO A CITY</span><span class="v g">The gold pill above the bottom bar walks you to the nearest city — road-routed around lakes and seas, bridges included</span></div>
     <div class="kv"><span class="k">WORLD MAP</span><span class="v">minimap (bottom right) · [M] or click it for the big map</span></div>
-    <div class="kv"><span class="k">THE EARTH</span><span class="v">the real planet — walk country roads between cities, cross straits by sea bridge, or fly anywhere from orbit</span></div>
+    <div class="kv"><span class="k">THE EARTH</span><span class="v">the real planet — walk country roads between cities (the WALK-TO pill routes you around water), cross straits by sea bridge, or fly anywhere from orbit</span></div>
     <div class="kv"><span class="k">EMPIRE</span><span class="v">avatar (top right) → TELEPORT to any plot you own</span></div>
     <div class="kv"><span class="k">SERVE</span><span class="v">[E] when standing at your cart</span></div>
     <div class="kv"><span class="k">MARKET</span><span class="v">📈 button · limit &amp; market orders</span></div>
@@ -7714,7 +7831,7 @@ window.addEventListener('keydown', e => {
 
 // ---------------- main loop -------------------------------------------
 const clock = new THREE.Clock();
-let streetT = 0, mmTimer = 0;
+let streetT = 0, mmTimer = 0, nextCityRef = null;   // v2.23: WALK-TO pill target
 function loop() {
   requestAnimationFrame(loop);
   const dt = Math.min(.05, clock.getDelta());
@@ -7800,6 +7917,32 @@ function loop() {
       }
       document.getElementById('streetname').textContent = nm ? '· ' + nm : '';
       document.getElementById('bb-loc').textContent = loc + (nm ? ' · ' + nm : '');
+      // v2.23: WALK-TO pill — always names the nearest other city with its
+      // distance + bearing arrow; one tap walks you there, roads included.
+      {
+        const pill = document.getElementById('bb-next');
+        if (STATE.mode === 'city' && CITIES.length) {
+          let nc = null, nd = 1e9;
+          for (const c of CITIES) {
+            if (STATE.city && c.key === STATE.city.key) continue;
+            const dd = Math.hypot(c.wx - camCtl.tx, c.wz - camCtl.tz);
+            if (dd < nd) { nd = dd; nc = c; }
+          }
+          if (nc) {
+            nextCityRef = nc;
+            const ddx = nc.wx - camCtl.tx, ddz = nc.wz - camCtl.tz;
+            const upx = -Math.sin(camCtl.az), upz = -Math.cos(camCtl.az);
+            const rtx = Math.cos(camCtl.az), rtz = -Math.sin(camCtl.az);
+            const th = Math.atan2(ddx * rtx + ddz * rtz, ddx * upx + ddz * upz);
+            const AR = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
+            const ar = AR[((Math.round(th / (Math.PI / 4)) % 8) + 8) % 8];
+            const walking = ACTORS.goal && Math.hypot(ACTORS.goal.x - nc.wx, ACTORS.goal.z - nc.wz) < 260;
+            pill.textContent = (walking ? '● WALKING TO ' : 'WALK TO ') + nc.name.toUpperCase() +
+              ' · ' + (nd / 1000).toFixed(1) + ' KM ' + ar;
+            pill.style.display = '';
+          } else { nextCityRef = null; pill.style.display = 'none'; }
+        } else { nextCityRef = null; pill.style.display = 'none'; }
+      }
     }
     // minimap
     mmTimer += dt;
@@ -7832,7 +7975,7 @@ EARTH.diveTo = (city, cb) => {
 };
 
 
-console.log('%cOPEN WORLD v2.22 — CITY WAYFINDING', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.23 — FOLLOW THE ROAD', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
