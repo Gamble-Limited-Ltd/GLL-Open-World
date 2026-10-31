@@ -2,10 +2,10 @@
 
 Shared rules for every agent and human on Open World. Read this first, every session. If something here is wrong, fix it in the same PR.
 
-## The project (v2.23 on the dev branch)
+## The project (v2.28 on the dev branch)
 - 3D Earth game by Kayne (`kayneheffelfinger-cyber`), who owns it and is the main dev. Gamble Limited Ltd. (James, `TheGeneral4757`) hosts it and helps with hosting, error fixing, repo cleanup and docs.
-- Plain HTML/JS, no build step, single-player, no accounts, no backend. State lives in the browser (`localStorage` key `openworld-v2`). Only network calls: OSM Overpass and Nominatim.
-- Files: `openworld.html` is the game. `game.html` must stay a byte-identical copy of it. `index.html` is the homepage, `home.html` a redirect stub, `version.json` the version feed (nothing reads it yet). `admin.html` and `supabase-setup.sql` are legacy (old multiplayer version) and should not be extended.
+- Plain HTML/JS, no build step, single-player, no accounts, no backend. State lives in the browser (`localStorage` key `openworld-v2`). Only network calls: OSM Overpass, Nominatim, and same-origin `version.json` (read on boot since v2.24 for the self-update check).
+- Files: `openworld.html` is the game. `game.html` must stay a byte-identical copy of it. `index.html` is the homepage, `home.html` a redirect stub, `version.json` the version feed (the game reads it on boot since v2.24 and offers a one-tap cache-busting update when the feed is newer than the running build). `admin.html` and `supabase-setup.sql` are legacy (old multiplayer version) and should not be extended.
 - License: PolyForm Noncommercial 1.0.0 (`LICENSE`). Play money only: no real-money features, ever.
 
 ## Branches and releases
@@ -22,8 +22,9 @@ Shared rules for every agent and human on Open World. Read this first, every ses
 - Do not copy code from other people's games.
 
 ## Ops (hosted game)
-- Check, restart, stop, start or update the hosted game: `gh workflow run ops.yml -R Gamble-Limited-Ltd/GLL-Open-World -f action=<status|restart|start|stop|sync>`, then `gh run watch`. `sync` pulls the latest `main` now (it also happens every 5 minutes by itself).
-- Only those five actions exist. There is no server access; ask James (`TheGeneral4757`) for anything else.
+- Check, restart, stop, start or update the hosted game: `gh workflow run ops.yml -R Gamble-Limited-Ltd/GLL-Open-World -f action=<status|restart|start|stop|sync>`. The server notices within about a minute and does it. `sync` pulls the latest `main` now (it also happens every 5 minutes by itself).
+- See the result: https://open-world.taps-holdings.org/__ops/status.json (container state, deployed commit, last action and who asked).
+- Only those five actions exist, and only for Kayne and James. There is no server access; ask James (`TheGeneral4757`) for anything else.
 
 ## Working together
 - Use GitHub issues and PRs. Assign whoever has to act (gear icon). Needs Kayne: assign `kayneheffelfinger-cyber`. Needs James: assign `TheGeneral4757`.
