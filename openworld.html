@@ -3,10 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.20</title>
+<title>Open World — v2.21</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.20 — DRY LAND: NOTHING generates in the water anymore —
+   OPEN WORLD v2.21 — REAL CITIES: a searched city is always the real
+   city (same streets as a globe dive — never an empty pasture when the
+   live map server is slow), and the map import waits longer for dense
+   downtowns. (v2.20 DRY LAND: nothing generates in the water —
    streets are clipped along their whole length (real OSM ways run
    hundreds of meters between vertices; a straight road used to jump
    clean across a bay), the asphalt pulls back from the waterline so it
@@ -511,7 +514,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.20 — the real Earth: nothing generates in the water — streets, buildings, props and plots stand on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.21 — the real Earth: every searched city is a real city, nothing generates in the water, streets, buildings, props and plots stand on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -547,7 +550,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.20';
+const GAME_VERSION = 'v2.21';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -1650,7 +1653,7 @@ out geom;`;
       const stagT = setTimeout(() => {
         for (let i = 1; i < ENDPOINTS.length; i++) { fired++; attempt(ENDPOINTS[i]); }
       }, 1800);
-      const capT = setTimeout(() => finish(null), 9500);
+      const capT = setTimeout(() => finish(null), 13000);   // v2.21: dense downtowns need the time
     });
   }
 
@@ -4942,6 +4945,7 @@ const CITY = (() => {
     get half() { return (cityRec && cityRec.half) || 720; },
     get rec() { return cityRec; },
     get anchor() { return cityAnchor; },
+    get buildingPolys() { return buildingPolys; },   // v2.21: world-space, water-filtered — the dense-core spawn reads this
   };
 })();
 
@@ -6946,7 +6950,37 @@ async function enterWorld(meta, opts = {}) {
       const r0 = (CITY.roads[0] || {}).pts;
       spot = (r0 && r0.length) ? { x: r0[0][0], z: r0[0][1] } : { x: 0, z: 0 };
     }
-    if (!spot) spot = CITY.randomRoadPoint(rnd);
+    if (!spot) {
+      // v2.21 REAL CITIES: land in the DENSE CORE — the street point
+      // nearest the rendered buildings' mass center. The anchor itself
+      // hugs the shoreline for coastal cities (snapped to dry land),
+      // and the v2.20 water clip leaves that fringe with streets but
+      // few buildings — spawning there reads as "there is no city".
+      // pointOnRoad's 26 m hash window can miss inside a block, so the
+      // polylines are scanned directly (vertices sit <=12 m apart).
+      const bl = CITY.buildingPolys || [];
+      let cx = anchor.x, cz = anchor.z;
+      if (bl.length) {
+        let sx = 0, sz = 0;
+        for (const b of bl) {
+          const p = b.poly || [];
+          if (!p.length) continue;
+          let bx = 0, bz = 0;
+          for (const v of p) { bx += v[0]; bz += v[1]; }
+          sx += bx / p.length; sz += bz / p.length;
+        }
+        cx = sx / bl.length; cz = sz / bl.length;
+      }
+      let best = null;
+      for (const rd of (CITY.roads || [])) {
+        const pts = rd.pts || [];
+        for (let i = 0; i < pts.length; i++) {
+          const d = Math.hypot(pts[i][0] - cx, pts[i][1] - cz);
+          if (!best || d < best.d) best = { x: pts[i][0], z: pts[i][1], d, rd };
+        }
+      }
+      spot = (best && best.d < 400) ? best : CITY.randomRoadPoint(rnd);
+    }
     // v2.19: never arrive standing in the water (an old save by a shore)
     if (spot && LANDGEO.ready && LANDGEO.isWaterWorld(spot.x, spot.z)) {
       const rp = CITY.randomRoadPoint(rnd);
@@ -7213,7 +7247,7 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
   a.onclick = e => {
     e.preventDefault();
     const k = a.dataset.abt;
-    openModal(k.toUpperCase(), `<p><b>Open World v2.20</b> runs entirely in your browser and saves locally.</p>
+    openModal(k.toUpperCase(), `<p><b>Open World v2.21</b> runs entirely in your browser and saves locally.</p>
       <p>No accounts, no tracking, no payments. Map data © OpenStreetMap contributors (ODbL).</p>
       <p>Support: keep playing and build something big.</p>`);
   };
@@ -7223,13 +7257,14 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.20 — DRY LAND', `
-    <p><b>Nothing generates in the water anymore.</b></p>
-    <div class="kv"><span class="k">WATERTIGHT STREETS</span><span class="v">Roads are clipped along their whole length — a straight street can no longer jump across a bay or inlet between two dry ends</span></div>
-    <div class="kv"><span class="k">ASPHALT ENDS ON LAND</span><span class="v">Streets pull back from the waterline by half a road width, so the pavement stops before the water starts</span></div>
-    <div class="kv"><span class="k">NOTHING AFLOAT</span><span class="v">Trees, lamps, hydrants, benches, cars and plots are placed on dry ground only — checked at every spot</span></div>
-    <div class="kv"><span class="k">ROADS AROUND THE LAKES</span><span class="v">Inter-city roads now route AROUND the great lakes — Chicago→Toronto walks the shore, not across Lake Michigan</span></div>
-    <div class="kv"><span class="k">REAL EARTH</span><span class="v">Oceans, coastlines, lakes and all 64 cities at their true spots</span></div>
+  openModal('Welcome to v2.21 — REAL CITIES', `
+    <p><b>A searched city is always the real city.</b></p>
+    <div class="kv"><span class="k">SEARCH ANY CITY</span><span class="v">Searching "Chicago", "Toronto", anywhere — lands you in the REAL city, same streets as diving in from orbit</span></div>
+    <div class="kv"><span class="k">NO MORE EMPTY SPOTS</span><span class="v">If the live map server is slow or busy, a city generates its full street grid instead of turning into empty countryside</span></div>
+    <div class="kv"><span class="k">PATIENT IMPORT</span><span class="v">Dense downtowns get up to 13 s (was 9.5) to import their real streets before the fallback</span></div>
+    <div class="kv"><span class="k">LAND DOWNTOWN</span><span class="v">Every city entry now puts you on a street in the dense core — never a random edge road where the fog hides the city</span></div>
+    <div class="kv"><span class="k">WALK THE WORLD</span><span class="v">Country roads still route around the lakes — follow Route 21 from Chicago to Toronto and the city streams in as you approach</span></div>
+    <div class="kv"><span class="k">DRY LAND</span><span class="v">Nothing generates in the water — streets, buildings, props and plots stand on dry land only</span></div>
     <div class="kv"><span class="k">SAME GAME</span><span class="v">Tap to move · build anywhere on dry land · real streets in every city</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
@@ -7266,7 +7301,7 @@ function recenterOnPlayer() {
 document.getElementById('b-locate').addEventListener('click', recenterOnPlayer);
 
 function openHelp() {
-  openModal('Open World v2.20 — Help', `
+  openModal('Open World v2.21 — Help', `
     <p><b>Controls</b></p>
     <div class="kv"><span class="k">MOVE</span><span class="v g">Tap / click anywhere — your tycoon walks there (the only way they move)</span></div>
     <div class="kv"><span class="k">LOOK AROUND</span><span class="v">Drag or WASD / arrows / joystick to glide the bird\u2019s-eye view across the map</span></div>
@@ -7316,6 +7351,19 @@ async function runSearch() {
       const f = found[+el.dataset.i];
       searchbox.classList.add('hidden');
       res.style.display = 'none';
+      // v2.21 REAL CITIES: a search that lands on a catalog city enters
+      // THAT city — the same key a globe dive uses, so its real streets
+      // import live (or come from cache, or generate procedurally).
+      // Before, a searched city kept a raw ll-key, and whenever the live
+      // map server was slow or rate-limited the spot degraded to an
+      // empty pasture — "there is no city". Cities can't degrade now;
+      // wild searches stay pastures by design.
+      const near = WORLD.nearestCityInfo(f.lon * DEG_M, -f.lat * DEG_M);
+      if (near && near.city && near.d < WORLD.BUILD_DIST) {
+        enterWorld({ key: near.city.key, name: near.city.name, lat: near.city.lat,
+          lon: near.city.lon, tier: near.city.tier, searched: true });
+        return;
+      }
       const key = 'll' + f.lat.toFixed(3) + '_' + f.lon.toFixed(3);
       enterWorld({ key, name: f.name, lat: f.lat, lon: f.lon, display: f.display, searched: true });
     };
@@ -7701,7 +7749,7 @@ EARTH.diveTo = (city, cb) => {
 };
 
 
-console.log('%cOPEN WORLD v2.20 — DRY LAND', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.21 — REAL CITIES', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
