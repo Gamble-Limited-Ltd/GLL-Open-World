@@ -1,8 +1,8 @@
 # Open World
 
-A single-player, in-browser tycoon game set on the real Earth. Current version: **v2.27** ("True Scale").
+A single-player, in-browser tycoon game set on the real Earth. Current version: **v2.28** ("Connected Roads").
 
-Search for any real city and the game builds it from OpenStreetMap data: real streets, buildings, greens and plots, all standing on dry land. Since v2.27 the world is 1:1 with the actual Earth — 111,320 meters per degree, 40,007 km around — with real distances between cities, a real horizon, and whole regions visible when you zoom out. Every one of the 64 catalog cities stands at its real spot as a metro-scale skyline before you ever walk there — walk in and it upgrades to the fully detailed downtown.
+Search for any real city and the game builds it from OpenStreetMap data: real streets, buildings, greens and plots, all standing on dry land. Since v2.27 the world is 1:1 with the actual Earth — 111,320 meters per degree, 40,007 km around — with real distances between cities, a real horizon, and whole regions visible when you zoom out. Every one of the 64 catalog cities stands at its real spot as a metro-scale skyline before you ever walk there — walk in and it upgrades to the fully detailed downtown, and every inter-city road runs all the way into the city it serves.
 
 ## Play
 
