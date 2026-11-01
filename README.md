@@ -1,6 +1,6 @@
 # Open World
 
-A single-player, in-browser tycoon game set on the real Earth. Current version: **v2.29** ("Real Junctions").
+A single-player, in-browser tycoon game set on the real Earth. Current version: **v2.30** ("Stable Ground").
 
 Search for any real city and the game builds it from OpenStreetMap data: real streets, buildings, greens and plots, all standing on dry land. Since v2.27 the world is 1:1 with the actual Earth — 111,320 meters per degree, 40,007 km around — with real distances between cities, a real horizon, and whole regions visible when you zoom out. Every one of the 64 catalog cities stands at its real spot as a metro-scale skyline before you ever walk there — walk in and it upgrades to the fully detailed downtown, and every inter-city road ends at a real junction with the first street of the city it serves (the skyline's sprawl streets while the city is distant, the imported true streets once you arrive).
 
@@ -45,6 +45,7 @@ The loop, as described by the in-game starter guide:
 - Live calls to OpenStreetMap Overpass (map data) and Nominatim (city search); if Overpass is unreachable, a built-in generator lays out the city instead. Map data is (c) OpenStreetMap contributors (ODbL).
 - True-scale Earth (v2.27): one degree is really 111 km and the world spans 40,007 km. World coordinates reach ±20 million meters — past float32 vertex precision — so the static planet (coasts, lakes, roads, bridges) is built as 8° world tiles and city/chunk-local frames, each positioned in double precision. Near every coast the land/water gate answers from the vector coastlines the player actually sees (the 0.25° land raster only settles open ocean and deep interior), and roads that cross vector water become causeways with guard pylons.
 - The world is pre-built (v2.26): all 64 cities stand in the world from the moment you enter — distant skylines use the city's true footprint spread to metro scale (true building sizes, no boot-time network calls) and are upgraded to full detail when you arrive.
+- Depth-stable ground (v2.30): every world tile's land is a grid of small polygons and every city sits on an exact fine land pad, so at 1:1 scale the city floors are solid (no grass z-fight bleeding through) and the inter-city roads render all the way from each city's streets into the countryside.
 - Roads meet the streets (v2.29): each land route keeps a re-trimmable final stretch before every city, so the highway always ends at a junction with the streets that are actually standing — the skyline's sprawl streets from afar, the imported city's true streets up close, ramping down to street level to merge with the real asphalt.
 - On boot the game reads same-origin `version.json` and offers the one-tap self-update described above. Saves from earlier versions migrate to the true-scale world: plots keep their spot beside their city, everything else keeps its lat/lon.
 - No accounts. Your world is saved in your browser's localStorage under the key `openworld-v2`, so it stays on that browser and device.
