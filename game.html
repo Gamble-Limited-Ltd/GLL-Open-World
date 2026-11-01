@@ -3,9 +3,30 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.33</title>
+<title>Open World — v2.34</title>
 <style>
 /* ==================================================================
+   OPEN WORLD v2.34 — CLEAR DAY: the user's verdict on v2.33 was "why
+   is there grass in Lake Michigan, and get rid of the haze — it just
+   makes the game look worse". Both were real. GRASS IN THE LAKES:
+   Sutherland–Hodgman clips each lake ring to its 8° tile, but a
+   concave shoreline (Green Bay, the south basin) makes the clipped
+   polygon self-intersect and ShapeGeometry silently drops whole
+   stretches of it — a 102-point raycast census measured 26% of Lake
+   Michigan with NO lake surface at all, raw grass at y=0 showing
+   through (and the old whole-cell fallback spilled water across real
+   shoreline wherever it did fire). Lake surfaces now get the same
+   treatment as the land: exact fragment where the clip holds, PLUS an
+   8×8 all-wet subcell top-up (6.9 km — an offline audit of every
+   all-wet subcell found zero land inside; the 55 km whole-cell fill
+   WOULD have watered the Door Peninsula) row-merged into runs, 2 cm
+   under the fragment plane. THE HAZE IS DEAD FOR GOOD: the wide
+   60→128 km gradient still milked the far half of every zoomed-out
+   frame; the fog now lives ONLY in the last 7.5 km before the 130 km
+   far-plane clip (121.9→129.4 km, constant at every zoom) — just
+   enough that the clip edge can't shard against the sky dome.
+   Everything else rides along: true 1:1 Earth, the pre-built 64-city
+   world, junctions, stable ground.
    OPEN WORLD v2.33 — CRISP RIFT: the user's verdict on v2.32 was "the
    world looks terrible" — and a frame census agreed: 60% of a
    zoomed-out frame was literally the fog color. Capital Rift's own
@@ -616,7 +637,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.33 — the real Earth at 1:1 in the Capital Rift look: crisp haze-free views at every zoom, high-contrast mottled olive grass, teal seas, azure sky, dark distant city masses; every searched city is a real city, nothing generates in the water, streets, buildings, props, plots and roads stand on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.34 — the real Earth at 1:1 in the Capital Rift look: great lakes render as true water (no grass in Lake Michigan), no haze anywhere at any zoom, high-contrast mottled olive grass, teal seas, azure sky, dark distant city masses; every searched city is a real city, nothing generates in the water, streets, buildings, props, plots and roads stand on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -652,7 +673,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.33';
+const GAME_VERSION = 'v2.34';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -2808,11 +2829,46 @@ const WORLD = (() => {
           const c0 = lon0 + (lon1 - lon0) * i / LG_N, c1 = lon0 + (lon1 - lon0) * (i + 1) / LG_N;
           const d0 = lat0 + (lat1 - lat0) * j / LG_N, d1 = lat0 + (lat1 - lat0) * (j + 1) / LG_N;
           if (c1 < bx0 || c0 > bx1 || d1 < bz0 || d0 > bz1) continue;
-          const cpoly = clipRing(poly, c0, c1, d0, d1);
-          if (cpoly.length >= 3) { landTri(t, cpoly, LAKE_Y, lbuf, [1, 1, 1]); continue; }
-          // v2.33: lake interiors fill too — a great lake's middle cells
-          // never touch the shoreline ring and used to fall through to land
-                   if (LANDGEO.isLakeLL((d0 + d1) / 2, (c0 + c1) / 2)) fillCell(t, c0, c1, d0, d1, LAKE_Y, lbuf, [1, 1, 1]);
+          // v2.34 LAKE HOLE FIX — "why is there grass in Lake Michigan":
+          // Sutherland–Hodgman clips the ring to the tile, but a CONCAVE
+          // shoreline (Green Bay, the south basin) makes that polygon
+          // self-intersect, and ShapeGeometry then silently drops whole
+          // stretches — a 102-point raycast census measured 26% of Lake
+          // Michigan with NO lake surface, raw grass at y=0 showing
+          // through. The old whole-cell fallback only fired when the
+          // fragment failed AND the center was wet, so it both holed the
+          // lake AND spilled water across real shoreline. New scheme,
+          // mirroring the land pass: exact fragment where the clip holds
+          // PLUS an 8×8 all-wet subcell top-up (6.9 km — an offline audit
+          // of every all-wet subcell found ZERO land inside, while the
+          // 55 km whole-cell fill WOULD water the Door Peninsula),
+          // row-merged into runs so an interior cell is 8 quads, not 64,
+          // 2 cm under the fragment plane so the fragment wins overlaps.
+          const wetC = (la, lo) => LANDGEO.isLakeLL(la, lo);
+          const cellWet = wetC((d0 + d1) / 2, (c0 + c1) / 2) || wetC(d0, c0) ||
+            wetC(d0, c1) || wetC(d1, c0) || wetC(d1, c1);
+          if (cellWet) {
+            const cpoly = clipRing(poly, c0, c1, d0, d1);
+            if (cpoly.length >= 3) landTri(t, cpoly, LAKE_Y, lbuf, [1, 1, 1]);
+            for (let sj = 0; sj < 8; sj++) {
+              const sd0 = d0 + (d1 - d0) * sj / 8, sd1 = d0 + (d1 - d0) * (sj + 1) / 8;
+              let run = -1;
+              for (let si = 0; si <= 8; si++) {
+                let wet = false;
+                if (si < 8) {
+                  const sc0 = c0 + (c1 - c0) * si / 8, sc1 = c0 + (c1 - c0) * (si + 1) / 8;
+                  wet = wetC((sd0 + sd1) / 2, (sc0 + sc1) / 2) && wetC(sd0, sc0) &&
+                    wetC(sd0, sc1) && wetC(sd1, sc0) && wetC(sd1, sc1);
+                  if (wet && run < 0) run = si;
+                }
+                if (!wet && run >= 0) {
+                  fillCell(t, c0 + (c1 - c0) * run / 8, c0 + (c1 - c0) * si / 8,
+                    sd0, sd1, LAKE_Y - .02, lbuf, [1, 1, 1]);
+                  run = -1;
+                }
+              }
+            }
+          }
         }
         if (lbuf.pos.length) {
           const g = new THREE.BufferGeometry();
@@ -8477,12 +8533,17 @@ function skyTexture() {
 
 function buildWorldScene() {
   worldScene = new THREE.Scene();
-  // v2.33 CRISP RIFT: haze-free CR daylight — a wide, soft distance-edge
-  // fog (60→128 km) hides nothing in gameplay range and melts the 130 km
-  // far-plane clip into the sky with no visible band; it opens further
-  // with altitude and stays soft at every zoom.
+  // v2.34 NO HAZE — the user's verdict on v2.33's zoomed-out look: the
+  // fog "just makes the game look worse". The wide 60→128 km gradient
+  // still washed the far half of every zoomed-out frame into pale
+  // azure. Capital Rift is crisp to its hard horizon at EVERY zoom, so
+  // the fog now lives ONLY in the last 7.5 km before the 130 km
+  // far-plane clip (121.9→129.4 km) — just enough that the clip edge
+  // can't shard against the sky dome, and nothing else. No altitude
+  // opening, no gradient: street level and the 34 km overview are
+  // identical, crisp end to end.
   worldScene.background = new THREE.Color(0xbcd4e2);
-  worldScene.fog = new THREE.Fog(0xbcd4e2, 60000, 128000);
+  worldScene.fog = new THREE.Fog(0xbcd4e2, 121900, 129400);
   // gradient sky dome (azure zenith → pale-azure horizon), rides with the camera
   skyDome = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 14),
     new THREE.MeshBasicMaterial({ map: skyTexture(), side: THREE.BackSide, fog: false, depthWrite: false }));
@@ -8925,13 +8986,11 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.33 — CRISP RIFT', `
-    <p><b>The haze is gone — the world reads crisp and vivid at every zoom, the way capitalrift.com actually looks.</b></p>
-    <div class="kv"><span class="k">NO MORE MILKY FOG</span><span class="v">Capital Rift has no haze — their world is saturated to the horizon. The pale fog that washed out 60% of every zoomed-out view now lives only past 45 km (and vanishes entirely when you zoom out) — cities, coasts and roads stay crisp end to end</span></div>
-    <div class="kv"><span class="k">GRASS THAT READS AT DISTANCE</span><span class="v">High-contrast mottled olive grass (their exact green family) in three scales — organic blotches, patches, grain — plus 3 km green tint drift across the land so it never reads as a flat colored slab</span></div>
-    <div class="kv"><span class="k">CRISP HORIZON</span><span class="v">An azure sky over a clean teal-to-sky horizon line; the sea blends into the sky with no seam, exactly like their shots</span></div>
-    <div class="kv"><span class="k">TWO REAL BUGS FIXED</span><span class="v">794 world land tiles shipped with NaN geometry and rendered as invisible holes in the planet — every triangle is now NaN-guarded; and a stuck loading veil could freeze the view forever — it now always clears itself</span></div>
-    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">True 1:1 scale, the pre-built 64-city world, real street junctions and stable ground all ride along untouched</span></div>
+  openModal('Welcome to v2.34 — CLEAR DAY', `
+    <p><b>The haze is gone for good, and the great lakes finally render as true water — no more grass in Lake Michigan.</b></p>
+    <div class="kv"><span class="k">NO HAZE, AT ANY ZOOM</span><span class="v">The last fog gradient still milked the far half of every zoomed-out view. Now the air is clear all the way to the edge of the world view — crisp and saturated like capitalrift.com at every distance</span></div>
+    <div class="kv"><span class="k">LAKES ARE LAKES</span><span class="v">A clipping bug dropped 26% of Lake Michigan's water surface — grass showed clear across the lake. Every great lake now renders solid teal water, hole-free, with its exact shoreline</span></div>
+    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">True 1:1 Earth, the pre-built 64-city world, real street junctions, stable ground and the Capital Rift look all ride along untouched</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -9356,20 +9415,12 @@ function loop() {
     // zoom glides toward its target — no snapping
     camCtl.dist += (camCtl.distT - camCtl.dist) * Math.min(1, dt * 9);
     camCtl.dist = THREE.MathUtils.clamp(camCtl.dist, 45, ZOOM_MAX);
-    // v2.33 CRISP RIFT: the fog lives at the distance edge only — a WIDE
-    // soft gradient (60→128 km at street level) so the 130 km far-plane
-    // clip blends into the dome with no visible band. It opens with
-    // altitude and always keeps ≥30 km of softness, so even the max
-    // zoom-out's far corners get a gentle atmospheric fade instead of the
-    // hard "white shards" a narrow fog band produced — while every
-    // gameplay view (streets, city, mid zoom) stays haze-free and crisp.
+    // v2.34 NO HAZE: the fog is a constant edge-band at every zoom —
+    // see buildWorldScene. (v2.33's altitude-opening 60→128 km gradient
+    // hazed the far half of every zoomed-out view; removed.)
     if (worldScene.fog) {
-      const z = Math.max(0, camCtl.dist - 480);
-      worldScene.fog.near = 60000 + z * 2.2;
-      worldScene.fog.far = Math.min(128000 + z * 2.6, 128700);
-      if (worldScene.fog.near > worldScene.fog.far - 30000) {
-        worldScene.fog.near = worldScene.fog.far - 30000;   // keep the gradient soft at every zoom
-      }
+      worldScene.fog.near = 121900;
+      worldScene.fog.far = 129400;
     }
     const ce = Math.cos(camCtl.el), se = Math.sin(camCtl.el);
     camera.position.set(
@@ -9500,7 +9551,7 @@ EARTH.diveTo = (city, cb) => {
 };
 
 
-console.log('%cOPEN WORLD v2.33 — CRISP RIFT', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.34 — CLEAR DAY', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
