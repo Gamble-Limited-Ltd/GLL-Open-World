@@ -3,25 +3,34 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.29</title>
+<title>Open World — v2.30</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.29 — REAL JUNCTIONS: inter-city roads now END at the
-   first street of the city they serve — a true T-junction — instead
-   of plowing through the grid to the anchor (the v2.28 "connection"
-   ran the ribbon over the city streets: full-city asphalt sits at
-   y .030–.038, under the road ribbon's .095, so the highway read as a
-   dark stripe crossing the town). Each land route keeps a
-   re-trimmable TAIL — the last ~10.5 km before every city are NOT
-   baked into the world tiles but live in a per-end group that is
-   re-emitted whenever what stands at the city changes: while the
-   distant SKYLINE stands the road ends at the first ×10 metro-sprawl
-   street (tucked under its asphalt); when the full city builds the
-   road re-trims to the first TRUE street of the imported city,
-   ramping down to street level so the junction merges with the real
-   asphalt; leaving hands it back to the skyline layout. Junctions
-   are found by scanning the route at 8 m steps against a spatial
-   hash of the standing street layout, then refined to the meter.
+   OPEN WORLD v2.30 — STABLE GROUND: the land shield of every 8° world
+   tile is now a 16×16 grid of cell polygons instead of one giant
+   ShapeGeometry. A full-tile quad is two 890 km triangles, and the
+   GPU's perspective interpolation of the logarithmic-depth varying
+   across a triangle that size is only good to a meter or two — every
+   centimeter-scale layer riding the shield lost whole patches to that
+   noise: grass bled through the 12 mm city plates in green z-fight
+   stripes (the "glitchy floor under the cities"), and the inter-city
+   road tails vanished for 10 km past every town ("I can't see the
+   roads connecting the cities") — the v2.29 tails also carried a
+   frame bug: emitTail pushed WORLD-coordinate vertices into a group
+   translated to the city anchor, displacing every tail ~10.8 million
+   meters from its road. Fixed: tails emit ANCHOR-LOCAL vertices
+   (matching their group frame); the land grid cuts the depth error to
+   ~4 cm (roads at 9.5 cm clear it everywhere); the ±12 km around
+   every city rides a FINE city pad — 1.5 km cells at exact y=0 in the
+   city-anchor frame — which the 12 mm plate, the 3–4 cm streets and
+   the road junctions sit on, while the coarse cells under a pad step
+   down to −10 cm so nothing can poke through it. Lake surfaces are
+   grid-clipped the same way (and lifted to .075, beaches to .07–.083,
+   rims to .09 — all clear of the residual grid error, all still under
+   the 9.5 cm road). Grass tint patches no longer spawn under city
+   plates. v2.29 REAL JUNCTIONS kept whole: every land route still
+   ends at the first street of the city it serves, near/far re-trim on
+   enter/leave, junction arcs and the 25 m street-level taper.
    v2.28 CONNECTED ROADS kept: route ends snap to each city's CURRENT
    (shoreline-snapped) anchor, the trim cuts at the exact along-route
    arc length, and the ribbon stack rides above every flat ground
@@ -560,7 +569,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.29 — the real Earth: every searched city is a real city, nothing generates in the water, streets, buildings, props, plots and roads stand on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.30 — the real Earth: every searched city is a real city, nothing generates in the water, streets, buildings, props, plots and roads stand on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -596,7 +605,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.29';
+const GAME_VERSION = 'v2.30';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -2136,9 +2145,11 @@ const WORLD = (() => {
   // corner-diagonal ~10.2 km). Bridges keep their near-full span (a
   // trimmed deck strands in open water — v2.22).
   const TAIL_CAP = 10500;
-  // v2.28: the ribbon stack sits ABOVE every flat ground layer it can
-  // meet at true scale (land shield y 0, city plate .012, beaches
-  // .05–.063, lakes .06, lake rims .068, skyline plates .05) and BELOW
+  // v2.30: the ribbon stack sits ABOVE every flat ground layer it can
+  // meet at true scale — the land shield (y 0, ±4 cm grid depth error;
+  // −.10 under the fine city pads), the city plate (.012, on the exact
+  // pad), beaches (.07–.083), lakes (.075), lake rims (.09) and the
+  // skyline plates (.05) — and BELOW
   // the sidewalk stack (.16), vendor plots (.105) and buildings.
   const ROAD_Y = .095, SHOL_Y = .09, DASH_Y = .098;
   // v2.29: a junction tail's last meters ramp down onto the city's
@@ -2428,18 +2439,56 @@ const WORLD = (() => {
     ocean.position.set(cx, -1.35, cz);
     group.add(ocean);
     // ---- the land: coastlines as flat shields at y = 0 ------------------
-    // v2.27: every ring is clipped to each 8° tile it crosses and
-    // triangulated in tile-local meters. polygonOffset still pushes the
-    // land a hair deeper so overlays built on it win the depth test.
+    // v2.30 STABLE GROUND: the land of each tile is emitted as a 16×16 grid
+    // of CELL polygons, not one ShapeGeometry per tile. A full-tile quad is
+    // two 890 km triangles, and the GPU's perspective interpolation of the
+    // logarithmic-depth varying across a triangle that size is only good to
+    // a meter or two — every centimeter-scale layer riding the shield (the
+    // 12 mm city plate, the 3–4 cm street asphalt, the 9.5 cm inter-city
+    // road tails) lost whole patches to that noise: grass bled through
+    // city floors in green z-fight stripes and the roads vanished for 10 km
+    // past every town. 55 km cells cut the error to ~4 cm; the ±12 km
+    // around every city rides the EXACT fine city pad (see buildCityPads),
+    // and the coarse cells touching a city zone step down to −10 cm so
+    // nothing under the pad can poke through it.
     const tex = grassTexture();
     tex.repeat.set(1 / 46, 1 / 46);
     const landMat = new THREE.MeshLambertMaterial({
       map: tex, side: THREE.DoubleSide,
       polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
     });
+    // triangulate a [lon,lat] polygon into tile-local flat-up triangles
+    // appended to buf {pos,norm,uv} at height y (exact ShapeGeometry-equivalent)
+    const landTri = (t, poly, y, buf) => {
+      if (poly.length < 3) return;
+      const pts = poly.map(p => [p[0] * DEG_M - t.ox, p[1] * DEG_M + t.oz]);
+      const shape = new THREE.Shape();
+      for (let i = 0; i < pts.length; i++) {
+        if (i) shape.lineTo(pts[i][0], pts[i][1]); else shape.moveTo(pts[i][0], pts[i][1]);
+      }
+      const g = new THREE.ShapeGeometry(shape);
+      const pa = g.attributes.position, ua = g.attributes.uv;
+      for (let i = 0; i < pa.count; i++) {
+        // shape (x,y,0) -> tile-local world (x, y=height, -y=z)
+        buf.pos.push(pa.getX(i), y, -pa.getY(i));
+        buf.norm.push(0, 1, 0);
+        buf.uv.push(ua.getX(i), ua.getY(i));
+      }
+      g.dispose();
+    };
+    // does this cell rect (lon/lat) come within a city's ±12 km fine pad?
+    // (half a 55 km cell of slack — the drop must cover the pad's edge)
+    const nearCityZone = (cLon0, cLat0, cLon1, cLat1) => {
+      const mx = (cLon0 + cLon1) / 2 * DEG_M, mz = -(cLat0 + cLat1) / 2 * DEG_M;
+      for (const c of CITIES) {
+        if (Math.abs(mx - c.wx) < 12000 + 28000 && Math.abs(mz - c.wz) < 12000 + 28000) return true;
+      }
+      return false;
+    };
     const cTop = col(0xd9c48f), cBot = col(0x86744e);
     const SEA = -3.4;
     const cBeach = col(0xe6d5a8), cShelf = col(0x5fb8d4);
+    const LG_N = 16;
     for (const ring of LANDGEO.rings) {
       if (ring.length < 4) continue;
       for (const [tx, tz] of ringTiles(ring)) {
@@ -2448,16 +2497,30 @@ const WORLD = (() => {
         const lat1 = 90 - tz * TILE_DEG, lat0 = lat1 - TILE_DEG;
         const poly = clipRing(ring, lon0, lon1, lat0, lat1);
         if (poly.length < 3) continue;
-        const shape = new THREE.Shape();
-        for (let i = 0; i < poly.length; i++) {
-          // shape (x, y) -> tile-local world (x, -y=z): x = lon-ox, z = lat+oz
-          const sx = poly[i][0] * DEG_M - t.ox, sy = poly[i][1] * DEG_M + t.oz;
-          if (i) shape.lineTo(sx, sy); else shape.moveTo(sx, sy);
+        // polygon bbox for the cell reject test
+        let bx0 = 1e9, bx1 = -1e9, bz0 = 1e9, bz1 = -1e9;
+        for (const p of poly) {
+          bx0 = Math.min(bx0, p[0]); bx1 = Math.max(bx1, p[0]);
+          bz0 = Math.min(bz0, p[1]); bz1 = Math.max(bz1, p[1]);
         }
-        const m = new THREE.Mesh(new THREE.ShapeGeometry(shape), landMat);
-        m.rotation.x = -Math.PI / 2;        // shape (x,y) -> world (x, -y=z)
-        m.receiveShadow = true;
-        t.g.add(m);
+        const buf = { pos: [], norm: [], uv: [] };
+        for (let i = 0; i < LG_N; i++) for (let j = 0; j < LG_N; j++) {
+          const c0 = lon0 + (lon1 - lon0) * i / LG_N, c1 = lon0 + (lon1 - lon0) * (i + 1) / LG_N;
+          const d0 = lat0 + (lat1 - lat0) * j / LG_N, d1 = lat0 + (lat1 - lat0) * (j + 1) / LG_N;
+          if (c1 < bx0 || c0 > bx1 || d1 < bz0 || d0 > bz1) continue;
+          const cpoly = clipRing(poly, c0, c1, d0, d1);
+          if (cpoly.length < 3) continue;
+          landTri(t, cpoly, nearCityZone(c0, d0, c1, d1) ? -.10 : 0, buf);
+        }
+        if (buf.pos.length) {
+          const g = new THREE.BufferGeometry();
+          g.setAttribute('position', new THREE.Float32BufferAttribute(buf.pos, 3));
+          g.setAttribute('normal', new THREE.Float32BufferAttribute(buf.norm, 3));
+          g.setAttribute('uv', new THREE.Float32BufferAttribute(buf.uv, 2));
+          const m = new THREE.Mesh(g, landMat);
+          m.receiveShadow = true;
+          t.g.add(m);
+        }
       }
       // world-space ring segments. All Natural Earth outer rings wind the
       // same way (positive signed area in world space): the interior lies
@@ -2485,7 +2548,7 @@ const WORLD = (() => {
         // segment seaward normal = right perpendicular of travel
         const dx = bx - ax, dz = bz - az, dl = seg;
         const snx = dz / dl, snz = -dx / dl;
-        const yb = .05 + (i % 2) * .013, ys = -1.30 + (i % 2) * .009;
+        const yb = .07 + (i % 2) * .013, ys = -1.30 + (i % 2) * .009;   // v2.30: beaches clear the coarse-grid depth error
         // beach: 26 m inland .. 14 m into the sea (straddles the waterline)
         const A = [lx - snx * 26, lz - snz * 26], B = [lbx - snx * 26, lbz - snz * 26];
         const Cc = [lbx + snx * 14, lbz + snz * 14], D = [lx + snx * 14, lz + snz * 14];
@@ -2509,6 +2572,7 @@ const WORLD = (() => {
     // edge, a hair above the surface — so a city beside a lake reads as a
     // waterfront, not as a slab over water.
     const cRim = col(0xd8cfa6);
+    const LAKE_Y = .075;   // v2.30: clears the ±4 cm coarse-grid depth error
     for (const lk of LANDGEO.lakes) {
       if (lk.ring.length < 4) continue;
       for (const [tx, tz] of ringTiles(lk.ring)) {
@@ -2517,15 +2581,31 @@ const WORLD = (() => {
         const lat1 = 90 - tz * TILE_DEG, lat0 = lat1 - TILE_DEG;
         const poly = clipRing(lk.ring, lon0, lon1, lat0, lat1);
         if (poly.length < 3) continue;
-        const shape = new THREE.Shape();
-        for (let i = 0; i < poly.length; i++) {
-          const sx = poly[i][0] * DEG_M - t.ox, sy = poly[i][1] * DEG_M + t.oz;
-          if (i) shape.lineTo(sx, sy); else shape.moveTo(sx, sy);
+        // v2.30: lake surfaces grid-clipped like the land — one big lake
+        // triangle per tile carried the same meter-scale depth error
+        let bx0 = 1e9, bx1 = -1e9, bz0 = 1e9, bz1 = -1e9;
+        for (const p of poly) {
+          bx0 = Math.min(bx0, p[0]); bx1 = Math.max(bx1, p[0]);
+          bz0 = Math.min(bz0, p[1]); bz1 = Math.max(bz1, p[1]);
         }
-        const m = new THREE.Mesh(new THREE.ShapeGeometry(shape), lakeMat);
-        m.rotation.x = -Math.PI / 2;
-        m.position.y = .06;
-        t.g.add(m);
+        const lbuf = { pos: [], norm: [], uv: [] };
+        for (let i = 0; i < LG_N; i++) for (let j = 0; j < LG_N; j++) {
+          const c0 = lon0 + (lon1 - lon0) * i / LG_N, c1 = lon0 + (lon1 - lon0) * (i + 1) / LG_N;
+          const d0 = lat0 + (lat1 - lat0) * j / LG_N, d1 = lat0 + (lat1 - lat0) * (j + 1) / LG_N;
+          if (c1 < bx0 || c0 > bx1 || d1 < bz0 || d0 > bz1) continue;
+          const cpoly = clipRing(poly, c0, c1, d0, d1);
+          if (cpoly.length < 3) continue;
+          landTri(t, cpoly, LAKE_Y, lbuf);
+        }
+        if (lbuf.pos.length) {
+          const g = new THREE.BufferGeometry();
+          g.setAttribute('position', new THREE.Float32BufferAttribute(lbuf.pos, 3));
+          g.setAttribute('normal', new THREE.Float32BufferAttribute(lbuf.norm, 3));
+          g.setAttribute('uv', new THREE.Float32BufferAttribute(lbuf.uv, 2));
+          const m = new THREE.Mesh(g, lakeMat);
+          m.receiveShadow = true;
+          t.g.add(m);
+        }
       }
       // ring winding: interior (the water) lies LEFT of travel for
       // positive signed area — all Natural Earth rings but the Caspian.
@@ -2546,7 +2626,41 @@ const WORLD = (() => {
         const wx = -snx * sgn, wz = -snz * sgn;         // toward the water
         const A = [lx, lz], B = [lbx, lbz];
         const C = [lbx + wx * 11, lbz + wz * 11], D = [lx + wx * 11, lz + wz * 11];
-        for (const p of [A, B, C, A, C, D]) { t.rm.pos.push(p[0], .068, p[1]); t.rm.col.push(cRim[0], cRim[1], cRim[2]); }
+        for (const p of [A, B, C, A, C, D]) { t.rm.pos.push(p[0], .09, p[1]); t.rm.col.push(cRim[0], cRim[1], cRim[2]); }
+      }
+    }
+
+    // ---- v2.30: the fine city pads ---------------------------------------
+    // ±12 km of 1.5 km land cells at EXACT y=0 in each city's anchor-local
+    // frame (the same float32-safe frame as the city and the road tails).
+    // The coarse 55 km grid still carries ~4 cm of depth error — plenty
+    // for roads at 9.5 cm, hopeless for the 12 mm city plate — so the
+    // plate, the streets and the road junctions ride this pad instead,
+    // and the coarse cells under it are dropped to −10 cm (nearCityZone).
+    if (LANDGEO.ready) {
+      for (const c of CITIES) {
+        const R = 12000, N = 16, T = 2 * R / N;
+        const pos = [], norm = [], uv = [];
+        for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+          const x0 = -R + i * T, z0 = -R + j * T, x1 = x0 + T, z1 = z0 + T;
+          // a cell is laid only where it is solid ground everywhere
+          if (LANDGEO.isWaterWorld(c.wx + x0, c.wz + z0) || LANDGEO.isWaterWorld(c.wx + x1, c.wz + z0) ||
+              LANDGEO.isWaterWorld(c.wx + x0, c.wz + z1) || LANDGEO.isWaterWorld(c.wx + x1, c.wz + z1) ||
+              LANDGEO.isWaterWorld(c.wx + (x0 + x1) / 2, c.wz + (z0 + z1) / 2)) continue;
+          const u0 = x0, u1 = x1, v0 = -z1, v1 = -z0;
+          pos.push(x0, 0, z1, x1, 0, z1, x1, 0, z0, x0, 0, z1, x1, 0, z0, x0, 0, z0);
+          norm.push(0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0);
+          uv.push(u0, v0, u1, v0, u1, v1, u0, v0, u1, v1, u0, v1);
+        }
+        if (!pos.length) continue;
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        g.setAttribute('normal', new THREE.Float32BufferAttribute(norm, 3));
+        g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+        const m = new THREE.Mesh(g, landMat);
+        m.position.set(c.wx, 0, c.wz);   // city-anchor-local: exact depth
+        m.receiveShadow = true;
+        group.add(m);
       }
     }
   }
@@ -2819,8 +2933,8 @@ const WORLD = (() => {
     // v2.28 CONNECTED ROADS: the ribbon stack sits ABOVE every flat
     // ground layer it can meet at true scale — the land shield (y 0,
     // whose polygonOffset is a no-op under the logarithmic depth
-    // buffer), the city ground plate (.012), beaches (.05–.063), lakes
-    // (.06) and lake rims (.068), the skyline plates (.05) — so the
+    // buffer), the city ground plate (.012), beaches (.07–.083), lakes
+    // (.075) and lake rims (.09), the skyline plates (.05) — so the
     // asphalt can never z-fight under them (7–19 mm gaps lose to
     // float32 depth noise at world scale). It stays BELOW the sidewalk
     // stack (.16), vendor plots (.105) and every 3D building, so town
@@ -2914,6 +3028,14 @@ const WORLD = (() => {
     raw.push(b0.p);
     const pts = sJun <= sCap ? raw : raw.slice().reverse();
     if (pts.length < 2) return;
+    // v2.30 FRAME FIX: the tail group is translated to the city anchor,
+    // so the vertices must be ANCHOR-LOCAL. v2.29 pushed the WORLD-
+    // coordinate polyline into the translated group — every tail rendered
+    // a full anchor (~10.8 million meters at Chicago) away from its road:
+    // mesh:true, junctions measured right, and NO road visible within
+    // 10.5 km of any city (the baked tile span starts at the cap, beyond
+    // the fog). Replaced references, never mutated: ti.full stays world.
+    for (let i = 0; i < pts.length; i++) pts[i] = [pts[i][0] - city.wx, pts[i][1] - city.wz];
     const cumT = [0];
     for (let i = 1; i < pts.length; i++) cumT.push(cumT[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
     const road = { pos: [], norm: [], uv: [], col: [] };
@@ -3103,6 +3225,12 @@ const WORLD = (() => {
       const w = 90 + rnd() * 120, d = 70 + rnd() * 110;
       const px = x0 + 30 + rnd() * (CH - 60), pz = z0 + 30 + rnd() * (CH - 60);
       if (LANDGEO.ready && LANDGEO.isWaterWorld(px, pz)) continue;
+      // v2.30: a patch never sits under a city's ground plate. The plate
+      // (.012) cleared the patch (.0095) by 2.5 mm — the logarithmic depth
+      // buffer cannot hold that beyond a few hundred meters at 1:1, so the
+      // green bled through the off-white plate in z-fight stripes (the
+      // "glitchy floor under the cities"). 170 m covers the patch rect.
+      if (distToCity(px, pz).d < CITY_R + 170) continue;
       const g = new THREE.PlaneGeometry(w, d); g.rotateX(-Math.PI / 2);
       // stay CLOSE to the base green — subtle mottle, not bold color blocks
       const tint = rnd() < .34 ? col(0x54934b) : rnd() < .5 ? col(0x5b9a4e) : col(0x4c8a4a);
