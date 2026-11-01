@@ -3,9 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.31</title>
+<title>Open World — v2.32</title>
 <style>
 /* ==================================================================
+   OPEN WORLD v2.32 — GREEN RIFT: the user's verdict on v2.31 was "there
+   is no grass or water like in the capitalrift.com game" — and the CR
+   reference's own world shots agree: their land IS mid olive-green
+   grass (#6e8b4c..#708e4c pixel truth, flat low-poly) and their water
+   IS readable teal-blue (bright on the globe, blue-gray in world
+   shots, pale-aqua shallow glow along every coast). So the taupe land
+   goes back to green (#71904c + light/dark green patches for far-zoom
+   variation), the slate sea becomes teal (#357f9e) with pale-sand
+   fringes and light-aqua shallows, the sky brightens to soft azure
+   (#7cb0d0) over a pale blue-white haze (#ccd9dd — fog and dome still
+   share it), the light warms up, and the street-level fog WIDENS back
+   to 420/2100 m so mid-distance detail stays readable. Far-zoom roads:
+   light-tan shoulders + chunkier cream dashes (0.42 × 4.8 m) sandwich
+   the dark asphalt — CR's distance-legibility trick. 1:1 Earth, cities,
+   junctions and ground stability untouched.
    OPEN WORLD v2.31 — RIFT LOOK: the world's face now wears the Capital
    Rift art direction end to end while keeping the true 1:1 Earth: flat
    warm-taupe land (#b8afa0) instead of grass green, a dark slate sea
@@ -580,7 +595,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.31 — the real Earth at 1:1 in the Capital Rift look: taupe land, slate seas, overcast haze; every searched city is a real city, nothing generates in the water, streets, buildings, props, plots and roads stand on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.32 — the real Earth at 1:1 in the Capital Rift look: grass-green land, teal-blue seas with pale shallows, warm daylight and light haze; every searched city is a real city, nothing generates in the water, streets, buildings, props, plots and roads stand on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -616,7 +631,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.31';
+const GAME_VERSION = 'v2.32';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -1228,7 +1243,7 @@ const frontierName = (lat, lon) =>
 // pasture gate placement.
 
 // bright toy-globe colors (Capital Rift bright-flat daylight direction)
-const COL = { ocean: '#2C7BB9', ocean2: '#24689F', land: '#57A05E', land2: '#4C9255', node: '#22D3EE', owned: '#48BB78', here: '#F5CC74' };
+const COL = { ocean: '#2C7BB9', ocean2: '#24689F', land: '#6B9A4E', land2: '#5D8A48', node: '#22D3EE', owned: '#48BB78', here: '#F5CC74' };
 
 // ---------------- v2.12/v2.14 — WORLD HIGHWAY NETWORK (data only) ----
 // The land-connectivity model: a road exists between two cities when the
@@ -1481,7 +1496,7 @@ const EARTH = (() => {
           const o = i * 4;
           if (bit) {
             const t = rowShift === 0 ? 0 : 1;
-            img.data[o] = 0x57 - t * 14; img.data[o + 1] = 0xA0 - t * 6; img.data[o + 2] = 0x5E + t * 10;
+            img.data[o] = 0x6B - t * 14; img.data[o + 1] = 0x9A - t * 6; img.data[o + 2] = 0x4E + t * 10;   // v2.32: olive land, matches the in-world grass
           } else { img.data[o] = 0x2C; img.data[o + 1] = 0x7B; img.data[o + 2] = 0xB9; }
           img.data[o + 3] = 255;
         }
@@ -2207,25 +2222,25 @@ const WORLD = (() => {
 
   // ---------------- textures ------------------------------------------
   let _grassTex = null;
-  // v2.31 CAPITAL RIFT WORLD LOOK: the open land between cities is a flat
-  // warm TAUPE (#b8afa0 — the CR reference's "bare earth / compacted dirt"
-  // ground), not grass green. Speckle + blotch contrast stays very low so
-  // the terrain reads as one uniform matte plane from any distance.
+  // v2.32 GREEN RIFT: the open land between cities is GRASS again — the
+  // CR reference's world shots are mid olive-green (#6e8b4c..#708e4c in
+  // pixel truth), flat and low-contrast up close, with light/dark green
+  // patches that keep the land readable when zoomed far out.
   function grassTexture() {
     if (_grassTex) return _grassTex;
     const cv = document.createElement('canvas'); cv.width = cv.height = 256;
     const ctx = cv.getContext('2d');
-    ctx.fillStyle = '#b8afa0'; ctx.fillRect(0, 0, 256, 256);
+    ctx.fillStyle = '#71904c'; ctx.fillRect(0, 0, 256, 256);
     const rnd = _mulberry(1234);
     for (let i = 0; i < 2100; i++) {
-      const v = 150 + rnd() * 46;
-      ctx.fillStyle = `rgba(${v},${v - 6},${v - 16},${.08 + rnd() * .12})`;
+      ctx.fillStyle = rnd() < .5
+        ? `rgba(54,84,32,${.07 + rnd() * .13})`
+        : `rgba(186,212,140,${.06 + rnd() * .11})`;
       ctx.fillRect(rnd() * 256, rnd() * 256, 1 + rnd() * 2.4, 1 + rnd() * 2.4);
     }
-    for (let i = 0; i < 26; i++) {
-      const v2 = 146 + rnd() * 28;
-      ctx.fillStyle = `rgba(${v2},${v2 - 7},${v2 - 18},.08)`;
-      ctx.beginPath(); ctx.arc(rnd() * 256, rnd() * 256, 14 + rnd() * 34, 0, 6.29); ctx.fill();
+    for (let i = 0; i < 30; i++) {
+      ctx.fillStyle = rnd() < .5 ? 'rgba(88,122,62,.10)' : 'rgba(132,162,92,.10)';
+      ctx.beginPath(); ctx.arc(rnd() * 256, rnd() * 256, 16 + rnd() * 38, 0, 6.29); ctx.fill();
     }
     const t = new THREE.CanvasTexture(cv);
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
@@ -2234,15 +2249,17 @@ const WORLD = (() => {
     return t;
   }
   let _ruralTex = null;
+  // v2.32: darker near-black asphalt (CR roads read by VALUE contrast:
+  // near-black band on bright grass), speckle kept subtle
   function ruralRoadTexture() {
     if (_ruralTex) return _ruralTex;
     const cv = document.createElement('canvas'); cv.width = cv.height = 128;
     const ctx = cv.getContext('2d');
-    ctx.fillStyle = '#4c4a47'; ctx.fillRect(0, 0, 128, 128);
+    ctx.fillStyle = '#333230'; ctx.fillRect(0, 0, 128, 128);
     const rnd = _mulberry(777);
     for (let i = 0; i < 900; i++) {
-      const v = 60 + rnd() * 45;
-      ctx.fillStyle = `rgba(${v},${v - 2},${v - 5},${.25 + rnd() * .3})`;
+      const v = 44 + rnd() * 40;
+      ctx.fillStyle = `rgba(${v},${v - 2},${v - 6},${.25 + rnd() * .3})`;
       ctx.fillRect(rnd() * 128, rnd() * 128, 1 + rnd() * 2, 1 + rnd() * 2);
     }
     const t = new THREE.CanvasTexture(cv);
@@ -2306,21 +2323,22 @@ const WORLD = (() => {
   // great lakes inset into the land. Cities, roads and pastures sit on
   // top at their true geographic coordinates.
   let _seaTex = null;
-  // v2.31 CR: the ocean is flat dark slate (#3d4f5f) — "opaque dark
-  // glass", no readable waves, no foam; only a whisper of streak so the
-  // plane is not sterile at close zoom
+  // v2.32 GREEN RIFT: the ocean is flat TEAL-BLUE (#357f9e — CR's water
+  // reads instantly as water: bright teal on their globe, blue-gray in
+  // world shots), wave-free glass with a whisper of streak, pale-aqua
+  // shallow shelves along the coasts
   function seaTexture() {
     if (_seaTex) return _seaTex;
     const cv = document.createElement('canvas'); cv.width = cv.height = 256;
     const ctx = cv.getContext('2d');
-    ctx.fillStyle = '#3d4f5f'; ctx.fillRect(0, 0, 256, 256);
+    ctx.fillStyle = '#357f9e'; ctx.fillRect(0, 0, 256, 256);
     const rnd = _mulberry(4242);
     for (let i = 0; i < 1400; i++) {
-      ctx.fillStyle = 'rgba(255,255,255,' + (.02 + rnd() * .035) + ')';
+      ctx.fillStyle = 'rgba(255,255,255,' + (.03 + rnd() * .04) + ')';
       ctx.fillRect(rnd() * 256, rnd() * 256, 3 + rnd() * 9, 1 + rnd() * 2);
     }
     for (let i = 0; i < 800; i++) {
-      ctx.fillStyle = 'rgba(10,18,26,' + (.04 + rnd() * .05) + ')';
+      ctx.fillStyle = 'rgba(6,36,54,' + (.05 + rnd() * .06) + ')';
       ctx.fillRect(rnd() * 256, rnd() * 256, 2 + rnd() * 6, 1 + rnd() * 2);
     }
     const t = new THREE.CanvasTexture(cv);
@@ -2452,7 +2470,7 @@ const WORLD = (() => {
     const sea = seaTexture();
     sea.repeat.set(W / 64, H / 64);
     const ocean = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
-      new THREE.MeshLambertMaterial({ map: sea, color: 0xffffff }));   // v2.31: slate sea, unfiltered
+      new THREE.MeshLambertMaterial({ map: sea, color: 0xffffff }));   // v2.32: teal-blue sea, unfiltered
     ocean.rotation.x = -Math.PI / 2;
     ocean.scale.set(W, 1, H);
     ocean.position.set(cx, -1.35, cz);
@@ -2487,11 +2505,24 @@ const WORLD = (() => {
       }
       const g = new THREE.ShapeGeometry(shape);
       const pa = g.attributes.position, ua = g.attributes.uv;
-      for (let i = 0; i < pa.count; i++) {
-        // shape (x,y,0) -> tile-local world (x, y=height, -y=z)
-        buf.pos.push(pa.getX(i), y, -pa.getY(i));
-        buf.norm.push(0, 1, 0);
-        buf.uv.push(ua.getX(i), ua.getY(i));
+      // v2.32 UP-FACING TERRAIN: Natural Earth rings wind both ways and the
+      // shape→world z-flip mirrors them, so most land cells and lake
+      // surfaces triangulated DOWN-facing (85% of land triangles, 88% of
+      // lake triangles). DoubleSide kept them visible but flipped their
+      // normals to (0,-1,0) — the surface lost the sun AND the sky light
+      // and rendered ~35% dark (the murky land / dark lake look since the
+      // Earth rewrite). Guarantee every triangle faces UP here.
+      for (let i = 0; i < pa.count; i += 3) {
+        const x0 = pa.getX(i), y0 = pa.getY(i);
+        const ny = (-pa.getY(i + 1) + y0) * (pa.getX(i + 2) - x0)
+                 - (pa.getX(i + 1) - x0) * (-pa.getY(i + 2) + y0);
+        const ord = ny < 0 ? [i, i + 2, i + 1] : [i, i + 1, i + 2];
+        for (const j of ord) {
+          // shape (x,y,0) -> tile-local world (x, y=height, -y=z)
+          buf.pos.push(pa.getX(j), y, -pa.getY(j));
+          buf.norm.push(0, 1, 0);
+          buf.uv.push(ua.getX(j), ua.getY(j));
+        }
       }
       g.dispose();
     };
@@ -2504,9 +2535,9 @@ const WORLD = (() => {
       }
       return false;
     };
-    const cTop = col(0xb8afa0), cBot = col(0x6e675e);   // v2.31: dry-earth cliff — matches the taupe land
+    const cTop = col(0x71904c), cBot = col(0x3f7688);   // v2.32: grass edge → teal bank (green land meets blue water)
     const SEA = -3.4;
-    const cBeach = col(0xc6bdae), cShelf = col(0x4a5a66);   // v2.31: dry fringe + slate shallows (no yellow sand, no cyan)
+    const cBeach = col(0xd8d1bc), cShelf = col(0xa9d7d9);   // v2.32: pale sand fringe + light-aqua shallows (the CR shallow glow)
     const LG_N = 16;
     for (const ring of LANDGEO.rings) {
       if (ring.length < 4) continue;
@@ -2583,14 +2614,14 @@ const WORLD = (() => {
     }
     // ---- the great lakes: inset water just above the land --------------
     const lakeMat = new THREE.MeshLambertMaterial({
-      color: 0x41525f, side: THREE.DoubleSide,   // v2.31: slate, same as the sea
+      color: 0x3f8099, side: THREE.DoubleSide,   // v2.32: teal, same family as the sea
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
     });
     // ---- v2.19: sandy rims just inside every lake waterline --------------
     // Same read as the ocean coasts: a pale sand shelf hugging each lake's
     // edge, a hair above the surface — so a city beside a lake reads as a
     // waterfront, not as a slab over water.
-    const cRim = col(0xc6bdae);   // v2.31: dry fringe to match the ocean beaches
+    const cRim = col(0xd8d1bc);   // v2.32: pale fringe to match the ocean beaches
     const LAKE_Y = .075;   // v2.30: clears the ±4 cm coarse-grid depth error
     for (const lk of LANDGEO.lakes) {
       if (lk.ring.length < 4) continue;
@@ -2645,7 +2676,11 @@ const WORLD = (() => {
         const wx = -snx * sgn, wz = -snz * sgn;         // toward the water
         const A = [lx, lz], B = [lbx, lbz];
         const C = [lbx + wx * 11, lbz + wz * 11], D = [lx + wx * 11, lz + wz * 11];
-        for (const p of [A, B, C, A, C, D]) { t.rm.pos.push(p[0], .09, p[1]); t.rm.col.push(cRim[0], cRim[1], cRim[2]); }
+        // v2.32: rims are FrontSide — the old (A,B,C) order faced DOWN for
+        // positive-area rings (89% of lakes), so the pale fringe was simply
+        // CULLED and never rendered. Flip the quad order with sgn.
+        const RIMQ = sgn > 0 ? [A, C, B, A, D, C] : [A, B, C, A, C, D];
+        for (const p of RIMQ) { t.rm.pos.push(p[0], .09, p[1]); t.rm.col.push(cRim[0], cRim[1], cRim[2]); }
       }
     }
 
@@ -2960,7 +2995,7 @@ const WORLD = (() => {
     // still occludes the road where it crosses blocks.
     // v2.29: this bakes the COUNTRYSIDE span only (junction caps — the
     // city-end tails live in re-trimmable groups, see emitTail).
-    const cAsph = [1, 1, 1], cShol = col(0x8d8265), cDash = col(0xb5b0a6);   // v2.31: dimmed — bright dashes moiré into white speckle at km range
+    const cAsph = [1, 1, 1], cShol = col(0xc2b89e), cDash = col(0xdfd8c6);   // v2.32: CR distance read — light-tan shoulders + cream dashes sandwich the dark asphalt so roads stay legible at multi-km zoom (dashes are chunkier: 0.42 m × 4.8 m, no white-speckle moiré)
     const rib = (arr, ax, az, bx, bz, ux, uz, w, y, c, vTile) => {
       const px = -uz * w / 2, pz = ux * w / 2;
       const L = Math.hypot(bx - ax, bz - az) || 1;
@@ -2986,15 +3021,24 @@ const WORLD = (() => {
       const t = tileRec(...tileOfLL(lonOf((ax + bx) / 2), latOf((az + bz) / 2)));
       const ox = t.ox, oz = t.oz;
       const lax = ax - ox, laz = az - oz, lbx = bx - ox, lbz = bz - oz;
-      rib(t.road, lax, laz, lbx, lbz, ux, uz, 7.5, ROAD_Y, cAsph, 1.07);
+      rib(t.road, lax, laz, lbx, lbz, ux, uz, 9, ROAD_Y, cAsph, 1.07);
       for (const s of [1, -1]) {
-        rib(t.road, lax - uz * 4.6 * s, laz + ux * 4.6 * s, lbx - uz * 4.6 * s, lbz + ux * 4.6 * s, ux, uz, 1.7, SHOL_Y, cShol, .24);
+        rib(t.road, lax - uz * 5.2 * s, laz + ux * 5.2 * s, lbx - uz * 5.2 * s, lbz - uz * 5.2 * s, ux, uz, 2, SHOL_Y, cShol, .24);
       }
       // v2.27: dashes near the cities only (within ~8 km of either end)
       if (Math.min(cum[i], L - cum[i]) < 8000) {
-        for (let d = 40; d < len - 40; d += 80) {
+        for (let d = 40; d < len - 40; d += 96) {
           const mx = lax + ux * d, mz = laz + uz * d;
-          rib(t.mark, mx, mz, mx + ux * 3.4, mz + uz * 3.4, ux, uz, .3, DASH_Y, cDash, .04);
+          rib(t.mark, mx, mz, mx + ux * 4.8, mz + uz * 4.8, ux, uz, .42, DASH_Y, cDash, .04);
+        }
+      } else {
+        // v2.32 far-zoom detail: the deep-countryside span gets sparse
+        // LONG dashes (14 m every 250 m) — CR's "staccato rhythm line" that
+        // keeps a road readable as a road (not a river/border) at multi-km
+        // zoom, at ~1/3 the vertex cost of the near-city dash density
+        for (let d = 60; d < len - 60; d += 250) {
+          const mx = lax + ux * d, mz = laz + uz * d;
+          rib(t.mark, mx, mz, mx + ux * 14, mz + uz * 14, ux, uz, .5, DASH_Y, cDash, .04);
         }
       }
       // v2.18 sea bridges / v2.27 causeways: guard pylons wherever the
@@ -3060,7 +3104,7 @@ const WORLD = (() => {
     const road = { pos: [], norm: [], uv: [], col: [] };
     const mark = { pos: [], norm: [], uv: [], col: [] };
     const pyl = [];
-    const cAsph = [1, 1, 1], cShol = col(0x8d8265), cDash = col(0xb5b0a6);   // v2.31: dimmed — bright dashes moiré into white speckle at km range
+    const cAsph = [1, 1, 1], cShol = col(0xc2b89e), cDash = col(0xdfd8c6);   // v2.32: light shoulders + cream dashes (matches buildEdgeMesh)
     // ribbon quad with per-end heights (the near-mode taper slopes)
     const quad = (arr, ax, az, bx, bz, yA, yB, w, c, vTile) => {
       const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz) || 1;
@@ -3083,17 +3127,17 @@ const WORLD = (() => {
       const yAt = d => (mode === 'near' && d < TAIL_TAPER)
         ? TAIL_STREET_Y + (ROAD_Y - TAIL_STREET_Y) * (d / TAIL_TAPER)
         : ROAD_Y;
-      quad(road, ax, az, bx, bz, yAt(d0), yAt(d1), 7.5, cAsph, 1.07);
+      quad(road, ax, az, bx, bz, yAt(d0), yAt(d1), 9, cAsph, 1.07);
       if (d0 >= TAIL_TAPER) {
         for (const s of [1, -1]) {
-          quad(road, ax - uz * 4.6 * s, az + ux * 4.6 * s, bx - uz * 4.6 * s, bz + ux * 4.6 * s, SHOL_Y, SHOL_Y, 1.7, cShol, .24);
+          quad(road, ax - uz * 5.2 * s, az + ux * 5.2 * s, bx - uz * 5.2 * s, bz + ux * 5.2 * s, SHOL_Y, SHOL_Y, 2, cShol, .24);
         }
       }
       // dashes within ~8 km of the road's end, clear of the junction mouth
       if (d0 >= 40 && d0 < 8000) {
-        for (let d = 40; d < len - 40; d += 80) {
+        for (let d = 40; d < len - 40; d += 96) {
           const mx = ax + ux * d, mz = az + uz * d;
-          quad(mark, mx, mz, mx + ux * 3.4, mz + uz * 3.4, DASH_Y, DASH_Y, .3, cDash, .04);
+          quad(mark, mx, mz, mx + ux * 4.8, mz + uz * 4.8, DASH_Y, DASH_Y, .42, cDash, .04);
         }
       }
       // causeway guard pylons on wet stretches (every other segment)
@@ -3238,10 +3282,10 @@ const WORLD = (() => {
       LANDGEO.isWaterWorld(x0, z0) && LANDGEO.isWaterWorld(x0 + CH, z0) &&
       LANDGEO.isWaterWorld(x0, z0 + CH) && LANDGEO.isWaterWorld(x0 + CH, z0 + CH)) return;
 
-    // soft taupe tint patches (flat decor — fine near cities too)
+    // soft green tint patches (flat decor — fine near cities too)
     const patches = 1 + Math.floor(rnd() * 2);
     for (let i = 0; i < patches; i++) {
-      const w = 90 + rnd() * 120, d = 70 + rnd() * 110;
+      const w = 120 + rnd() * 220, d = 90 + rnd() * 180;
       const px = x0 + 30 + rnd() * (CH - 60), pz = z0 + 30 + rnd() * (CH - 60);
       if (LANDGEO.ready && LANDGEO.isWaterWorld(px, pz)) continue;
       // v2.30: a patch never sits under a city's ground plate. The plate
@@ -3251,12 +3295,13 @@ const WORLD = (() => {
       // "glitchy floor under the cities"). 170 m covers the patch rect.
       if (distToCity(px, pz).d < CITY_R + 170) continue;
       const g = new THREE.PlaneGeometry(w, d); g.rotateX(-Math.PI / 2);
-      // v2.31 CR: subtle TAUPE mottle on the taupe land — no green blocks
-      const tint = rnd() < .34 ? col(0xb4ab9c) : rnd() < .5 ? col(0xbfb6a7) : col(0xafa698);
+      // v2.32 GREEN RIFT: light/dark GREEN mottle — bigger patches, more
+      // contrast, so the land keeps organic variation when zoomed far out
+      const tint = rnd() < .34 ? col(0x86a35e) : rnd() < .5 ? col(0x5e7c40) : col(0x7d9a55);
       B.addGeo(g, trs(px, .0095, pz, rnd() * 3.14, 1, 1, 1), tint);
     }
-    // v2.31 CR: wildflowers removed — Capital Rift's countryside is bare
-    // earth, and 0.55 m white specks alias into "shard" artifacts at range.
+    // v2.31 CR: wildflowers removed — 0.55 m white specks alias into
+    // "shard" artifacts at range (kept out in v2.32 too).
 
     if (!insideCity) {
       const groves = Math.round((rnd() < .55 ? 1 + Math.floor(rnd() * 2) : 0) * mobF);
@@ -5910,7 +5955,7 @@ const CITY = (() => {
     const inst = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 12, 8, 0, 6.2832, 0, 1.35),
       new THREE.MeshLambertMaterial({ color: 0xffffff }), spots.length);
     const mat4 = new THREE.Matrix4();
-    const fogC = new THREE.Color(0xa9b4ba), base = new THREE.Color(0x8f8a80), c = new THREE.Color();   // v2.31: dry taupe hills into the CR haze
+    const fogC = new THREE.Color(0xccd9dd), base = new THREE.Color(0x7c8f56), c = new THREE.Color();   // v2.32: olive-green hills fading into the pale haze
     spots.forEach((s, i) => {
       mat4.makeScale(s.w, s.h, s.w * s.zf);
       mat4.setPosition(s.x - AX, -6, s.z - AZ);
@@ -8233,18 +8278,19 @@ function clampPan(x, z) {
   return WORLD.clampToBounds(x, z);
 }
 
-// v2.31: the CR sky — a vertical gradient from a slate-gray zenith to
-// the haze color at the horizon. The fog and the dome share #a9b4ba, so
-// the fully-fogged ocean meets the sky with no seam at any altitude.
+// v2.32 GREEN RIFT: the CR sky — a light azure zenith fading to a pale
+// blue-white haze at the horizon (their world shots read as soft daylight,
+// not overcast). The fog and the dome share #ccd9dd, so the fully-fogged
+// ocean meets the sky with no seam at any altitude.
 let _skyTex = null;
 function skyTexture() {
   if (_skyTex) return _skyTex;
   const cv = document.createElement('canvas'); cv.width = 2; cv.height = 256;
   const ctx = cv.getContext('2d');
   const gr = ctx.createLinearGradient(0, 0, 0, 256);
-  gr.addColorStop(0, '#78909c');      // zenith (canvas top = dome top)
-  gr.addColorStop(.5, '#a9b4ba');     // horizon = fog color
-  gr.addColorStop(1, '#a9b4ba');      // below the horizon (the sea covers it)
+  gr.addColorStop(0, '#7cb0d0');     // zenith (canvas top = dome top) — soft azure
+  gr.addColorStop(.5, '#ccd9dd');    // horizon = fog color — pale blue-white haze
+  gr.addColorStop(1, '#ccd9dd');     // below the horizon (the sea covers it)
   ctx.fillStyle = gr; ctx.fillRect(0, 0, 2, 256);
   const t = new THREE.CanvasTexture(cv);
   t.colorSpace = THREE.SRGBColorSpace;
@@ -8254,20 +8300,20 @@ function skyTexture() {
 
 function buildWorldScene() {
   worldScene = new THREE.Scene();
-  // v2.31 CAPITAL RIFT WORLD LOOK: desaturated overcast atmosphere — the
-  // sky, the fog and the horizon all read as one soft slate-gray haze,
-  // and the street-level fog closes in tighter (CR's intimate "model
-  // city" read) while the altitude-opening keeps zoom-out views clear
-  worldScene.background = new THREE.Color(0xa9b4ba);
-  worldScene.fog = new THREE.Fog(0xa9b4ba, 300, 1050);
-  // gradient sky dome (slate zenith → haze horizon), rides with the camera
+  // v2.32 GREEN RIFT: bright soft-daylight atmosphere — a light azure
+  // sky over a pale blue-white haze, and the street-level fog WIDENED
+  // back (420→2100 m) so mid-distance detail stays readable (the
+  // altitude-opening still clears zoom-out views)
+  worldScene.background = new THREE.Color(0xccd9dd);
+  worldScene.fog = new THREE.Fog(0xccd9dd, 420, 2100);
+  // gradient sky dome (azure zenith → pale haze horizon), rides with the camera
   skyDome = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 14),
     new THREE.MeshBasicMaterial({ map: skyTexture(), side: THREE.BackSide, fog: false, depthWrite: false }));
   skyDome.scale.setScalar(CAM_FAR * .88);
   skyDome.renderOrder = -1;
   worldScene.add(skyDome);
-  worldScene.add(new THREE.HemisphereLight(0xf2f6f8, 0x8e959a, 2.6));   // v2.31: overcast CR fill
-  sun = new THREE.DirectionalLight(0xeef3f6, 2.05);            // v2.31: cool neutral noon
+  worldScene.add(new THREE.HemisphereLight(0xf0f7fa, 0x97a184, 2.5));   // v2.32: sky fill, warm green-earth bounce
+  sun = new THREE.DirectionalLight(0xfff3df, 2.0);              // v2.32: warm noon — green grass pops
   sun.position.set(-170, 180, 95);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -8275,7 +8321,7 @@ function buildWorldScene() {
   sun.shadow.camera.top = 240; sun.shadow.camera.bottom = -240;
   sun.shadow.camera.near = 20; sun.shadow.camera.far = 1200;
   sun.shadow.bias = -0.0006;
-  sun.shadow.radius = 7;   // v2.31: softer overcast penumbra
+  sun.shadow.radius = 5;   // v2.32: a touch crisper — CR keeps readable soft shadows
   worldScene.add(sun);
   worldScene.add(sun.target);
 }
@@ -8702,11 +8748,11 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.31 — RIFT LOOK', `
-    <p><b>The world now wears the Capital Rift look — same true 1:1 Earth underneath.</b></p>
-    <div class="kv"><span class="k">TAUPE LAND, SLATE SEA</span><span class="v">The open country is a flat warm dirt-tone plane; oceans and lakes are dark slate glass with dry-fringe coasts — no more grass-green continents and yellow beaches</span></div>
-    <div class="kv"><span class="k">OVERCAST ATMOSPHERE</span><span class="v">A desaturated slate sky fades into a soft haze that closes in around you at street level (the "model city" read) and opens back up as you zoom out to study the planet</span></div>
-    <div class="kv"><span class="k">SKYLINES THAT READ</span><span class="v">Distant cities are darker masses with readable building silhouettes on the horizon — and the city beacons are now Capital-Rift sky-blue (your owned cities stay money-green)</span></div>
+  openModal('Welcome to v2.32 — GREEN RIFT', `
+    <p><b>Grass and water, the Capital Rift way — same true 1:1 Earth underneath.</b></p>
+    <div class="kv"><span class="k">GRASS LAND, TEAL SEA</span><span class="v">The open country is olive-green grass with light/dark patches, oceans and lakes are readable teal-blue with pale-sand fringes and aqua shallows — matching capitalrift.com's actual world shots</span></div>
+    <div class="kv"><span class="k">BRIGHTER SKY, WIDER VIEW</span><span class="v">A soft azure sky over pale daylight haze, warm noon light on the grass — and the fog pulls back so mid-distance cities, roads and coasts stay readable</span></div>
+    <div class="kv"><span class="k">FAR-ZOOM DETAIL</span><span class="v">Country roads read at multi-km zoom: light shoulders and chunkier cream dashes sandwich the dark asphalt, and the land keeps organic green variation when you zoom out</span></div>
     <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">True 1:1 scale, the pre-built 64-city world, real street junctions and stable ground all ride along untouched</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
@@ -9134,11 +9180,11 @@ function loop() {
     camCtl.dist = THREE.MathUtils.clamp(camCtl.dist, 45, ZOOM_MAX);
     // v2.18: zoomed out to study the planet — the fog opens with altitude
     // (v2.27: scaled for the true Earth — ~90 km of haze at max zoom,
-    // capped just inside the far plane)
+    // capped just inside the far plane; v2.32 base widened to 420/2100)
     if (worldScene.fog) {
       const z = Math.max(0, camCtl.dist - 480);
-      worldScene.fog.near = 300 + z * 2.66;
-      worldScene.fog.far = Math.min(1050 + z * 10.26, CAM_FAR * .92);
+      worldScene.fog.near = 420 + z * 2.66;
+      worldScene.fog.far = Math.min(2100 + z * 10.26, CAM_FAR * .92);
     }
     const ce = Math.cos(camCtl.el), se = Math.sin(camCtl.el);
     camera.position.set(
@@ -9151,6 +9197,22 @@ function loop() {
       sun.position.set(camCtl.tx - 170, 180, camCtl.tz + 95);
       sun.target.position.set(camCtl.tx, 0, camCtl.tz);
       sun.target.updateMatrixWorld();
+      // v2.32 SUN CLIFF FIX: the shadow camera used to be a fixed ±240 m
+      // box — every fragment beyond it sampled the shadow-map EDGE (the
+      // out-of-frustum clamp) and lost the WHOLE sun term, so all
+      // mid-distance terrain dimmed ~35% with a hard brightness cliff
+      // ~240 m past the camera focus. The v2.31 fog (300/1050 m) had
+      // masked it; widening the fog exposed it. The box now scales with
+      // the camera distance: street level keeps the crisp ±240 m map,
+      // zoomed out it grows to cover the whole view, so distant land,
+      // lakes and roads keep full sunlight.
+      const SH_S = Math.max(240, Math.round(camCtl.dist * 2.2));
+      if (sun.shadow.camera.right !== SH_S) {
+        sun.shadow.camera.left = -SH_S; sun.shadow.camera.right = SH_S;
+        sun.shadow.camera.top = SH_S; sun.shadow.camera.bottom = -SH_S;
+        sun.shadow.camera.far = Math.max(1200, SH_S * 1.5);
+        sun.shadow.camera.updateProjectionMatrix();
+      }
     }
     // the ONE WORLD: stream pasture chunks, swap city chunks as you walk
     const req = WORLD.update(dt, p.x, p.z, camCtl.dist);
