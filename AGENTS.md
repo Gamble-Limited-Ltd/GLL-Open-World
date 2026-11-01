@@ -2,7 +2,7 @@
 
 Shared rules for every agent and human on Open World. Read this first, every session. If something here is wrong, fix it in the same PR.
 
-## The project (v2.29 on the dev branch)
+## The project (v2.30 on the dev branch)
 - 3D Earth game by Kayne (`kayneheffelfinger-cyber`), who owns it and is the main dev. Gamble Limited Ltd. (James, `TheGeneral4757`) hosts it and helps with hosting, error fixing, repo cleanup and docs.
 - Plain HTML/JS, no build step, single-player, no accounts, no backend. State lives in the browser (`localStorage` key `openworld-v2`). Only network calls: OSM Overpass, Nominatim, and same-origin `version.json` (read on boot since v2.24 for the self-update check).
 - Files: `openworld.html` is the game. `game.html` must stay a byte-identical copy of it. `index.html` is the homepage, `home.html` a redirect stub, `version.json` the version feed (the game reads it on boot since v2.24 and offers a one-tap cache-busting update when the feed is newer than the running build). `admin.html` and `supabase-setup.sql` are legacy (old multiplayer version) and should not be extended.
