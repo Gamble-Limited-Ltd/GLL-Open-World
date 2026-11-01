@@ -3,23 +3,30 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.28</title>
+<title>Open World — v2.29</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.28 — CONNECTED ROADS: every inter-city road now runs
-   INTO the city it serves. Two v2.27 leftovers kept roads out of
-   town: the baked route ends were raw catalog coordinates (quantized
-   to 0.01° — avg 117 m off at 1:1, worst 7.1 km), and the trim loop,
-   tuned for the old 11 m resample cadence, jumped whole ~2.2 km steps
-   at true scale — so roads stopped up to ~2 km short of streets that
-   end ±360 m from the anchor. Route ends now snap to each city's
-   CURRENT (shoreline-snapped) anchor and the trim cuts at the exact
-   along-route arc length, running land routes all the way to each
-   city's anchor so the ribbon crosses the fringe streets and truly
-   connects to the grid. The ribbon stack was also lifted just above
-   every flat ground layer (city plate, beaches, lakes, skyline
-   plates), whose old 7–19 mm separations lost to float32 depth noise
-   at 1:1 and left the asphalt invisible.
+   OPEN WORLD v2.29 — REAL JUNCTIONS: inter-city roads now END at the
+   first street of the city they serve — a true T-junction — instead
+   of plowing through the grid to the anchor (the v2.28 "connection"
+   ran the ribbon over the city streets: full-city asphalt sits at
+   y .030–.038, under the road ribbon's .095, so the highway read as a
+   dark stripe crossing the town). Each land route keeps a
+   re-trimmable TAIL — the last ~10.5 km before every city are NOT
+   baked into the world tiles but live in a per-end group that is
+   re-emitted whenever what stands at the city changes: while the
+   distant SKYLINE stands the road ends at the first ×10 metro-sprawl
+   street (tucked under its asphalt); when the full city builds the
+   road re-trims to the first TRUE street of the imported city,
+   ramping down to street level so the junction merges with the real
+   asphalt; leaving hands it back to the skyline layout. Junctions
+   are found by scanning the route at 8 m steps against a spatial
+   hash of the standing street layout, then refined to the meter.
+   v2.28 CONNECTED ROADS kept: route ends snap to each city's CURRENT
+   (shoreline-snapped) anchor, the trim cuts at the exact along-route
+   arc length, and the ribbon stack rides above every flat ground
+   layer (whose old 7–19 mm separations lost to float32 depth noise
+   at 1:1 and left the asphalt invisible).
    v2.27 TRUE SCALE: the whole world is now 1:1 with the
    real Earth — 111,320 meters per degree, 40,007 km around. Every
    static chunk of the planet (coasts, lakes, roads, bridges) builds
@@ -553,7 +560,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.28 — the real Earth: every searched city is a real city, nothing generates in the water, streets, buildings, props, plots and roads stand on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.29 — the real Earth: every searched city is a real city, nothing generates in the water, streets, buildings, props, plots and roads stand on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -589,7 +596,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.28';
+const GAME_VERSION = 'v2.29';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -2119,10 +2126,31 @@ const WORLD = (() => {
   const CITY_R = 745;                // city import extent radius
   const BUILD_DIST = 950;            // detailed city streams in
   const LEAVE_DIST = 1250;           // detailed city streams out
-  const ROAD_CITY_REACH = 0;         // v2.28: land routes run all the way
-                                      // to the city ANCHOR — they cross the
-                                      // fringe streets and connect to the
-                                      // grid (bridges keep near-full span)
+  // v2.29 REAL JUNCTIONS: inter-city roads end at the first street of
+  // the city they serve, not at the anchor. The last TAIL_CAP meters
+  // of every land route before each city are a re-trimmable TAIL (a
+  // per-end group) instead of baked tile ribbons, so the road's end
+  // can follow whatever stands at the city right now — the distant
+  // skyline's ×10 sprawl streets or the imported city's true streets.
+  // 10.5 km covers the whole skyline approach (streets reach ±7.2 km,
+  // corner-diagonal ~10.2 km). Bridges keep their near-full span (a
+  // trimmed deck strands in open water — v2.22).
+  const TAIL_CAP = 10500;
+  // v2.28: the ribbon stack sits ABOVE every flat ground layer it can
+  // meet at true scale (land shield y 0, city plate .012, beaches
+  // .05–.063, lakes .06, lake rims .068, skyline plates .05) and BELOW
+  // the sidewalk stack (.16), vendor plots (.105) and buildings.
+  const ROAD_Y = .095, SHOL_Y = .09, DASH_Y = .098;
+  // v2.29: a junction tail's last meters ramp down onto the city's
+  // street asphalt (y .030–.038 by class) — .046 clears every class by
+  // ≥8 mm (the city's own curb/plate stack proves 8 mm safe in the
+  // anchor-local frame) and stays ~11 cm under the sidewalks (.16).
+  const TAIL_TAPER = 25, TAIL_STREET_Y = .046;
+  // shared ribbon materials (tile ribbons + re-trimmable tails)
+  let _roadMat = null, _markMat = null, _pylMat = null;
+  const roadMatShared = () => _roadMat || (_roadMat = new THREE.MeshLambertMaterial({ map: ruralRoadTexture(), vertexColors: true }));
+  const markMatShared = () => _markMat || (_markMat = new THREE.MeshLambertMaterial({ vertexColors: true }));
+  const pylMatShared = () => _pylMat || (_pylMat = new THREE.MeshLambertMaterial({ color: 0x9aa2a9 }));
   const isMob = matchMedia('(pointer:coarse)').matches;
   const CHUNK_R = isMob ? 750 : 1050;
 
@@ -2341,10 +2369,10 @@ const WORLD = (() => {
     const beachMat = new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
     const shelfMat = new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
     const rimMat = new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
-    const roadMat = new THREE.MeshLambertMaterial({ map: ruralRoadTexture(), vertexColors: true });
-    const markMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+    const roadMat = roadMatShared();   // v2.29: shared with the re-trimmable tails
+    const markMat = markMatShared();
     const pylGeo = new THREE.BoxGeometry(1.25, 3.9, 1.25);
-    const pylMat = new THREE.MeshLambertMaterial({ color: 0x9aa2a9 });
+    const pylMat = pylMatShared();
     const fullMesh = (t, arr, mat) => {      // pos + norm + uv + col
       if (!arr.pos.length) return;
       const g = new THREE.BufferGeometry();
@@ -2545,6 +2573,97 @@ const WORLD = (() => {
   // cities are joined by sea bridges (pylons, no plots).
   const RSAMPLE = DEG_M / 50;         // route resample step (~2.2 km at 1:1)
   const RDECIM = DEG_M * 0.0236;      // polyline decimation (~2.6 km at 1:1)
+  // ---- v2.29 REAL JUNCTIONS: street-aware road ends -------------------
+  // A street layout (skyline ×10 sprawl or the imported city's true
+  // streets) becomes a spatial hash of segments; the route is scanned
+  // inward at 8 m steps to find the FIRST street it meets, refined to
+  // the meter, and the road ends there — merged into the street band
+  // instead of crossing the grid.
+  const SCELL = 256, J_SCAN = 11000, J_STEP = 8;
+  function cutAtArc(full, cum, L, s) {      // exact point + segment at arc length s
+    s = Math.max(0, Math.min(L, s));
+    let i = 0;
+    while (i < full.length - 1 && cum[i + 1] < s) i++;
+    if (i >= full.length - 1) return { p: full[full.length - 1].slice(), i };
+    const t = Math.max(0, (s - cum[i]) / (cum[i + 1] - cum[i] || 1));
+    return { p: [full[i][0] + (full[i + 1][0] - full[i][0]) * t,
+                 full[i][1] + (full[i + 1][1] - full[i][1]) * t], i };
+  }
+  function streetGridFor(roads) {
+    const g = new Map();
+    for (const r of roads) {
+      const pts = r.pts;
+      if (!pts || pts.length < 2) continue;
+      const w = r.w || 9;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const seg = { ax: pts[i][0], az: pts[i][1], bx: pts[i + 1][0], bz: pts[i + 1][1], w };
+        const slen = Math.hypot(seg.bx - seg.ax, seg.bz - seg.az) || 1;
+        const n = Math.max(1, Math.ceil(slen / (SCELL / 2)));
+        for (let k = 0; k <= n; k++) {
+          const kx = Math.floor((seg.ax + (seg.bx - seg.ax) * k / n) / SCELL) + ',' +
+            Math.floor((seg.az + (seg.bz - seg.az) * k / n) / SCELL);
+          if (!g.has(kx)) g.set(kx, []);
+          g.get(kx).push(seg);
+        }
+      }
+    }
+    return g;
+  }
+  // distance from (x,z) to the nearest street centerline, within
+  // w/2 + margin — returns the street's width when hit, else 0
+  function gridNear(g, x, z, margin) {
+    const cx = Math.floor(x / SCELL), cz = Math.floor(z / SCELL);
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+      const arr = g.get((cx + i) + ',' + (cz + j));
+      if (!arr) continue;
+      for (const s of arr) {
+        const dx = s.bx - s.ax, dz = s.bz - s.az, L2 = dx * dx + dz * dz || 1;
+        let t = ((x - s.ax) * dx + (z - s.az) * dz) / L2;
+        t = Math.max(0, Math.min(1, t));
+        if (Math.hypot(x - (s.ax + t * dx), z - (s.az + t * dz)) < s.w / 2 + margin) return s.w;
+      }
+    }
+    return 0;
+  }
+  // scan the route from OUTSIDE toward the city end (d = arc distance
+  // from that city's anchor) and return the arc where the road should
+  // END: the outermost street band it meets. Perpendicular crossings
+  // end 1 m INSIDE the band (asphalt merged into the street); a route
+  // that runs ALONG a street (axial approaches hug the generator's
+  // Central Street line) ends at its FIRST TOUCH of the band instead,
+  // so the road feeds into the street and never overlaps the grid.
+  // 0 = no street met — run to the anchor (v2.28 behavior, safe fallback).
+  function junctionEnd(tail, end, grid) {
+    if (!grid || !grid.size) return 0;
+    const at = d => cutAtArc(tail.full, tail.cum, tail.L, end === 'A' ? d : tail.L - d).p;
+    let hit = -1;
+    for (let d = Math.min(J_SCAN, tail.L - 1); d >= 0; d -= J_STEP) {
+      const p = at(d);
+      if (gridNear(grid, p[0], p[1], 4.5)) { hit = d; break; }
+    }
+    if (hit < 0) return 0;
+    let dIn = hit, walked = 0;   // refine to the band's inner edge at 1 m
+    while (dIn > 0 && walked <= 60) {
+      const p = at(dIn - 1);
+      if (!gridNear(grid, p[0], p[1], 4.5)) break;
+      dIn -= 1; walked++;
+    }
+    if (walked > 60) {
+      // shallow/parallel approach — the road keeps running alongside the
+      // street: stop it where it first touches the band
+      let dOut = hit, steps = 0;
+      while (dOut < Math.min(J_SCAN, tail.L) && steps < 400) {
+        const p = at(dOut + 1);
+        if (!gridNear(grid, p[0], p[1], 4.5)) break;
+        dOut += 1; steps++;
+      }
+      return Math.max(0, dOut + 1);
+    }
+    // perpendicular crossing: the hit threshold is w/2 + 4.5 (road
+    // half-width + margin), so the street band's inner edge sits 4.5 m
+    // further in — end the road 1 m INSIDE the band: +5.5 from dIn
+    return Math.max(0, dIn + 5.5);
+  }
   function buildEdges() {
     edges = [];
     roadHash = new Map();
@@ -2576,32 +2695,46 @@ const WORLD = (() => {
       const cum = [0];
       for (let i = 1; i < full.length; i++) cum.push(cum[i - 1] + Math.hypot(full[i][0] - full[i - 1][0], full[i][1] - full[i - 1][1]));
       const L = cum[cum.length - 1];
-      // v2.28 CONNECTED ROADS (2/2): the trim used to skip whole vertices
-      // while cum < trim — tuned for the old 11 m resample cadence, it
-      // jumped whole ~2.2 km steps at 1:1 and roads really ended up to
-      // ~2.2 km short of town (streets end ±360 m from the anchor — the
-      // "roads never touch the city" report). Cut at the EXACT along-route
-      // arc length instead, and run land routes all the way TO the
-      // anchor: the ribbon crosses the city's fringe streets — a real
-      // connection, whatever the import's street density — then dives
-      // under the downtown blocks (buildings occlude it at true height).
-      // Sea bridges keep (nearly) their full span — a trimmed bridge
-      // strands its deck in open water with no way on from shore (v2.22).
-      const trimEnd = e.bridge ? 60 : ROAD_CITY_REACH;
-      const cutAt = s => {          // exact point + segment at arc length s
-        let i = 0;
-        while (i < full.length - 1 && cum[i + 1] < s) i++;
-        if (i >= full.length - 1) return { p: full[full.length - 1].slice(), i };
-        const t = Math.max(0, (s - cum[i]) / (cum[i + 1] - cum[i] || 1));
-        return { p: [full[i][0] + (full[i + 1][0] - full[i][0]) * t,
-                     full[i][1] + (full[i + 1][1] - full[i][1]) * t], i };
-      };
-      let pts;
-      if (L > trimEnd * 2 + 60) {
-        const a = cutAt(trimEnd), b = cutAt(L - trimEnd);
-        pts = [a.p, ...full.slice(a.i + 1, b.i + 1), b.p];
+      const cutAt = s => cutAtArc(full, cum, L, s);
+      // v2.29 REAL JUNCTIONS: a land route ends at the first street of
+      // the city it serves. Bridges keep their 60 m trim (a trimmed
+      // deck strands in open water — v2.22). Each land route keeps a
+      // re-trimmable TAIL: the baked tile ribbons stop TAIL_CAP short
+      // of town and the per-end tail group carries the final stretch,
+      // re-emitted when the standing city changes (skyline ↔ full).
+      // The junction at boot answers the SKYLINE layout — the streets
+      // you actually see when the full city is not built (cached real
+      // data where this browser has it, the deterministic generator
+      // otherwise — the same source buildSkyline uses).
+      let pts, tail = null, bakePts = null;
+      if (e.bridge) {
+        if (L > 180) {
+          const a = cutAt(60), b = cutAt(L - 60);
+          pts = [a.p, ...full.slice(a.i + 1, b.i + 1), b.p];
+        } else {
+          pts = full.slice();         // very short span — keep it whole
+        }
       } else {
-        pts = full.slice();         // very short span — keep it whole
+        tail = { full, cum, L, A: { dEnd: 0, cap: 0, mesh: null }, B: { dEnd: 0, cap: 0, mesh: null } };
+        tail.A.dEnd = junctionEnd(tail, 'A', skyGridFor(A));
+        tail.B.dEnd = junctionEnd(tail, 'B', skyGridFor(B));
+        const span = L - tail.A.dEnd - tail.B.dEnd;
+        if (span > 2 * TAIL_CAP + 200) {
+          tail.A.cap = tail.B.cap = TAIL_CAP;
+        } else {
+          tail.A.cap = tail.B.cap = Math.max(0, span / 2);
+        }
+        tail.A.dEnd = Math.min(tail.A.dEnd, Math.max(0, tail.A.cap - 30));
+        tail.B.dEnd = Math.min(tail.B.dEnd, Math.max(0, tail.B.cap - 30));
+        if (span < 220) {
+          tail = null;                // degenerate tiny route — bake it whole
+          pts = full.slice();
+        } else {
+          const a = cutAt(tail.A.dEnd), b = cutAt(L - tail.B.dEnd);
+          pts = [a.p, ...full.slice(a.i + 1, b.i + 1), b.p];          // the whole road, junction to junction
+          const ba = cutAt(tail.A.cap), bb = cutAt(L - tail.B.cap);
+          bakePts = [ba.p, ...full.slice(ba.i + 1, bb.i + 1), bb.p];  // baked span, cap to cap
+        }
       }
       const poly = [pts[0]];
       let acc = 0;
@@ -2613,6 +2746,8 @@ const WORLD = (() => {
         idx: edges.length, A, B, poly, bridge: !!e.bridge,
         name: (e.bridge ? 'Sea Bridge · ' : 'Route ' + (rn + 11) + ' · ') + A.name + ' – ' + B.name,
         group: null, plotRecs: [],
+        bakePts: bakePts || poly,   // v2.29: span baked into the world tiles
+        tail,                       // v2.29: re-trimmable city-end tails
         bbox: [1e9, -1e9, 1e9, -1e9],
       };
       rn += 3;
@@ -2620,6 +2755,12 @@ const WORLD = (() => {
         rec.bbox[0] = Math.min(rec.bbox[0], pt[0]); rec.bbox[1] = Math.max(rec.bbox[1], pt[0]);
         rec.bbox[2] = Math.min(rec.bbox[2], pt[1]); rec.bbox[3] = Math.max(rec.bbox[3], pt[1]);
       });
+      // v2.29: the tails reach toward both anchors — keep them inside
+      // the visibility bbox (the group gates on it every frame)
+      for (const c of [A, B]) {
+        rec.bbox[0] = Math.min(rec.bbox[0], c.wx); rec.bbox[1] = Math.max(rec.bbox[1], c.wx);
+        rec.bbox[2] = Math.min(rec.bbox[2], c.wz); rec.bbox[3] = Math.max(rec.bbox[3], c.wz);
+      }
       // v2.27: the edge group now holds only its roadside plots — the
       // ribbons themselves live in the world tiles
       rec.group = new THREE.Group();
@@ -2646,6 +2787,9 @@ const WORLD = (() => {
       }
       buildEdgePlots(rec);
       edges.push(rec);
+      // v2.29: the re-trimmable city-end tails (far/skyline junctions
+      // at boot; setCity/clearCity re-emit them on regime change)
+      if (tail) { emitTail(rec, 'A', 'far'); emitTail(rec, 'B', 'far'); }
     }
   }
 
@@ -2681,7 +2825,8 @@ const WORLD = (() => {
     // float32 depth noise at world scale). It stays BELOW the sidewalk
     // stack (.16), vendor plots (.105) and every 3D building, so town
     // still occludes the road where it crosses blocks.
-    const ROAD_Y = .095, SHOL_Y = .09, DASH_Y = .098;
+    // v2.29: this bakes the COUNTRYSIDE span only (junction caps — the
+    // city-end tails live in re-trimmable groups, see emitTail).
     const cAsph = [1, 1, 1], cShol = col(0x8d8265), cDash = col(0xe8e4dc);
     const rib = (arr, ax, az, bx, bz, ux, uz, w, y, c, vTile) => {
       const px = -uz * w / 2, pz = ux * w / 2;
@@ -2696,7 +2841,7 @@ const WORLD = (() => {
         arr.col.push(c[0], c[1], c[2]);
       }
     };
-    const poly = rec.poly;
+    const poly = rec.bakePts || rec.poly;   // v2.29: bake the countryside span
     const cum = [0];
     for (let i = 1; i < poly.length; i++) cum.push(cum[i - 1] + Math.hypot(poly[i][0] - poly[i - 1][0], poly[i][1] - poly[i - 1][1]));
     const L = cum[poly.length - 1] || 1;
@@ -2728,6 +2873,143 @@ const WORLD = (() => {
           t.pyl.push([lax - dz / len * 3.4, laz + dx / len * 3.4]);
           t.pyl.push([lax + dz / len * 3.4, laz - dx / len * 3.4]);
         }
+      }
+    }
+  }
+
+  // ---------------- v2.29: re-trimmable road tails --------------------
+  // One tail = the final stretch of a land route into its city, emitted
+  // as its OWN group in the city-anchor-local frame (float32-safe at
+  // 1:1, same as the skyline and city meshes) so it can be disposed and
+  // re-emitted when the standing city changes:
+  //   'far'  — the skyline stands: flat ribbon that ends tucked UNDER
+  //            the ×10 sprawl street it meets (that asphalt sits at .3);
+  //   'near' — the full city is built: the last TAIL_TAPER meters ramp
+  //            down onto the street asphalt (y .030–.038) so the road
+  //            merges into the grid as a junction instead of riding
+  //            over it at .095 (the v2.28 look this replaces).
+  function disposeTailGroup(g) {
+    if (!g) return;
+    g.traverse(o => { if (o.geometry) { try { o.geometry.dispose(); } catch (err) { } } });
+    if (g.parent) g.parent.remove(g);
+  }
+  function emitTail(rec, end, mode) {
+    const ti = rec.tail, E = ti[end];
+    const city = end === 'A' ? rec.A : rec.B;
+    disposeTailGroup(E.mesh);
+    E.mesh = null;
+    const sJun = end === 'A' ? E.dEnd : ti.L - E.dEnd;   // junction end
+    const sCap = end === 'A' ? E.cap : ti.L - E.cap;     // where baking takes over
+    if (E.cap - E.dEnd < 2) return;   // junction at/beyond the cap — no tail
+    // polyline over the arc span, then junction-first
+    const lo = Math.min(sJun, sCap), hi = Math.max(sJun, sCap);
+    const a0 = cutAtArc(ti.full, ti.cum, ti.L, lo);
+    const raw = [a0.p];
+    for (let i = a0.i + 1; i < ti.full.length; i++) {
+      if (ti.cum[i] <= lo) continue;
+      if (ti.cum[i] >= hi) break;
+      raw.push(ti.full[i]);
+    }
+    const b0 = cutAtArc(ti.full, ti.cum, ti.L, hi);
+    raw.push(b0.p);
+    const pts = sJun <= sCap ? raw : raw.slice().reverse();
+    if (pts.length < 2) return;
+    const cumT = [0];
+    for (let i = 1; i < pts.length; i++) cumT.push(cumT[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    const road = { pos: [], norm: [], uv: [], col: [] };
+    const mark = { pos: [], norm: [], uv: [], col: [] };
+    const pyl = [];
+    const cAsph = [1, 1, 1], cShol = col(0x8d8265), cDash = col(0xe8e4dc);
+    // ribbon quad with per-end heights (the near-mode taper slopes)
+    const quad = (arr, ax, az, bx, bz, yA, yB, w, c, vTile) => {
+      const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz) || 1;
+      const px = -dz / L * w / 2, pz = dx / L * w / 2;
+      const u1 = L / 7;
+      const P = [[ax + px, yA, az + pz], [bx + px, yB, bz + pz], [bx - px, yB, bz - pz], [ax - px, yA, az - pz]];
+      const UV = [[0, 0], [u1, 0], [u1, vTile], [0, vTile]];
+      for (const i of [0, 1, 2, 0, 2, 3]) {
+        arr.pos.push(P[i][0], P[i][1], P[i][2]);
+        arr.norm.push(0, 1, 0);
+        arr.uv.push(UV[i][0], UV[i][1]);
+        arr.col.push(c[0], c[1], c[2]);
+      }
+    };
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [ax, az] = pts[i], [bx, bz] = pts[i + 1];
+      const d0 = cumT[i], d1 = cumT[i + 1];
+      const len = Math.hypot(bx - ax, bz - az) || 1;
+      const ux = (bx - ax) / len, uz = (bz - az) / len;
+      const yAt = d => (mode === 'near' && d < TAIL_TAPER)
+        ? TAIL_STREET_Y + (ROAD_Y - TAIL_STREET_Y) * (d / TAIL_TAPER)
+        : ROAD_Y;
+      quad(road, ax, az, bx, bz, yAt(d0), yAt(d1), 7.5, cAsph, 1.07);
+      if (d0 >= TAIL_TAPER) {
+        for (const s of [1, -1]) {
+          quad(road, ax - uz * 4.6 * s, az + ux * 4.6 * s, bx - uz * 4.6 * s, bz + ux * 4.6 * s, SHOL_Y, SHOL_Y, 1.7, cShol, .24);
+        }
+      }
+      // dashes within ~8 km of the road's end, clear of the junction mouth
+      if (d0 >= 40 && d0 < 8000) {
+        for (let d = 40; d < len - 40; d += 80) {
+          const mx = ax + ux * d, mz = az + uz * d;
+          quad(mark, mx, mz, mx + ux * 3.4, mz + uz * 3.4, DASH_Y, DASH_Y, .3, cDash, .04);
+        }
+      }
+      // causeway guard pylons on wet stretches (every other segment)
+      if (LANDGEO.ready && i % 2 === 0) {
+        if (LANDGEO.isWaterWorld((ax + bx) / 2, (az + bz) / 2)) {
+          pyl.push([ax - uz * 3.4, az + ux * 3.4]);
+          pyl.push([ax + uz * 3.4, az - ux * 3.4]);
+        }
+      }
+    }
+    const g = new THREE.Group();
+    const mkTailMesh = (arr, mat) => {
+      if (!arr.pos.length) return;
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(arr.pos, 3));
+      geo.setAttribute('normal', new THREE.Float32BufferAttribute(arr.norm, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(arr.uv, 2));
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(arr.col, 3));
+      const m = new THREE.Mesh(geo, mat);
+      m.receiveShadow = true;
+      g.add(m);
+    };
+    mkTailMesh(road, roadMatShared());
+    mkTailMesh(mark, markMatShared());
+    if (pyl.length) {
+      const inst = new THREE.InstancedMesh(new THREE.BoxGeometry(1.25, 3.9, 1.25), pylMatShared(), pyl.length);
+      const m4 = new THREE.Matrix4();
+      pyl.forEach((p, i) => { m4.makeTranslation(p[0], -1.55, p[1]); inst.setMatrixAt(i, m4); });
+      inst.receiveShadow = true;
+      g.add(inst);
+    }
+    g.position.set(city.wx, 0, city.wz);   // city-anchor-local frame
+    rec.group.add(g);
+    E.mesh = g;
+  }
+
+  // v2.29: switch a city's road tails between the FAR layout (skyline
+  // streets) and the NEAR one (the built city's true streets). setCity
+  // calls this with CITY.roads once the full city stands; clearCity
+  // calls it with null when the skyline takes the horizon back.
+  function roadJunction(key, cityRoads) {
+    if (!edges.length || !key) return;
+    const c = CITIES.find(x => x.key === key);
+    if (!c) return;                       // searched spots have no roads
+    let grid, mode;
+    if (cityRoads && cityRoads.length) { grid = streetGridFor(cityRoads); mode = 'near'; }
+    else { grid = skyGridFor(c); mode = 'far'; }
+    if (!grid || !grid.size) return;
+    for (const rec of edges) {
+      if (rec.bridge || !rec.tail) continue;
+      const ends = [];
+      if (rec.A.key === key) ends.push('A');
+      if (rec.B.key === key) ends.push('B');
+      for (const end of ends) {
+        const E = rec.tail[end];
+        E.dEnd = Math.min(junctionEnd(rec.tail, end, grid), Math.max(0, E.cap - 30));
+        emitTail(rec, end, mode);
       }
     }
   }
@@ -3080,11 +3362,14 @@ const WORLD = (() => {
                        // city stands, ready on the horizon when you leave
   }
 
-  function buildSkyline(c, force) {
-    const old = skyBuilt.get(c.key);
-    if (old && !force) return;
-    if (old) disposeSkyGroup(old);
-    if (!skyRoot) return;
+  // v2.29: the skyline LAYOUT (data source + metro spread + dry-land
+  // gate) is cached per city and shared with the road junctions — one
+  // source of truth for what stands at a distant city. buildSkyline
+  // meshes it; junctionEnd scans it for the road's far junction.
+  const skyLayoutCache = new Map();   // cityKey -> {roads, buildings, greens, dsrc}
+  const skyGrids = new Map();         // cityKey -> street grid of that layout
+  function skyLayout(c, force) {
+    if (!force && skyLayoutCache.has(c.key)) return skyLayoutCache.get(c.key);
     const meta = { key: c.key, name: c.name, lat: c.lat, lon: c.lon, tier: c.tier };
     let dsrc = 'osm';
     let data = null;
@@ -3179,6 +3464,29 @@ const WORLD = (() => {
       buildings = buildings.filter(b => b.poly && b.poly.length >= 3 && solid(b.poly) && polyDry(b.poly));
       greens = greens.filter(g => g.poly && g.poly.length >= 3 && solid(g.poly) && polyDry(g.poly));
     }
+    const out = { roads, buildings, greens, dsrc };
+    skyLayoutCache.set(c.key, out);
+    skyGrids.delete(c.key);   // layout changed → the junction grid rebuilds
+    return out;
+  }
+  // the skyline layout's street grid — what a far road junction answers to
+  function skyGridFor(c) {
+    let g = skyGrids.get(c.key);
+    if (!g) { g = streetGridFor(skyLayout(c).roads); skyGrids.set(c.key, g); }
+    return g;
+  }
+
+  function buildSkyline(c, force) {
+    const old = skyBuilt.get(c.key);
+    if (old && !force) return;
+    if (old) disposeSkyGroup(old);
+    if (!skyRoot) return;
+    // v2.29: shared layout (cached real data / generator + metro spread
+    // + dry-land gate) — the road junctions read the same streets
+    const lay = skyLayout(c, force);
+    const dsrc = lay.dsrc;
+    const ax = c.wx, az = c.wz;
+    let roads = lay.roads, buildings = lay.buildings, greens = lay.greens;
     // ---- the skyline mesh: ONE vertex-colored geometry per city -------
     // fog:false (like the city beacons) so a distant city reads through
     // the haze from any altitude; buildings keep their true footprints
@@ -3323,6 +3631,8 @@ const WORLD = (() => {
     const mk = markers.get(meta.key);
     if (mk) mk.group.visible = false;
     skyHide(meta.key);     // v2.26: the full city replaces the skyline
+    // v2.29: the roads meet the REAL streets while this city stands
+    try { roadJunction(meta.key, CITY.roads); } catch (e) { console.error('[roadJunction]', e); }
     // v2.26: arriving with REAL map data upgrades that city's skyline
     // from the generator look to the true footprint — so the horizon
     // stays accurate after you leave (runs behind the travel veil)
@@ -3339,6 +3649,9 @@ const WORLD = (() => {
     const mk = markers.get(activeCity.key);
     if (mk) mk.group.visible = true;
     skyShow(activeCity.key);   // v2.26: the skyline stands back up as you leave
+    // v2.29: the junctions hand back to the skyline's streets
+    const leavingKey = activeCity.key;
+    try { roadJunction(leavingKey, null); } catch (e) { console.error('[roadJunction]', e); }
     const was = activeCity;
     activeCity = null;
     curRegion = 'rural';
@@ -3502,7 +3815,8 @@ const WORLD = (() => {
         active: !!(activeCity && activeCity.key === c.key),
       })),
       // v2.18: the real routed road polylines (world coords, bridges flagged)
-      edges: edges.map(rec => ({ poly: rec.poly, bridge: rec.bridge })),
+      // v2.29: name included — the QA probe matches tails to edges by it
+      edges: edges.map(rec => ({ poly: rec.poly, bridge: rec.bridge, name: rec.name })),
       conts: WORLD_CONTS,
     };
   }
@@ -3609,6 +3923,19 @@ const WORLD = (() => {
       const m = g.children[0];
       return { visible: g.visible, tris: m && m.geometry ? m.geometry.attributes.position.count / 3 : 0 };
     },
+    // v2.29: junction state of every land route's city ends (QA + tuning)
+    roadTails: () => edges.filter(r => r.tail).map(r => {
+      const endPt = end => {
+        const E = r.tail[end];
+        const p = cutAtArc(r.tail.full, r.tail.cum, r.tail.L, end === 'A' ? E.dEnd : r.tail.L - E.dEnd).p;
+        return [+p[0].toFixed(1), +p[1].toFixed(1)];
+      };
+      return {
+        name: r.name,
+        A: { dEnd: +r.tail.A.dEnd.toFixed(1), cap: r.tail.A.cap, mesh: !!r.tail.A.mesh, at: endPt('A') },
+        B: { dEnd: +r.tail.B.dEnd.toFixed(1), cap: r.tail.B.cap, mesh: !!r.tail.B.mesh, at: endPt('B') },
+      };
+    }),
     set pending(v) { pendingCity = v; },
     get pending() { return pendingCity; },
     get activeCity() { return activeCity; },
@@ -8754,7 +9081,7 @@ EARTH.diveTo = (city, cb) => {
 };
 
 
-console.log('%cOPEN WORLD v2.28 — CONNECTED ROADS', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.29 — REAL JUNCTIONS', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
