@@ -3,9 +3,48 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.36</title>
+<title>Open World — v2.38</title>
 <style>
 /* ==================================================================
+   OPEN WORLD v2.38 — DEEP-BLUE LAKES: the last green-bleed mechanism
+   is dead, at every altitude. The land rings are outer-contour only,
+   so lake interiors clipped as "land" — the grass shield rendered
+   UNDER the water, and a 55 km land cell's log-depth interpolation
+   error grows into METERS by a few hundred km of altitude, past any
+   separation the lake plane could ride at: grass bled back through
+   the water exactly in the 100–2000 km band the v2.37 zoom opens
+   (measured: half of Lake Michigan's deep-interior points green at
+   300 km). Cells that touch a lake (plus a 0.55° margin, UNION over
+   every nearby lake so straits cells census against all of them) now
+   build from the lake's own raster on a 6.9 km → 860 m → 215 m grid
+   — fully-wet rects are never emitted (the water is the ONLY surface
+   there), near-shore dry rects subdivide to 860 m so their depth
+   error can never reach back over the water, and the lake plane also
+   rides .8 m clear of every remaining shore sliver. Green pastures,
+   solid blue lakes, zero mixing, from street level to the 23,000 km
+   view. Verified pixel-projected: 0 green lake-interior samples at
+   every zoom band (34 km / 100 km / 300 km / 600 km / 2,000 km /
+   whole-world).
+   OPEN WORLD v2.37 — WHOLE-WORLD ZOOM: the ask was "allow me to zoom
+   out farther" — so the ceiling lifts from 34 km to 23,000 km: the
+   FULL flat Earth (40,075 km wide, 20,038 km tall) fits in one
+   overhead view, with every altitude in between on the same wheel
+   (the glide stays gentle at street level and firms up with height
+   so the climb takes ~35 notches, not ~80). The far plane spans
+   56,000 km so even a tilted whole-world view keeps every corner of
+   the planet inside the clip, and the city beacons scale with the
+   altitude uncapped so the map keeps its dots from orbit.
+   THE FLAT-GROUND LADDER: at 23,000 km the log-depth buffer resolves
+   only ~12-23 m of separation — every centimeter-scale gap between
+   ocean (-1.35), land (0), forest belts (9.5 mm), skyline plates
+   (.05), beaches (.07), lakes (.075), rims (.09) and roads (.095)
+   rounds to the SAME depth, so polygon offset and insertion order
+   (the old tie-breakers) could flicker whole lakes green and paint
+   continents blue exactly at the new zoom. Every flat layer now
+   carries an explicit renderOrder ladder (ocean 0 < shelf .5 < land 1
+   < belt 1.5 < plate 1.6 < skyline 2 < beach 2.5 < lake 3 < rim 3.5
+   < road 4 < marks 4.2) — draw order matches physical height, so
+   the right surface wins at ANY zoom, deterministically.
    OPEN WORLD v2.36 — TRUE LAKES: the verdict on v2.35 was "MAKE THE
    LAKE LOOK BETTER, ive told you ten times" — and a ray census agreed:
    38 of 49 samples across north Lake Michigan hit raw GRASS. The root
@@ -678,7 +717,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.36 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline, zero fog anywhere, free camera roam with no distance cap from your tycoon, woodland belts around the cities, and the same streets, buildings, plots and roads on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.38 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, woodland belts around the cities, and the same streets, buildings, plots and roads on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -714,7 +753,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.36';
+const GAME_VERSION = 'v2.38';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -2277,10 +2316,26 @@ const WORLD = (() => {
   // v2.30: the ribbon stack sits ABOVE every flat ground layer it can
   // meet at true scale — the land shield (y 0, ±4 cm grid depth error;
   // −.10 under the fine city pads), the city plate (.012, on the exact
-  // pad), beaches (.07–.083), lakes (.075), lake rims (.09) and the
-  // skyline plates (.05) — and BELOW
+  // pad), beaches (.07–.083) and the skyline plates (.05) — and BELOW
   // the sidewalk stack (.16), vendor plots (.105) and buildings.
+  // v2.38: lakes (.8) now ride far ABOVE the ribbons — no road ever
+  // crosses a lake (routes are water-gated; the 61 baked routes were
+  // audited: zero lake-ring crossings), so the two never meet.
   const ROAD_Y = .095, SHOL_Y = .09, DASH_Y = .098;
+  // v2.37 FLAT-GROUND LADDER: zooming to 23,000 km makes the log-depth
+  // buffer resolve only ~12-23 m — every cm-scale gap below rounds to a
+  // tie, so each flat layer now carries an explicit renderOrder that
+  // matches its physical height (ocean 0 < shelf .5 < land 1 < belt 1.5
+  // < city plate 1.6 < skyline 2 < beach 2.5 < lake 3 < rim 3.5 < road 4
+  // < marks 4.2). Ties break toward the physically-higher surface at
+  // every zoom; real gaps still win by depth where they resolve.
+  // v2.38 exception: the lake PLANE sits at .8 (depth separation — see
+  // LAKE_Y) but keeps ladder slot 3 — no higher layer ever overlaps a
+  // lake (roads and rims are water-gated or submerged), so the order
+  // holds.
+  const RO_SHELF = .5, RO_LAND = 1, RO_BELT = 1.5, RO_PLATE = 1.6,
+        RO_SKY = 2, RO_BEACH = 2.5, RO_LAKE = 3, RO_RIM = 3.5,
+        RO_ROAD = 4, RO_MARK = 4.2;
   // v2.29: a junction tail's last meters ramp down onto the city's
   // street asphalt (y .030–.038 by class) — .046 clears every class by
   // ≥8 mm (the city's own curb/plate stack proves 8 mm safe in the
@@ -2568,7 +2623,7 @@ const WORLD = (() => {
     const markMat = markMatShared();
     const pylGeo = new THREE.BoxGeometry(1.25, 3.9, 1.25);
     const pylMat = pylMatShared();
-    const fullMesh = (t, arr, mat) => {      // pos + norm + uv + col
+    const fullMesh = (t, arr, mat, order = 0) => {   // pos + norm + uv + col
       if (!arr.pos.length) return;
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(arr.pos, 3));
@@ -2577,9 +2632,10 @@ const WORLD = (() => {
       g.setAttribute('color', new THREE.Float32BufferAttribute(arr.col, 3));
       const m = new THREE.Mesh(g, mat);
       m.receiveShadow = true;
+      m.renderOrder = order;   // v2.37 flat-ground ladder
       t.g.add(m);
     };
-    const flatMesh = (t, arr, mat) => {      // pos + col only, normals up
+    const flatMesh = (t, arr, mat, order = 0) => {   // pos + col only, normals up
       if (!arr.pos.length) return;
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(arr.pos, 3));
@@ -2587,15 +2643,16 @@ const WORLD = (() => {
       g.setAttribute('color', new THREE.Float32BufferAttribute(arr.col, 3));
       const m = new THREE.Mesh(g, mat);
       m.receiveShadow = true;
+      m.renderOrder = order;   // v2.37 flat-ground ladder
       t.g.add(m);
     };
     tiles.forEach(t => {
       fullMesh(t, t.sk, skirtMat);
-      flatMesh(t, t.bh, beachMat);
-      flatMesh(t, t.sh, shelfMat);
-      flatMesh(t, t.rm, rimMat);
-      fullMesh(t, t.road, roadMat);
-      fullMesh(t, t.mark, markMat);
+      flatMesh(t, t.bh, beachMat, RO_BEACH);
+      flatMesh(t, t.sh, shelfMat, RO_SHELF);
+      flatMesh(t, t.rm, rimMat, RO_RIM);
+      fullMesh(t, t.road, roadMat, RO_ROAD);
+      fullMesh(t, t.mark, markMat, RO_MARK);
       if (t.pyl.length) {
         const inst = new THREE.InstancedMesh(pylGeo, pylMat, t.pyl.length);
         const m4 = new THREE.Matrix4();
@@ -2731,6 +2788,150 @@ const WORLD = (() => {
     };
     const LG_N = 16;
     const interiorFilled = new Set();   // 'tx,tz,i,j' — one whole-cell fill per cell across ALL rings
+    // ---- v2.38 LAND VS LAKE: no land under the water, at any zoom --------
+    // The land rings are outer-contour only — lake interiors are "land" to
+    // the ring clipper (the cell lies inside the continent polygon), so
+    // every land cell touching a lake emitted a full fragment of grass
+    // UNDER the water. At street zoom the opaque lake plane at .8 m covers
+    // it, but a 55 km land cell's log-depth interpolation error grows into
+    // METERS by a few hundred km of altitude — past any separation the
+    // lake could physically ride at — and grass bled back through the
+    // water exactly in the 100–2000 km band the v2.37 zoom opens
+    // (measured: half of Lake Michigan's deep-interior points render
+    // pasture green at 300 km while a raycast puts blue water closest
+    // along the same ray; hiding the land turns every one of them blue).
+    // The only ordering that holds at EVERY altitude: the water is the
+    // ONLY surface there. Cells that touch a lake's bbox now build from
+    // the lake's own boot-time raster on a 6.9 km → 860 m → 215 m grid —
+    // fully-wet rects are simply not emitted, dry rects fill, and
+    // ocean-coast rects (dual-coast cells like Nicaragua's) keep the
+    // exact ring fragment at the subrect scale.
+    const lakeRaster = lk => {
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+      for (const p of lk.ring) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
+      const res = lk.ring.length < 200 ? .016 : .004;   // coarse rings (the Caspian's 110m) get a matching grid
+      const w = Math.ceil((x1 - x0) / res) + 2, h = Math.ceil((y1 - y0) / res) + 2;
+      const bits = new Uint8Array((w * h + 7) >> 3);
+      for (let j = 0; j < h; j++) {
+        const la = y0 + (j + .5) * res;
+        const xs = [];
+        for (let i = 0; i < lk.ring.length; i++) {
+          const a = lk.ring[i], b = lk.ring[(i + 1) % lk.ring.length];
+          if ((a[1] > la) !== (b[1] > la)) xs.push(a[0] + (b[0] - a[0]) * (la - a[1]) / (b[1] - a[1]));
+        }
+        xs.sort((p, q) => p - q);
+        for (let k = 0; k + 1 < xs.length; k += 2) {
+          const ia = Math.max(0, Math.ceil((xs[k] - x0) / res - .5));
+          const ib = Math.min(w - 1, Math.floor((xs[k + 1] - x0) / res - .5));
+          for (let i = ia; i <= ib; i++) { const idx = j * w + i; bits[idx >> 3] |= 128 >> (idx & 7); }
+        }
+      }
+      return { res, x0, y0, w, h, bits };
+    };
+    const lakeBBs = [], lakeRasByLk = new Map();
+    for (const lk of LANDGEO.lakes) {
+      if (lk.ring.length < 4) continue;
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+      for (const p of lk.ring) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
+      const ras = lakeRaster(lk);
+      lakeBBs.push([x0, x1, y0, y1, ras]);
+      lakeRasByLk.set(lk, ras);
+    }
+    const lakesHit = (c0, d0, c1, d1) => {
+      // v2.38: +0.55° MARGIN — the 55 km whole-cell fills in the cells JUST
+      // past a lake's bbox are the biggest triangles in the world, and at
+      // far zoom their oblique screen footprint + log-depth error bleeds
+      // green up to ~10 km back over the water (the Muskegon band). Those
+      // cells take the grid too.
+      // v2.38b: returns EVERY lake whose margined bbox hits the cell — a
+      // straits cell (Michigan + Huron + Superior all nearby) must census
+      // against the UNION, or the first lake's raster silently calls the
+      // other lake's open water "dry" and fills it green (the Straits of
+      // Mackinac regression).
+      const M = .55, out = [];
+      for (const e of lakeBBs) if (!(c1 < e[0] - M || c0 > e[1] + M || d1 < e[2] - M || d0 > e[3] + M)) out.push(e);
+      return out;
+    };
+    // census of lake-raster cells (UNION over the hit lakes) in [a0,a1]x[b0,b1]
+    const rasCensus = (Es, a0, a1, b0, b1) => {
+      let wet = 0, tot = 0;
+      for (const e of Es) {
+        const r = e[4];
+        const i0 = Math.max(0, Math.ceil((a0 - r.x0) / r.res - .5)), i1 = Math.min(r.w - 1, Math.floor((a1 - r.x0) / r.res - .5));
+        const j0 = Math.max(0, Math.ceil((b0 - r.y0) / r.res - .5)), j1 = Math.min(r.h - 1, Math.floor((b1 - r.y0) / r.res - .5));
+        for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+          const idx = j * r.w + i;
+          tot++; if (r.bits[idx >> 3] & (128 >> (idx & 7))) wet++;
+        }
+      }
+      return { wet, tot };
+    };
+    const emitLakeCell = (t, c0, c1, d0, d1, y0, tint, buf, Es, poly, bx0, bx1, bz0, bz1, cellKey) => {
+      const dry5 = (a0, a1, b0, b1) => {
+        const m = (b0 + b1) / 2, mm = (a0 + a1) / 2;
+        return !LANDGEO.isWaterLL(m, mm) && !LANDGEO.isWaterLL(b0, a0) && !LANDGEO.isWaterLL(b0, a1) &&
+          !LANDGEO.isWaterLL(b1, a0) && !LANDGEO.isWaterLL(b1, a1);
+      };
+      const centerDry = (a0, a1, b0, b1) => !LANDGEO.isWaterLL((b0 + b1) / 2, (a0 + a1) / 2);
+      for (let si = 0; si < 8; si++) for (let sj = 0; sj < 8; sj++) {
+        const a0 = c0 + (c1 - c0) * si / 8, a1 = c0 + (c1 - c0) * (si + 1) / 8;
+        const b0 = d0 + (d1 - d0) * sj / 8, b1 = d0 + (d1 - d0) * (sj + 1) / 8;
+        const cs = rasCensus(Es, a0, a1, b0, b1);
+        if (cs.tot > 0 && cs.wet === cs.tot) continue;            // bare water — the lake plane is the only surface
+        if (cs.wet === 0) {
+          // v2.38 NEAR-SHORE DRY R1: is the water within one R1 of here?
+          // (dilated census). A dry 6.9 km quad this close to the water
+          // still carries enough log-depth error at far zoom to bleed over
+          // the lake — fall through to the 860 m grid instead.
+          const dil = rasCensus(Es, a0 - .063, a1 + .063, b0 - .063, b1 + .063);
+          if (dil.wet === 0) {
+            if (dry5(a0, a1, b0, b1)) {
+              const k = cellKey + '|g' + si + ',' + sj;
+              if (!interiorFilled.has(k)) { interiorFilled.add(k); fillCell(t, a0, a1, b0, b1, y0, buf, tint); }
+              continue;
+            }
+            // ocean-side wet (dual-coast cells): the exact fragment path at
+            // the subrect scale — ocean coasts keep their v2.33 exactness
+            if (!(a1 < bx0 || a0 > bx1 || b1 < bz0 || b0 > bz1)) {
+              const cpoly = clipRing(poly, a0, a1, b0, b1);
+              if (cpoly.length >= 3) landTri(t, cpoly, y0, buf, tint);
+            }
+            for (let ti = 0; ti < 4; ti++) for (let tj = 0; tj < 4; tj++) {
+              const e0 = a0 + (a1 - a0) * ti / 4, e1 = a0 + (a1 - a0) * (ti + 1) / 4;
+              const f0 = b0 + (b1 - b0) * tj / 4, f1 = b0 + (b1 - b0) * (tj + 1) / 4;
+              if (dry5(e0, e1, f0, f1)) fillCell(t, e0, e1, f0, f1, y0 - .02, buf, tint);
+            }
+            continue;
+          }
+          // near-shore — drop into the R2 grid below
+        }
+        // lake shoreline inside this 6.9 km subrect → 860 m grid
+        for (let ti = 0; ti < 8; ti++) for (let tj = 0; tj < 8; tj++) {
+          const e0 = a0 + (a1 - a0) * ti / 8, e1 = a0 + (a1 - a0) * (ti + 1) / 8;
+          const f0 = b0 + (b1 - b0) * tj / 8, f1 = b0 + (b1 - b0) * (tj + 1) / 8;
+          const c2 = rasCensus(Es, e0, e1, f0, f1);
+          if (c2.tot > 0 && c2.wet === c2.tot) continue;
+          if (c2.wet === 0) {
+            if (centerDry(e0, e1, f0, f1)) {
+              const k = cellKey + '|g' + si + ',' + sj + '|' + ti + ',' + tj;
+              if (!interiorFilled.has(k)) { interiorFilled.add(k); fillCell(t, e0, e1, f0, f1, y0, buf, tint); }
+            }
+            continue;
+          }
+          // shoreline → 215 m leaves
+          for (let ui = 0; ui < 4; ui++) for (let uj = 0; uj < 4; uj++) {
+            const g0 = e0 + (e1 - e0) * ui / 4, g1 = e0 + (e1 - e0) * (ui + 1) / 4;
+            const h0 = f0 + (f1 - f0) * uj / 4, h1 = f0 + (f1 - f0) * (uj + 1) / 4;
+            const c3 = rasCensus(Es, g0, g1, h0, h1);
+            if (c3.tot > 0 && c3.wet === c3.tot) continue;
+            if (centerDry(g0, g1, h0, h1)) {
+              const k = cellKey + '|g' + si + ',' + sj + '|' + ti + ',' + tj + '|' + ui + ',' + uj;
+              if (!interiorFilled.has(k)) { interiorFilled.add(k); fillCell(t, g0, g1, h0, h1, y0, buf, tint); }
+            }
+          }
+        }
+      }
+    };
     for (const ring of LANDGEO.rings) {
       if (ring.length < 4) continue;
       for (const [tx, tz] of ringTiles(ring)) {
@@ -2769,6 +2970,13 @@ const WORLD = (() => {
           const hv = hashStr(cellKey);
           const f = .92 + (hv % 160) / 1000, wg = .97 + (Math.floor(hv / 160) % 60) / 1000;
           const tint = [f * wg, f, f * (2 - wg)];
+          // v2.38: cells touching a lake build from the raster-true grid —
+          // no land under the water, at any zoom (see the hoisted block)
+          const lke = lakesHit(c0, d0, c1, d1);
+          if (lke.length) {
+            emitLakeCell(t, c0, c1, d0, d1, y0, tint, buf, lke, poly, bx0, bx1, bz0, bz1, cellKey);
+            continue;
+          }
           const allDry = !LANDGEO.isWaterLL(cm, clm) && !LANDGEO.isWaterLL(d0, c0) &&
             !LANDGEO.isWaterLL(d0, c1) && !LANDGEO.isWaterLL(d1, c0) && !LANDGEO.isWaterLL(d1, c1);
           if (allDry) {
@@ -2817,6 +3025,7 @@ const WORLD = (() => {
           g.setAttribute('uv', new THREE.Float32BufferAttribute(buf.uv, 2));
           g.setAttribute('color', new THREE.Float32BufferAttribute(buf.col, 3));
           const m = new THREE.Mesh(g, landMat);
+          m.renderOrder = RO_LAND;   // v2.37 flat-ground ladder
           m.receiveShadow = true;
           t.g.add(m);
         }
@@ -2867,11 +3076,22 @@ const WORLD = (() => {
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
     });
     // ---- v2.19: sandy rims just inside every lake waterline --------------
-    // Same read as the ocean coasts: a pale sand shelf hugging each lake's
-    // edge, a hair above the surface — so a city beside a lake reads as a
-    // waterfront, not as a slab over water.
+    // v2.38: the lake plane (.8) now rides far above this fringe — it
+    // stays fully submerged (invisible at every zoom; subpixel at the
+    // altitudes where depths tie) and is kept only as harmless ballast.
     const cRim = col(0xd8d1bc);   // v2.32: pale fringe to match the ocean beaches
-    const LAKE_Y = .075;   // v2.30: clears the ±4 cm coarse-grid depth error
+    // v2.38 DEPTH SEPARATION: the lake plane rides .8 m above the land
+    // shield (was 7.5 cm). The land under every lake is a 55 km-cell grid
+    // whose vertices carry ±4 cm of float32 noise, and the view-distance
+    // term grows with zoom — in the 100–700 km band the old 7.5 cm margin
+    // could still interleave with the land's depth noise and bleed green
+    // patches through the water (the "still green in the lake" reports).
+    // 80 cm clears the worst-case combined noise by an order of magnitude
+    // at every zoom where depth decides; past ~700 km the log-depth quantum
+    // exceeds the gap and the v2.37 renderOrder ladder (lake 3 > land 1)
+    // hands the surface to the water deterministically. The land stays
+    // under the opaque lake, so nothing shows through anywhere.
+    const LAKE_Y = .8;
     // ---- v2.36 TRUE LAKES surface ---------------------------------------
     // Coverage is layered so a hole is impossible: every 6.9 km subcell
     // whose 9 raster samples are all wet fills as one quad; every shore
@@ -2883,28 +3103,6 @@ const WORLD = (() => {
     // Sutherland-Hodgman bowties that greened Green Bay can neither hole
     // the lake (runs carry the water) nor spill onto the shore (unverified
     // fragments are dropped).
-    const lakeRaster = lk => {
-      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
-      for (const p of lk.ring) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
-      const res = lk.ring.length < 200 ? .016 : .004;   // coarse rings (the Caspian's 110m) get a matching grid
-      const w = Math.ceil((x1 - x0) / res) + 2, h = Math.ceil((y1 - y0) / res) + 2;
-      const bits = new Uint8Array((w * h + 7) >> 3);
-      for (let j = 0; j < h; j++) {
-        const la = y0 + (j + .5) * res;
-        const xs = [];
-        for (let i = 0; i < lk.ring.length; i++) {
-          const a = lk.ring[i], b = lk.ring[(i + 1) % lk.ring.length];
-          if ((a[1] > la) !== (b[1] > la)) xs.push(a[0] + (b[0] - a[0]) * (la - a[1]) / (b[1] - a[1]));
-        }
-        xs.sort((p, q) => p - q);
-        for (let k = 0; k + 1 < xs.length; k += 2) {
-          const ia = Math.max(0, Math.ceil((xs[k] - x0) / res - .5));
-          const ib = Math.min(w - 1, Math.floor((xs[k + 1] - x0) / res - .5));
-          for (let i = ia; i <= ib; i++) { const idx = j * w + i; bits[idx >> 3] |= 128 >> (idx & 7); }
-        }
-      }
-      return { res, x0, y0, w, h, bits };
-    };
     const wetR = (r, la, lo) => {
       const i = Math.floor((lo - r.x0) / r.res), j = Math.floor((la - r.y0) / r.res);
       if (i < 0 || j < 0 || i >= r.w || j >= r.h) return false;
@@ -2963,7 +3161,7 @@ const WORLD = (() => {
       if (lk.ring.length < 4) continue;
       let rbx0 = 1e9, rbx1 = -1e9, rbz0 = 1e9, rbz1 = -1e9;
       for (const p of lk.ring) { rbx0 = Math.min(rbx0, p[0]); rbx1 = Math.max(rbx1, p[0]); rbz0 = Math.min(rbz0, p[1]); rbz1 = Math.max(rbz1, p[1]); }
-      const ras = lakeRaster(lk);
+      const ras = lakeRasByLk.get(lk) || lakeRaster(lk);   // v2.38: reuse the hoisted raster (also drives the land grid)
       for (const [tx, tz] of ringTiles(lk.ring)) {
         const t = tileRec(tx, tz);
         const lon0 = -180 + tx * TILE_DEG, lon1 = lon0 + TILE_DEG;
@@ -3012,6 +3210,7 @@ const WORLD = (() => {
           g.setAttribute('uv', new THREE.Float32BufferAttribute(lbuf.uv, 2));
           g.setAttribute('color', new THREE.Float32BufferAttribute(lbuf.col, 3));
           const m = new THREE.Mesh(g, lakeMat);
+          m.renderOrder = RO_LAKE;   // v2.37 flat-ground ladder: blue beats land at ANY zoom
           m.receiveShadow = true;
           t.g.add(m);
         }
@@ -3087,6 +3286,7 @@ const WORLD = (() => {
       g.setAttribute('normal', new THREE.Float32BufferAttribute(norm, 3));
       g.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3));
       const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true }));
+      m.renderOrder = RO_BELT;   // v2.37 flat-ground ladder
       m.position.set(c.wx, 0, c.wz);   // city-anchor-local: exact depth
       m.receiveShadow = true;
       group.add(m);
@@ -3122,6 +3322,7 @@ const WORLD = (() => {
         g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
         g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
         const m = new THREE.Mesh(g, landMat);
+        m.renderOrder = RO_LAND;   // v2.37 flat-ground ladder
         m.position.set(c.wx, 0, c.wz);   // city-anchor-local: exact depth
         m.receiveShadow = true;
         group.add(m);
@@ -3136,6 +3337,7 @@ const WORLD = (() => {
     geo.rotateX(-Math.PI / 2);
     const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: grassTexture() }));
     m.scale.set(W, 1, H);   // v2.27: unit plane scaled — float32-exact verts
+    m.renderOrder = RO_LAND;   // v2.37 flat-ground ladder
     m.position.set(cx, .006, cz);
     m.receiveShadow = true;
     group.add(m);
@@ -3397,10 +3599,12 @@ const WORLD = (() => {
     // v2.28 CONNECTED ROADS: the ribbon stack sits ABOVE every flat
     // ground layer it can meet at true scale — the land shield (y 0,
     // whose polygonOffset is a no-op under the logarithmic depth
-    // buffer), the city ground plate (.012), beaches (.07–.083), lakes
-    // (.075) and lake rims (.09), the skyline plates (.05) — so the
+    // buffer), the city ground plate (.012), beaches (.07–.083) and the
+    // skyline plates (.05) — so the
     // asphalt can never z-fight under them (7–19 mm gaps lose to
-    // float32 depth noise at world scale). It stays BELOW the sidewalk
+    // float32 depth noise at world scale). v2.38: lakes (.8) ride far
+    // above the ribbons, but no road crosses a lake (water-gated,
+    // audited) so they never meet. It stays BELOW the sidewalk
     // stack (.16), vendor plots (.105) and every 3D building, so town
     // still occludes the road where it crosses blocks.
     // v2.29: this bakes the COUNTRYSIDE span only (junction caps — the
@@ -3559,7 +3763,7 @@ const WORLD = (() => {
       }
     }
     const g = new THREE.Group();
-    const mkTailMesh = (arr, mat) => {
+    const mkTailMesh = (arr, mat, order = 0) => {
       if (!arr.pos.length) return;
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.Float32BufferAttribute(arr.pos, 3));
@@ -3567,11 +3771,12 @@ const WORLD = (() => {
       geo.setAttribute('uv', new THREE.Float32BufferAttribute(arr.uv, 2));
       geo.setAttribute('color', new THREE.Float32BufferAttribute(arr.col, 3));
       const m = new THREE.Mesh(geo, mat);
+      m.renderOrder = order;   // v2.37 flat-ground ladder
       m.receiveShadow = true;
       g.add(m);
     };
-    mkTailMesh(road, roadMatShared());
-    mkTailMesh(mark, markMatShared());
+    mkTailMesh(road, roadMatShared(), RO_ROAD);
+    mkTailMesh(mark, markMatShared(), RO_MARK);
     if (pyl.length) {
       const inst = new THREE.InstancedMesh(new THREE.BoxGeometry(1.25, 3.9, 1.25), pylMatShared(), pyl.length);
       const m4 = new THREE.Matrix4();
@@ -4226,6 +4431,7 @@ const WORLD = (() => {
     geo.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
     geo.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
     const mesh = new THREE.Mesh(geo, _skyMat);
+    mesh.renderOrder = RO_SKY;   // v2.37 flat-ground ladder: distant city masses beat the land at any zoom
     const g = new THREE.Group();
     g.add(mesh);
     g.position.set(ax, 0, az);   // v2.27: anchor-local geometry, absolute group
@@ -4358,8 +4564,13 @@ const WORLD = (() => {
       const owned = new Set(STATE.plots.map(p => p.cityKey));
       // v2.27 TRUE SCALE: beacons, pillars and labels scale with ALTITUDE
       // so they stay readable from a 30 km study view while looking
-      // city-sized from the ground
+      // city-sized from the ground. v2.37: kf stays capped for the
+      // street-sized cues (pillars, labels), but the DOT scales with the
+      // altitude uncapped (kd) so every city keeps a visible dot on the
+      // 23,000 km whole-world view; labels fade out past ~2,000 km where
+      // a capped 9.5 km tag would be subpixel mush.
       const kf = Math.max(1, Math.min(36, camDist / 850));
+      const kd = Math.max(1, camDist / 850);   // v2.37: uncapped — dots visible from orbit
       markers.forEach((mk, key) => {
         if (activeCity && key === activeCity.key) { mk.group.visible = false; return; }
         const d = Math.hypot(px - mk.city.wx, pz - mk.city.wz);
@@ -4370,7 +4581,7 @@ const WORLD = (() => {
         mk.dot.visible = true;                      // v2.22: every city has a beacon
         mk.dot.material.color.setHex(own ? 0x48bb78 : 0x74b9e8);   // v2.31: CR sky-blue markers (owned stays money-green)
         mk.dot.material.opacity = own ? .9 : .78;
-        const ms = Math.min(4.2, 1 + d / 2200) * kf;   // far = easier to spot
+        const ms = Math.min(4.2, 1 + d / 2200) * kd;   // far = easier to spot (dot rides kd: visible at ANY altitude)
         mk.dot.scale.setScalar(ms);
         if (mk.pil) {                                 // v2.23: tall light column
           mk.pil.material.color.setHex(own ? 0x48bb78 : 0x74b9e8);
@@ -4382,7 +4593,10 @@ const WORLD = (() => {
           const ls = Math.min(3, 1 + d / 3000) * kf;    // tags stay readable far out
           mk.label.scale.set(88 * ls, 22 * ls, 1);
           mk.label.position.y = 44 * Math.min(1, kf / 3);
-          mk.label.material.opacity = (camDist > 560 && d > 880) ? .92 : 0;
+          // v2.37: fade out past ~2,000 km — a capped 9.5 km tag is
+          // subpixel mush from the whole-world view (the dots carry it)
+          mk.label.material.opacity = (camDist > 560 && d > 880)
+            ? .92 * THREE.MathUtils.clamp((2e6 - camDist) / 1.1e6, 0, 1) : 0;
         }
       });
     }
@@ -6434,6 +6648,7 @@ const CITY = (() => {
       const base = new THREE.Mesh(new THREE.PlaneGeometry(size, size),
         new THREE.MeshLambertMaterial({ map: tex }));
       base.rotation.x = -Math.PI / 2; base.position.set(ax, y, az);
+      base.renderOrder = 1.6;   // v2.37 flat-ground ladder: city plate (literal — this module sits outside the WORLD closure that owns the RO_* constants)
       base.receiveShadow = true;
       return base;
     }
@@ -6458,6 +6673,7 @@ const CITY = (() => {
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: tex }));
     mesh.position.set(ax, 0, az);   // v2.27: city-local geometry
+    mesh.renderOrder = 1.6;   // v2.37 flat-ground ladder: city plate (literal — outside the WORLD closure)
     mesh.receiveShadow = true;
     return mesh;
   }
@@ -8690,10 +8906,15 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;   // v2.03: soft toy-matte shadows
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-// v2.27 TRUE SCALE: zoom out to ~34 km and see ~130 km of real Earth —
-// a real horizon for a real planet (log depth keeps streets crisp)
-const ZOOM_MAX = 34000;
-const CAM_FAR = 130000;
+// v2.37 WHOLE-WORLD ZOOM: "allow me to zoom out farther" — the ceiling
+// lifts from 34 km to 23,000 km: the FULL flat Earth (40,075 km wide,
+// 20,038 km tall) fits in one overhead view at el 1.5, with every
+// altitude in between on the same wheel. The far plane spans 56,000 km
+// so even a tilted whole-world view keeps every corner of the planet
+// inside the clip (log depth keeps the streets crisp at the bottom of
+// the same range — same renderer, same near plane).
+const ZOOM_MAX = 23000000;
+const CAM_FAR = 56000000;
 
 // v2.15: far plane spans the whole one world so real distant land and
 // streaming cities stay visible on the horizon (log depth keeps the
@@ -9197,12 +9418,13 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.36 — TRUE LAKES', `
-    <p><b>The lakes finally have their real shapes — and the camera is unchained.</b></p>
-    <div class="kv"><span class="k">REAL LAKES</span><span class="v">Lake Michigan, Superior, Huron and every great lake now use real 10-m-resolution outlines — Green Bay, the Door Peninsula and the whole shoreline sit where the real Earth puts them, no more grass inside the water</span></div>
-    <div class="kv"><span class="k">SOLID BLUE</span><span class="v">The water surface is layered so it can never hole: solid blue from shore to shore, clean green pastures right up to the waterline</span></div>
-    <div class="kv"><span class="k">FREE CAMERA</span><span class="v">The distance cap between your camera and your tycoon is GONE — pan anywhere on Earth; FIND ME [C] still snaps you home, and the world streams detail wherever you look</span></div>
-    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">True 1:1 Earth, the pre-built 64-city world, pastures and woodland belts, real street junctions and stable ground all ride along untouched</span></div>
+  openModal('Welcome to v2.37 — WHOLE-WORLD ZOOM', `
+    <p><b>Zoom out as far as you want — the whole Earth fits in one view.</b></p>
+    <div class="kv"><span class="k">23,000 KM CEILING</span><span class="v">The zoom now climbs from street level past the old 34 km cap all the way to a 23,000 km view — the entire real Earth (40,075 km wide) in a single frame, green continents, blue oceans and blue lakes included</span></div>
+    <div class="kv"><span class="k">SAME WHEEL FEEL</span><span class="v">Gentle glide at street level, firm and fast once you are high — reaching orbit takes ~35 notches, and WASD panning speeds up with altitude so the map still crosses in seconds</span></div>
+    <div class="kv"><span class="k">CITIES FROM ORBIT</span><span class="v">City beacons now scale with altitude with no cap — every city keeps a visible dot on the whole-world view; name tags fade only where they would be unreadable</span></div>
+    <div class="kv"><span class="k">DEPTH-PROOF GROUND</span><span class="v">Every flat layer (ocean, land, lakes, beaches, roads, skylines) now draws in explicit height order, so nothing flickers or bleeds green/blue at the new extreme zooms</span></div>
+    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">True 1:1 Earth, the real lake shapes, free camera roam, pastures, streets and roads all ride along untouched</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -9249,12 +9471,12 @@ document.getElementById('bb-next').addEventListener('click', () => {
 });
 
 function openHelp() {
-  openModal('Open World v2.36 — Help', `
+  openModal('Open World v2.37 — Help', `
     <p><b>Controls</b></p>
     <div class="kv"><span class="k">MOVE</span><span class="v g">Tap / click anywhere — your tycoon walks there (the only way they move)</span></div>
     <div class="kv"><span class="k">LOOK AROUND</span><span class="v">Drag or WASD / arrows / joystick to glide the bird\u2019s-eye view across the map — no distance cap, roam the whole Earth; detail streams wherever you look</span></div>
     <div class="kv"><span class="k">ROTATE</span><span class="v">Right-drag (or Ctrl+drag) · touch: pinch zoom</span></div>
-    <div class="kv"><span class="k">ZOOM</span><span class="v">Wheel / pinch (gentle, glide)</span></div>
+    <div class="kv"><span class="k">ZOOM</span><span class="v">Wheel / pinch — gentle at street level, faster with altitude; zoom out to a 23,000 km whole-world view of the real Earth</span></div>
     <div class="kv"><span class="k">FIND ME</span><span class="v">[C] or the crosshair button → snap back to your tycoon</span></div>
     <div class="kv"><span class="k">THE HORIZON</span><span class="v">Every city already stands in the world at metro scale — walk in and the true downtown gains full detail</span></div>
     <div class="kv"><span class="k">WALK TO A CITY</span><span class="v g">The gold pill above the bottom bar walks you to the nearest city — road-routed around lakes and seas, bridges included</span></div>
@@ -9345,7 +9567,8 @@ function buildTicker() {
 //     pan speed scales with how high the camera sits, and the focus
 //     roams freely — detail streams around whatever you look at
 //   · right-drag / middle-drag / Ctrl+drag rotates + tilts
-//   · wheel / pinch zooms gently (unchanged glide, wider 520m ceiling)
+//   · wheel / pinch zooms gently (v2.37: the ceiling is now the whole
+//     world — 23,000 km, the full flat Earth in one view)
 //   · WASD / arrows / the touch joystick pan from the keyboard
 //   · a TAP on the ground sends the character walking there (the only
 //     way it moves now) and re-attaches the follow camera
@@ -9392,7 +9615,12 @@ canvas.addEventListener('wheel', e => {
   if (STATE.mode !== 'city') return;
   let dy = e.deltaY * (e.deltaMode === 1 ? 33 : 1);   // deltaMode 1 = lines
   dy = THREE.MathUtils.clamp(dy, -180, 180);          // cap single-event jumps
-  camCtl.distT = THREE.MathUtils.clamp(camCtl.distT * Math.exp(dy * .0016), 45, ZOOM_MAX);
+  // v2.37: the glide stays gentle at street level (.0016 — the feel the
+  // user knows) and firms up smoothly with altitude (to .005 above
+  // ~60 km) so the climb from 100 m to the 23,000 km whole-world view
+  // takes ~35 notches instead of ~80
+  const zf = .0016 + .0034 * THREE.MathUtils.clamp((camCtl.distT - 800) / 60000, 0, 1);
+  camCtl.distT = THREE.MathUtils.clamp(camCtl.distT * Math.exp(dy * zf), 45, ZOOM_MAX);
 }, { passive: true });
 canvas.addEventListener('touchmove', e => {
   if (STATE.mode !== 'city' || e.touches.length !== 2) return;
@@ -9610,7 +9838,7 @@ function loop() {
     const ni = ACTORS.navInput();
     if (ni.active) {
       camCtl.follow = false;
-      const spd = THREE.MathUtils.clamp(camCtl.dist * .9, 18, 30000) * (ni.run ? 1.8 : 1);   // v2.27: altitude-scaled
+      const spd = THREE.MathUtils.clamp(camCtl.dist * .9, 18, 3e7) * (ni.run ? 1.8 : 1);   // v2.27 altitude-scaled; v2.37: cap raised with the 23,000 km ceiling — WASD still crosses one screen in ~2 s at ANY altitude
       const fx = -Math.sin(camCtl.az), fz = -Math.cos(camCtl.az);   // screen-up on the ground
       const rx = Math.cos(camCtl.az), rz = -Math.sin(camCtl.az);    // screen-right
       const [nx, nz] = clampPan(
@@ -9757,7 +9985,7 @@ EARTH.diveTo = (city, cb) => {
 };
 
 
-console.log('%cOPEN WORLD v2.36 — TRUE LAKES', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.37 — WHOLE-WORLD ZOOM', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
