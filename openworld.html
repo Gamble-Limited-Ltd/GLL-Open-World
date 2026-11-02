@@ -6,18 +6,6 @@
 <title>Open World — v2.40</title>
 <style>
 /* ==================================================================
-   OPEN WORLD v2.40 — HIGH COUNTRY: hills and mountains around the
-   map. One additive section (46_worldhills.js) grows real relief in
-   the open country — smooth pasture domes in the rolling provinces,
-   faceted snow-capped mountains in the high country — placed by a
-   smooth 24-km province field, gated per spot (never within 8 km of
-   a city, never in or over water, never over a road), streamed on a
-   6-km grid with an altitude-breathing radius, merged into
-   cell-local meshes at true 1:1. The ONLY other code touched is the
-   tree spawners, at the user's explicit direction: both addTree
-   functions now ask WM.blocked() so no tree ever spawns on top of a
-   hill or mountain. The world forest, lakes, zoom, roads, cities and
-   the economy ride untouched.
    OPEN WORLD v2.38 — DEEP-BLUE LAKES: the last green-bleed mechanism
    is dead, at every altitude. The land rings are outer-contour only,
    so lake interiors clipped as "land" — the grass shield rendered
@@ -729,7 +717,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.40 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, woodland belts around the cities, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), hills and snow-capped mountains across the high country between the cities (never in water, never over a road, never near a city — and the trees never on top of them), and the same streets, buildings, plots and roads on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.40 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, woodland belts around the cities, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — walk up to any building and it opens like a dollhouse at waist height so you can see its furnished rooms on every floor (every other building keeps its full silhouette), and the same streets, buildings, plots and roads on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -4009,7 +3997,6 @@ const WORLD = (() => {
   function addTree(B, x, z, s, rnd) {
     if (distToCity(x, z).d < CITY_R + 60 || nearRoad(x, z, 8)) return;
     if (LANDGEO.ready && LANDGEO.isWaterWorld(x, z)) return;   // v2.18: trees don't grow at sea
-    if (window.WM && window.WM.blocked(x, z, 8)) return;       // v2.40 HIGH COUNTRY: no tree on the world's hills & mountains
     const pine = rnd() < .42;
     const trunk = new THREE.CylinderGeometry(.22 * s, .3 * s, 2.2 * s, 6);
     B.addGeo(trunk, trs(x, 1.1 * s, z, rnd() * 3.14, 1, 1, 1), col(0x6b4f33));
@@ -9431,12 +9418,12 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.40 — HIGH COUNTRY', `
-    <p><b>Hills and mountains now stand around the map — real relief between the cities.</b></p>
-    <div class="kv"><span class="k">HIGH COUNTRY</span><span class="v">The open world is no longer flat: rolling green hills, highlands and true mountain ranges with snow-capped faceted peaks rise across the countryside — zoom out anywhere to see the ranges, or walk right up to one</span></div>
-    <div class="kv"><span class="k">PLACED LIKE THE REAL WORLD</span><span class="v">Every hill and mountain checks the Earth first — never in water, never over a road, never near a city — and the land flows in provinces: plains, rolling pasture, highlands and mountain country</span></div>
-    <div class="kv"><span class="k">TREES OFF THE PEAKS</span><span class="v">The forest now plants itself around the mountains, never on top of them — the treeline stops at the snow</span></div>
-    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The world forest, the deep-blue lakes, the 23,000 km whole-world zoom and the true 1:1 Earth are untouched — this update only ADDS the high country</span></div>
+  openModal('Welcome to v2.40 — OPEN HOUSE', `
+    <p><b>Walk up to any building and you can see the rooms inside it.</b></p>
+    <div class="kv"><span class="k">DOLLHOUSE CUT</span><span class="v">Get close to a building — on foot or with the camera — and its walls swing open at waist height: real floor slabs, partitions with doorways and a stair core, so every floor shows its rooms</span></div>
+    <div class="kv"><span class="k">FURNISHED ROOMS</span><span class="v">Offices with desks and monitors, apartments with beds and wardrobes, lobbies with reception counters and planters, shops with counters and shelves — every building's interior is its own and stays the same every visit</span></div>
+    <div class="kv"><span class="k">THE SKYLINE KEEPS ITS SHAPE</span><span class="v">Only the building you're at opens — every other one keeps its full silhouette, and it all heals the moment you step away or zoom out</span></div>
+    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The world forest, the deep-blue lakes, the 23,000 km whole-world zoom and the true 1:1 Earth are untouched — this update only ADDS the open house</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -10118,7 +10105,6 @@ const WF = (() => {
     if (WORLD.nearRoad(x, z, 8)) return;                      // off the asphalt, 8 m like every tree
     if (LANDGEO.ready && LANDGEO.isWaterWorld(x, z)) return;  // never at sea / never in a lake
     if (onPlot(x, z)) return;                                 // never on a roadside vendor plot
-    if (window.WM && window.WM.blocked(x, z, 8)) return;      // v2.40 HIGH COUNTRY: never on a hill or mountain
     const ry = rnd() * 3.14;
     B.addGeo(TRUNK, trs(x, 1.1 * s, z, ry, s, s, s), C_TRUNK);
     if (rnd() < .42) B.addGeo(PINE, trs(x, 3.6 * s, z, ry, s, s, s), C_PINE);
@@ -10208,7 +10194,7 @@ const WF = (() => {
   // on the shipped geometry that no tree stands in a city, in water or
   // on a road. Runs only when called from the console.
   function audit() {
-    let trees = 0, badCity = 0, badWater = 0, badRoad = 0, badMount = 0;
+    let trees = 0, badCity = 0, badWater = 0, badRoad = 0;
     for (const g of chunks.values()) {
       if (!g) continue;
       const m = g.children[0], pos = m.geometry.attributes.position;
@@ -10220,10 +10206,9 @@ const WF = (() => {
         if (nearCity(wx, wz) < BELT_R) badCity++;
         if (LANDGEO.ready && LANDGEO.isWaterWorld(wx, wz)) badWater++;
         if (WORLD.nearRoad(wx, wz, 8)) badRoad++;
-        if (window.WM && window.WM.blocked(wx, wz, 7.5)) badMount++;   // v2.40: no tree on a hill or mountain (7.5 = center-equivalent: ring verts sit ~.45 m past the center the 8 m guard places)
       }
     }
-    return { trees, badCity, badWater, badRoad, badMount };
+    return { trees, badCity, badWater, badRoad };
   }
   return { tick, reset, audit, get count() { return chunks.size; }, get meshed() { let n = 0; for (const v of chunks.values()) if (v) n++; return n; }, get trees() { return trees; },
     // QA: world-frame data of every standing forest chunk (null = built empty)
@@ -10243,393 +10228,530 @@ WORLD.update = function (dt, px, pz, camDist) {
 };
 window.WF = WF;   // QA surface
 
-
-// ======== section: 46_worldhills.js ========
+// ======== section: 46_openhouse.js ========
 // ====================================================================
-// v2.40 — HIGH COUNTRY. The ask: "add hills and moutains around the
-// map, just focus on this. And the only other code you can change is
-// for the trees. I don't want them to spawn on top of mountains."
+// v2.40 — OPEN HOUSE. The ask: "allow people to see the rooms inside
+// of buildings." This whole section is ADDITIVE: not one existing line
+// above was modified or removed (only the version strings and the
+// What's-New panel carry the new build number, exactly as every
+// release does). The lakes, the world forest, the 23,000 km zoom, the
+// streets and the economy all ride exactly as v2.39 shipped them.
 //
-// This section is ADDITIVE, exactly like 45_worldforest.js before it:
-// not one existing line was modified to place the hills and mountains.
-// The ONLY touch on prior code is inside the TREE spawners, which the
-// user explicitly authorized: both addTree functions (the world
-// forest's and the pasture pass's) now also ask WM.blocked(), so no
-// tree ever plants itself on a hill or a mountain.
-//
-// What ships here: the open country between the cities now has REAL
-// RELIEF. A smooth 24-km value-noise field splits the land into
-// provinces — plains, rolling pasture, highlands and true mountain
-// country — and each 6 km cell of a province grows what belongs there:
-// smooth green pasture domes (the exact recipe the city hill rings
-// already use) in the gentle provinces, and faceted snow-capped
-// mountains (flat-shaded cones, jagged by angle, green foot → rock →
-// snowline) in the high country, with twin peaks and foot hills.
-//
-// Every hill and mountain passes the same gates the rest of the world
-// obeys, BEFORE it is ever placed (the decision is deterministic and
-// cached per cell, so the mesh builder and the tree guard always
-// agree):
-//   • never within CITY_R + 8 km of any city — cities, their plates,
-//     belts, skyline sprawls and hill rings keep their approved look;
-//   • never in or over water — the whole footprint is census-checked
-//     against the real LANDGEO coastlines and lake rings;
-//   • never over a road — a sample grid covers the whole footprint and
-//     asks the world's own nearRoad, so every inter-city road, tail
-//     and bridge keeps a clear 260 m+ corridor.
-//
-// Streaming mirrors the pasture/forest passes (same follow/pan focus
-// rule, same 400 ms cadence) on a 6 km grid with altitude-breathing
-// radius (14 km at street level up to 88 km high up; mobile 9→34 km)
-// and a fixed dispose hysteresis, merged per cell into chunk-local
-// meshes — float32-safe at 1:1, exactly like everything else.
+// What is new: walk your tycoon up to any building — or pan the view
+// right up to one — and it opens like a dollhouse. The mechanism is a
+// world-space clip rig (renderer.localClippingEnabled + one horizontal
+// cut plane and up to 12 vertical hull planes on the BUILDING SHELL
+// materials only, with clipIntersection so a fragment is cut only when
+// it is inside the prism AND above the cut):
+//   - the shell meshes are captured precisely at build time (the
+//     capture window is the city builder's own "Raising … buildings"
+//     status phase, so walls, shopfronts, roofs, parapets and rooftop
+//     clutter are caught, and roads / ground / trees / cars never are);
+//   - the opened building's own shell is sliced at 1.45 m — walls stay
+//     as waist-high rims, the roof and upper walls lift away, and every
+//     OTHER building keeps its full silhouette (the prism hugs the
+//     footprint's convex hull + 22 cm, so only geometry standing inside
+//     that column above the cut is removed);
+//   - inside, a furnished interior is generated deterministically per
+//     building (seeded by its own bkey): floor slabs with stair-core
+//     openings, partitions with doorways, and rooms dressed by type —
+//     offices with desks/monitors/chairs, apartments with beds and
+//     wardrobes, lobbies with reception counters and planters, retail
+//     floors with counters, shelves and crates. One merged vertex-color
+//     Lambert mesh, cast-shadowed, DoubleSide so every winding is safe;
+//   - step away (or zoom past ~340 m) and the building heals instantly.
+//     Interiors stream from a tiny LRU cache (max 4 meshes) and die
+//     with the city group like every other city mesh.
+// Nothing spawns in water, nothing existing is regenerated, and every
+// openhouse call is try/caught so a mistake here can never touch the
+// world. window.OH exposes the state for QA.
 // ====================================================================
-const WM = (() => {
-  const CH = 6000;                      // relief cell size (m) — mountains are big
-  const CITY_R = 745;                   // mirrors WORLD's CITY_R
-  const CITY_CLEAR = CITY_R + 8000;     // cities + plates + belts + skyline sprawl stay mountain-free
-  const MOB = matchMedia('(pointer:coarse)').matches;
-  const BASE_R = MOB ? 9000 : 14000;    // relief stands this far out at street level
-  const MAX_R = MOB ? 34000 : 88000;    // …and this far once you are high up
-  const DISPOSE_R = MAX_R + 12000;      // fixed hysteresis — no churn on zoom cycles
-  const MAXF = 2400;                    // largest footprint any spot can have (m)
+const OH = (() => {
+  // ---- tuning -------------------------------------------------------
+  const CUT = 1.45;            // dollhouse cut height above the pad
+  const MARGIN = .22;          // prism grows past the wall line so the shell's own zero-thickness quads clip
+  const OPEN_R = 40;           // focus-to-centroid radius that opens a building
+  const HEAL_R = 58;           // heal radius (hysteresis band)
+  const SWITCH_F = .7;         // a rival must be this much closer to steal an opening
+  const ZOOM_OPEN = 280;       // open only at street-ish views
+  const ZOOM_HEAL = 340;       // heal once the view pulls back past this
+  const FH = 3.2;              // the game's own floor height (h / 3.2)
+  const SLAB0 = .21;           // ground-floor finish height (clear of the .16 pad)
+  const SKIRT = .24;           // slab edge band so each floor reads as a plate
+  const PART_H = 2.99;         // partitions run slab-to-slab (airtight stack)
+  const PART_T = .15;          // partition thickness
+  const DOOR = 1.15;           // doorway gap in every partition
+  const MAXEDGE = 12;          // vertical prism planes (FIXED count -> no recompile churn)
+  const CACHE_MAX = 4;         // furnished interiors kept alive at once
 
-  const cells = new Map();              // 'cx,cz' -> group | null (null = built empty)
-  const spotCache = new Map();          // 'cx,cz' -> spots (deterministic, shared with the tree guard)
-  let queue = [], lastUpd = 0, root = null;
+  try { renderer.localClippingEnabled = true; } catch (e) { }
 
-  // ---- colors ---------------------------------------------------------
-  const wcol = hex => { const c = new THREE.Color(hex); return [c.r, c.g, c.b]; };
-  const HILL_BASE = new THREE.Color(0x619a44), HILL_LIFT = new THREE.Color(0x9cc47a);   // the approved pasture-hill greens
-  const hillMat = new THREE.MeshLambertMaterial({ vertexColors: true });
-  const mountMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });   // crisp facets
-  const HILLGEO = new THREE.SphereGeometry(1, 12, 8, 0, 6.2832, 0, 1.35);   // the city hill ring's own dome
+  // ---- the clip rig: 13 shared world-space planes -------------------
+  // plane[0] = horizontal cut; plane[1..12] = vertical hull edges.
+  // A parked plane (normal (0,-1,0), constant 1e9) clips nothing, so a
+  // fixed-length array can be mutated in place every frame with zero
+  // shader recompiles (only constants move; count never changes).
+  const planes = [];
+  for (let i = 0; i <= MAXEDGE; i++) planes.push(new THREE.Plane(new THREE.Vector3(0, -1, 0), 1e9));
+  let planesActive = false;
+  function parkAll() {
+    for (const p of planes) { p.normal.set(0, -1, 0); p.constant = 1e9; }
+    planesActive = false;
+  }
 
-  // ---- micro merged-geometry builder (same contract as the forest's) --
-  const _nm3 = new THREE.Matrix3(), _v3a = new THREE.Vector3(), _v3b = new THREE.Vector3();
-  const _mShift = new THREE.Matrix4();
-  function GeoB(ox, oz) {
-    const off = (ox || 0) !== 0 || (oz || 0) !== 0;
-    if (off) _mShift.makeTranslation(-(ox || 0), 0, -(oz || 0));
-    const pos = [], norm = [], uv = [], colr = [];
-    function addGeo(geo, mat4, color) {
-      const p = geo.attributes.position, n = geo.attributes.normal;
-      const vc = color ? null : geo.attributes.color;   // per-vertex colors (mountains)
-      const idx = geo.index ? geo.index.array : null;
-      const count = idx ? idx.length : p.count;
-      _nm3.getNormalMatrix(mat4);
-      for (let i = 0; i < count; i++) {
-        const vi = idx ? idx[i] : i;
-        _v3a.fromBufferAttribute(p, vi).applyMatrix4(mat4);
-        if (off) _v3a.applyMatrix4(_mShift);
-        _v3b.fromBufferAttribute(n, vi).applyMatrix3(_nm3).normalize();
-        pos.push(_v3a.x, _v3a.y, _v3a.z);
-        norm.push(_v3b.x, _v3b.y, _v3b.z);
-        uv.push(0, 0);
-        if (vc) colr.push(vc.getX(vi), vc.getY(vi), vc.getZ(vi));
-        else colr.push(color[0], color[1], color[2]);
+  // convex hull (monotone chain, CCW) — the prism of a concave footprint
+  // is its hull so the WHOLE building opens (the kernel would leave arms closed)
+  function hullOf(pts) {
+    const P = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    if (P.length < 3) return null;
+    const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const lo = [], up = [];
+    for (const p of P) { while (lo.length > 1 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+    for (let i = P.length - 1; i >= 0; i--) {
+      const p = P[i];
+      while (up.length > 1 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop();
+      up.push(p);
+    }
+    lo.pop(); up.pop();
+    const h = lo.concat(up);
+    return h.length >= 3 ? h : null;
+  }
+
+  function setPrism(poly) {
+    planes[0].normal.set(0, -1, 0);
+    planes[0].constant = CUT;
+    let h = hullOf(poly);
+    if (!h) {
+      let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+      for (const v of poly) { x0 = Math.min(x0, v[0]); x1 = Math.max(x1, v[0]); z0 = Math.min(z0, v[1]); z1 = Math.max(z1, v[1]); }
+      h = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
+    }
+    const edges = [];
+    for (let i = 0; i < h.length; i++) {
+      const a = h[i], c = h[(i + 1) % h.length];
+      const dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz);
+      if (L > .05) edges.push({ a, nx: dz / L, nz: -dx / L, L });   // outward normal for CCW — the wallBand convention
+    }
+    edges.sort((e, f) => f.L - e.L);          // keep the longest hull edges
+    for (let i = 1; i <= MAXEDGE; i++) {
+      const p = planes[i], e = edges[i - 1];
+      if (e) { p.normal.set(e.nx, 0, e.nz); p.constant = -(e.nx * e.a[0] + e.nz * e.a[1]) - MARGIN; }
+      else { p.normal.set(0, -1, 0); p.constant = -1e9; }   // ALWAYS-CLIPPED side: never constrains the intersection
+    }
+    planesActive = true;
+  }
+
+  // ---- shell capture: exact, at build time --------------------------
+  // The capture window is the city builder's own "Raising …" status
+  // phase: between "Raising N buildings…" and "Marking real estate…"
+  // the ONLY meshes added to the city group are the building shell's
+  // (walls x4, shopfronts, roofs, pitched faces, trim, HVAC/tank/
+  // antenna clutter — and barn walls in the open country). The
+  // prototype wrap is inert outside that window.
+  let shellMeshes = [], win = false;
+  function attachPlanes() {
+    const seen = new Set();
+    for (const m of shellMeshes) {
+      const mat = m && m.material;
+      if (!mat || Array.isArray(mat) || !mat.isMeshLambertMaterial || seen.has(mat)) continue;
+      seen.add(mat);
+      try {
+        mat.clippingPlanes = planes;
+        mat.clipIntersection = true;
+        mat.clipShadows = true;
+        mat.needsUpdate = true;
+      } catch (e) { }
+    }
+  }
+  const __ohAdd = THREE.Object3D.prototype.add;
+  THREE.Object3D.prototype.add = function (...objs) {
+    try {
+      if (win && this === CITY.group) {
+        for (const o of objs)
+          if (o && (o.isMesh || o.isInstancedMesh) && o.material && !Array.isArray(o.material) && o.material.isMeshLambertMaterial)
+            shellMeshes.push(o);
       }
-    }
-    function mesh(mat) {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(norm, 3));
-      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3));
-      const m = new THREE.Mesh(g, mat);
-      if (off) m.position.set(ox, 0, oz);   // cell-local frame (float32-safe at 1:1)
-      m.castShadow = true;                  // big landforms throw real shadows at mid zoom
-      return m;
-    }
-    return { addGeo, mesh, get count() { return pos.length / 3; } };
-  }
-  const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _s3 = new THREE.Vector3(), _s2 = new THREE.Vector3();
-  function trs(x, y, z, ry, sx, sy, sz) {
-    _e.set(0, ry || 0, 0);
-    _q.setFromEuler(_e);
-    return _m4.compose(_s3.set(x, y, z), _q, _s2.set(sx, sy, sz)).clone();
-  }
+    } catch (e) { }
+    return __ohAdd.apply(this, objs);
+  };
+  const __ohBuild = CITY.build.bind(CITY);
+  CITY.build = async function (cityData, cityMeta, anchor, onStatus) {
+    const st = typeof onStatus === 'function' ? onStatus : null;
+    const wrap = st ? function (s) {
+      try {
+        if (/^Raising/.test(s)) { win = true; shellMeshes = []; }
+        else if (/^Marking/.test(s)) {
+          win = false;
+          if (shellMeshes.length < 2 && CITY.group) {   // fallback: at this instant the group holds ground, roads and SHELLS only
+            try {
+              CITY.group.traverse(o => {
+                if (o !== CITY.group && o.isMesh && !o.isInstancedMesh && o.castShadow &&
+                  o.material && !Array.isArray(o.material) && o.material.isMeshLambertMaterial)
+                  shellMeshes.push(o);
+              });
+            } catch (e) { }
+          }
+          attachPlanes();
+        }
+      } catch (e) { }
+      return st(s);
+    } : null;
+    return __ohBuild(cityData, cityMeta, anchor, wrap);
+  };
 
-  // ---- the placement gates (deterministic — mesh and tree guard agree) --
-  function cityClear(x, z) {
-    for (const c of CITIES) if (Math.hypot(x - c.wx, z - c.wz) < CITY_CLEAR) return false;
-    return true;
-  }
-  function dryFootprint(x, z, fr) {
-    if (!LANDGEO.ready) return true;                    // the game's own convention pre-boot
-    if (LANDGEO.isWaterWorld(x, z)) return false;
-    for (let k = 0; k < 12; k++) {                      // rim ring — the shore shapes the mountain
-      const a = k / 12 * 6.2832;
-      if (LANDGEO.isWaterWorld(x + Math.cos(a) * fr * .96, z + Math.sin(a) * fr * .96)) return false;
-    }
-    for (let k = 0; k < 8; k++) {                       // mid ring — no bay hiding inside
-      const a = k / 8 * 6.2832 + .39;
-      if (LANDGEO.isWaterWorld(x + Math.cos(a) * fr * .55, z + Math.sin(a) * fr * .55)) return false;
-    }
-    return true;
-  }
-  function roadClear(x, z, fr) {
-    // a sample grid blankets the whole footprint (pitch 800 ≤ 850·√2 so
-    // the 850 m detection discs overlap) and asks the world's own
-    // nearRoad — 850 stays inside its documented RCELL ceiling. The
-    // +350 m skirt catches roads that only graze the rim.
-    const D = fr + 260;
-    const n = Math.max(1, Math.ceil((2 * D) / 800));
-    for (let i = 0; i <= n; i++) for (let j = 0; j <= n; j++) {
-      const px = x - D + (2 * D) * i / n, pz = z - D + (2 * D) * j / n;
-      if (Math.hypot(px - x, pz - z) > D + 350) continue;
-      if (WORLD.nearRoad(px, pz, 850)) return false;
-    }
-    return true;
-  }
+  // ---- the interior builder -----------------------------------------
+  const _col = new THREE.Color();
+  const C = h => { _col.setHex(h); return [_col.r, _col.g, _col.b]; };
+  const jitA = (c, f) => [c[0] * f, c[1] * f, c[2] * f];
+  const FLOORS_OFF = [C(0xa98f6f), C(0x9aa0a3)], FLOORS_HOME = [C(0xb39068), C(0xa98f6f)];
+  const FLOOR_RETAIL = C(0xcfc8bb), FLOOR_LOBBY = C(0xd6d0c4);
+  const PARTC = [C(0xefe9dc), C(0xe6dfd2)];
+  const C_DESK = C(0x8a6a48), C_MON = C(0x23262b), C_CHAIR = C(0x46505a), C_CAB = C(0x6d7278);
+  const C_BEDF = C(0x7a5c44), C_BEDD = C(0xece5d6), C_PIL = C(0xf4f0e7), C_WARD = C(0x5f4632);
+  const C_CNT = C(0x6f4f36), C_CNTTOP = C(0xd9cdbb), C_SHELF = C(0x7f6a4f), C_CRATE = C(0x9c7c50);
+  const C_POT = C(0x6b5a48), C_PLANT = C(0x3e7c41), C_BENCH = C(0x86664c), C_STAIR = C(0x9c8668);
+  const RUGS = [C(0xa2653f), C(0x7e8ea0), C(0x8f7f5a)];
 
-  // ---- province field: smooth 24-km value noise ------------------------
-  // plains ↔ rolling ↔ highlands ↔ mountain country, in blobs 24-60 km
-  // across, so ranges READ as ranges instead of uniform scatter.
-  function regionV(cx, cz) {
-    const fx = cx / 4, fz = cz / 4;
-    const ix = Math.floor(fx), iz = Math.floor(fz);
-    let tx = fx - ix, tz = fz - iz;
-    tx = tx * tx * (3 - 2 * tx); tz = tz * tz * (3 - 2 * tz);
-    const a = _ihash(ix, iz, 7717), b = _ihash(ix + 1, iz, 7717),
-          c = _ihash(ix, iz + 1, 7717), d = _ihash(ix + 1, iz + 1, 7717);
-    return a + (b - a) * tx + (c - a) * tz + (a - b - c + d) * tx * tz;
-  }
+  function buildInterior(b, anchor) {
+    const P = b.poly, ax = anchor.x, az = anchor.z;
+    const rnd = _mulberry(hashStr('oh' + b.bkey));
+    const nF = Math.max(1, Math.round(b.h / FH));
+    const pos = [], nor = [], uv = [], col = [];
+    let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+    for (const v of P) { x0 = Math.min(x0, v[0]); x1 = Math.max(x1, v[0]); z0 = Math.min(z0, v[1]); z1 = Math.max(z1, v[1]); }
+    const w = x1 - x0, d = z1 - z0;
 
-  // ---- deterministic spots per cell (the single source of truth) -------
-  function spotsFor(cx, cz) {
-    const key = cx + ',' + cz;
-    let s = spotCache.get(key);
-    if (s) return s;
-    const rnd = _mulberry(hashStr('wm' + key));
-    const v = regionV(cx, cz);
-    const spots = [];
-    const x0 = cx * CH, z0 = cz * CH;
-    const jx = () => x0 + 700 + rnd() * (CH - 1400);    // spot centers stay inside their cell
-    const jz = () => z0 + 700 + rnd() * (CH - 1400);
-    const clampIn = (x) => Math.min(x0 + CH - 700, Math.max(x0 + 700, x));
-    const put = (type, x, z, a, b, zf, f) => {
-      const sink = type === 'hill' ? Math.max(14, b * .28 + 8) : Math.max(40, b * .07);
-      const H = b + sink;
-      const fr = type === 'hill'
-        ? a * Math.sqrt(Math.max(0, 1 - (sink / H) * (sink / H)))
-        : a * b / H;
-      if (!cityClear(x, z)) return null;
-      if (!dryFootprint(x, z, fr)) return null;
-      if (!roadClear(x, z, fr)) return null;
-      const spot = { type, x, z, a, b, zf, f, fr };
-      spots.push(spot);
-      return spot;
+    function inP(x, z) { return CITY.inPoly(x, z, P); }
+    function rectIn(rx0, rz0, rx1, rz1) {
+      return inP(rx0, rz0) && inP(rx1, rz0) && inP(rx1, rz1) && inP(rx0, rz1) && inP((rx0 + rx1) / 2, (rz0 + rz1) / 2);
+    }
+    function spotOK(x, z, hw, hd) {
+      return inP(x, z) && inP(x - hw, z - hd) && inP(x + hw, z - hd) && inP(x + hw, z + hd) && inP(x - hw, z + hd);
+    }
+
+    // quad: two tris A,B,C / A,C,D — world in, city-local out
+    const q = (A, B, Cq, D, n, c) => {
+      pos.push(A[0] - ax, A[1], A[2] - az, B[0] - ax, B[1], B[2] - az, Cq[0] - ax, Cq[1], Cq[2] - az,
+        A[0] - ax, A[1], A[2] - az, Cq[0] - ax, Cq[1], Cq[2] - az, D[0] - ax, D[1], D[2] - az);
+      for (let k = 0; k < 6; k++) { nor.push(n[0], n[1], n[2]); uv.push(0, 0); col.push(c[0], c[1], c[2]); }
     };
-    if (v >= .84) {
-      // MOUNTAIN COUNTRY — a big faceted mount, often a twin, often a foot hill
-      const R1 = 1000 + rnd() * 1400, h1 = 430 + rnd() * 520;
-      const m1 = put('mount', jx(), jz(), R1, h1, .8 + rnd() * .5, 0);
-      if (m1 && rnd() < .45) {
-        const ang = rnd() * 6.2832, d = 1250 + rnd() * 1500;
-        const m2x = clampIn(m1.x + Math.cos(ang) * d), m2z = clampIn(m1.z + Math.sin(ang) * d);
-        if (Math.hypot(m2x - m1.x, m2z - m1.z) > 800)   // never concentric after the edge clamp
-          put('mount', m2x, m2z, R1 * (.5 + rnd() * .28), h1 * (.5 + rnd() * .3), .8 + rnd() * .5, 0);
-      }
-      if (rnd() < .5) put('hill', jx(), jz(), 300 + rnd() * 380, 80 + rnd() * 100, .75 + rnd() * .5, .18 + rnd() * .3);
-    } else if (v >= .68) {
-      // HIGHLANDS — pasture domes with the odd small mount
-      put('hill', jx(), jz(), 350 + rnd() * 430, 90 + rnd() * 100, .75 + rnd() * .5, .18 + rnd() * .3);
-      if (rnd() < .4) put('mount', jx(), jz(), 750 + rnd() * 750, 300 + rnd() * 260, .8 + rnd() * .5, 0);
-    } else if (v >= .46) {
-      // ROLLING PASTURE — one or two green domes
-      put('hill', jx(), jz(), 280 + rnd() * 360, 70 + rnd() * 100, .75 + rnd() * .5, .18 + rnd() * .3);
-      if (rnd() < .25) put('hill', jx(), jz(), 180 + rnd() * 160, 50 + rnd() * 50, .75 + rnd() * .5, .18 + rnd() * .3);
-    } else if (rnd() < .1) {
-      // PLAINS — the occasional lone hill on the horizon
-      put('hill', jx(), jz(), 220 + rnd() * 200, 60 + rnd() * 60, .75 + rnd() * .5, .18 + rnd() * .3);
-    }
-    spotCache.set(key, spots);
-    if (spotCache.size > 24000) {                       // bounded: trim the oldest fifth
-      let n = 4800;
-      for (const k of spotCache.keys()) { if (n-- <= 0) break; spotCache.delete(k); }
-    }
-    return spots;
-  }
+    const box = (x, y0, y1, z, hw, hd, c) => {
+      q([x + hw, y0, z - hd], [x + hw, y1, z - hd], [x + hw, y1, z + hd], [x + hw, y0, z + hd], [1, 0, 0], c);
+      q([x - hw, y0, z + hd], [x - hw, y1, z + hd], [x - hw, y1, z - hd], [x - hw, y0, z - hd], [-1, 0, 0], c);
+      q([x + hw, y0, z + hd], [x + hw, y1, z + hd], [x - hw, y1, z + hd], [x - hw, y0, z + hd], [0, 0, 1], c);
+      q([x - hw, y0, z - hd], [x - hw, y1, z - hd], [x + hw, y1, z - hd], [x + hw, y0, z - hd], [0, 0, -1], c);
+      q([x - hw, y1, z + hd], [x + hw, y1, z + hd], [x + hw, y1, z - hd], [x - hw, y1, z - hd], [0, 1, 0], c);
+    };
 
-  // ---- the landforms ----------------------------------------------------
-  const _hc = new THREE.Color();
-  function addHill(B, s) {
-    const sink = Math.max(14, s.b * .28 + 8), H = s.b + sink;
-    _hc.copy(HILL_BASE).lerp(HILL_LIFT, s.f * .8);     // the approved pasture-hill blend
-    B.addGeo(HILLGEO, trs(s.x, -sink, s.z, 0, s.a, H, s.a * s.zf), [_hc.r, _hc.g, _hc.b]);
-  }
-  const _mca = new THREE.Color(0x58913c), _mcb = new THREE.Color(0x6f7a5a),   // land green → rock green
-        _mcc = new THREE.Color(0x8b8b7f), _mcd = new THREE.Color(0xedf2f6), _mcc2 = new THREE.Color();
-  function addMount(B, s, key, i) {
-    const mrnd = _mulberry(hashStr('wm#' + key + '.' + i));
-    const R = s.a, h = s.b, sink = Math.max(40, h * .07), H = h + sink;
-    const g = new THREE.ConeGeometry(1, 1, 9, 5, true);   // open-ended — the base cap is underground
-    const p = g.attributes.position;
-    const jag = [], sj = [];
-    for (let k = 0; k < 9; k++) { jag.push((mrnd() - .5) * .26); sj.push((mrnd() - .5) * .16); }
-    const cols = [];
-    for (let vi = 0; vi < p.count; vi++) {
-      const lx = p.getX(vi), ly = p.getY(vi), lz = p.getZ(vi);
-      const ang = Math.atan2(lz, lx);
-      const ai = ((Math.round(ang / (Math.PI * 2 / 9)) % 9) + 9) % 9;   // seam duplicates agree — no crack
-      const t = ly + .5;                                  // 0 at the base ring, 1 at the apex
-      const disp = 1 + jag[ai] * t;                        // base undisplaced; the peak leans jagged
-      p.setXYZ(vi, lx * disp, ly, lz * disp);
-      const u = Math.max(0, Math.min(1, (t * H - sink) / h));   // visible height fraction
-      const snow = .62 + sj[ai];                                 // an organically wobbling snowline
-      if (u < .14) _mcc2.copy(_mca);
-      else if (u < .32) _mcc2.copy(_mca).lerp(_mcb, (u - .14) / .18);
-      else if (u < snow - .09) _mcc2.copy(_mcb).lerp(_mcc, Math.min(1, (u - .32) / Math.max(.14, snow - .09 - .32)));
-      else if (u < snow) _mcc2.copy(_mcc).lerp(_mcd, (u - (snow - .09)) / .09);
-      else _mcc2.copy(_mcd);
-      cols.push(_mcc2.r, _mcc2.g, _mcc2.b);
-    }
-    g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
-    B.addGeo(g, trs(s.x, H / 2 - sink, s.z, mrnd() * 6.2832, R, H, R * s.zf), null);
-  }
+    // stair core: solid 8-step flight in the (x0,z0) corner, marching +z;
+    // slabs above get the matching opening (earcut hole)
+    const stX = x0 + 1.35, stZ = z0 + 1.35;
+    const sOK = nF >= 2 && w >= 4.6 && d >= 4.6 && rectIn(stX - .68, stZ - .2, stX + .68, stZ + 2.5);
+    const holeRing = [[stX - .6, stZ - .12], [stX + .6, stZ - .12], [stX + .6, stZ + 2.38], [stX - .6, stZ + 2.38]];
 
-  // ---- streaming (mirrors the forest pass) ------------------------------
-  function build(cx, cz) {
-    const key = cx + ',' + cz;
-    if (cells.has(key)) return;
-    cells.set(key, null);                 // reserve — built, even if it ends up empty
-    const spots = spotsFor(cx, cz);
-    if (!spots.length) return;
-    const xm = cx * CH + CH / 2, zm = cz * CH + CH / 2;
-    const hillB = GeoB(xm, zm), mountB = GeoB(xm, zm);
-    let hasHill = false, hasMount = false;
-    spots.forEach((s, i) => {
-      if (s.type === 'hill') { addHill(hillB, s); hasHill = true; }
-      else { addMount(mountB, s, key, i); hasMount = true; }
-    });
-    const cg = new THREE.Group();
-    if (hasHill && hillB.count) cg.add(hillB.mesh(hillMat));
-    if (hasMount && mountB.count) cg.add(mountB.mesh(mountMat));
-    if (root) root.add(cg);
-    cells.set(key, cg);
-  }
-  function dispose(key) {
-    const cg = cells.get(key);
-    if (cg) cg.traverse(o => { if (o.geometry) { try { o.geometry.dispose(); } catch (e) { } } });
-    if (cg && cg.parent) cg.parent.remove(cg);
-    cells.delete(key);
-  }
-  function reset() {
-    for (const key of [...cells.keys()]) dispose(key);
-    queue = [];
-  }
-  function tick(dt, px, pz, camDist) {
-    const r = WORLD.group;
-    if (!r) { if (cells.size) reset(); return; }    // world not built / disposed
-    if (r !== root) { reset(); root = r; }          // the world rebuilt under us
-    const now = performance.now();
-    const fx = camCtl.follow ? px : camCtl.tx, fz = camCtl.follow ? pz : camCtl.tz;
-    // relief is big and reads from far away: the zone breathes out
-    // much further than the pasture/forest detail rings
-    const R = Math.min(BASE_R + Math.max(0, camDist - 260) * 1.05, MAX_R);
-    if (now - lastUpd > 400) {
-      lastUpd = now;
-      const c0x = Math.floor((fx - R) / CH), c1x = Math.floor((fx + R) / CH);
-      const c0z = Math.floor((fz - R) / CH), c1z = Math.floor((fz + R) / CH);
-      const want = new Set();
-      for (let cx = c0x; cx <= c1x; cx++) for (let cz = c0z; cz <= c1z; cz++) want.add(cx + ',' + cz);
-      for (const key of [...cells.keys()]) {
-        if (want.has(key)) continue;
-        const [cx, cz] = key.split(',').map(Number);
-        if (Math.abs(cx * CH + CH / 2 - fx) > DISPOSE_R || Math.abs(cz * CH + CH / 2 - fz) > DISPOSE_R) dispose(key);
-      }
-      queue = [...want].filter(k => !cells.has(k))
-        .map(k => { const [cx, cz] = k.split(',').map(Number); return { k, cx, cz, d: Math.hypot(cx * CH + CH / 2 - fx, cz * CH + CH / 2 - fz) }; })
-        .sort((a, b) => a.d - b.d);
-    }
-    for (let i = 0; i < 3 && queue.length; i++) {
-      const job = queue.shift();
-      build(job.cx, job.cz);
-    }
-  }
-
-  // ---- the tree guard (the ONE authorized change to the tree spawners) --
-  // true when (x,z) sits on a hill dome or a mountainside (+margin).
-  function blocked(x, z, m) {
-    const R = MAXF + (m || 0);
-    const c0x = Math.floor((x - R) / CH), c1x = Math.floor((x + R) / CH);
-    const c0z = Math.floor((z - R) / CH), c1z = Math.floor((z + R) / CH);
-    for (let cx = c0x; cx <= c1x; cx++) for (let cz = c0z; cz <= c1z; cz++) {
-      const spots = spotsFor(cx, cz);
-      for (let i = 0; i < spots.length; i++) {
-        const s = spots[i], dx = x - s.x, dz = z - s.z, rr = s.fr + (m || 0);
-        if (dx * dx + dz * dz < rr * rr) return true;
-      }
-    }
-    return false;
-  }
-
-  // ---- QA ---------------------------------------------------------------
-  function audit() {
-    let mounts = 0, hills = 0, badWater = 0, badCity = 0, badRoad = 0, maxFr = 0;
-    for (const key of cells.keys()) {
-      const [cx, cz] = key.split(',').map(Number);
-      for (const s of spotsFor(cx, cz)) {
-        if (s.type === 'mount') mounts++; else hills++;
-        if (s.fr > maxFr) maxFr = s.fr;
-        let dcity = 1e18;
-        for (const c of CITIES) { const d = Math.hypot(s.x - c.wx, s.z - c.wz); if (d < dcity) dcity = d; }
-        if (dcity < CITY_CLEAR) badCity++;
-        if (LANDGEO.ready && (LANDGEO.isWaterWorld(s.x, s.z) ||
-          LANDGEO.isWaterWorld(s.x + s.fr * .96, s.z) || LANDGEO.isWaterWorld(s.x, s.z + s.fr * .96))) badWater++;
-        if (!roadClear(s.x, s.z, s.fr)) badRoad++;
-      }
-    }
-    return { cells: cells.size, mounts, hills, badWater, badCity, badRoad, maxFr: +maxFr.toFixed(0) };
-  }
-  function visible(v) { for (const cg of cells.values()) if (cg) cg.visible = !!v; }
-  function census() {
-    let m = 0, h = 0;
-    for (const key of cells.keys()) {
-      const [cx, cz] = key.split(',').map(Number);
-      for (const s of spotsFor(cx, cz)) (s.type === 'mount') ? m++ : h++;
-    }
-    return { cells: cells.size, meshed: [...cells.values()].filter(v => v).length, mounts: m, hills: h, cachedCells: spotCache.size };
-  }
-  function debug() {
-    const out = [];
-    for (const [key, cg] of cells) {
-      if (!cg) continue;
-      const [cx, cz] = key.split(',').map(Number);
-      out.push({ k: key, spots: spotsFor(cx, cz).map(s => ({ t: s.type, x: +s.x.toFixed(0), z: +s.z.toFixed(0), fr: +s.fr.toFixed(0), h: s.b })) });
-    }
-    return out;
-  }
-  return { tick, reset, blocked, audit, census, visible, debug,
-    get count() { return cells.size; },
-    // nearest standing spot to (x,z) — QA: drive the camera to a mountain
-    near(x, z) {
-      let best = null, bd = 1e18;
-      for (const key of cells.keys()) {
-        const [cx, cz] = key.split(',').map(Number);
-        for (const s of spotsFor(cx, cz)) {
-          const d = Math.hypot(s.x - x, s.z - z);
-          if (d < bd) { bd = d; best = s; }
+    const slab = (yb, i, fc) => {
+      const contour = P.map(v => new THREE.Vector2(v[0] - ax, v[1] - az));
+      const holes = [];
+      if (i >= 1 && sOK) holes.push(holeRing.map(v => new THREE.Vector2(v[0] - ax, v[1] - az)));
+      let tris = null;
+      try { tris = THREE.ShapeUtils.triangulateShape(contour, holes); } catch (e) { tris = null; }
+      if (tris && tris.length) {
+        const verts = contour.concat(...holes);
+        for (const t of tris) {
+          const A = verts[t[0]], Bv = verts[t[1]], Cv = verts[t[2]];
+          pos.push(A.x, yb, A.y, Cv.x, yb, Cv.y, Bv.x, yb, Bv.y);   // roofDeck's proven emit order
+          for (let k = 0; k < 3; k++) { nor.push(0, 1, 0); uv.push(0, 0); col.push(fc[0], fc[1], fc[2]); }
         }
       }
-      return best ? { type: best.type, x: best.x, z: best.z, fr: best.fr, h: best.b, d: +bd.toFixed(0) } : null;
-    } };
-})();
+      if (i > 0) {
+        const sc = jitA(fc, .8);
+        for (let e = 0; e < P.length; e++) {
+          const a = P[e], c = P[(e + 1) % P.length];
+          const dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz);
+          if (L < .05) continue;
+          const nx = dz / L, nz = -dx / L;
+          q([a[0], yb - SKIRT, a[1]], [a[0], yb, a[1]], [c[0], yb, c[1]], [c[0], yb - SKIRT, c[1]], [nx, 0, nz], sc);
+        }
+      }
+    };
 
-// ADDITIVE hook — stacked on the forest's wrap: WORLD.update keeps
-// doing everything it always did, the forest ticks after it, and the
-// high country ticks right after the forest. Every WM call is
-// try/caught so a relief error can never touch the world.
-const __wmOrigUpdate = WORLD.update.bind(WORLD);
+    // longest contiguous inside-poly run of a segment (t0,t1 fractions)
+    function insideRun(axp, azp, bxp, bzp) {
+      const L = Math.hypot(bxp - axp, bzp - azp) || 1;
+      const N = Math.max(8, Math.ceil(L * 2.2));
+      let best = null, run = null;
+      for (let k = 0; k <= N; k++) {
+        const t = k / N, x = axp + (bxp - axp) * t, z = azp + (bzp - azp) * t;
+        if (inP(x, z)) { if (!run) run = [t, t]; run[1] = t; }
+        else if (run) { if (!best || run[1] - run[0] > best[1] - best[0]) best = run; run = null; }
+      }
+      if (run && (!best || run[1] - run[0] > best[1] - best[0])) best = run;
+      return best;
+    }
+
+    // one partition: a wall segment with a doorway, trimmed to the real interior
+    function wallRun(axp, azp, bxp, bzp, yb, pc) {
+      const run = insideRun(axp, azp, bxp, bzp);
+      if (!run) return;
+      const L = Math.hypot(bxp - axp, bzp - azp) || 1;
+      const s0 = run[0] * L + .35, s1 = run[1] * L - .35;
+      if (s1 - s0 < 2.6) return;
+      const ux = (bxp - axp) / L, uz = (bzp - azp) / L;
+      const dC = s0 + (s1 - s0) * (.3 + rnd() * .4), dH = DOOR / 2;
+      const seg = (m0, m1) => {
+        if (m1 - m0 < .2) return;
+        const px = axp + ux * m0, pz = azp + uz * m0, qx = axp + ux * m1, qz = azp + uz * m1;
+        if (Math.abs(ux) < .01) box(px, yb, yb + PART_H, (pz + qz) / 2, PART_T / 2, Math.abs(qz - pz) / 2, pc);
+        else box((px + qx) / 2, yb, yb + PART_H, pz, Math.abs(qx - px) / 2, PART_T / 2, pc);
+      };
+      seg(s0, dC - dH); seg(dC + dH, s1);
+    }
+
+    // ---- furniture emitters (all guarded by spotOK) ----
+    function furnishRoom(rx0, rx1, rz0, rz1, yb, type, r) {
+      const cw = rx1 - rx0, cd = rz1 - rz0;
+      if (cw < 2.1 || cd < 2.1) return;
+      const put = (x, z, hw, hd, y0, y1, c) => { if (spotOK(x, z, hw + .1, hd + .1)) { box(x, y0, y1, z, hw, hd, c); return true; } return false; };
+      if (type === 'office') {
+        const n = cw * cd > 42 ? 4 : cw * cd > 20 ? 3 : 2;
+        for (let k = 0; k < n; k++) {
+          const fx = rx0 + .85 + r() * Math.max(.2, cw - 1.7), fz = rz0 + .85 + r() * Math.max(.2, cd - 1.7);
+          const dir = r() < .5 ? 1 : -1;
+          if (put(fx, fz, .68, .38, yb, yb + .74, C_DESK)) {
+            put(fx + dir * .16, fz, .27, .06, yb + .74, yb + 1.07, C_MON);       // monitor
+            put(fx - dir * .8, fz, .24, .24, yb, yb + .52, C_CHAIR);             // chair
+          }
+        }
+        if (r() < .7) put(rx1 - .55, rz0 + 1, .3, .55, yb, yb + 1.32, C_CAB);   // filing cabinet
+        if (r() < .5) put(rx0 + .55, rz1 - 1.1, .3, .55, yb, yb + 1.32, C_CAB); // second cabinet
+      } else if (type === 'home') {
+        const longX = cw >= cd;                     // bed along the longer side
+        const bx = longX ? (r() < .5 ? rx0 + 1.15 : rx1 - 1.15) : (r() < .5 ? rx0 + .8 : rx1 - .8);
+        const bz = longX ? (r() < .5 ? rz0 + .8 : rz1 - .8) : (r() < .5 ? rz0 + 1.15 : rz1 - 1.15);
+        const bhw = longX ? 1.02 : .47, bhd = longX ? .47 : 1.02;
+        if (put(bx, bz, bhw, bhd, yb, yb + .42, C_BEDF)) {
+          put(bx, bz, bhw - .07, bhd - .07, yb + .42, yb + .58, C_BEDD);         // mattress
+          const hx = longX ? bx - Math.sign(bx - (rx0 + rx1) / 2) * (bhw - .36) : bx;
+          const hz = longX ? bz : bz - Math.sign(bz - (rz0 + rz1) / 2) * (bhd - .36);
+          put(hx, hz, .3, .18, yb + .58, yb + .68, C_PIL);                        // pillow
+        } else {                                                                  // studio: sofa + coffee table
+          put((rx0 + rx1) / 2, (rz0 + rz1) / 2, .9, .38, yb, yb + .62, C_BENCH);
+          put((rx0 + rx1) / 2, (rz0 + rz1) / 2 + .75, .55, .3, yb, yb + .4, C_DESK);
+        }
+        if (cw > 3.4 && cd > 3.4 && r() < .85) {                                 // sofa corner + table in every home
+          put(rx0 + .85, rz1 - .7, .8, .34, yb, yb + .62, C_BENCH);
+          put(rx0 + .85, rz1 - 1.75, .5, .28, yb, yb + .38, C_DESK);
+        }
+        if (r() < .8) put(longX ? rx1 - .62 : (r() < .5 ? rx0 + .7 : rx1 - .7), longX ? (r() < .5 ? rz0 + .7 : rz1 - .7) : rz1 - .62, .6, .32, yb, yb + 1.85, C_WARD);
+        const rug = RUGS[Math.floor(r() * RUGS.length)];                          // rug under it all
+        q([(rx0 + rx1) / 2 - Math.min(1.15, cw * .4), yb + .012, (rz0 + rz1) / 2 - Math.min(.85, cd * .4)],
+          [(rx0 + rx1) / 2 + Math.min(1.15, cw * .4), yb + .012, (rz0 + rz1) / 2 - Math.min(.85, cd * .4)],
+          [(rx0 + rx1) / 2 + Math.min(1.15, cw * .4), yb + .012, (rz0 + rz1) / 2 + Math.min(.85, cd * .4)],
+          [(rx0 + rx1) / 2 - Math.min(1.15, cw * .4), yb + .012, (rz0 + rz1) / 2 + Math.min(.85, cd * .4)], [0, 1, 0], rug);
+      } else if (type === 'lobby') {
+        const cx = (rx0 + rx1) / 2, cz = (rz0 + rz1) / 2;
+        if (put(cx, cz, 1.4, .4, yb, yb + 1.02, C_CNT)) put(cx, cz, 1.48, .46, yb + 1.02, yb + 1.07, C_CNTTOP);
+        put(rx0 + .6, cz, .3, .3, yb, yb + .85, C_POT);
+        if (r() < .8) put(rx0 + .6, cz, .26, .26, yb + .85, yb + 1.4, C_PLANT);
+        put(rx1 - .55, cz - .9, .32, .3, yb, yb + .85, C_POT);
+        if (r() < .8) put(rx1 - .55, cz - .9, .27, .26, yb + .85, yb + 1.42, C_PLANT);
+        if (cw > 5) put(cx, rz0 + .7, .95, .26, yb, yb + .46, C_BENCH);           // waiting bench
+      } else {                                                                    // retail
+        const cx = (rx0 + rx1) / 2, cz = (rz0 + rz1) / 2;
+        if (put(cx, cz, 1.3, .38, yb, yb + .95, C_CNT)) put(cx, cz, 1.38, .44, yb + .95, yb + 1, C_CNTTOP);
+        if (put(rx0 + 1, rz0 + .45, .9, .22, yb, yb + 1.65, C_SHELF)) { }
+        if (cw > 4.6 && r() < .85) put(rx1 - 1, rz0 + .45, .9, .22, yb, yb + 1.65, C_SHELF);
+        if (cd > 5 && r() < .6) put(rx0 + .5, rz1 - .5, .28, .28, yb, yb + .5, C_CRATE);
+        if (cd > 5 && r() < .6) put(rx0 + .95, rz1 - .5, .28, .28, yb, yb + .86, C_CRATE);
+      }
+    }
+
+    // ---- per-floor assembly ----
+    const lobby = b.h >= 12 || b.area >= 200;
+    for (let i = 0; i < nF; i++) {
+      const yb = SLAB0 + i * FH;
+      const fc = i === 0 ? (lobby ? FLOOR_LOBBY : FLOOR_RETAIL)
+        : (b.h >= 24 ? FLOORS_OFF[i % 2] : FLOORS_HOME[i % 2]);
+      const pc = PARTC[i % 2];
+      slab(yb, i, fc);
+
+      // partitions: a room grid that scales with the floor — 1 split per axis
+      // past 9.5 m, 2 past 17 m (up to 3x3 rooms on big tower floors)
+      const vs = [], hs = [];
+      if (w > 9.5) vs.push(x0 + w * (.38 + rnd() * .16));
+      if (w > 17) vs.push(x0 + w * (.58 + rnd() * .16));
+      if (d > 9.5) hs.push(z0 + d * (.38 + rnd() * .16));
+      if (d > 17) hs.push(z0 + d * (.58 + rnd() * .16));
+      for (const sx of vs) wallRun(sx, z0 + .55, sx, z1 - .55, yb, pc);
+      for (const sz of hs) wallRun(x0 + .55, sz, x1 - .55, sz, yb, pc);
+
+      // stairs (every floor except the top)
+      if (sOK && i < nF - 1) {
+        const steps = 8, rise = FH / steps;
+        for (let k = 0; k < steps; k++)
+          box(stX, yb, yb + (k + 1) * rise, stZ + (k + .5) * .28, .55, .16, C_STAIR);
+      }
+
+      // rooms + furniture
+      const type = i === 0 ? (lobby ? 'lobby' : 'retail')
+        : (b.h >= 24 ? (rnd() < .72 ? 'office' : 'home') : (rnd() < .42 ? 'office' : 'home'));
+      const xsL = [x0 + .55, ...vs, x1 - .55];
+      const zsL = [z0 + .55, ...hs, z1 - .55];
+      for (let a = 0; a < xsL.length - 1; a++)
+        for (let bq = 0; bq < zsL.length - 1; bq++)
+          furnishRoom(xsL[a] + .45, xsL[a + 1] - .45, zsL[bq] + .45, zsL[bq + 1] - .45, yb, type, rnd);
+    }
+
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+    m.position.set(ax, 0, az);      // city-local frame, exactly like every city mesh
+    m.castShadow = true; m.receiveShadow = true;
+    m.visible = false;
+    m.name = 'oh-interior-' + b.bkey;
+    return m;
+  }
+
+  // ---- open / heal / tick -------------------------------------------
+  let lastGroup = null, cur = null, curMesh = null, lastScan = 0, pinned = null;
+  const cache = new Map();          // bkey -> { mesh, b } (LRU, max CACHE_MAX)
+  function dropCache() {
+    for (const e of cache.values()) {
+      try {
+        if (e.mesh.parent) e.mesh.parent.remove(e.mesh);
+        e.mesh.geometry.dispose(); e.mesh.material.dispose();
+      } catch (er) { }
+    }
+    cache.clear(); curMesh = null;
+  }
+  function open(b) {
+    if (!b) return;
+    let e = cache.get(b.bkey);
+    if (!e || (e.mesh.parent !== CITY.group)) {
+      if (e) { try { e.mesh.geometry.dispose(); e.mesh.material.dispose(); } catch (er) { } cache.delete(b.bkey); }
+      const anchor = CITY.anchor || { x: 0, z: 0 };
+      e = { mesh: buildInterior(b, anchor), b };
+      cache.set(b.bkey, e);
+      while (cache.size > CACHE_MAX) {                       // LRU eviction (insertion order)
+        const oldK = cache.keys().next().value;
+        if (oldK === b.bkey) break;
+        const oe = cache.get(oldK);
+        try { if (oe.mesh.parent) oe.mesh.parent.remove(oe.mesh); oe.mesh.geometry.dispose(); oe.mesh.material.dispose(); } catch (er) { }
+        cache.delete(oldK);
+      }
+      try { CITY.group.add(e.mesh); } catch (er) { }
+    }
+    cur = b; curMesh = e.mesh;
+    setPrism(b.poly);
+    curMesh.visible = true;
+  }
+  function heal() {
+    cur = null; curMesh = null;
+    parkAll();
+    for (const e of cache.values()) e.mesh.visible = false;
+  }
+  function force(bkey) {
+    if (bkey == null) { pinned = null; heal(); return 'healed'; }
+    const B = CITY.buildingPolys || [];
+    const b = B.find(x => x.bkey === bkey) || null;
+    if (!b) return 'no building ' + bkey;
+    pinned = b;
+    open(b);
+    return 'open ' + bkey;
+  }
+
+  function tick(dt, px, pz, camDist) {
+    const g = CITY.group;
+    if (g !== lastGroup) {          // a new city (or none) — heal, unpin and drop the cache
+      lastGroup = g;
+      pinned = null;
+      heal(); dropCache();
+      return;
+    }
+    if (!g) return;
+    if (pinned) { if (!cur || cur.bkey !== pinned.bkey) open(pinned); return; }
+    // same focus rule as the world forest: the character while following,
+    // the panned view while roaming
+    const fx = camCtl.follow ? px : camCtl.tx;
+    const fz = camCtl.follow ? pz : camCtl.tz;
+    const now = performance.now();
+    if (cur) {
+      const d = Math.hypot(fx - cur.x, fz - cur.z);
+      if (d > HEAL_R || camDist > ZOOM_HEAL) { heal(); return; }
+      if (now - lastScan > 300) {                  // sticky handover to a much closer rival
+        lastScan = now;
+        const B = CITY.buildingPolys;
+        let best = null, bestD = 1e9;
+        for (let i = 0; i < B.length; i++) {
+          const b = B[i];
+          const bd = Math.hypot(fx - b.x, fz - b.z);
+          if (bd < bestD) { bestD = bd; best = b; }
+        }
+        if (best && best !== cur && bestD < OPEN_R * .6 && bestD < d * SWITCH_F) open(best);
+      }
+    } else if (camDist < ZOOM_OPEN) {
+      if (now - lastScan > 120) {
+        lastScan = now;
+        const B = CITY.buildingPolys;
+        let best = null, bestD = 1e9;
+        for (let i = 0; i < B.length; i++) {
+          const b = B[i];
+          const bd = Math.hypot(fx - b.x, fz - b.z);
+          if (bd < bestD) { bestD = bd; best = b; }
+        }
+        if (best && bestD < OPEN_R) open(best);
+      }
+    }
+  }
+
+  return {
+    tick, force, heal,
+    get shells() { return shellMeshes.length; },
+    rig() { return planes.map(p => [p.normal.x, p.normal.y, p.normal.z, p.constant]); },
+    probe(x, y, z) {          // QA: is a world point inside the live clip prism (above cut)?
+      for (const p of planes) if (p.normal.x * x + p.normal.y * y + p.normal.z * z + p.constant >= 0) return false;
+      return true;
+    },
+    mats() {                  // QA: the shell materials' clipping state
+      const out = [];
+      for (const m of shellMeshes) {
+        const mat = m && m.material;
+        if (mat && !Array.isArray(mat) && mat.isMeshLambertMaterial && !out.includes(mat))
+          out.push({ type: m.isInstancedMesh ? 'inst' : 'mesh', planes: mat.clippingPlanes ? mat.clippingPlanes.length : 0, inter: !!mat.clipIntersection, shadows: !!mat.clipShadows });
+      }
+      return out;
+    },
+    state() {
+      return {
+        open: cur ? {
+          bkey: cur.bkey, h: Math.round(cur.h), floors: Math.max(1, Math.round(cur.h / FH)),
+          x: Math.round(cur.x), z: Math.round(cur.z),
+          verts: curMesh ? curMesh.geometry.attributes.position.count : 0,
+        } : null,
+        pinned: pinned ? pinned.bkey : null,
+        planesActive, shells: shellMeshes.length, cached: cache.size,
+      };
+    },
+  };
+})();
+window.OH = OH;   // QA surface
+
+// ADDITIVE hook — the same wrap pattern the game already uses (the
+// world forest wrapped WORLD.update first; this chains right after it,
+// so the beat is: the original update, then the forest tick, then the
+// open house tick). Installed at module-eval time, before the first
+// rAF tick ever fires.
+const __ohOrigUpdate = WORLD.update.bind(WORLD);
 WORLD.update = function (dt, px, pz, camDist) {
-  const req = __wmOrigUpdate(dt, px, pz, camDist);
-  try { WM.tick(dt, px, pz, camDist); } catch (e) { console.error('[worldhills]', e); }
+  const req = __ohOrigUpdate(dt, px, pz, camDist);
+  try { OH.tick(dt, px, pz, camDist); } catch (e) { console.error('[openhouse]', e); }
   return req;
 };
-window.WM = WM;   // QA surface + the tree guard's doorway
 
-console.log('%cOPEN WORLD v2.40 — HIGH COUNTRY', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.40 — OPEN HOUSE', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
