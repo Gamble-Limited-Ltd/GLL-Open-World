@@ -3,9 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.39</title>
+<title>Open World — v2.40</title>
 <style>
 /* ==================================================================
+   OPEN WORLD v2.40 — HIGH COUNTRY: hills and mountains around the
+   map. One additive section (46_worldhills.js) grows real relief in
+   the open country — smooth pasture domes in the rolling provinces,
+   faceted snow-capped mountains in the high country — placed by a
+   smooth 24-km province field, gated per spot (never within 8 km of
+   a city, never in or over water, never over a road), streamed on a
+   6-km grid with an altitude-breathing radius, merged into
+   cell-local meshes at true 1:1. The ONLY other code touched is the
+   tree spawners, at the user's explicit direction: both addTree
+   functions now ask WM.blocked() so no tree ever spawns on top of a
+   hill or mountain. The world forest, lakes, zoom, roads, cities and
+   the economy ride untouched.
    OPEN WORLD v2.38 — DEEP-BLUE LAKES: the last green-bleed mechanism
    is dead, at every altitude. The land rings are outer-contour only,
    so lake interiors clipped as "land" — the grass shield rendered
@@ -717,7 +729,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.39 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, woodland belts around the cities, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), and the same streets, buildings, plots and roads on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.40 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, woodland belts around the cities, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), hills and snow-capped mountains across the high country between the cities (never in water, never over a road, never near a city — and the trees never on top of them), and the same streets, buildings, plots and roads on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -753,7 +765,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.39';
+const GAME_VERSION = 'v2.40';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -3997,6 +4009,7 @@ const WORLD = (() => {
   function addTree(B, x, z, s, rnd) {
     if (distToCity(x, z).d < CITY_R + 60 || nearRoad(x, z, 8)) return;
     if (LANDGEO.ready && LANDGEO.isWaterWorld(x, z)) return;   // v2.18: trees don't grow at sea
+    if (window.WM && window.WM.blocked(x, z, 8)) return;       // v2.40 HIGH COUNTRY: no tree on the world's hills & mountains
     const pine = rnd() < .42;
     const trunk = new THREE.CylinderGeometry(.22 * s, .3 * s, 2.2 * s, 6);
     B.addGeo(trunk, trs(x, 1.1 * s, z, rnd() * 3.14, 1, 1, 1), col(0x6b4f33));
@@ -9418,12 +9431,12 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.39 — WORLD FOREST', `
-    <p><b>Trees now grow all around the world — everywhere except inside the cities.</b></p>
-    <div class="kv"><span class="k">FOREST EVERYWHERE</span><span class="v">Beyond every city's woodland belt, the open country is real 3D forest now — walk, ride or zoom anywhere on Earth and the pastures are wooded: thick stands blending into open savanna, different from chunk to chunk</span></div>
-    <div class="kv"><span class="k">CITIES STAY CLEAR</span><span class="v">Nothing changed inside the cities or their woodland belts — streets, plates and the approved tree rings ride exactly as they were; the new forest starts where the belts end</span></div>
-    <div class="kv"><span class="k">SMART PLACEMENT</span><span class="v">Every tree checks the real Earth first: never in water, never on the roads, never on a roadside vendor plot — and it streams with you exactly like the pastures do</span></div>
-    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The deep-blue lakes, the 23,000 km whole-world zoom, free camera roam and the true 1:1 Earth are untouched — this update only ADDS the forest</span></div>
+  openModal('Welcome to v2.40 — HIGH COUNTRY', `
+    <p><b>Hills and mountains now stand around the map — real relief between the cities.</b></p>
+    <div class="kv"><span class="k">HIGH COUNTRY</span><span class="v">The open world is no longer flat: rolling green hills, highlands and true mountain ranges with snow-capped faceted peaks rise across the countryside — zoom out anywhere to see the ranges, or walk right up to one</span></div>
+    <div class="kv"><span class="k">PLACED LIKE THE REAL WORLD</span><span class="v">Every hill and mountain checks the Earth first — never in water, never over a road, never near a city — and the land flows in provinces: plains, rolling pasture, highlands and mountain country</span></div>
+    <div class="kv"><span class="k">TREES OFF THE PEAKS</span><span class="v">The forest now plants itself around the mountains, never on top of them — the treeline stops at the snow</span></div>
+    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The world forest, the deep-blue lakes, the 23,000 km whole-world zoom and the true 1:1 Earth are untouched — this update only ADDS the high country</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -10105,6 +10118,7 @@ const WF = (() => {
     if (WORLD.nearRoad(x, z, 8)) return;                      // off the asphalt, 8 m like every tree
     if (LANDGEO.ready && LANDGEO.isWaterWorld(x, z)) return;  // never at sea / never in a lake
     if (onPlot(x, z)) return;                                 // never on a roadside vendor plot
+    if (window.WM && window.WM.blocked(x, z, 8)) return;      // v2.40 HIGH COUNTRY: never on a hill or mountain
     const ry = rnd() * 3.14;
     B.addGeo(TRUNK, trs(x, 1.1 * s, z, ry, s, s, s), C_TRUNK);
     if (rnd() < .42) B.addGeo(PINE, trs(x, 3.6 * s, z, ry, s, s, s), C_PINE);
@@ -10194,7 +10208,7 @@ const WF = (() => {
   // on the shipped geometry that no tree stands in a city, in water or
   // on a road. Runs only when called from the console.
   function audit() {
-    let trees = 0, badCity = 0, badWater = 0, badRoad = 0;
+    let trees = 0, badCity = 0, badWater = 0, badRoad = 0, badMount = 0;
     for (const g of chunks.values()) {
       if (!g) continue;
       const m = g.children[0], pos = m.geometry.attributes.position;
@@ -10206,9 +10220,10 @@ const WF = (() => {
         if (nearCity(wx, wz) < BELT_R) badCity++;
         if (LANDGEO.ready && LANDGEO.isWaterWorld(wx, wz)) badWater++;
         if (WORLD.nearRoad(wx, wz, 8)) badRoad++;
+        if (window.WM && window.WM.blocked(wx, wz, 7.5)) badMount++;   // v2.40: no tree on a hill or mountain (7.5 = center-equivalent: ring verts sit ~.45 m past the center the 8 m guard places)
       }
     }
-    return { trees, badCity, badWater, badRoad };
+    return { trees, badCity, badWater, badRoad, badMount };
   }
   return { tick, reset, audit, get count() { return chunks.size; }, get meshed() { let n = 0; for (const v of chunks.values()) if (v) n++; return n; }, get trees() { return trees; },
     // QA: world-frame data of every standing forest chunk (null = built empty)
@@ -10228,7 +10243,393 @@ WORLD.update = function (dt, px, pz, camDist) {
 };
 window.WF = WF;   // QA surface
 
-console.log('%cOPEN WORLD v2.39 — WORLD FOREST', 'color:#38BDF8;font-weight:700', 'ready.');
+
+// ======== section: 46_worldhills.js ========
+// ====================================================================
+// v2.40 — HIGH COUNTRY. The ask: "add hills and moutains around the
+// map, just focus on this. And the only other code you can change is
+// for the trees. I don't want them to spawn on top of mountains."
+//
+// This section is ADDITIVE, exactly like 45_worldforest.js before it:
+// not one existing line was modified to place the hills and mountains.
+// The ONLY touch on prior code is inside the TREE spawners, which the
+// user explicitly authorized: both addTree functions (the world
+// forest's and the pasture pass's) now also ask WM.blocked(), so no
+// tree ever plants itself on a hill or a mountain.
+//
+// What ships here: the open country between the cities now has REAL
+// RELIEF. A smooth 24-km value-noise field splits the land into
+// provinces — plains, rolling pasture, highlands and true mountain
+// country — and each 6 km cell of a province grows what belongs there:
+// smooth green pasture domes (the exact recipe the city hill rings
+// already use) in the gentle provinces, and faceted snow-capped
+// mountains (flat-shaded cones, jagged by angle, green foot → rock →
+// snowline) in the high country, with twin peaks and foot hills.
+//
+// Every hill and mountain passes the same gates the rest of the world
+// obeys, BEFORE it is ever placed (the decision is deterministic and
+// cached per cell, so the mesh builder and the tree guard always
+// agree):
+//   • never within CITY_R + 8 km of any city — cities, their plates,
+//     belts, skyline sprawls and hill rings keep their approved look;
+//   • never in or over water — the whole footprint is census-checked
+//     against the real LANDGEO coastlines and lake rings;
+//   • never over a road — a sample grid covers the whole footprint and
+//     asks the world's own nearRoad, so every inter-city road, tail
+//     and bridge keeps a clear 260 m+ corridor.
+//
+// Streaming mirrors the pasture/forest passes (same follow/pan focus
+// rule, same 400 ms cadence) on a 6 km grid with altitude-breathing
+// radius (14 km at street level up to 88 km high up; mobile 9→34 km)
+// and a fixed dispose hysteresis, merged per cell into chunk-local
+// meshes — float32-safe at 1:1, exactly like everything else.
+// ====================================================================
+const WM = (() => {
+  const CH = 6000;                      // relief cell size (m) — mountains are big
+  const CITY_R = 745;                   // mirrors WORLD's CITY_R
+  const CITY_CLEAR = CITY_R + 8000;     // cities + plates + belts + skyline sprawl stay mountain-free
+  const MOB = matchMedia('(pointer:coarse)').matches;
+  const BASE_R = MOB ? 9000 : 14000;    // relief stands this far out at street level
+  const MAX_R = MOB ? 34000 : 88000;    // …and this far once you are high up
+  const DISPOSE_R = MAX_R + 12000;      // fixed hysteresis — no churn on zoom cycles
+  const MAXF = 2400;                    // largest footprint any spot can have (m)
+
+  const cells = new Map();              // 'cx,cz' -> group | null (null = built empty)
+  const spotCache = new Map();          // 'cx,cz' -> spots (deterministic, shared with the tree guard)
+  let queue = [], lastUpd = 0, root = null;
+
+  // ---- colors ---------------------------------------------------------
+  const wcol = hex => { const c = new THREE.Color(hex); return [c.r, c.g, c.b]; };
+  const HILL_BASE = new THREE.Color(0x619a44), HILL_LIFT = new THREE.Color(0x9cc47a);   // the approved pasture-hill greens
+  const hillMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  const mountMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });   // crisp facets
+  const HILLGEO = new THREE.SphereGeometry(1, 12, 8, 0, 6.2832, 0, 1.35);   // the city hill ring's own dome
+
+  // ---- micro merged-geometry builder (same contract as the forest's) --
+  const _nm3 = new THREE.Matrix3(), _v3a = new THREE.Vector3(), _v3b = new THREE.Vector3();
+  const _mShift = new THREE.Matrix4();
+  function GeoB(ox, oz) {
+    const off = (ox || 0) !== 0 || (oz || 0) !== 0;
+    if (off) _mShift.makeTranslation(-(ox || 0), 0, -(oz || 0));
+    const pos = [], norm = [], uv = [], colr = [];
+    function addGeo(geo, mat4, color) {
+      const p = geo.attributes.position, n = geo.attributes.normal;
+      const vc = color ? null : geo.attributes.color;   // per-vertex colors (mountains)
+      const idx = geo.index ? geo.index.array : null;
+      const count = idx ? idx.length : p.count;
+      _nm3.getNormalMatrix(mat4);
+      for (let i = 0; i < count; i++) {
+        const vi = idx ? idx[i] : i;
+        _v3a.fromBufferAttribute(p, vi).applyMatrix4(mat4);
+        if (off) _v3a.applyMatrix4(_mShift);
+        _v3b.fromBufferAttribute(n, vi).applyMatrix3(_nm3).normalize();
+        pos.push(_v3a.x, _v3a.y, _v3a.z);
+        norm.push(_v3b.x, _v3b.y, _v3b.z);
+        uv.push(0, 0);
+        if (vc) colr.push(vc.getX(vi), vc.getY(vi), vc.getZ(vi));
+        else colr.push(color[0], color[1], color[2]);
+      }
+    }
+    function mesh(mat) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('normal', new THREE.Float32BufferAttribute(norm, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3));
+      const m = new THREE.Mesh(g, mat);
+      if (off) m.position.set(ox, 0, oz);   // cell-local frame (float32-safe at 1:1)
+      m.castShadow = true;                  // big landforms throw real shadows at mid zoom
+      return m;
+    }
+    return { addGeo, mesh, get count() { return pos.length / 3; } };
+  }
+  const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _s3 = new THREE.Vector3(), _s2 = new THREE.Vector3();
+  function trs(x, y, z, ry, sx, sy, sz) {
+    _e.set(0, ry || 0, 0);
+    _q.setFromEuler(_e);
+    return _m4.compose(_s3.set(x, y, z), _q, _s2.set(sx, sy, sz)).clone();
+  }
+
+  // ---- the placement gates (deterministic — mesh and tree guard agree) --
+  function cityClear(x, z) {
+    for (const c of CITIES) if (Math.hypot(x - c.wx, z - c.wz) < CITY_CLEAR) return false;
+    return true;
+  }
+  function dryFootprint(x, z, fr) {
+    if (!LANDGEO.ready) return true;                    // the game's own convention pre-boot
+    if (LANDGEO.isWaterWorld(x, z)) return false;
+    for (let k = 0; k < 12; k++) {                      // rim ring — the shore shapes the mountain
+      const a = k / 12 * 6.2832;
+      if (LANDGEO.isWaterWorld(x + Math.cos(a) * fr * .96, z + Math.sin(a) * fr * .96)) return false;
+    }
+    for (let k = 0; k < 8; k++) {                       // mid ring — no bay hiding inside
+      const a = k / 8 * 6.2832 + .39;
+      if (LANDGEO.isWaterWorld(x + Math.cos(a) * fr * .55, z + Math.sin(a) * fr * .55)) return false;
+    }
+    return true;
+  }
+  function roadClear(x, z, fr) {
+    // a sample grid blankets the whole footprint (pitch 800 ≤ 850·√2 so
+    // the 850 m detection discs overlap) and asks the world's own
+    // nearRoad — 850 stays inside its documented RCELL ceiling. The
+    // +350 m skirt catches roads that only graze the rim.
+    const D = fr + 260;
+    const n = Math.max(1, Math.ceil((2 * D) / 800));
+    for (let i = 0; i <= n; i++) for (let j = 0; j <= n; j++) {
+      const px = x - D + (2 * D) * i / n, pz = z - D + (2 * D) * j / n;
+      if (Math.hypot(px - x, pz - z) > D + 350) continue;
+      if (WORLD.nearRoad(px, pz, 850)) return false;
+    }
+    return true;
+  }
+
+  // ---- province field: smooth 24-km value noise ------------------------
+  // plains ↔ rolling ↔ highlands ↔ mountain country, in blobs 24-60 km
+  // across, so ranges READ as ranges instead of uniform scatter.
+  function regionV(cx, cz) {
+    const fx = cx / 4, fz = cz / 4;
+    const ix = Math.floor(fx), iz = Math.floor(fz);
+    let tx = fx - ix, tz = fz - iz;
+    tx = tx * tx * (3 - 2 * tx); tz = tz * tz * (3 - 2 * tz);
+    const a = _ihash(ix, iz, 7717), b = _ihash(ix + 1, iz, 7717),
+          c = _ihash(ix, iz + 1, 7717), d = _ihash(ix + 1, iz + 1, 7717);
+    return a + (b - a) * tx + (c - a) * tz + (a - b - c + d) * tx * tz;
+  }
+
+  // ---- deterministic spots per cell (the single source of truth) -------
+  function spotsFor(cx, cz) {
+    const key = cx + ',' + cz;
+    let s = spotCache.get(key);
+    if (s) return s;
+    const rnd = _mulberry(hashStr('wm' + key));
+    const v = regionV(cx, cz);
+    const spots = [];
+    const x0 = cx * CH, z0 = cz * CH;
+    const jx = () => x0 + 700 + rnd() * (CH - 1400);    // spot centers stay inside their cell
+    const jz = () => z0 + 700 + rnd() * (CH - 1400);
+    const clampIn = (x) => Math.min(x0 + CH - 700, Math.max(x0 + 700, x));
+    const put = (type, x, z, a, b, zf, f) => {
+      const sink = type === 'hill' ? Math.max(14, b * .28 + 8) : Math.max(40, b * .07);
+      const H = b + sink;
+      const fr = type === 'hill'
+        ? a * Math.sqrt(Math.max(0, 1 - (sink / H) * (sink / H)))
+        : a * b / H;
+      if (!cityClear(x, z)) return null;
+      if (!dryFootprint(x, z, fr)) return null;
+      if (!roadClear(x, z, fr)) return null;
+      const spot = { type, x, z, a, b, zf, f, fr };
+      spots.push(spot);
+      return spot;
+    };
+    if (v >= .84) {
+      // MOUNTAIN COUNTRY — a big faceted mount, often a twin, often a foot hill
+      const R1 = 1000 + rnd() * 1400, h1 = 430 + rnd() * 520;
+      const m1 = put('mount', jx(), jz(), R1, h1, .8 + rnd() * .5, 0);
+      if (m1 && rnd() < .45) {
+        const ang = rnd() * 6.2832, d = 1250 + rnd() * 1500;
+        const m2x = clampIn(m1.x + Math.cos(ang) * d), m2z = clampIn(m1.z + Math.sin(ang) * d);
+        if (Math.hypot(m2x - m1.x, m2z - m1.z) > 800)   // never concentric after the edge clamp
+          put('mount', m2x, m2z, R1 * (.5 + rnd() * .28), h1 * (.5 + rnd() * .3), .8 + rnd() * .5, 0);
+      }
+      if (rnd() < .5) put('hill', jx(), jz(), 300 + rnd() * 380, 80 + rnd() * 100, .75 + rnd() * .5, .18 + rnd() * .3);
+    } else if (v >= .68) {
+      // HIGHLANDS — pasture domes with the odd small mount
+      put('hill', jx(), jz(), 350 + rnd() * 430, 90 + rnd() * 100, .75 + rnd() * .5, .18 + rnd() * .3);
+      if (rnd() < .4) put('mount', jx(), jz(), 750 + rnd() * 750, 300 + rnd() * 260, .8 + rnd() * .5, 0);
+    } else if (v >= .46) {
+      // ROLLING PASTURE — one or two green domes
+      put('hill', jx(), jz(), 280 + rnd() * 360, 70 + rnd() * 100, .75 + rnd() * .5, .18 + rnd() * .3);
+      if (rnd() < .25) put('hill', jx(), jz(), 180 + rnd() * 160, 50 + rnd() * 50, .75 + rnd() * .5, .18 + rnd() * .3);
+    } else if (rnd() < .1) {
+      // PLAINS — the occasional lone hill on the horizon
+      put('hill', jx(), jz(), 220 + rnd() * 200, 60 + rnd() * 60, .75 + rnd() * .5, .18 + rnd() * .3);
+    }
+    spotCache.set(key, spots);
+    if (spotCache.size > 24000) {                       // bounded: trim the oldest fifth
+      let n = 4800;
+      for (const k of spotCache.keys()) { if (n-- <= 0) break; spotCache.delete(k); }
+    }
+    return spots;
+  }
+
+  // ---- the landforms ----------------------------------------------------
+  const _hc = new THREE.Color();
+  function addHill(B, s) {
+    const sink = Math.max(14, s.b * .28 + 8), H = s.b + sink;
+    _hc.copy(HILL_BASE).lerp(HILL_LIFT, s.f * .8);     // the approved pasture-hill blend
+    B.addGeo(HILLGEO, trs(s.x, -sink, s.z, 0, s.a, H, s.a * s.zf), [_hc.r, _hc.g, _hc.b]);
+  }
+  const _mca = new THREE.Color(0x58913c), _mcb = new THREE.Color(0x6f7a5a),   // land green → rock green
+        _mcc = new THREE.Color(0x8b8b7f), _mcd = new THREE.Color(0xedf2f6), _mcc2 = new THREE.Color();
+  function addMount(B, s, key, i) {
+    const mrnd = _mulberry(hashStr('wm#' + key + '.' + i));
+    const R = s.a, h = s.b, sink = Math.max(40, h * .07), H = h + sink;
+    const g = new THREE.ConeGeometry(1, 1, 9, 5, true);   // open-ended — the base cap is underground
+    const p = g.attributes.position;
+    const jag = [], sj = [];
+    for (let k = 0; k < 9; k++) { jag.push((mrnd() - .5) * .26); sj.push((mrnd() - .5) * .16); }
+    const cols = [];
+    for (let vi = 0; vi < p.count; vi++) {
+      const lx = p.getX(vi), ly = p.getY(vi), lz = p.getZ(vi);
+      const ang = Math.atan2(lz, lx);
+      const ai = ((Math.round(ang / (Math.PI * 2 / 9)) % 9) + 9) % 9;   // seam duplicates agree — no crack
+      const t = ly + .5;                                  // 0 at the base ring, 1 at the apex
+      const disp = 1 + jag[ai] * t;                        // base undisplaced; the peak leans jagged
+      p.setXYZ(vi, lx * disp, ly, lz * disp);
+      const u = Math.max(0, Math.min(1, (t * H - sink) / h));   // visible height fraction
+      const snow = .62 + sj[ai];                                 // an organically wobbling snowline
+      if (u < .14) _mcc2.copy(_mca);
+      else if (u < .32) _mcc2.copy(_mca).lerp(_mcb, (u - .14) / .18);
+      else if (u < snow - .09) _mcc2.copy(_mcb).lerp(_mcc, Math.min(1, (u - .32) / Math.max(.14, snow - .09 - .32)));
+      else if (u < snow) _mcc2.copy(_mcc).lerp(_mcd, (u - (snow - .09)) / .09);
+      else _mcc2.copy(_mcd);
+      cols.push(_mcc2.r, _mcc2.g, _mcc2.b);
+    }
+    g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+    B.addGeo(g, trs(s.x, H / 2 - sink, s.z, mrnd() * 6.2832, R, H, R * s.zf), null);
+  }
+
+  // ---- streaming (mirrors the forest pass) ------------------------------
+  function build(cx, cz) {
+    const key = cx + ',' + cz;
+    if (cells.has(key)) return;
+    cells.set(key, null);                 // reserve — built, even if it ends up empty
+    const spots = spotsFor(cx, cz);
+    if (!spots.length) return;
+    const xm = cx * CH + CH / 2, zm = cz * CH + CH / 2;
+    const hillB = GeoB(xm, zm), mountB = GeoB(xm, zm);
+    let hasHill = false, hasMount = false;
+    spots.forEach((s, i) => {
+      if (s.type === 'hill') { addHill(hillB, s); hasHill = true; }
+      else { addMount(mountB, s, key, i); hasMount = true; }
+    });
+    const cg = new THREE.Group();
+    if (hasHill && hillB.count) cg.add(hillB.mesh(hillMat));
+    if (hasMount && mountB.count) cg.add(mountB.mesh(mountMat));
+    if (root) root.add(cg);
+    cells.set(key, cg);
+  }
+  function dispose(key) {
+    const cg = cells.get(key);
+    if (cg) cg.traverse(o => { if (o.geometry) { try { o.geometry.dispose(); } catch (e) { } } });
+    if (cg && cg.parent) cg.parent.remove(cg);
+    cells.delete(key);
+  }
+  function reset() {
+    for (const key of [...cells.keys()]) dispose(key);
+    queue = [];
+  }
+  function tick(dt, px, pz, camDist) {
+    const r = WORLD.group;
+    if (!r) { if (cells.size) reset(); return; }    // world not built / disposed
+    if (r !== root) { reset(); root = r; }          // the world rebuilt under us
+    const now = performance.now();
+    const fx = camCtl.follow ? px : camCtl.tx, fz = camCtl.follow ? pz : camCtl.tz;
+    // relief is big and reads from far away: the zone breathes out
+    // much further than the pasture/forest detail rings
+    const R = Math.min(BASE_R + Math.max(0, camDist - 260) * 1.05, MAX_R);
+    if (now - lastUpd > 400) {
+      lastUpd = now;
+      const c0x = Math.floor((fx - R) / CH), c1x = Math.floor((fx + R) / CH);
+      const c0z = Math.floor((fz - R) / CH), c1z = Math.floor((fz + R) / CH);
+      const want = new Set();
+      for (let cx = c0x; cx <= c1x; cx++) for (let cz = c0z; cz <= c1z; cz++) want.add(cx + ',' + cz);
+      for (const key of [...cells.keys()]) {
+        if (want.has(key)) continue;
+        const [cx, cz] = key.split(',').map(Number);
+        if (Math.abs(cx * CH + CH / 2 - fx) > DISPOSE_R || Math.abs(cz * CH + CH / 2 - fz) > DISPOSE_R) dispose(key);
+      }
+      queue = [...want].filter(k => !cells.has(k))
+        .map(k => { const [cx, cz] = k.split(',').map(Number); return { k, cx, cz, d: Math.hypot(cx * CH + CH / 2 - fx, cz * CH + CH / 2 - fz) }; })
+        .sort((a, b) => a.d - b.d);
+    }
+    for (let i = 0; i < 3 && queue.length; i++) {
+      const job = queue.shift();
+      build(job.cx, job.cz);
+    }
+  }
+
+  // ---- the tree guard (the ONE authorized change to the tree spawners) --
+  // true when (x,z) sits on a hill dome or a mountainside (+margin).
+  function blocked(x, z, m) {
+    const R = MAXF + (m || 0);
+    const c0x = Math.floor((x - R) / CH), c1x = Math.floor((x + R) / CH);
+    const c0z = Math.floor((z - R) / CH), c1z = Math.floor((z + R) / CH);
+    for (let cx = c0x; cx <= c1x; cx++) for (let cz = c0z; cz <= c1z; cz++) {
+      const spots = spotsFor(cx, cz);
+      for (let i = 0; i < spots.length; i++) {
+        const s = spots[i], dx = x - s.x, dz = z - s.z, rr = s.fr + (m || 0);
+        if (dx * dx + dz * dz < rr * rr) return true;
+      }
+    }
+    return false;
+  }
+
+  // ---- QA ---------------------------------------------------------------
+  function audit() {
+    let mounts = 0, hills = 0, badWater = 0, badCity = 0, badRoad = 0, maxFr = 0;
+    for (const key of cells.keys()) {
+      const [cx, cz] = key.split(',').map(Number);
+      for (const s of spotsFor(cx, cz)) {
+        if (s.type === 'mount') mounts++; else hills++;
+        if (s.fr > maxFr) maxFr = s.fr;
+        let dcity = 1e18;
+        for (const c of CITIES) { const d = Math.hypot(s.x - c.wx, s.z - c.wz); if (d < dcity) dcity = d; }
+        if (dcity < CITY_CLEAR) badCity++;
+        if (LANDGEO.ready && (LANDGEO.isWaterWorld(s.x, s.z) ||
+          LANDGEO.isWaterWorld(s.x + s.fr * .96, s.z) || LANDGEO.isWaterWorld(s.x, s.z + s.fr * .96))) badWater++;
+        if (!roadClear(s.x, s.z, s.fr)) badRoad++;
+      }
+    }
+    return { cells: cells.size, mounts, hills, badWater, badCity, badRoad, maxFr: +maxFr.toFixed(0) };
+  }
+  function visible(v) { for (const cg of cells.values()) if (cg) cg.visible = !!v; }
+  function census() {
+    let m = 0, h = 0;
+    for (const key of cells.keys()) {
+      const [cx, cz] = key.split(',').map(Number);
+      for (const s of spotsFor(cx, cz)) (s.type === 'mount') ? m++ : h++;
+    }
+    return { cells: cells.size, meshed: [...cells.values()].filter(v => v).length, mounts: m, hills: h, cachedCells: spotCache.size };
+  }
+  function debug() {
+    const out = [];
+    for (const [key, cg] of cells) {
+      if (!cg) continue;
+      const [cx, cz] = key.split(',').map(Number);
+      out.push({ k: key, spots: spotsFor(cx, cz).map(s => ({ t: s.type, x: +s.x.toFixed(0), z: +s.z.toFixed(0), fr: +s.fr.toFixed(0), h: s.b })) });
+    }
+    return out;
+  }
+  return { tick, reset, blocked, audit, census, visible, debug,
+    get count() { return cells.size; },
+    // nearest standing spot to (x,z) — QA: drive the camera to a mountain
+    near(x, z) {
+      let best = null, bd = 1e18;
+      for (const key of cells.keys()) {
+        const [cx, cz] = key.split(',').map(Number);
+        for (const s of spotsFor(cx, cz)) {
+          const d = Math.hypot(s.x - x, s.z - z);
+          if (d < bd) { bd = d; best = s; }
+        }
+      }
+      return best ? { type: best.type, x: best.x, z: best.z, fr: best.fr, h: best.b, d: +bd.toFixed(0) } : null;
+    } };
+})();
+
+// ADDITIVE hook — stacked on the forest's wrap: WORLD.update keeps
+// doing everything it always did, the forest ticks after it, and the
+// high country ticks right after the forest. Every WM call is
+// try/caught so a relief error can never touch the world.
+const __wmOrigUpdate = WORLD.update.bind(WORLD);
+WORLD.update = function (dt, px, pz, camDist) {
+  const req = __wmOrigUpdate(dt, px, pz, camDist);
+  try { WM.tick(dt, px, pz, camDist); } catch (e) { console.error('[worldhills]', e); }
+  return req;
+};
+window.WM = WM;   // QA surface + the tree guard's doorway
+
+console.log('%cOPEN WORLD v2.40 — HIGH COUNTRY', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
