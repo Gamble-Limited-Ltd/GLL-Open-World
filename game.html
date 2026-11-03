@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.45</title>
+<title>Open World — v2.44</title>
 <style>
 /* ==================================================================
    OPEN WORLD v2.42 — NEIGHBORHOODS: "make houses and neighborhoods
@@ -731,7 +731,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.44 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), every one of those rooms and floors for sale or for rent (buy it outright — yours forever, tenants pay you daily — or rent it with a two-day deposit; your holdings glow gold and pay you every day), open land for sale everywhere around the cities (LAND MODE — the parcel button — stakes 30 × 30 m claims on any dry ground past the city belts, with a golden preview, a daily farm lease and resale at 60%), three graphics modes (HIGH — the full approved look — BALANCED, and a speed-first CHROMEBOOK coat that real Chromebooks start on automatically; switch anytime under HELP → GRAPHICS or with [G]), and the same streets, buildings, plots and roads on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.44 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), every one of those rooms and floors for sale or for rent (buy it outright — yours forever, tenants pay you daily — or rent it with a two-day deposit; your holdings glow gold and pay you every day), a patchwork of buyable farm parcels over every mile of open country around the cities (rectangles of all shapes and sizes in every shade of green like a satellite view — hover one for its price, click to buy it, and the tenant farmers pay you daily), and the same streets, buildings, plots and roads on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -767,83 +767,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.45';
+const GAME_VERSION = 'v2.44';
 const SAVE_KEY = 'openworld-v2';
-
-// ---------------- v2.45 — GFX: graphics modes (TURBO) ---------------------
-// The ask: "make different graphics modes for people who are on
-// Chromebooks." One knob, three coats of paint on the same 1:1 Earth.
-// HIGH is the approved v2.44 look, untouched, and stays the default for
-// every device except real Chromebooks, which auto-start on the
-// CHROMEBOOK coat (switchable any time: HELP → GRAPHICS or [G]).
-// The choice lives in its OWN localStorage key (openworld-gfx) so it
-// loads before the renderer is built — anti-aliasing is a context
-// creation flag and cannot be swapped mid-flight (mode switches that
-// change it trigger a quick reload; everything else applies live via
-// GFX.apply() in 90_main). It is a device setting, not progress: a new
-// game or a save reset keeps it.
-const GFX_KEY = 'openworld-gfx';
-const GFX_MODES = {
-  high:       { label: 'HIGH',       aa: true,  px: 2,    shadows: true,  sh: 2048, tree: 1,   prop: 1,   wf: 1,   zoneR: 1,   hemiBoost: 0,
-                hint: 'The full approved look — every tree, soft 2048px shadows, retina-sharp pixels' },
-  balanced:   { label: 'BALANCED',   aa: true,  px: 1.25, shadows: true,  sh: 1024, tree: .75, prop: .8,  wf: .6,  zoneR: .85, hemiBoost: .15,
-                hint: 'A lighter coat for everyday laptops — softer 1024px shadows, a thinner forest' },
-  chromebook: { label: 'CHROMEBOOK', aa: false, px: 1,    shadows: false, sh: 512,  tree: .5,  prop: .55, wf: .35, zoneR: .65, hemiBoost: .45,
-                hint: 'Built for school Chromebooks — shadows off, light forest, crisp pixels' }
-};
-// real Chromebooks say CrOS in the user agent; weak ones (≤4 GB RAM or
-// ≤4 cores) take the CHROMEBOOK coat, beefier ones BALANCED. Phones and
-// desktops stay HIGH until the player chooses otherwise.
-function gfxDetect(ua, nav) {
-  try {
-    if (!/CrOS/.test(ua || '')) return 'high';
-    const mem = nav && nav.deviceMemory, cores = nav && nav.hardwareConcurrency;
-    if ((mem && mem <= 4) || (cores && cores <= 4)) return 'chromebook';
-    return 'balanced';
-  } catch (e) { return 'high'; }
-}
-// deterministic list thinning — even stride, so a thinned street of
-// trees still reads as a street of trees; a factor of 1 returns the
-// list untouched (the exact v2.44 placement).
-function gfxThin(list, f) {
-  if (!f || f >= 1 || !list || !list.length) return list;
-  const keep = Math.round(list.length * f);
-  if (keep >= list.length) return list;
-  if (keep <= 0) return [];
-  const out = new Array(keep), step = list.length / keep;
-  for (let i = 0; i < keep; i++) out[i] = list[Math.floor(i * step)];
-  return out;
-}
-const GFX = (() => {
-  let mode = 'high', auto = true;
-  try {
-    const raw = localStorage.getItem(GFX_KEY);
-    if (raw) { const j = JSON.parse(raw); if (j && GFX_MODES[j.mode]) { mode = j.mode; auto = false; } }
-  } catch (e) { }
-  if (auto) mode = gfxDetect(navigator.userAgent, navigator);
-  function px() { return Math.min(GFX_MODES[mode].px, window.deviceRatio || window.devicePixelRatio || 1); }
-  function set(k) {
-    if (!GFX_MODES[k] || k === mode) return { aaChanged: false };
-    const aaChanged = GFX_MODES[k].aa !== GFX_MODES[mode].aa;
-    mode = k; auto = false;
-    try { localStorage.setItem(GFX_KEY, JSON.stringify({ mode: k })); } catch (e) { }
-    return { aaChanged };
-  }
-  return {
-    get mode() { return mode; }, get auto() { return auto; }, get q() { return GFX_MODES[mode]; },
-    px, set, thin: gfxThin,
-    apply() { },   // replaced by 90_main once the renderer + sun exist
-    detectFor: ua => gfxDetect(ua, navigator)
-  };
-})();
-window.GFX = {   // QA surface: window.GFX.get() / .set(k) / .detected() / .detectFor(ua) / .modes
-  get: () => ({ mode: GFX.mode, auto: GFX.auto, aa: GFX.q.aa, px: GFX.px(), shadows: GFX.q.shadows, sh: GFX.q.sh, tree: GFX.q.tree, prop: GFX.q.prop, wf: GFX.q.wf, zoneR: GFX.q.zoneR }),
-  set: k => GFX.set(k),
-  detected: () => gfxDetect(navigator.userAgent, navigator),
-  detectFor: ua => gfxDetect(ua, navigator),
-  modes: GFX_MODES
-};
-
 
 // ---- deterministic rng --------------------------------------------
 function _ihash(x, y, s) {
@@ -1262,7 +1187,7 @@ const STATE = {
   plots: [],                     // owned: {id, cityKey, x, z(world), cart:{cuisine}, crew:[], office?}
   offices: [],                   // leased: {id, cityKey, bkey, name, sqm, rate}
   rooms: [],                     // v2.43 TITLE DEEDS: bought/rented units {id, cityKey, cityName, bkey, kind:'floor'|'room', index, name, area, rate, mode:'owned'|'rented', price, x, z}
-  land: [],                      // v2.44 LAND RUSH: staked parcels {id, x, z, w, d, price, rate, land:true, rural:true, sold:true, mesh}
+  acres: [],                     // v2.44 PATCHWORK: bought farm parcels {id, name, ha, price, rate, x, z, near, nearKey}
   market: null,                  // MARKET module state (positions/orders)
   lastCityKey: null,
   seenNews: false,
@@ -1288,7 +1213,7 @@ function saveGame() {
       })),
       offices: STATE.offices.map(o => ({ id: o.id, cityKey: o.cityKey, bkey: o.bkey, name: o.name, sqm: o.sqm, rate: o.rate })),
       rooms: (STATE.rooms || []).map(r => ({ id: r.id, cityKey: r.cityKey, cityName: r.cityName || null, bkey: r.bkey, kind: r.kind, index: r.index, name: r.name, area: r.area, rate: r.rate, mode: r.mode, price: r.price, x: r.x, z: r.z })),   // v2.43 TITLE DEEDS (optional field — older builds ignore it)
-      land: (STATE.land || []).map(p => ({ id: p.id, x: +p.x.toFixed(2), z: +p.z.toFixed(2), w: p.w, d: p.d, price: p.price, rate: p.rate })),   // v2.44 LAND RUSH (optional field — older builds ignore it)
+      acres: (STATE.acres || []).map(a => ({ id: a.id, name: a.name, ha: +a.ha || 0, price: +a.price || 0, rate: +a.rate || 0, x: +a.x || 0, z: +a.z || 0, near: a.near || null, nearKey: a.nearKey || null })),   // v2.44 PATCHWORK (optional field — older builds ignore it)
       market: STATE.market ? STATE.market.pack() : null,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(pack));
@@ -1354,15 +1279,13 @@ function loadGame() {
     });
     STATE.offices = p.offices || [];
     // v2.43 TITLE DEEDS: rooms/floors you bought or rented (absent on older saves)
+    // v2.44 PATCHWORK: farm parcels you bought (absent on older saves)
+    STATE.acres = (p.acres || []).filter(a => a && typeof a.id === 'string' && a.id.charAt(0) === 'f')
+      .slice(0, 150)
+      .map(a => ({ id: a.id, name: a.name || 'Farm parcel', ha: +a.ha || 0, price: +a.price || 0, rate: +a.rate || 0, x: +a.x || 0, z: +a.z || 0, near: a.near || null, nearKey: a.nearKey || null }));
     STATE.rooms = (p.rooms || []).filter(r => r && (r.kind === 'floor' || r.kind === 'room') &&
       (r.mode === 'owned' || r.mode === 'rented') && r.bkey !== undefined && typeof r.index === 'number')
       .map(r => ({ id: r.id, cityKey: r.cityKey, cityName: r.cityName || null, bkey: r.bkey, kind: r.kind, index: r.index, name: r.name || r.kind, area: +r.area || 0, rate: +r.rate || 0, mode: r.mode, price: +r.price || 0, x: +r.x || 0, z: +r.z || 0 }));
-    // v2.44 LAND RUSH: staked parcels (absent on older saves)
-    STATE.land = (p.land || []).filter(q => q && typeof q.x === 'number' && typeof q.z === 'number' &&
-      typeof q.price === 'number' && typeof q.rate === 'number')
-      .map(q => ({ id: q.id || ('L' + Math.round(q.x) + '_' + Math.round(q.z)), x: +q.x, z: +q.z,
-        w: +q.w || 30, d: +q.d || 30, price: Math.max(0, +q.price || 0), rate: Math.max(0, +q.rate || 0),
-        land: true, rural: true, sold: true, cityKey: 'rural', cityName: 'Countryside', mesh: null }));
     STATE.marketPack = p.market || null;
     // v2.05 starter guide: fresh players start at step 0; returning
     // players who already own a business are exempt
@@ -2450,10 +2373,7 @@ const WORLD = (() => {
   const markMatShared = () => _markMat || (_markMat = new THREE.MeshLambertMaterial({ vertexColors: true }));
   const pylMatShared = () => _pylMat || (_pylMat = new THREE.MeshLambertMaterial({ color: 0x9aa2a9 }));
   const isMob = matchMedia('(pointer:coarse)').matches;
-  // v2.45: the pasture detail zone follows the graphics mode (same zoneR
-  // factor as the world forest's radii, so trees never outrun their
-  // ground); HIGH is exactly the v2.44 radius.
-  const CHUNK_R = Math.round((isMob ? 750 : 1050) * GFX.q.zoneR);
+  const CHUNK_R = isMob ? 750 : 1050;
 
   let scene = null, group = null;
   let inited = false;
@@ -4089,7 +4009,7 @@ const WORLD = (() => {
     // scatter, which read as 'a few trees'). addTree's own guards still
     // apply to every tree (off the plate, off roads, dry land only).
     if (nearC.d < CITY_R + 3300 + CH * .75) {
-      const stands = Math.round((3 + rnd() * 3) * mobF * GFX.q.tree);
+      const stands = Math.round((3 + rnd() * 3) * mobF);
       for (let s = 0; s < stands; s++) {
         const sx = x0 + rnd() * CH, sz = z0 + rnd() * CH;
         const sd = distToCity(sx, sz).d;
@@ -4103,7 +4023,7 @@ const WORLD = (() => {
       }
     }
     if (!insideCity) {
-      const groves = Math.round((rnd() < .55 ? 1 + Math.floor(rnd() * 2) : 0) * mobF * GFX.q.tree);
+      const groves = Math.round((rnd() < .55 ? 1 + Math.floor(rnd() * 2) : 0) * mobF);
       for (let gi = 0; gi < groves; gi++) {
         const gx = x0 + 60 + rnd() * (CH - 120), gz = z0 + 60 + rnd() * (CH - 120);
         const cnt = 4 + Math.floor(rnd() * 7);
@@ -4111,7 +4031,7 @@ const WORLD = (() => {
           addTree(B, gx + (rnd() - .5) * 90, gz + (rnd() - .5) * 90, .7 + rnd() * .9, rnd);
         }
       }
-      const lone = Math.floor((rnd() < .6 ? 1 + rnd() * 5 : 0) * mobF * GFX.q.tree);
+      const lone = Math.floor((rnd() < .6 ? 1 + rnd() * 5 : 0) * mobF);
       for (let i = 0; i < lone; i++) addTree(B, x0 + rnd() * CH, z0 + rnd() * CH, .6 + rnd() * .8, rnd);
 
       if (rnd() < .62) {   // fenced paddock with animals
@@ -4125,7 +4045,7 @@ const WORLD = (() => {
           buildPaddock(B, px, pz, w, d, rnd, mobF);
         }
       }
-      const rocks = Math.floor((2 + rnd() * 6) * mobF * GFX.q.prop);
+      const rocks = Math.floor((2 + rnd() * 6) * mobF);
       for (let i = 0; i < rocks; i++) {
         const rx = x0 + rnd() * CH, rz = z0 + rnd() * CH;
         if (distToCity(rx, rz).d < CITY_R + 1950 || nearRoad(rx, rz, 8)) continue;   // v2.42
@@ -4139,7 +4059,7 @@ const WORLD = (() => {
         if (distToCity(px, pz).d > CITY_R + 1950 && !nearRoad(px, pz, 20) &&   // v2.42
           !(LANDGEO.ready && LANDGEO.isWaterWorld(px, pz))) {   // v2.18
           const g = new THREE.CircleGeometry(9 + rnd() * 9, 18); g.rotateX(-Math.PI / 2);
-          B.addGeo(g, trs(px, .012, pz, 0, 1, 1, 1), col(0x3479bd));
+          B.addGeo(g, trs(px, .040, pz, 0, 1, 1, 1), col(0x3479bd));   // v2.44 PATCHWORK: above the farm quilt (.028) so ponds keep their water over the fields
         }
       }
     }
@@ -4189,12 +4109,12 @@ const WORLD = (() => {
       }
     }
     const cows = rnd() < .55;
-    const nAnim = Math.max(1, Math.round((1 + rnd() * 4) * mobF * GFX.q.prop));
+    const nAnim = Math.max(1, Math.round((1 + rnd() * 4) * mobF));
     for (let i = 0; i < nAnim; i++) {
       const ax = px + (rnd() - .5) * (w - 8), az = pz + (rnd() - .5) * (d - 8);
       addAnimal(B, ax, az, cows ? 'cow' : 'sheep', rnd);
     }
-    const hay = Math.round(rnd() * 3 * mobF * GFX.q.prop);
+    const hay = Math.round(rnd() * 3 * mobF);
     for (let i = 0; i < hay; i++) {
       const hx2 = px + (rnd() < .5 ? hx + 2.4 : -hx - 2.4), hz2 = pz + (rnd() - .5) * d;
       const g = new THREE.CylinderGeometry(.8, .8, 1.3, 9);
@@ -5429,7 +5349,7 @@ const CITY = (() => {
 
     // manhole covers (instanced)
     if (manholes.length) {
-      const n = Math.min(manholes.length, Math.floor(240 * mobF * GFX.q.prop));
+      const n = Math.min(manholes.length, Math.floor(240 * mobF));
       const geo = new THREE.CircleGeometry(.55, 10); geo.rotateX(-Math.PI / 2);
       const inst = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color: 0x2b2f33 }), n);
       const mat4 = new THREE.Matrix4();
@@ -5817,7 +5737,7 @@ const CITY = (() => {
       group.add(mesh);
     };
     flat(city.greens, 0x5fbf6f, .065);
-    flat(city.waters, 0x3479bd, .02);
+    flat(city.waters, 0x3479bd, .042);   // v2.44 PATCHWORK: above the farm quilt (.028) so pasture ponds keep their water
 
     // walking-path rings through the parks + benches facing the center
     const paths = { pos: [], norm: [], uv: [], col: [] };
@@ -5944,9 +5864,7 @@ const CITY = (() => {
     // crosses (park + lawn trees get the same guarantee here).
     const keptTrees = [];
     let droppedTrees = 0;
-    // v2.45: graphics-mode thinning first (factor 1 = the exact v2.44
-    // list), then the same asphalt guarantee as always
-    for (const t of gfxThin(trees, GFX.q.tree)) {
+    for (const t of trees) {
       if (offAsphalt(t[0], t[1], 1.4)) keptTrees.push(t); else droppedTrees++;
     }
     treeList = keptTrees;
@@ -6029,7 +5947,7 @@ const CITY = (() => {
       }
     }
     if (lamps.length) {
-      const n = Math.min(lamps.length, Math.floor(460 * mobF * GFX.q.prop));
+      const n = Math.min(lamps.length, Math.floor(460 * mobF));
       const poleM = new THREE.MeshLambertMaterial({ color: 0x363b41 });
       const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(.06, .09, 5.6, 7), poleM, n);
       const arm = new THREE.InstancedMesh(new THREE.BoxGeometry(.95, .08, .08), poleM, n);
@@ -6070,7 +5988,7 @@ const CITY = (() => {
       }
     }
     if (hyds.length) {
-      const n = Math.min(hyds.length, Math.floor(90 * mobF * GFX.q.prop));
+      const n = Math.min(hyds.length, Math.floor(90 * mobF));
       const body = new THREE.InstancedMesh(new THREE.CylinderGeometry(.14, .17, .72, 8),
         new THREE.MeshLambertMaterial({ color: 0xb03a2e }), n);
       const cap = new THREE.InstancedMesh(new THREE.CylinderGeometry(.09, .09, .16, 8),
@@ -6091,7 +6009,7 @@ const CITY = (() => {
         const [x, z, th] = lamps[i];
         bins.push([x + Math.cos(th) * .9, z - Math.sin(th) * .9]);   // toward the road a touch
       }
-      const n = Math.min(bins.length, Math.floor(160 * mobF * GFX.q.prop));
+      const n = Math.min(bins.length, Math.floor(160 * mobF));
       const inst = new THREE.InstancedMesh(new THREE.CylinderGeometry(.26, .3, .85, 8),
         new THREE.MeshLambertMaterial({ color: 0x3d444a }), n);
       const mat4 = new THREE.Matrix4();
@@ -6174,7 +6092,7 @@ const CITY = (() => {
       }
     }
     if (spots.length) {
-      const n = Math.min(spots.length, Math.floor(240 * mobF * GFX.q.prop));
+      const n = Math.min(spots.length, Math.floor(240 * mobF));
       const bodyGeo = new THREE.BoxGeometry(4.05, 1.0, 1.76); bodyGeo.translate(0, .58, 0);
       const cabGeo = new THREE.BoxGeometry(2.35, .66, 1.5); cabGeo.translate(-.26, 1.36, 0);
       const whGeo = new THREE.CylinderGeometry(.3, .3, .2, 10); whGeo.rotateZ(Math.PI / 2);
@@ -6829,9 +6747,9 @@ const CITY = (() => {
     if (flat.pos.length) { const m = mkS(flat, null, true); m.receiveShadow = true; group.add(m); }   // lawns/drives: always on (flat + cheap — the pattern from above)
     suburbRec.verts = (wall.pos.length + roof.pos.length + flat.pos.length) / 3 | 0;
     // yard trees — the city's own instancing pass, inside the LOD group
-    if (trees.length) { const subTrees = gfxThin(trees, GFX.q.tree); addTrees(subTrees, suburbGroup); suburbRec.trees = subTrees.length; }   // v2.45: graphics-mode thinning
+    if (trees.length) { addTrees(trees, suburbGroup); suburbRec.trees = trees.length; }
     if (lamps.length) {
-      const n = Math.min(lamps.length, Math.floor((isMob ? 140 : 240) * GFX.q.prop));
+      const n = Math.min(lamps.length, Math.floor(isMob ? 140 : 240));
       const poleM = new THREE.MeshLambertMaterial({ color: 0x363b41 });
       const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(.06, .09, 5.6, 7), poleM, n);
       const arm = new THREE.InstancedMesh(new THREE.BoxGeometry(.95, .08, .08), poleM, n);
@@ -6851,7 +6769,7 @@ const CITY = (() => {
       suburbRec.lamps = n;
     }
     if (cars.length) {
-      const n = Math.min(cars.length, Math.floor((isMob ? 36 : 70) * GFX.q.prop));
+      const n = Math.min(cars.length, isMob ? 36 : 70);
       const bodyGeo = new THREE.BoxGeometry(4.05, 1.0, 1.76); bodyGeo.translate(0, .58, 0);
       const cabGeo = new THREE.BoxGeometry(2.35, .66, 1.5); cabGeo.translate(-.26, 1.36, 0);
       const whGeo = new THREE.CylinderGeometry(.3, .3, .2, 10); whGeo.rotateZ(Math.PI / 2);
@@ -6969,7 +6887,7 @@ const CITY = (() => {
 
     // ---- groves + lone trees ----
     const trees = [];
-    const nG = Math.round((6 + rnd() * 4) * mobF * GFX.q.tree);
+    const nG = Math.round((6 + rnd() * 4) * mobF);
     for (let gi = 0; gi < nG; gi++) {
       const gx = PAX + (rnd() * 2 - 1) * 500, gz = PAZ + (rnd() * 2 - 1) * 500;
       if (Math.hypot(gx - PAX, gz - PAZ) < 120) continue;
@@ -6980,14 +6898,13 @@ const CITY = (() => {
         trees.push([gx + Math.cos(a) * rr, gz + Math.sin(a) * rr]);
       }
     }
-    for (let i = 0; i < Math.round(34 * mobF * GFX.q.tree); i++) {          // lone sentinels
+    for (let i = 0; i < Math.round(34 * mobF); i++) {          // lone sentinels
       const a = rnd() * 6.2832, rr = 130 + rnd() * 430;
       trees.push([PAX + Math.cos(a) * rr, PAZ + Math.sin(a) * rr]);
     }
     const keptTrees = [];
     let droppedTrees = 0;
-    // v2.45: graphics-mode thinning first, same guards as always
-    for (const t of gfxThin(trees, GFX.q.tree)) {
+    for (const t of trees) {
       if (offAsphalt(t[0], t[1], 1.4) && !plotAt(t[0], t[1]) && gateClear(t[0], t[1]) && dry(t[0], t[1])) keptTrees.push(t);
       else droppedTrees++;
     }
@@ -6997,17 +6914,17 @@ const CITY = (() => {
 
     // ---- rocks + bushes + hay bales (instanced) ----
     const rocks = [], bushes = [], bales = [];
-    for (let i = 0; i < Math.round(26 * mobF * GFX.q.prop); i++) {
+    for (let i = 0; i < Math.round(26 * mobF); i++) {
       const a = rnd() * 6.2832, rr = 60 + rnd() * 520;
       const x = PAX + Math.cos(a) * rr, z = PAZ + Math.sin(a) * rr;
       if (dry(x, z) && offAsphalt(x, z, 1.6) && !plotAt(x, z) && gateClear(x, z)) rocks.push([x, z, .5 + rnd() * 1.3, rnd() * 6.28]);
     }
-    for (let i = 0; i < Math.round(46 * mobF * GFX.q.prop); i++) {
+    for (let i = 0; i < Math.round(46 * mobF); i++) {
       const a = rnd() * 6.2832, rr = 40 + rnd() * 560;
       const x = PAX + Math.cos(a) * rr, z = PAZ + Math.sin(a) * rr;
       if (dry(x, z) && offAsphalt(x, z, 1.2) && !plotAt(x, z)) bushes.push([x, z, .7 + rnd() * .8]);
     }
-    for (let i = 0; i < Math.round((6 + rnd() * 8) * mobF * GFX.q.prop); i++) {
+    for (let i = 0; i < Math.round((6 + rnd() * 8) * mobF); i++) {
       const a = rnd() * 6.2832, rr = 150 + rnd() * 380;
       const x = PAX + Math.cos(a) * rr, z = PAZ + Math.sin(a) * rr;
       if (dry(x, z) && offAsphalt(x, z, 2.2) && !plotAt(x, z) && gateClear(x, z)) bales.push([x, z, rnd() * 6.28]);
@@ -8106,7 +8023,7 @@ const ECO = (() => {
       // v2.09: plot ids reshuffled with the sidewalk spots — fall back to
       // the nearest new spot so older saves keep their carts on the street
       const rec = regionPlots(ck).find(r => r.id === p.id) ||
-        regionPlots(ck).find(r => !r.land && !taken.has(r.id) && Math.hypot(r.x - p.x, r.z - p.z) < 15);   // v2.44: a cart never snaps onto a staked land parcel
+        regionPlots(ck).find(r => !taken.has(r.id) && Math.hypot(r.x - p.x, r.z - p.z) < 15);
       if (rec) {
         taken.add(rec.id);
         markPlotOwned(rec);
@@ -9422,14 +9339,10 @@ window.addEventListener('error', e => { (window.__errs = window.__errs || []).pu
 
 // ---------------- renderer / camera ---------------------------------
 const canvas = document.getElementById('gl');
-// v2.45 TURBO: the renderer is built from the graphics mode — the pref
-// loaded in core before this line, so anti-aliasing (a context-creation
-// flag) is right on first boot; HIGH builds the exact v2.44 renderer.
-// Live mode switches re-run everything below except aa via GFX.apply().
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: GFX.q.aa, logarithmicDepthBuffer: true });
-renderer.setPixelRatio(GFX.px());
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true });
+renderer.setPixelRatio(Math.min(2, window.deviceRatio || window.devicePixelRatio || 1));
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = GFX.q.shadows;
+renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;   // v2.03: soft toy-matte shadows
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 // v2.37 WHOLE-WORLD ZOOM: "allow me to zoom out farther" — the ceiling
@@ -9449,12 +9362,11 @@ const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerH
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setPixelRatio(GFX.px());   // v2.45: a monitor change can change the dpr
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
 // ---------------- the ONE WORLD scene --------------------------------
-let worldScene = null, sun = null, skyDome = null, hemiLight = null;   // v2.45: hemiLight for live mode switches
+let worldScene = null, sun = null, skyDome = null;
 // v2.17 BIRD'S EYE command camera: `follow` keeps the view riding on
 // the character; panning (drag / WASD / joystick) detaches it, and any
 // tap-to-move command — or FIND ME / [C] — re-attaches it.
@@ -9509,91 +9421,19 @@ function buildWorldScene() {
   skyDome.scale.setScalar(CAM_FAR * .88);
   skyDome.renderOrder = -1;
   worldScene.add(skyDome);
-  // v2.45: shadow rig + the shadowless hemisphere lift follow the
-  // graphics mode; HIGH rebuilds the exact v2.44 rig (2048 map, radius 5)
-  hemiLight = new THREE.HemisphereLight(0xf0f7fa, 0x97a184, 2.5 + (GFX.q.hemiBoost || 0));   // sky fill, warm green-earth bounce
-  worldScene.add(hemiLight);
+  worldScene.add(new THREE.HemisphereLight(0xf0f7fa, 0x97a184, 2.5));   // sky fill, warm green-earth bounce
   sun = new THREE.DirectionalLight(0xfff3df, 2.1);              // v2.33: a touch brighter — CR's flat bright noon
   sun.position.set(-170, 180, 95);
-  sun.castShadow = GFX.q.shadows;
-  sun.shadow.mapSize.set(GFX.q.shadows ? GFX.q.sh : 512, GFX.q.shadows ? GFX.q.sh : 512);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.left = -240; sun.shadow.camera.right = 240;
   sun.shadow.camera.top = 240; sun.shadow.camera.bottom = -240;
   sun.shadow.camera.near = 20; sun.shadow.camera.far = 1200;
   sun.shadow.bias = -0.0006;
-  sun.shadow.radius = sun.shadow.mapSize.x >= 2048 ? 5 : 4;
+  sun.shadow.radius = 5;
   worldScene.add(sun);
   worldScene.add(sun.target);
 }
-
-// ---------------- v2.45 — GFX live apply + mode picker --------------------
-// Everything except anti-aliasing retunes right here, mid-session:
-// pixel ratio, the shadow rig, the hemisphere lift and the world forest
-// (WF.applyGfx re-streams it); three.js only rebuilds shader programs
-// when materials are flagged, so the traversal below is required after
-// toggling shadow rendering.
-GFX.apply = function () {
-  const q = GFX.q;
-  try {
-    renderer.setPixelRatio(GFX.px());
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = q.shadows;
-    if (sun) {
-      sun.castShadow = q.shadows;
-      const sh = q.shadows ? q.sh : 512;
-      if (sun.shadow.mapSize.x !== sh) {
-        sun.shadow.mapSize.set(sh, sh);
-        if (sun.shadow.map) { try { sun.shadow.map.dispose(); } catch (e) { } sun.shadow.map = null; }
-      }
-      sun.shadow.radius = sh >= 2048 ? 5 : 4;
-    }
-    if (hemiLight) hemiLight.intensity = 2.5 + (q.hemiBoost || 0);
-    const seen = new Set();
-    [worldScene, EARTH.scene].forEach(s => {
-      if (!s) return;
-      s.traverse(o => {
-        const m = o.material; if (!m) return;
-        (Array.isArray(m) ? m : [m]).forEach(x => { if (x && !seen.has(x)) { seen.add(x); x.needsUpdate = true; } });
-      });
-    });
-    if (typeof WF !== 'undefined' && WF.applyGfx) WF.applyGfx();
-  } catch (e) { console.error('[GFX] apply', e); }
-};
-
-function openGfx() {
-  const cur = GFX.mode;
-  const rows = Object.keys(GFX_MODES).map(k => {
-    const m = GFX_MODES[k], on = k === cur;
-    return '<button class="btn' + (on ? ' primary' : '') + '" id="gfx-' + k + '" style="flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:10px 14px">' +
-      '<span style="font-size:12px">' + (on ? '\u25C9 ' : '\u25CB ') + m.label + '</span>' +
-      '<span style="font-size:10.5px;font-weight:400;letter-spacing:0;text-transform:none;color:' + (on ? '#cfe4f7' : 'var(--dim)') + '">' + m.hint + '</span></button>';
-  }).join('');
-  openModal('Graphics Mode — ' + GAME_VERSION, `
-    <p><b>Three coats of paint on the same real Earth.</b> Pick how hard the planet works your machine — the choice saves on this device and applies to every visit.</p>
-    <div style="display:flex;flex-direction:column;gap:8px">${rows}</div>
-    <div class="kv" style="margin-top:12px"><span class="k">RUNNING</span><span class="v">${GFX_MODES[cur].label}${GFX.auto ? ' — auto-detected for this device' : ' — your choice'}</span></div>
-    <div class="kv"><span class="k">APPLIES</span><span class="v">Pixel sharpness, shadows and the world forest update right away; anti-aliasing (HIGH / BALANCED ↔ CHROMEBOOK) finishes with a quick reload. Chromebooks start on the CHROMEBOOK coat automatically.</span></div>
-    <div style="display:flex;gap:8px;margin-top:14px"><button class="btn" id="gfx-x" style="flex:1">CLOSE</button></div>`);
-  document.getElementById('gfx-x').onclick = closeModal;
-  Object.keys(GFX_MODES).forEach(k => {
-    const b = document.getElementById('gfx-' + k);
-    if (b) b.onclick = () => pickGfx(k);
-  });
-}
-function pickGfx(k) {
-  if (k === GFX.mode) return;
-  const r = GFX.set(k);
-  GFX.apply();
-  if (r && r.aaChanged) {
-    toast('Graphics: <b>' + GFX_MODES[k].label + '</b> — reloading to finish anti-aliasing…', 'warn');
-    try { sessionStorage.setItem('ow-gfx-reload', '1'); saveGame(); } catch (e) { }
-    setTimeout(() => location.reload(), 1500);
-  } else {
-    toast('Graphics: <b>' + GFX_MODES[k].label + '</b> applied — forest and shadows re-tuned. City trees finish on your next visit.', 'warn');
-    openGfx();
-  }
-}
-
 
 // ---------------- travel ---------------------------------------------
 // enterWorld: orbit dive / map click / search / instant travel → build
@@ -9953,23 +9793,10 @@ function doEnter() {
     setTimeout(autoEnterLast, 900);
   }
   else toast('Welcome, <b>' + nm + '</b>. Click a glowing city — or any land — to land anywhere on Earth.');
-  // v2.45: an auto-detected lite device (a real Chromebook) gets one
-  // gentle note per session — the mode is already running, this says so
-  if (GFX.auto && GFX.mode !== 'high' && !sessionStorage.getItem('ow-gfx-note')) {
-    sessionStorage.setItem('ow-gfx-note', '1');
-    setTimeout(() => toast(GFX_MODES[GFX.mode].label + ' graphics on — auto-tuned for this device. Switch anytime: HELP → GRAPHICS or [G].', 'warn'), 2600);
-  }
   // v2.24: compare this build to the site's feed once per session
   checkForUpdate();
 }
 enterBtn.addEventListener('click', doEnter);
-// v2.45: a graphics-mode reload (anti-aliasing change) carries a one-shot
-// flag so the game CONTINUEs by itself — the switch feels instant instead
-// of dumping you back at the login screen
-if (sessionStorage.getItem('ow-gfx-reload')) {
-  sessionStorage.removeItem('ow-gfx-reload');
-  if (hadSave && STATE.name) setTimeout(() => { try { doEnter(); } catch (e) { } }, 200);
-}
 pnameEl.addEventListener('keydown', e => { if (e.key === 'Enter') doEnter(); });
 document.querySelectorAll('#boot .foot a').forEach(a => {
   a.onclick = e => {
@@ -10030,12 +9857,13 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.45 — TURBO', `
-    <p><b>New graphics modes — pick how hard the real Earth works your machine.</b></p>
-    <div class="kv"><span class="k">THREE MODES</span><span class="v"><b>HIGH</b> — the full approved look, unchanged · <b>BALANCED</b> — softer shadows and a thinner forest for everyday laptops · <b>CHROMEBOOK</b> — shadows off, light forest, crisp pixels: built for school Chromebooks</span></div>
-    <div class="kv"><span class="k">CHROMEBOOKS AUTO</span><span class="v">A real Chromebook now starts on the CHROMEBOOK coat by itself — the smoothest ride — and says so once; everyone else keeps HIGH until they choose</span></div>
-    <div class="kv"><span class="k">SWITCH ANYTIME</span><span class="v">HELP → GRAPHICS or press [G] — pixel sharpness, shadows and the world forest retune instantly (anti-aliasing finishes with a quick reload), and the choice saves on this device</span></div>
-    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">HIGH is the exact v2.44 look — every tree, every shadow, same pixels — and the 1:1 Earth, cities, title deeds and land claims are untouched</span></div>
+  openModal('Welcome to v2.44 — PATCHWORK', `
+    <p><b>The open country around every city is now a patchwork of buyable farm parcels.</b></p>
+    <div class="kv"><span class="k">THE QUILT</span><span class="v">Fields of all shapes and sizes — green rectangles in every shade, divided by hedge lines, with plough stripes and the odd harvested tan — tile every mile of land past the suburbs, like a satellite view of farm country</span></div>
+    <div class="kv"><span class="k">BUY ANY SQUARE</span><span class="v">Zoom out past ~300 m and the whole quilt becomes a land catalog: hover any field for its size and price, click to buy it — or walk up to a FOR SALE signpost at street level and click that</span></div>
+    <div class="kv"><span class="k">TENANT FARMERS</span><span class="v">An owned field pays rent every day, its hedge border turns GOLD, the sign goes away, and it lists in your Empire panel with one-tap TELEPORT — sell it back any time for 60%</span></div>
+    <div class="kv"><span class="k">EVERYWHERE</span><span class="v">The quilt streams around you wherever you roam on dry land — never inside a city or its neighborhoods, never on the roads, never in the water</span></div>
+    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The title deeds, the inspector, the neighborhoods, the world forest, the deep-blue lakes, the 23,000 km whole-world zoom and the true 1:1 Earth are untouched</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -10053,8 +9881,8 @@ document.getElementById('b-build').addEventListener('click', () => {
     <p>Everything starts on the ground — city sidewalks or open country:</p>
     <div class="kv"><span class="k">GREEN $ SPOTS</span><span class="v">Click to buy — sidewalk spots in cities, roadside plots in the wild</span></div>
     <div class="kv"><span class="k">YOUR PLOT</span><span class="v">Click again → park a food cart</span></div>
-    <div class="kv"><span class="k">OPEN LAND</span><span class="v">BUY LAND button (or [L]) → LAND MODE: click open country past the city belts to stake 30 × 30 m claims — farm-lease rent, resale 60%</span></div>
     <div class="kv"><span class="k">BUILDINGS</span><span class="v">Click any building to open it and pick a floor or a room — then <b>BUY</b> it outright or <b>RENT</b> it from the panel (your holdings pay you daily); leasable towers keep their LEASE SUITE button</span></div>
+    <div class="kv"><span class="k">FARMLAND</span><span class="v">The open country around every city is a patchwork of buyable farm parcels — zoom out and click any field (or walk up to a FOR SALE sign); your fields pay rent every day</span></div>
     <div class="kv"><span class="k">CARTS</span><span class="v">Stand close → [E] to serve the queue</span></div>
     <div class="kv"><span class="k">CREWS</span><span class="v">Business panel → hire star vendors</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn" id="hb-x" style="flex:1">GOT IT</button></div>`);
@@ -10083,7 +9911,7 @@ document.getElementById('bb-next').addEventListener('click', () => {
 });
 
 function openHelp() {
-  openModal('Open World v2.45 — Help', `
+  openModal('Open World v2.37 — Help', `
     <p><b>Controls</b></p>
     <div class="kv"><span class="k">MOVE</span><span class="v g">Tap / click anywhere — your tycoon walks there (the only way they move)</span></div>
     <div class="kv"><span class="k">LOOK AROUND</span><span class="v">Drag or WASD / arrows / joystick to glide the bird\u2019s-eye view across the map — no distance cap, roam the whole Earth; detail streams wherever you look</span></div>
@@ -10095,21 +9923,17 @@ function openHelp() {
     <div class="kv"><span class="k">WORLD MAP</span><span class="v">minimap (bottom right) · [M] or click it for the big map</span></div>
     <div class="kv"><span class="k">THE EARTH</span><span class="v">the real planet at TRUE SCALE — 40,007 km around, real distances between cities. Cross continents by orbit flight, search or the world map [M]; sea bridges still span the straits</span></div>
     <div class="kv"><span class="k">EMPIRE</span><span class="v">avatar (top right) → TELEPORT to any plot you own</span></div>
-    <div class="kv"><span class="k">BUY LAND</span><span class="v g">Parcel button (or [L]) → LAND MODE: click dry open country past the city belts to stake 30 × 30 m claims — a farmer leases them for daily rent, and they list in your Empire</span></div>
-    <div class="kv"><span class="k">GRAPHICS</span><span class="v g">[G] or the GRAPHICS button — HIGH / BALANCED / CHROMEBOOK modes; real Chromebooks start on CHROMEBOOK automatically</span></div>
     <div class="kv"><span class="k">SERVE</span><span class="v">[E] when standing at your cart</span></div>
     <div class="kv"><span class="k">MARKET</span><span class="v">📈 button · limit &amp; market orders</span></div>
     <p style="margin-top:12px"><b>The loop</b></p>
-    <p>Buy a green <b>$</b> plot → park a food cart → serve the queue yourself or hire star vendors → lease offices in the towers → buy rooms and floors for title deeds → stake open country land in LAND MODE → trade the exchange → grow your net worth.</p>
+    <p>Buy a green <b>$</b> plot → park a food cart → serve the queue yourself or hire star vendors → lease offices in the towers → trade the exchange → grow your net worth.</p>
     <p style="font-size:11px;color:var(--dim)">Map data © OpenStreetMap contributors (ODbL). This game runs 100% in your browser; your world saves locally.</p>
     <div style="display:flex;gap:8px;margin-top:14px">
       <button class="btn" id="hp-tut" style="flex:1">REPLAY TUTORIAL</button>
-      <button class="btn" id="hp-gfx" style="flex:1">GRAPHICS</button>
       <button class="btn" id="hp-x" style="flex:1">CLOSE</button>
     </div>`);
   document.getElementById('hp-x').onclick = closeModal;
   document.getElementById('hp-tut').onclick = () => { closeModal(); TUT.restart(); };
-  document.getElementById('hp-gfx').onclick = () => { closeModal(); openGfx(); };   // v2.45
 }
 
 // search box
@@ -10166,8 +9990,8 @@ function buildTicker() {
     const items = stats.map(s =>
       `<span class="tk"><span class="s">${s.sym}</span><span class="p">$${s.price.toFixed(2)}</span><span class="${s.chg >= 0 ? 'up' : 'dn'}">${s.chg >= 0 ? '▲' : '▼'}${Math.abs(s.chg).toFixed(1)}%</span></span>`).join('');
     const worth = STATE.money + STATE.offices.reduce((s2, o) => s2 + o.rate * 8, 0)
-      + (STATE.rooms || []).reduce((s2, r) => s2 + (r.mode === 'owned' ? r.price : 0), 0)   // v2.43: owned property counts at purchase price
-      + (STATE.land || []).reduce((s2, p) => s2 + p.price, 0);   // v2.44: staked land counts at purchase price
+      + (STATE.rooms || []).reduce((s2, r) => s2 + (r.mode === 'owned' ? r.price : 0), 0)
+      + (STATE.acres || []).reduce((s2, a) => s2 + a.price, 0);   // v2.44: owned farmland counts at purchase price
     track.innerHTML = items +
       `<span class="tk"><span class="s g">GDP</span><span class="p">${fmtK(STATE.gdp)}</span><span class="up">▲</span></span>` +
       `<span class="tk"><span class="s o">WORTH</span><span class="p">${fmtK(worth)}</span></span>` +
@@ -10433,7 +10257,6 @@ window.addEventListener('keydown', e => {
   if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;   // v2.06
   if (e.key.toLowerCase() === 'm' && STATE.mode === 'city' && !e.repeat) openBigMap();
   if (e.key.toLowerCase() === 'c' && STATE.mode === 'city' && !e.repeat) recenterOnPlayer();   // v2.17 FIND ME
-  if (e.key.toLowerCase() === 'g' && !e.repeat) openGfx();   // v2.45 TURBO: graphics modes
 });
 
 // ---------------- main loop -------------------------------------------
@@ -10638,13 +10461,9 @@ const WF = (() => {
   const BELT_R = CITY_R + 3300;         // the v2.35 woodland belt owns everything inside this
   const MOB = matchMedia('(pointer:coarse)').matches;
   const MOBF = MOB ? .55 : 1;
-  // v2.45: the treed zone follows the graphics mode (the same zoneR
-  // factor as WORLD's CHUNK_R, so the forest never outruns its ground)
-  // and a density factor rides every stand — applyGfx() re-streams live.
-  let BASE_R = Math.round((MOB ? 750 : 1050) * GFX.q.zoneR);
-  let MAX_R = Math.round((MOB ? 1300 : 2000) * GFX.q.zoneR);
-  let DISPOSE_R = MAX_R + 450;
-  let WF_F = GFX.q.wf;
+  const BASE_R = MOB ? 750 : 1050;      // matches WORLD.CHUNK_R at street level
+  const MAX_R = MOB ? 1300 : 2000;      // treed zone breathing room with altitude
+  const DISPOSE_R = MAX_R + 450;        // fixed hysteresis — no churn on zoom cycles
 
   const chunks = new Map();             // 'cx,cz' -> group | null (null = built empty)
   let queue = [], lastUpd = 0, root = null, trees = 0;
@@ -10710,17 +10529,12 @@ const WF = (() => {
   }
 
   // plot snapshot — green $ pads AND sold roadside plots (sold recs stay
-  // in the list, so a bought cart is guarded the same as a live pad);
-  // v2.44: wrapped WORLD.plots() also carries staked land parcels
+  // in the list, so a bought cart is guarded the same as a live pad)
   let _plots = [], _plotsAt = 0;
   function onPlot(x, z) {
     const now = performance.now();
     if (now - _plotsAt > 400) { _plotsAt = now; try { _plots = WORLD.plots() || []; } catch (e) { _plots = []; } }
     for (const p of _plots) {
-      if (p.land) {   // v2.44 LAND RUSH: square staked parcels keep their corners tree-free
-        if (Math.abs(p.x - x) <= p.w / 2 + 2 && Math.abs(p.z - z) <= p.d / 2 + 2) return true;
-        continue;
-      }
       if (Math.abs(p.x - x) > 15 || Math.abs(p.z - z) > 15) continue;
       if (Math.hypot(p.x - x, p.z - z) < 14) return true;
     }
@@ -10759,7 +10573,7 @@ const WF = (() => {
     // real clearings, leaner per-tree geometry keeps ~7k verts a chunk
     const density = .4 + rnd() * .6;     // woodland character: thick woods ↔ open savanna
     const B = GeoB(xm, zm);
-    const stands = Math.max(WF_F >= 1 ? 4 : 2, Math.round((14 + rnd() * 10) * density * MOBF * WF_F));
+    const stands = Math.max(4, Math.round((14 + rnd() * 10) * density * MOBF));
     for (let s = 0; s < stands; s++) {
       const sx = x0 + 40 + rnd() * (CH - 80), sz = z0 + 40 + rnd() * (CH - 80);
       if (nearCity(sx, sz) < BELT_R + 160) continue;   // stand head past the belt edge
@@ -10767,7 +10581,7 @@ const WF = (() => {
       for (let i = 0; i < cnt; i++)
         addTree(B, sx + (rnd() - .5) * 320, sz + (rnd() - .5) * 320, .8 + rnd() * .7, rnd);
     }
-    const fill = Math.round((14 + rnd() * 16) * density * MOBF * WF_F);
+    const fill = Math.round((14 + rnd() * 16) * density * MOBF);
     for (let i = 0; i < fill; i++)
       addTree(B, x0 + rnd() * CH, z0 + rnd() * CH, .6 + rnd() * .6, rnd);
     if (B.count < 6) return;
@@ -10786,16 +10600,6 @@ const WF = (() => {
   function reset() {
     for (const key of [...chunks.keys()]) dispose(key);
     queue = []; trees = 0;
-  }
-
-  // v2.45: live graphics-mode switch — new density and zone radii, then
-  // a clean re-stream on the next ticks (HIGH rebuilds the v2.44 forest)
-  function applyGfx() {
-    WF_F = GFX.q.wf;
-    BASE_R = Math.round((MOB ? 750 : 1050) * GFX.q.zoneR);
-    MAX_R = Math.round((MOB ? 1300 : 2000) * GFX.q.zoneR);
-    DISPOSE_R = MAX_R + 450;
-    reset();
   }
 
   function tick(dt, px, pz, camDist) {
@@ -10849,7 +10653,7 @@ const WF = (() => {
     }
     return { trees, badCity, badWater, badRoad };
   }
-  return { tick, reset, applyGfx, audit, get count() { return chunks.size; }, get meshed() { let n = 0; for (const v of chunks.values()) if (v) n++; return n; }, get trees() { return trees; },
+  return { tick, reset, audit, get count() { return chunks.size; }, get meshed() { let n = 0; for (const v of chunks.values()) if (v) n++; return n; }, get trees() { return trees; },
     // QA: world-frame data of every standing forest chunk (null = built empty)
     get debug() { return [...chunks.entries()].map(([k, g]) => g ? { k, x: g.children[0].position.x, z: g.children[0].position.z, verts: g.children[0].geometry.attributes.position.count } : { k, empty: true }); } };
 })();
@@ -12118,431 +11922,625 @@ WORLD.update = function (dt, px, pz, camDist) {
   return req;
 };
 
-// ======== section: 48_land.js ========
+// ======== section: 48_farmland.js ========
 // ====================================================================
-// v2.44 — LAND RUSH. The ask: "allow people to buy plots everywhere
-// in the world around the cities." The game already sells roadside
-// vending plots along the inter-city roads; this section opens the
-// REST of the planet: any dry, road-free ground past every city's
-// suburbs and woodland belt can be staked, bought and owned.
-//   - a BUY LAND button joins the bottom bar ([L] too) and toggles
-//     LAND MODE: over buyable country a golden claim preview follows
-//     the pointer — a 30 × 30 m parcel snapped to a 30 m survey grid
-//     so claims tile into fields — and a click opens the deal;
-//   - the price rides the game's own countryside curve (further out
-//     = dearer land, the roadside convention), a local farmer grazes
-//     the parcel for a small daily lease, it counts toward WORTH at
-//     purchase price, and it sells back any time for 60% — the
-//     established deal shape, at open-country scale;
-//   - owned parcels wear a staked-field look: a straw-tinted pad, a
-//     dashed gold boundary, four wooden corner posts and a gold
-//     pennant; the world forest never grows a tree inside a stake
-//     (its guard reads land parcels through the wrapped WORLD.plots);
-//   - every parcel lists in the Empire panel with one-tap TELEPORT /
-//     TRAVEL (open country = the landAtWorld dive), farm-lease income
-//     accrues on the same 90 s game-day beat as offices and rooms,
-//     and it all persists — a new optional "land" field in the save
-//     pack (pack stays v5; older builds simply ignore it).
-// Touchpoints outside this section (each annotated "v2.44"): the
-// STATE/save/load land field, the WORTH ticker, one guard line in
-// ECO.setRegion, one branch in WF.onPlot, help/news/build-menu lines,
-// and the version surfaces. Every land call is try/caught so a
-// mistake here can never touch the world. window.LANDRUSH is the QA
-// surface.
+// v2.44 — PATCHWORK. The ask: "make squares everywhere in the world
+// around the cities people can buy of all shapes and sizes like in
+// this picture with the exact same look" — the picture being a
+// satellite photo of farm country: a quilt of green rectangles in
+// every shade, a road, tree clumps, roofs at the edges.
+//
+// What this adds, all ADDITIVE (one new section + the usual annotated
+// touchpoints, the exact pattern v2.39/42/43 shipped):
+//   - the open country past every city's suburb ring now wears a
+//     PATCHWORK of farm parcels — rectangles of all shapes and sizes
+//     (30 m strips to 400 m fields) divided by darker hedge lines,
+//     tinted from a satellite-green palette with occasional plough
+//     stripes and harvested tans. The lattice is a jittered global
+//     grid, so the quilt is continuous across the whole Earth at 1:1
+//     and every parcel's identity is deterministic (same parcel, same
+//     price, same name, every session, on every machine).
+//   - EVERY PARCEL IS BUYABLE: zoom out past ~300 m and the whole
+//     quilt becomes a land catalog — hover any field for its size and
+//     price, click it to buy. At street level a small FOR SALE
+//     signpost stands in every field (click it), and plain ground
+//     clicks keep their walk-to meaning.
+//   - OWNERSHIP: a bought field pays tenant rent every day (same beat
+//     as office suites and title deeds), its hedge border turns GOLD,
+//     the sign goes away, it counts in the WORTH ticker at purchase
+//     price, lists in the Empire panel with one-tap TELEPORT, and
+//     sells back any time for 60%. Persisted as an optional `acres`
+//     pack field (pack stays v5 — older builds ignore it).
+//   - GUARDS: never inside a city or its suburb ring (past 2.4 km),
+//     never in water (centre + all four corners must be dry, so no
+//     field bleeds into a lake or the sea), and the quilt plane rides
+//     at .028 under every road (.095), vendor pad (.105) and sidewalk
+//     (.16) — with the two tiny pond lifts annotated "v2.44" so the
+//     little blue ponds keep their water over the fields.
+//
+// Mechanically it mirrors the world-forest streaming it follows: same
+// 500 m chunk grid, same focus rule (character while following,
+// panned view while roaming), same 400 ms cadence and 2-chunks-per-
+// frame budget; the quilted zone breathes out with altitude (1.2 km
+// at street level up to 3 km once you are a kilometre up) and the
+// FOR SALE signs hide past 900 m exactly like the suburb houses do.
+// window.FARM is the QA surface.
 // ====================================================================
+const FARM = (() => {
+  const CH = 500;                       // same chunk grid as everything else
+  const MOB = matchMedia('(pointer:coarse)').matches;
+  const BASE_R = MOB ? 800 : 1200;      // quilted radius at street level
+  const MAX_R = MOB ? 1700 : 3000;      // breathing room with altitude
+  const DISPOSE_R = MAX_R + 450;        // fixed hysteresis, like the forest
+  const SUB_R = 2400;                   // quilt starts past the suburb ring (2360)
+  const LAT_B = 260, LAT_J = 70;        // jittered parcel lattice (cells 120–400 m)
+  const Y_F = .028, Y_S = .0295, Y_H = .032;   // field / stripe / hedge heights
+  const RO_QUILT = 1.8;                 // flat-ground ladder: above the plate (1.6), under the skyline (2)
+  const CAP = 150;                      // land holdings cap
+  const SELL_BACK = .6;
+  const SHOP_DIST = 300;                // camDist ≥ this: the quilt is a land catalog
+  const SIGN_DIST = 900;                // signposts hide past this (sub-pixel specks)
+  const HW = 2.4;                       // hedge border width
 
-// v2.44: the world's plot list now carries staked land parcels too, so
-// the world forest's tree guard (and any WORLD.plots() reader) keeps
-// claims tree-free without touching the WORLD closure itself.
-const __landOrigPlots = WORLD.plots.bind(WORLD);
-WORLD.plots = function () {
-  let a = [];
-  try { a = __landOrigPlots() || []; } catch (e) { }
-  return a.concat(STATE.land || []);
-};
-const __landOrigPlotAt = WORLD.plotAt.bind(WORLD);   // roadside pads only — the click path stays the game's own
+  // satellite farm palette — greens of every shade, rare tans/straws
+  const wcol = h => { const c = new THREE.Color(h); return [c.r, c.g, c.b]; };
+  const PAL = [0x5d8a41, 0x69913f, 0x74a04a, 0x7fae52, 0x8fb75a, 0x9cbf62,
+    0x6f8c3c, 0xa3b266, 0x557f3a, 0x8ab054].map(wcol);
+  const RARE = [0xb3a45e, 0xb9c47e].map(wcol);        // harvested / pale straw
+  const HEDGE = wcol(0x3f5c33), GOLD = wcol(0xf5cc74);
+  const POST = wcol(0x6e5138), BOARD = wcol(0xf4ead0), INK = wcol(0x4a3a28);
+  const FN = ['Wheat', 'Barley', 'Clover', 'Meadow', 'Orchard', 'Corn', 'Rye', 'Oat',
+    'Hay', 'Bean', 'Pea', 'Flax', 'Alder', 'Birch', 'Cedar', 'Maple', 'Willow', 'Hazel'];
+  const FS = ['Field', 'Plot', 'Grounds', 'Flat', 'Acre', 'Row'];
 
-const LANDRUSH = (() => {
-  const CAP = 60;             // parcel cap — bounds the accrual and the Empire list
-  const SIZE = 30;            // the claim: 30 × 30 m (900 m²) on a 30 m survey grid
-  const MIN_D = 745 + 3400;   // past every city, suburb ring and woodland belt (the belt ends at 745 + 3300)
-  const SELL_BACK = .6;       // selling returns 60% (the game's established resale)
-  const RATE_DIV = 60;        // farm lease ≈ price / 60 per day — a ~60-day payback
-  let rootRef = null, group = null;    // parcel meshes ride WORLD.group, like the forest
-  let preview = null, pvT = 0;         // the golden claim preview (breathing dash)
-  let acc = 0;                         // income accrual (1 s ticks, the office/room beat)
-  let buyMode = false, pending = null;
+  const chunks = new Map();             // 'cx,cz' -> group | null (null = built empty)
+  const cells = new Map();              // 'k,m' -> parcel recs (deterministic)
+  let queue = [], lastUpd = 0, root = null;
+  let signMeshes = [], lastSignVis = null;
+  let acc = 0;                          // income accumulator (1 s beat, like rooms)
 
-  // ---- the survey -----------------------------------------------------
-  function at(x, z) {
-    const L = STATE.land || [];
-    for (const p of L) if (Math.abs(x - p.x) <= p.w / 2 && Math.abs(z - p.z) <= p.d / 2) return p;
+  // ---- helpers ---------------------------------------------------------
+  function nearCity(x, z) {
+    let best = 1e9;
+    for (const c of CITIES) { const d = Math.hypot(x - c.wx, z - c.wz); if (d < best) best = d; }
+    return best;
+  }
+  function nearestCity(x, z) {
+    let best = null;
+    for (const c of CITIES) { const d = Math.hypot(x - c.wx, z - c.wz); if (!best || d < best.d) best = { c, d }; }
+    return best;
+  }
+  const isW = (x, z) => { try { return !!(LANDGEO.ready && LANDGEO.isWaterWorld(x, z)); } catch (e) { return false; } };
+
+  // ---- the jittered lattice (global, deterministic, seam-free) ---------
+  function lineX(k) { return k * LAT_B + (hashStr('fq' + k) % (LAT_J * 2 + 1)) - LAT_J; }
+  function lineZ(m) { return m * LAT_B + (hashStr('fr' + m) % (LAT_J * 2 + 1)) - LAT_J; }
+  function cellK(x) {
+    const k0 = Math.floor(x / LAT_B);
+    for (let k = k0 - 1; k <= k0 + 1; k++) if (lineX(k) <= x && x < lineX(k + 1)) return k;
+    return k0;
+  }
+  function cellM(z) {
+    const m0 = Math.floor(z / LAT_B);
+    for (let m = m0 - 1; m <= m0 + 1; m++) if (lineZ(m) <= z && z < lineZ(m + 1)) return m;
+    return m0;
+  }
+
+  // ---- the parcels of one lattice cell ---------------------------------
+  // Recursive binary splits at jittered fractions (sometimes an extreme
+  // .16–.31 split — that's what makes long strip fields), so every cell
+  // carries 1–8 rectangles of genuinely varied shapes and sizes.
+  function cellParcels(k, m) {
+    const key = k + ',' + m;
+    let arr = cells.get(key);
+    if (arr) return arr;
+    const rnd = _mulberry(hashStr('fc' + k + '_' + m));
+    const x0 = lineX(k), x1 = lineX(k + 1), z0 = lineZ(m), z1 = lineZ(m + 1);
+    const rects = [];
+    (function split(rx0, rz0, rx1, rz1, depth) {
+      const w = rx1 - rx0, d = rz1 - rz0, mn = Math.min(w, d);
+      if (depth >= 3 || mn < 70 || (mn < 170 && rnd() < .62)) { rects.push([rx0, rz0, rx1, rz1]); return; }
+      const t = rnd() < .25 ? .16 + rnd() * .15 : .3 + rnd() * .4;
+      if (w >= d) { const xm = rx0 + w * t; split(rx0, rz0, xm, rz1, depth + 1); split(xm, rz0, rx1, rz1, depth + 1); }
+      else { const zm = rz0 + d * t; split(rx0, rz0, rx1, zm, depth + 1); split(rx0, zm, rx1, rz1, depth + 1); }
+    })(x0, z0, x1, z1, 0);
+    arr = [];
+    rects.forEach((rc, i) => {
+      const [rx0, rz0, rx1, rz1] = rc;
+      const cx = (rx0 + rx1) / 2, cz = (rz0 + rz1) / 2;
+      const w = rx1 - rx0, d = rz1 - rz0, ha = w * d / 1e4;
+      const id = 'f' + k + '_' + m + '_' + i;
+      const h = hashStr(id), h2 = hashStr(id + 'x');
+      const base = (h2 % 100) < 9 ? RARE[h % RARE.length] : PAL[h % PAL.length];
+      const jit = .94 + (h2 % 100) / 100 * .12;
+      const nc = nearestCity(cx, cz);
+      const rate = Math.max(2, Math.round(4 + ha * 2.6 + (h % 5)));
+      arr.push({
+        id, x0: rx0, z0: rz0, x1: rx1, z1: rz1, cx, cz, w, d, ha,
+        color: [base[0] * jit, base[1] * jit, base[2] * jit],
+        striped: (h2 % 100) > 30 && Math.min(w, d) > 60,      // a third of the fields carry plough stripes
+        ry: (h % 628) / 100,
+        name: FN[h % FN.length] + ' ' + FS[h2 % FS.length],
+        rate,
+        price: Math.max(80, Math.round(rate * 14 / 10) * 10),
+        near: nc && nc.d < 120000 ? nc.c.name : null,
+        nearKey: nc ? nc.c.key : null,
+        usable: null,                                          // lazy — LANDGEO may still be loading
+      });
+    });
+    if (cells.size > 6000) cells.clear();
+    cells.set(key, arr);
+    return arr;
+  }
+
+  function usable(p) {
+    if (p.usable !== null) return p.usable;
+    let ok = nearCity(p.cx, p.cz) >= SUB_R;                   // never in a city or its suburbs
+    if (ok && LANDGEO.ready) {                                // dry land only — centre + all four corners
+      if (isW(p.cx, p.cz) || isW(p.x0, p.z0) || isW(p.x1, p.z0) || isW(p.x0, p.z1) || isW(p.x1, p.z1)) ok = false;
+      p.usable = ok;
+    }
+    return ok;
+  }
+
+  function parcelAt(x, z) {
+    const arr = cellParcels(cellK(x), cellM(z));
+    for (const p of arr)
+      if (x >= p.x0 && x < p.x1 && z >= p.z0 && z < p.z1) return usable(p) ? p : null;
     return null;
   }
-  // the game's own countryside curve, taken further out: land past the
-  // belts climbs with distance, the way roadside frontage does
-  function priceOf(d) { return Math.max(150, Math.round(ECON.plotBase * ECON.ruralFactor * (.45 + Math.min(d, 80000) / 40000) / 25) * 25); }   // capped at 80 km out — a wilderness estate tops out ~$1,900
-  const rateOf = price => Math.max(5, Math.round(price / RATE_DIV));
 
-  function valid(x, z) {
-    try {
-      if (STATE.mode !== 'city' || !LANDGEO.ready) return null;
-      const gx = Math.round(x / SIZE) * SIZE, gz = Math.round(z / SIZE) * SIZE;   // survey grid
-      if (at(gx, gz)) return null;                       // cell already claimed
-      const h = SIZE / 2;                                // whole footprint dry (the game's 5-point rule)
-      if (LANDGEO.isWaterWorld(gx, gz) ||
-        LANDGEO.isWaterWorld(gx - h, gz - h) || LANDGEO.isWaterWorld(gx + h, gz - h) ||
-        LANDGEO.isWaterWorld(gx - h, gz + h) || LANDGEO.isWaterWorld(gx + h, gz + h)) return null;
-      const near = WORLD.nearestCityInfo(gx, gz);        // past every city, suburb and belt
-      if (!near || near.d < MIN_D) return null;
-      if (WORLD.nearRoad(gx, gz, h + 9)) return null;    // the whole parcel clears the asphalt
-      if (__landOrigPlotAt(gx, gz)) return null;         // roadside vendor pads keep their ground
-      const price = priceOf(near.d);
-      return { x: gx, z: gz, near, price, rate: rateOf(price) };
-    } catch (e) { return null; }
+  // ---- geometry builders (chunk-local frame, float32-safe at 1:1) ------
+  function pushQuad(b, x0, z0, x1, z1, y, c) {
+    b.pos.push(x0, y, z0, x0, y, z1, x1, y, z1, x0, y, z0, x1, y, z1, x1, y, z0);
+    for (let i = 0; i < 6; i++) b.col.push(c[0], c[1], c[2]);
   }
-  function nearStr(p) {
-    try {
-      const n = WORLD.nearestCityInfo(p.x, p.z);
-      return n && n.city ? n.city.name + ' ' + (n.d / 1000).toFixed(1) + ' km' : 'the open country';
-    } catch (e) { return 'the open country'; }
-  }
-
-  // ---- parcel + preview meshes -----------------------------------------
-  function dashedRect(w, d, color, y) {
-    const hw = w / 2 - .5, hd = d / 2 - .5;
-    const pts = [new THREE.Vector3(-hw, y, -hd), new THREE.Vector3(hw, y, -hd),
-      new THREE.Vector3(hw, y, hd), new THREE.Vector3(-hw, y, hd), new THREE.Vector3(-hw, y, -hd)];
-    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
-      new THREE.LineDashedMaterial({ color, dashSize: 1.3, gapSize: .8, transparent: true, opacity: .95 }));
-    line.computeLineDistances();
-    return line;
-  }
-  function buildMesh(p) {
-    const g = new THREE.Group();
-    const pad = new THREE.Mesh(new THREE.PlaneGeometry(p.w - 2.4, p.d - 2.4),    // a staked field
-      new THREE.MeshLambertMaterial({ color: 0xb59a55, transparent: true, opacity: .5 }));
-    pad.rotation.x = -Math.PI / 2; pad.position.y = .105;
-    g.add(pad);
-    g.add(dashedRect(p.w, p.d, 0xf5cc74, .13));
-    const postG = new THREE.CylinderGeometry(.13, .16, 1.35, 5);
-    const postM = new THREE.MeshLambertMaterial({ color: 0x6b4f33 });
-    const hw = p.w / 2 - .55, hd = p.d / 2 - .55;
-    for (const c of [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]]) {
-      const post = new THREE.Mesh(postG, postM);
-      post.position.set(c[0], .67, c[1]);
-      post.castShadow = true;
-      g.add(post);
+  const _BOX = new THREE.BoxGeometry(1, 1, 1);
+  const _m4 = new THREE.Matrix4(), _q4 = new THREE.Quaternion(), _e4 = new THREE.Euler();
+  const _nm4 = new THREE.Matrix3(), _v4a = new THREE.Vector3(), _v4b = new THREE.Vector3(), _s4 = new THREE.Vector3();
+  function pushBox(b, x, y, z, ry, sx, sy, sz, c) {
+    _e4.set(0, ry, 0); _q4.setFromEuler(_e4);
+    _m4.compose(_v4a.set(x, y, z), _q4, _s4.set(sx, sy, sz));
+    _nm4.getNormalMatrix(_m4);
+    const p = _BOX.attributes.position, n = _BOX.attributes.normal, idx = _BOX.index.array;
+    for (let i = 0; i < idx.length; i++) {
+      const vi = idx[i];
+      _v4a.fromBufferAttribute(p, vi).applyMatrix4(_m4);
+      _v4b.fromBufferAttribute(n, vi).applyMatrix3(_nm4).normalize();
+      b.pos.push(_v4a.x, _v4a.y, _v4a.z);
+      b.norm.push(_v4b.x, _v4b.y, _v4b.z);
+      b.col.push(c[0], c[1], c[2]);
+      b.uv.push(0, 0);
     }
-    const flag = new THREE.Mesh(new THREE.PlaneGeometry(.95, .6),                 // the gold pennant
-      new THREE.MeshLambertMaterial({ color: 0xf5cc74, side: THREE.DoubleSide }));
-    flag.position.set(-hw, 1.02, -hd);
-    g.add(flag);
-    g.position.set(p.x, 0, p.z);
-    return g;
   }
-  function ensurePreview() {
-    if (preview) return preview;
-    preview = new THREE.Group();
-    const fill = new THREE.Mesh(new THREE.PlaneGeometry(SIZE - 1, SIZE - 1),
-      new THREE.MeshBasicMaterial({ color: 0xf5cc74, transparent: true, opacity: .16, depthWrite: false }));
-    fill.rotation.x = -Math.PI / 2; fill.position.y = .115;
-    preview.add(fill);
-    preview.add(dashedRect(SIZE, SIZE, 0xf6d365, .14));
-    preview.visible = false;
-    return preview;
+  function toMesh(b, flat) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
+    if (flat) {
+      const nm = new Float32Array((b.pos.length / 3) * 3);
+      for (let i = 0; i < nm.length; i += 3) { nm[i] = 0; nm[i + 1] = 1; nm[i + 2] = 0; }
+      g.setAttribute('normal', new THREE.BufferAttribute(nm, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array((b.pos.length / 3) * 2), 2));
+    } else {
+      g.setAttribute('normal', new THREE.Float32BufferAttribute(b.norm, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
+    }
+    g.setAttribute('color', new THREE.Float32BufferAttribute(b.col, 3));
+    return new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
   }
-  function setPreview(x, z, on) {
-    const pv = ensurePreview();
-    if (on) pv.position.set(x, 0, z);
-    pv.visible = !!on;
+  const goldTint = c => [c[0] + (GOLD[0] - c[0]) * .18, c[1] + (GOLD[1] - c[1]) * .18, c[2] + (GOLD[2] - c[2]) * .18];
+
+  // ---- the chunk builder ------------------------------------------------
+  function build(cx, cz) {
+    const key = cx + ',' + cz;
+    if (chunks.has(key)) return;
+    chunks.set(key, null);                 // reserve — built, even if it ends up empty
+    const x0 = cx * CH, z0 = cz * CH, xm = x0 + CH / 2, zm = z0 + CH / 2;
+    // whole-chunk water — nothing to farm
+    if (isW(xm, zm) && isW(x0, z0) && isW(x0 + CH, z0) && isW(x0, z0 + CH) && isW(x0 + CH, z0 + CH)) return;
+    // whole chunk inside the city + suburb zone
+    if (nearCity(xm, zm) < SUB_R - CH * .8) return;
+
+    const Q = { pos: [], col: [] };                       // the quilt (fields + stripes + hedges)
+    const S = { pos: [], norm: [], uv: [], col: [] };     // the FOR SALE signposts
+    const signs = [];
+    const owned = new Set((STATE.acres || []).map(a => a.id));
+
+    // every lattice cell whose CENTRE lives in this chunk (seam-free: a
+    // cell belongs to exactly one chunk, whoever builds it)
+    const k0 = Math.floor((x0 - LAT_B) / LAT_B) - 1, k1 = Math.floor((x0 + CH + LAT_B) / LAT_B) + 1;
+    const m0 = Math.floor((z0 - LAT_B) / LAT_B) - 1, m1 = Math.floor((z0 + CH + LAT_B) / LAT_B) + 1;
+    for (let k = k0; k <= k1; k++) for (let m = m0; m <= m1; m++) {
+      const ccx = (lineX(k) + lineX(k + 1)) / 2, ccz = (lineZ(m) + lineZ(m + 1)) / 2;
+      if (ccx < x0 || ccx >= x0 + CH || ccz < z0 || ccz >= z0 + CH) continue;
+      for (const p of cellParcels(k, m)) {
+        if (!usable(p)) continue;
+        const own = owned.has(p.id);
+        const lx0 = p.x0 - xm, lz0 = p.z0 - zm, lx1 = p.x1 - xm, lz1 = p.z1 - zm;
+        const fc = own ? goldTint(p.color) : p.color;
+        pushQuad(Q, lx0, lz0, lx1, lz1, Y_F, fc);
+        // plough stripes — darker bands across the short axis
+        if (p.striped && !own) {
+          const sc = [fc[0] * .9, fc[1] * .9, fc[2] * .9];
+          const short = Math.min(p.w, p.d);
+          const n = Math.max(2, Math.min(5, Math.round(short / 70)));
+          const sw = short / (n * 2);
+          for (let i = 0; i < n; i++) {
+            if (p.w >= p.d) { const a = lz0 + (i * 2 + 1) * sw, b = a + sw; pushQuad(Q, lx0, a, lx1, b, Y_S, sc); }
+            else { const a = lx0 + (i * 2 + 1) * sw, b = a + sw; pushQuad(Q, a, lz0, b, lz1, Y_S, sc); }
+          }
+        }
+        // the hedge border — gold when the field is yours
+        const hc = own ? GOLD : HEDGE;
+        pushQuad(Q, lx0, lz0, lx1, lz0 + HW, Y_H, hc);
+        pushQuad(Q, lx0, lz1 - HW, lx1, lz1, Y_H, hc);
+        pushQuad(Q, lx0, lz0, lx0 + HW, lz1, Y_H, hc);
+        pushQuad(Q, lx1 - HW, lz0, lx1, lz1, Y_H, hc);
+        // a small FOR SALE signpost at the centre (street-level buy entry)
+        if (!own && p.ha >= .3) {
+          let onRoad = false;
+          try { onRoad = WORLD.nearRoad(p.cx, p.cz, 8); } catch (e) { }
+          if (!onRoad) {
+            pushBox(S, p.cx - xm, .75, p.cz - zm, p.ry, .1, 1.5, .1, POST);
+            pushBox(S, p.cx - xm, 1.28, p.cz - zm, p.ry, 1.45, .75, .07, BOARD);
+            pushBox(S, p.cx - xm, 1.3, p.cz - zm, p.ry, 1.02, .16, .09, INK);   // the painted line — reads as writing from afar
+            signs.push({ x: p.cx, z: p.cz, p });
+          }
+        }
+      }
+    }
+
+    const cg = new THREE.Group();
+    if (Q.pos.length) {
+      const mesh = toMesh(Q, true);
+      mesh.position.set(xm, 0, zm);
+      mesh.renderOrder = RO_QUILT;         // v2.44 flat-ground ladder rung
+      mesh.receiveShadow = true;
+      cg.add(mesh);
+    }
+    if (S.pos.length) {
+      const mesh = toMesh(S, false);
+      mesh.position.set(xm, 0, zm);
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      mesh.userData.signs = signs;
+      mesh.visible = lastSignVis !== false;
+      signMeshes.push(mesh);
+      cg.add(mesh);
+    }
+    if (!cg.children.length) return;
+    if (root) root.add(cg);
+    chunks.set(key, cg);
   }
 
-  // ---- hover + click (wrapped over ECO's own) ---------------------------
-  function hover(x, z) {
-    const own = at(x, z);
-    if (own) {
-      setPreview(0, 0, false);
-      return { t: 'Your land', s: (own.w * own.d) + ' m² staked claim · ' + nearStr(own),
-        p: '+$' + own.rate + '/day farm lease', a: '✓ Owned', l: 'Click to manage' };
+  function dispose(key) {
+    const cg = chunks.get(key);
+    if (cg) {
+      cg.traverse(o => { if (o.geometry) { try { o.geometry.dispose(); } catch (e) { } } });
+      cg.children.forEach(ch => {
+        const i = signMeshes.indexOf(ch);
+        if (i >= 0) signMeshes.splice(i, 1);
+      });
+      if (cg.parent) cg.parent.remove(cg);
     }
-    if (!buyMode) { setPreview(0, 0, false); return null; }
-    const s = valid(x, z);
-    if (!s) { setPreview(0, 0, false); return null; }
-    setPreview(s.x, s.z, true);
-    return { t: 'Open land', s: (SIZE * SIZE) + ' m² claim · ' + nearStr(s),
-      p: fmt$(s.price), a: '✓ Available to stake', l: 'Click to stake a claim' };
+    chunks.delete(key);
   }
-  function click(x, z) {
-    const own = at(x, z);
-    if (own) { openManage(own); return true; }
-    if (!buyMode) return false;
-    const s = valid(x, z);
-    if (!s) return false;
-    openBuy(s);
-    return true;
+  function reset() {
+    for (const key of [...chunks.keys()]) dispose(key);
+    queue = []; signMeshes = []; lastSignVis = null;
+  }
+  function rebuildAt(x, z) {         // a purchase re-draws its chunk (gold border, no sign)
+    const key = Math.floor(x / CH) + ',' + Math.floor(z / CH);
+    if (!chunks.has(key)) return;
+    dispose(key);
+    const [cx, cz] = key.split(',').map(Number);
+    build(cx, cz);
   }
 
   // ---- the deal ---------------------------------------------------------
-  function commit(s) {
-    const L = STATE.land || (STATE.land = []);
-    if (at(s.x, s.z)) return { ok: false, why: 'taken' };
-    if (L.length >= CAP) return { ok: false, why: 'cap' };
-    if (!spend(s.price)) return { ok: false, why: 'funds', cost: s.price };
-    const p = {
-      id: 'L' + Math.round(s.x) + '_' + Math.round(s.z),
-      x: s.x, z: s.z, w: SIZE, d: SIZE, price: s.price, rate: s.rate,
-      land: true, rural: true, sold: true, cityKey: 'rural', cityName: 'Countryside',
-      mesh: null,
-    };
-    L.push(p);
+  function commit(par) {
+    const A = STATE.acres || (STATE.acres = []);
+    if (A.find(a => a.id === par.id)) return { ok: false, why: 'taken' };
+    if (A.length >= CAP) return { ok: false, why: 'cap' };
+    if (!spend(par.price)) return { ok: false, why: 'funds', cost: par.price };
+    A.push({ id: par.id, name: par.name, ha: par.ha, price: par.price, rate: par.rate,
+      x: par.cx, z: par.cz, near: par.near, nearKey: par.nearKey });
     try { saveGame(); } catch (e) { }
-    return { ok: true, cost: s.price, entry: p };
+    rebuildAt(par.cx, par.cz);
+    return { ok: true, cost: par.price };
   }
-  function openBuy(s) {
-    pending = s;
-    setPreview(s.x, s.z, true);
-    openModal('Open Land — Stake a Claim', `
-      <p>Stake <b>${SIZE} × ${SIZE} m</b> (${SIZE * SIZE} m²) of open country — yours forever, on the survey grid, ${nearStr(s)}.</p>
-      <div class="kv"><span class="k">PRICE</span><span class="v g">${fmt$(s.price)}</span></div>
-      <div class="kv"><span class="k">FARM LEASE</span><span class="v g">+$${s.rate}/day</span></div>
+  function openBuy(par) {
+    openModal(par.name + ' \u2014 Farm Parcel', `
+      <p>A <b>${par.ha.toFixed(1)} ha</b> parcel of open farmland${par.near ? ' out past <b>' + par.near + '</b>' : ' in the open country'} — buy it and tenant farmers work the land, paying you <b>$${par.rate}/day</b>. Yours forever; sell it back any time for 60%.</p>
+      <div class="kv"><span class="k">SIZE</span><span class="v">${par.ha.toFixed(1)} ha \u00b7 ${Math.round(par.ha * 1e4).toLocaleString('en-US')} m\u00b2</span></div>
+      <div class="kv"><span class="k">PRICE</span><span class="v g">${fmt$(par.price)}</span></div>
+      <div class="kv"><span class="k">FARM INCOME</span><span class="v g">+$${par.rate}/day</span></div>
       <div class="kv"><span class="k">BALANCE</span><span class="v">${fmt$(STATE.money)}</span></div>
       <div style="display:flex;gap:8px;margin-top:16px">
-        <button class="btn good" id="ld-go" style="flex:1">STAKE THIS CLAIM</button>
-        <button class="btn" id="ld-x">CLOSE</button>
+        <button class="btn good" id="fa-go" style="flex:1">BUY ${par.name.toUpperCase()}</button>
+        <button class="btn" id="fa-x">CLOSE</button>
       </div>`);
-    document.getElementById('ld-go').onclick = () => {
-      const res = commit(s);
+    document.getElementById('fa-go').onclick = () => {
+      const res = commit(par);
       if (!res.ok) {
-        if (res.why === 'cap') toast('<b>Land cap reached</b> (' + CAP + '). Sell a parcel first.', 'warn');
+        if (res.why === 'cap') toast('<b>Land cap reached</b> (' + CAP + ' parcels). Sell some farmland first.', 'warn');
         else if (res.why === 'funds') toast('<b>Not enough money.</b> Serve some food first.', 'warn');
-        else toast('That claim is already yours.', 'warn');
+        else toast('That parcel is already yours.', 'warn');
         return;
       }
       closeModal();
-      setPreview(0, 0, false);
-      toast('Claim staked — <b>' + SIZE + ' × ' + SIZE + ' m</b> of open country for ' + fmt$(res.cost) +
-        '. A local farmer pays you <b>$' + s.rate + '/day</b>.');
+      toast('Bought <b>' + par.name + '</b> for ' + fmt$(res.cost) + ' \u2014 the farmers move in and pay $' + par.rate + '/day.');
     };
-    document.getElementById('ld-x').onclick = closeModal;
+    document.getElementById('fa-x').onclick = closeModal;
   }
-  function openManage(p) {
-    openModal('Your Land — Staked Claim', `
-      <div id="pl"><span class="l">Farm lease</span><span class="v">+$${(p.rate / 90 * 60).toFixed(2)}/min</span></div>
-      <div class="kv"><span class="k">SIZE</span><span class="v">${p.w} × ${p.d} m (${p.w * p.d} m²)</span></div>
-      <div class="kv"><span class="k">REGION</span><span class="v">Open country · ${nearStr(p)}</span></div>
-      <div class="kv"><span class="k">RESALE VALUE</span><span class="v">${fmt$(Math.round(p.price * SELL_BACK))}</span></div>
+  function openManage(a) {
+    if (!a) return;
+    openModal(a.name + ' \u2014 Your Farmland', `
+      <div id="pl"><span class="l">Income</span><span class="v">+$${(a.rate / 90 * 60).toFixed(2)}/min</span></div>
+      <div class="kv"><span class="k">LOCATION</span><span class="v">${a.near ? 'Open country near ' + a.near : 'The open country'}</span></div>
+      <div class="kv"><span class="k">SIZE</span><span class="v">${a.ha.toFixed(1)} ha</span></div>
+      <div class="kv"><span class="k">RENT</span><span class="v g">$${a.rate}.00 /day</span></div>
+      <div class="kv"><span class="k">RESALE VALUE</span><span class="v">${fmt$(Math.round(a.price * SELL_BACK))}</span></div>
       <div style="display:flex;gap:8px;margin-top:16px">
-        <button class="btn bad" id="lm-sell" style="flex:1">SELL — ${fmt$(Math.round(p.price * SELL_BACK))}</button>
-        <button class="btn" id="lm-x">CLOSE</button>
+        <button class="btn primary" id="fm-tp" style="flex:1">TELEPORT THERE</button>
+        <button class="btn bad" id="fm-sell">SELL \u2014 ${fmt$(Math.round(a.price * SELL_BACK))}</button>
+        <button class="btn" id="fm-x">CLOSE</button>
       </div>`);
-    document.getElementById('lm-sell').onclick = () => { sell(p); };
-    document.getElementById('lm-x').onclick = closeModal;
-  }
-  function sell(p) {
-    STATE.land = (STATE.land || []).filter(x => x !== p);
-    if (p.mesh) { if (p.mesh.parent) p.mesh.parent.remove(p.mesh); p.mesh = null; }
-    earn(Math.round(p.price * SELL_BACK), false);   // resale proceeds don't count toward GDP
-    try { saveGame(); } catch (e) { }
-    closeModal();
-    toast('Sold your <b>' + (p.w * p.d) + ' m²</b> parcel for ' + fmt$(Math.round(p.price * SELL_BACK)) + '.');
+    document.getElementById('fm-tp').onclick = () => travelTo(a);
+    document.getElementById('fm-sell').onclick = () => {
+      STATE.acres = (STATE.acres || []).filter(x => x !== a);
+      earn(Math.round(a.price * SELL_BACK), false);   // resale proceeds don't count toward GDP
+      try { saveGame(); } catch (e) { }
+      rebuildAt(a.x, a.z);
+      closeModal();
+      toast('Sold <b>' + a.name + '</b> for ' + fmt$(Math.round(a.price * SELL_BACK)) + '.');
+    };
+    document.getElementById('fm-x').onclick = closeModal;
   }
 
-  // ---- the Empire panel: your estates, one-tap travel --------------------
+  // ---- travel (one world, one tap) ---------------------------------------
+  function travelTo(a) {
+    if (!a) return;
+    closeModal();
+    const p = ACTORS.player && ACTORS.player.group.position;
+    const local = STATE.mode === 'city' && WORLD.group && p && Math.hypot(p.x - a.x, p.z - a.z) < 3000;
+    if (local) {
+      try { ACTORS.clearGoal(); } catch (e) { }
+      ACTORS.placePlayer(a.x, a.z);
+      camCtl.tx = a.x; camCtl.tz = a.z;
+      camCtl.follow = true; camCtl.distT = 64;
+      ECO.arrivalPulse(a.x, a.z);
+      toast('\u26a1 Teleported to your <b>' + a.name + '</b>.', 'warn');
+      return;
+    }
+    const c = nearestCity(a.x, a.z);
+    if (!c) return;
+    enterWorld({ key: c.c.key, name: c.c.name, lat: c.c.lat, lon: c.c.lon, tier: c.c.tier },
+      { at: { x: a.x, z: a.z } });
+  }
+
+  // ---- the Empire panel rows --------------------------------------------
   function empireInto() {
     const body = document.getElementById('mbody');
     if (!body) return;
     const close = document.getElementById('em-x');
     const anchorEl = close ? close.parentElement : null;
-    const L = STATE.land || [];
-    const local = !CITY.rec && STATE.mode === 'city';   // open country = the same region
-    const rows = L.map((p, i) =>
-      '<div class="kv"><span class="k">' + (p.w * p.d) + ' m² land · ' + nearStr(p) + ' · $' + p.rate + '/day</span>' +
-      '<button class="tpbtn" data-ln="' + i + '">' + (local ? 'TELEPORT' : 'TRAVEL') + '</button></div>').join('');
-    const inc = L.reduce((s, p) => s + p.rate, 0);
-    const html = '<div class="msec" style="margin-top:14px">Open land — your country estates</div>' +
-      (rows || '<p>No land yet. Toggle <b>BUY LAND</b> (the parcel button, or [L]) and click open country beyond the city belts.</p>') +
-      (rows ? '<div class="kv" style="margin-top:10px"><span class="k">LAND INCOME</span><span class="v g">+$' + (inc / 90 * 60).toFixed(2) + '/min</span></div>' : '');
+    const A = STATE.acres || [];
+    const rows = A.map((a, i) =>
+      '<div class="kv"><span class="k">' + a.name + ' \u00b7 ' + a.ha.toFixed(1) + ' ha \u00b7 ' +
+      (a.near || 'open country') + ' \u00b7 $' + a.rate + '/day</span>' +
+      '<button class="tpbtn" data-fa="' + i + '">TELEPORT</button></div>').join('');
+    const inc = A.reduce((s, a) => s + a.rate, 0);
+    const ha = A.reduce((s, a) => s + a.ha, 0);
+    const html = '<div class="msec" style="margin-top:14px">Farmland \u2014 your acres</div>' +
+      (rows || '<p>No farmland yet. Zoom out over the open country and click a field (or walk up to a FOR SALE sign) to buy it.</p>') +
+      (rows ? '<div class="kv" style="margin-top:10px"><span class="k">FARM INCOME</span><span class="v g">+$' + (inc / 90 * 60).toFixed(2) + '/min \u00b7 ' + ha.toFixed(1) + ' ha owned</span></div>' : '');
     if (anchorEl) anchorEl.insertAdjacentHTML('beforebegin', html);
     else body.insertAdjacentHTML('beforeend', html);
-    body.querySelectorAll('[data-ln]').forEach(b => {
-      b.onclick = () => { travelTo(L[+b.dataset.ln]); };
+    body.querySelectorAll('[data-fa]').forEach(b => {
+      b.onclick = () => { travelTo(A[+b.dataset.fa]); };
     });
   }
-  const __landEmpire = ECO.openEmpire.bind(ECO);   // chains after the title-deeds panel
-  ECO.openEmpire = function () {
-    __landEmpire();
-    try { empireInto(); } catch (e) { console.error('[land]', e); }
-  };
 
-  // ---- travel: one tap to the stake ---------------------------------------
-  function travelTo(p) {
-    if (!p) return;
-    closeModal();
-    if (STATE.mode === 'city' && !CITY.rec) {
-      try { ACTORS.clearGoal(); } catch (e) { }
-      ACTORS.placePlayer(p.x, p.z + p.d / 2 + 4);
-      camCtl.tx = p.x; camCtl.tz = p.z;
-      camCtl.follow = true; camCtl.distT = 64;
-      try { ECO.arrivalPulse(p.x, p.z); } catch (e) { }
-      toast('⚡ Teleported to your <b>' + (p.w * p.d) + ' m² parcel</b>.', 'warn');
-      return;
+  // ---- picking ----------------------------------------------------------
+  const _ndc = new THREE.Vector2();
+  function signHit(cx, cy) {
+    if (!signMeshes.length) return null;
+    _ndc.set((cx / window.innerWidth) * 2 - 1, -(cy / window.innerHeight) * 2 + 1);
+    ray.setFromCamera(_ndc, camera);
+    const hits = ray.intersectObjects(signMeshes, false);
+    if (!hits.length || !hits[0].object.userData || !hits[0].object.userData.signs) return null;
+    const idx = Math.floor((hits[0].faceIndex || 0) / 36);      // 3 boxes = 36 triangles per sign
+    return hits[0].object.userData.signs[idx] || null;
+  }
+  function signNear(x, z, r) {
+    for (const m of signMeshes) {
+      if (!m.visible || !m.userData.signs) continue;
+      for (const s of m.userData.signs)
+        if (Math.hypot(s.x - x, s.z - z) < r) return s.p;
     }
-    // a city (or orbit): tear down exactly like every dive, then land
-    // in the open country right on the stake (landAtWorld dives clear
-    // of cities — parcels sit past the belts)
-    if (STATE.mode === 'city') {
-      try {
-        saveGame();
-        ECO.clearCarts();
-        TUT.onLeaveCity();
-        ACTORS.reset();
-        if (ACTORS.player && ACTORS.player.group.parent) ACTORS.player.group.parent.remove(ACTORS.player.group);
-        WORLD.clearCity();
-      } catch (e) { console.error('[land] travel teardown', e); }
+    return null;
+  }
+  function pick(cx, cy) {
+    if (STATE.mode !== 'city' || !WORLD.group) return false;
+    const pt = screenToGround(cx, cy);
+    if (!pt) return false;
+    // clicks that belong to older systems are never stolen
+    try { if (CITY.pointInBuilding && CITY.pointInBuilding(pt.x, pt.z)) return false; } catch (e) { }
+    try { if (CITY.plotAt && CITY.plotAt(pt.x, pt.z)) return false; } catch (e) { }
+    try { if (WORLD.plotAt && WORLD.plotAt(pt.x, pt.z)) return false; } catch (e) { }
+    // 1) a tap on a FOR SALE sign — works at any zoom
+    let par = null;
+    try { const s = signHit(cx, cy); if (s) par = s.p; } catch (e) { }
+    // 2) shopping view (camDist ≥ 300): the whole quilt is a land catalog
+    if (!par && camCtl.dist >= SHOP_DIST) {
+      try { if (!WORLD.nearRoad(pt.x, pt.z, 10)) par = parcelAt(pt.x, pt.z); } catch (e) { }
     }
-    landAtWorld(p.x, p.z, 'Your land');
+    if (!par) return false;
+    const own = (STATE.acres || []).find(a => a.id === par.id);
+    if (own) openManage(own); else openBuy(par);
+    return true;
+  }
+  function tip(x, z) {
+    if (STATE.mode !== 'city' || !WORLD.group) return null;
+    const shopping = camCtl.dist >= SHOP_DIST;
+    let par = null;
+    if (shopping) {
+      try { if (!WORLD.nearRoad(x, z, 10)) par = parcelAt(x, z); } catch (e) { }
+    }
+    if (!par) { try { par = signNear(x, z, 3); } catch (e) { } }
+    if (!par) return null;
+    const own = (STATE.acres || []).find(a => a.id === par.id);
+    if (own) return { t: own.name + ' \u2014 your land', s: own.ha.toFixed(1) + ' ha \u00b7 ' + (own.near || 'open country'), p: '+$' + own.rate + '/day', a: '\u2713 OWNED', l: 'Click to manage' };
+    // street level the ground click still walks — the tip teaches the way in
+    const hint = shopping ? 'Click to buy' : 'Zoom out to buy \u00b7 or click its FOR SALE sign';
+    return { t: par.name, s: par.ha.toFixed(1) + ' ha \u00b7 ' + (par.near ? 'near ' + par.near : 'the open country'), p: fmt$(par.price), a: '\u2713 For sale', l: hint };
   }
 
-  // ---- the frame tick: meshes, preview, income -----------------------------
-  function tick(dt) {
-    try {
-      const r = WORLD.group;
-      if (!r) { if (group) group = null; return; }        // world down — rebuilt when it stands
-      if (r !== rootRef) {
-        rootRef = r;
-        group = new THREE.Group();
-        r.add(group);
-        for (const p of STATE.land || []) p.mesh = null; // stale meshes died with the old root
-      }
-      if (group) {
-        for (const p of STATE.land || []) {
-          if (!p.mesh) { p.mesh = buildMesh(p); group.add(p.mesh); }
-          else if (p.mesh.parent !== group) group.add(p.mesh);
-        }
-        const pv = ensurePreview();
-        if (pv.parent !== group) group.add(pv);
-        if (pv.visible) {                                  // the breathing claim beacon
-          pvT += dt;
-          pv.children[1].material.opacity = .55 + .4 * Math.abs(Math.sin(pvT * 2.6));
-        }
-      }
-      if (pending && mwrap.classList.contains('hidden')) { // the deal closed — pack the preview up
-        pending = null;
-        if (!buyMode) setPreview(0, 0, false);
-      }
-    } catch (e) { /* never touch the world */ }
-    // farm-lease income — the office/room beat: $rate per 90 s game-day
-    const L = STATE.land || [];
-    if (STATE.mode !== 'city' || !L.length) { acc = 0; return; }
+  // ---- income (the office-suite / title-deed beat) ----------------------
+  function accrue(dt) {
+    const A = STATE.acres || [];
+    if (STATE.mode !== 'city' || !A.length) { acc = 0; return; }
     acc += dt;
     if (acc >= 1) {
       const secs = acc; acc = 0;
       let inc = 0;
-      for (const p of L) inc += p.rate;
+      for (const a of A) inc += a.rate;
       if (inc > 0) earn(inc / 90 * secs);
     }
   }
 
-  // ---- LAND MODE: the parcel button, [L], the hint chip --------------------
-  function ensureHint() {
-    let h = document.getElementById('landhint');
-    if (!h) {
-      h = document.createElement('div');
-      h.id = 'landhint';
-      h.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:96px;z-index:30;' +
-        'padding:7px 14px;border-radius:8px;background:rgba(20,24,18,.92);border:1px solid #f5cc74;' +
-        'color:#f5cc74;font-size:11px;letter-spacing:1px;font-weight:700;pointer-events:none;display:none;' +
-        'box-shadow:0 6px 22px rgba(0,0,0,.4);white-space:nowrap';
-      document.body.appendChild(h);
+  // ---- streaming (the world-forest pattern) -----------------------------
+  function tick(dt, px, pz, camDist) {
+    const r = WORLD.group;
+    if (!r) { if (chunks.size) reset(); return; }
+    if (r !== root) { reset(); root = r; }
+    accrue(dt);
+    const now = performance.now();
+    const fx = camCtl.follow ? px : camCtl.tx, fz = camCtl.follow ? pz : camCtl.tz;
+    const R = Math.min(BASE_R + Math.max(0, camDist - 260) * 1.15, MAX_R);
+    if (now - lastUpd > 400) {
+      lastUpd = now;
+      const c0x = Math.floor((fx - R) / CH), c1x = Math.floor((fx + R) / CH);
+      const c0z = Math.floor((fz - R) / CH), c1z = Math.floor((fz + R) / CH);
+      const want = new Set();
+      for (let cx = c0x; cx <= c1x; cx++) for (let cz = c0z; cz <= c1z; cz++) want.add(cx + ',' + cz);
+      for (const key of [...chunks.keys()]) {
+        if (want.has(key)) continue;
+        const [cx, cz] = key.split(',').map(Number);
+        if (Math.abs(cx * CH + CH / 2 - fx) > DISPOSE_R || Math.abs(cz * CH + CH / 2 - fz) > DISPOSE_R) dispose(key);
+      }
+      queue = [...want].filter(k => !chunks.has(k))
+        .map(k => { const [cx, cz] = k.split(',').map(Number); return { k, cx, cz, d: Math.hypot(cx * CH + CH / 2 - fx, cz * CH + CH / 2 - fz) }; })
+        .sort((a, b) => a.d - b.d);
     }
-    return h;
-  }
-  function ensureBtn() {
-    const btn = document.getElementById('b-land');
-    if (btn) return btn;
-    const b = document.createElement('button');
-    b.className = 'bb-btn'; b.id = 'b-land';
-    b.innerHTML = '<span class="tip">BUY LAND</span>' +
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-      '<rect x="5" y="6" width="14" height="13"/><path d="M5 6V3M19 6V3M5 19v3M19 19v3"/></svg>';
-    const buildBtn = document.getElementById('b-build');
-    if (buildBtn && buildBtn.parentElement) buildBtn.parentElement.insertBefore(b, buildBtn.nextSibling);
-    else document.body.appendChild(b);
-    b.addEventListener('click', () => toggle());
-    return b;
-  }
-  function toggle() {
-    if (STATE.mode !== 'city') { toast('Enter the world first.'); return; }
-    buyMode = !buyMode;
-    const btn = ensureBtn();
-    btn.classList.toggle('on', buyMode);
-    const h = ensureHint();
-    if (buyMode) {
-      h.textContent = matchMedia('(pointer:coarse)').matches
-        ? 'LAND MODE — TAP OPEN COUNTRY TO STAKE A CLAIM'
-        : 'LAND MODE — CLICK OPEN COUNTRY TO STAKE A CLAIM · [L] TO EXIT';
-      h.style.display = 'block';
-      toast('<b>Land mode on.</b> Buyable ground: dry open land past the city belts — off roads and water.', 'warn');
-    } else {
-      h.style.display = 'none';
-      setPreview(0, 0, false);
+    for (let i = 0; i < 2 && queue.length; i++) {
+      const job = queue.shift();
+      build(job.cx, job.cz);
+    }
+    // sign LOD — past 900 m the posts are sub-pixel specks (like suburb houses)
+    const sv = camDist < SIGN_DIST;
+    if (sv !== lastSignVis) {
+      lastSignVis = sv;
+      for (const m of signMeshes) m.visible = sv;
     }
   }
-  window.addEventListener('keydown', e => {
-    if (e.key.toLowerCase() !== 'l' || e.repeat) return;
-    const tag = (e.target && e.target.tagName) || '';
-    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-    if (STATE.mode !== 'city') return;
-    toggle();
-  });
-  ensureBtn();   // the parcel button sits on the bottom bar from boot
+
+  // ---- QA ---------------------------------------------------------------
+  function audit() {
+    let parcels = 0, badCity = 0, badWater = 0, signs = 0;
+    for (const g of chunks.values()) {
+      if (!g) continue;
+      for (const ch of g.children) {
+        const ss = ch.userData && ch.userData.signs;
+        if (ss) signs += ss.length;
+      }
+    }
+    const seen = new Set();
+    for (const key of chunks.keys()) {
+      const [cx, cz] = key.split(',').map(Number);
+      const x0 = cx * CH, z0 = cz * CH;
+      const k0 = Math.floor((x0 - LAT_B) / LAT_B) - 1, k1 = Math.floor((x0 + CH + LAT_B) / LAT_B) + 1;
+      const m0 = Math.floor((z0 - LAT_B) / LAT_B) - 1, m1 = Math.floor((z0 + CH + LAT_B) / LAT_B) + 1;
+      for (let k = k0; k <= k1; k++) for (let m = m0; m <= m1; m++) {
+        const ccx = (lineX(k) + lineX(k + 1)) / 2, ccz = (lineZ(m) + lineZ(m + 1)) / 2;
+        if (ccx < x0 || ccx >= x0 + CH || ccz < z0 || ccz >= z0 + CH) continue;
+        for (const p of cellParcels(k, m)) {
+          if (seen.has(p.id)) continue;
+          seen.add(p.id);
+          parcels++;
+          if (nearCity(p.cx, p.cz) < SUB_R) badCity++;
+          if (isW(p.cx, p.cz) || isW(p.x0, p.z0) || isW(p.x1, p.z0) || isW(p.x0, p.z1) || isW(p.x1, p.z1)) badWater++;
+        }
+      }
+    }
+    return { parcels, badCity, badWater, signs, chunks: chunks.size };
+  }
 
   return {
-    valid, at, hover, click, tick, toggle, travelTo, sell,
-    setMode: v => { if (buyMode !== !!v) { buyMode = !buyMode; if (!buyMode) { ensureHint().style.display = 'none'; setPreview(0, 0, false); } const btn = ensureBtn(); btn.classList.toggle('on', buyMode); } },
+    tick, pick, tip, parcelAt, travelTo, openManage, empireInto, rebuildAt,
+    list: () => (STATE.acres || []).slice(),
+    count: () => (STATE.acres || []).length,
+    buyAt(x, z) { const p = parcelAt(x, z); if (!p) return { ok: false, why: 'no parcel' }; return commit(p); },
+    sellAt(id) {
+      const A = STATE.acres || [];
+      const a = A.find(x => x.id === id);
+      if (!a) return { ok: false, why: 'no acre ' + id };
+      STATE.acres = A.filter(x => x !== a);
+      earn(Math.round(a.price * SELL_BACK), false);
+      try { saveGame(); } catch (e) { }
+      rebuildAt(a.x, a.z);
+      return { ok: true, got: Math.round(a.price * SELL_BACK) };
+    },
     state() {
-      const L = STATE.land || [];
       return {
-        parcels: L.length, buyMode,
-        incomePerDay: L.reduce((s, p) => s + p.rate, 0),
-        worth: L.reduce((s, p) => s + p.price, 0),
+        chunks: chunks.size,
+        meshed: [...chunks.values()].filter(Boolean).length,
+        signs: signMeshes.reduce((s, m) => s + ((m.userData.signs || []).length), 0),
+        signMeshes: signMeshes.length,
+        acres: (STATE.acres || []).length,
+        incomePerDay: (STATE.acres || []).reduce((s, a) => s + a.rate, 0),
         accrual: +acc.toFixed(2),
-        minD: MIN_D, size: SIZE,
+        camDist: camCtl.dist,
       };
     },
-    buy(x, z) {   // QA: programmatic stake at a world point (no modal)
-      const s = valid(x, z);
-      return s ? commit(s) : { ok: false, why: 'invalid spot' };
-    },
+    audit,
   };
 })();
-window.LANDRUSH = LANDRUSH;   // QA surface
+window.FARM = FARM;   // QA surface
 
-// ADDITIVE hooks — the same wrap pattern the game already uses. Land
-// hover/click run BEFORE the game's own (the survey excludes everything
-// the game claims: pads, buildings, cities), income rides the
-// WORLD.update chain (original → forest → open house → suburbs →
-// title deeds → LAND RUSH), and every call is try/caught so a land
-// error can never touch the world.
-const __landHoverInfo = ECO.hoverInfo.bind(ECO);
+// ADDITIVE hooks — the same wrap pattern the game already uses.
+// 1. the click chain: a farm parcel claim runs BEFORE the openhouse /
+//    plot / walk routing (it wraps the wrapper OH installed in v2.41);
+//    if the farmland pass ever throws, the original flow still runs.
+const __farmClickPick = clickPick;
+clickPick = function (cx, cy) {
+  try { if (FARM.pick(cx, cy)) return; } catch (e) { console.error('[farmland]', e); }
+  return __farmClickPick(cx, cy);
+};
+// 2. hover: the farm tip fills in wherever nothing older claims the point
+const __farmHoverInfo = ECO.hoverInfo.bind(ECO);
 ECO.hoverInfo = function (x, z) {
-  try { const info = LANDRUSH.hover(x, z); if (info) return info; } catch (e) { }
-  return __landHoverInfo(x, z);
+  const info = __farmHoverInfo(x, z);
+  if (info) return info;
+  try { return FARM.tip(x, z); } catch (e) { return null; }
 };
-const __landClickAt = ECO.clickAt.bind(ECO);
-ECO.clickAt = function (x, z) {
-  try { if (LANDRUSH.click(x, z)) return true; } catch (e) { console.error('[land]', e); }
-  return __landClickAt(x, z);
+// 3. the Empire panel: your acres, one tap away
+const __farmEmpire = ECO.openEmpire.bind(ECO);
+ECO.openEmpire = function () {
+  __farmEmpire();
+  try { FARM.empireInto(); } catch (e) { console.error('[farmland]', e); }
 };
-const __landOrigUpdate = WORLD.update.bind(WORLD);
+// 4. the update chain: original → world forest → open house → suburbs →
+//    title deeds → PATCHWORK. Every call is try/caught so a farmland
+//    error can never touch the world.
+const __farmOrigUpdate = WORLD.update.bind(WORLD);
 WORLD.update = function (dt, px, pz, camDist) {
-  const req = __landOrigUpdate(dt, px, pz, camDist);
-  try { LANDRUSH.tick(dt); } catch (e) { console.error('[land]', e); }
+  const req = __farmOrigUpdate(dt, px, pz, camDist);
+  try { FARM.tick(dt, px, pz, camDist); } catch (e) { console.error('[farmland]', e); }
   return req;
 };
 
-console.log('%cOPEN WORLD v2.45 — TURBO', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.44 — PATCHWORK', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
