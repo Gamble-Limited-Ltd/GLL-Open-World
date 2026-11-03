@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.40</title>
+<title>Open World — v2.41</title>
 <style>
 /* ==================================================================
    OPEN WORLD v2.38 — DEEP-BLUE LAKES: the last green-bleed mechanism
@@ -717,7 +717,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.40 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, woodland belts around the cities, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — walk up to any building and it opens like a dollhouse at waist height so you can see its furnished rooms on every floor (every other building keeps its full silhouette), and the same streets, buildings, plots and roads on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.41 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, woodland belts around the cities, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), and the same streets, buildings, plots and roads on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -753,7 +753,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.40';
+const GAME_VERSION = 'v2.41';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -7969,10 +7969,10 @@ const ECO = (() => {
       const suite = CITY.suites.find(s => s.bkey === b.bkey);
       if (suite) {
         const mine = STATE.offices.find(o => o.bkey === suite.bkey);
-        if (mine) return { t: suite.name, s: 'Size: ' + suite.sqm + 'm² | ' + suite.floors + ' floors', p: '$' + suite.rate + '.00 /day', a: '✓ Leased by you', l: 'Click to manage' };
-        return { t: suite.name, s: 'Size: ' + suite.sqm + 'm² | ' + suite.floors + ' floors', p: '$' + suite.rate + '.00 /day', a: '✓ Available to rent', l: 'Click to lease' };
+        if (mine) return { t: suite.name, s: 'Size: ' + suite.sqm + 'm² | ' + suite.floors + ' floors', p: '$' + suite.rate + '.00 /day', a: '✓ Leased by you', l: 'Click to inspect · manage inside' };
+        return { t: suite.name, s: 'Size: ' + suite.sqm + 'm² | ' + suite.floors + ' floors', p: '$' + suite.rate + '.00 /day', a: '✓ Available to rent', l: 'Click to inspect · lease inside' };
       }
-      return { t: 'Private building', s: Math.round(b.h) + 'm · ' + Math.max(1, Math.round(b.h / 3.2)) + ' floors', p: '', a: '', l: '' };
+      return { t: 'Private building', s: Math.round(b.h) + 'm · ' + Math.max(1, Math.round(b.h / 3.2)) + ' floors', p: '', a: '', l: 'Click to look inside' };
     }
     return null;
   }
@@ -9418,12 +9418,13 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.40 — OPEN HOUSE', `
-    <p><b>Walk up to any building and you can see the rooms inside it.</b></p>
-    <div class="kv"><span class="k">DOLLHOUSE CUT</span><span class="v">Get close to a building — on foot or with the camera — and its walls swing open at waist height: real floor slabs, partitions with doorways and a stair core, so every floor shows its rooms</span></div>
-    <div class="kv"><span class="k">FURNISHED ROOMS</span><span class="v">Offices with desks and monitors, apartments with beds and wardrobes, lobbies with reception counters and planters, shops with counters and shelves — every building's interior is its own and stays the same every visit</span></div>
-    <div class="kv"><span class="k">THE SKYLINE KEEPS ITS SHAPE</span><span class="v">Only the building you're at opens — every other one keeps its full silhouette, and it all heals the moment you step away or zoom out</span></div>
-    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The world forest, the deep-blue lakes, the 23,000 km whole-world zoom and the true 1:1 Earth are untouched — this update only ADDS the open house</span></div>
+  openModal('Welcome to v2.41 — FLOOR PLAN', `
+    <p><b>Click any building and pick what you want to see inside it.</b></p>
+    <div class="kv"><span class="k">CLICK TO INSPECT</span><span class="v">The dollhouse no longer waits for you to stand next to it — click a building (wall, window or rooftop) and it opens on the spot with an inspector panel beside it</span></div>
+    <div class="kv"><span class="k">PICK A FLOOR</span><span class="v">Big buildings list every floor — choose one and the storeys above lift away, leaving that floor's furnished rooms open to the sky; the camera glides level with your pick</span></div>
+    <div class="kv"><span class="k">PICK A ROOM</span><span class="v">Houses and small buildings list their rooms by name — Living Room, Kitchen, Bedroom, Stock Room… — and the room you pick glows on the floor</span></div>
+    <div class="kv"><span class="k">SUITES RIDE ALONG</span><span class="v">Leasable towers open the same inspector, with their LEASE SUITE button right in the panel; ✕ or ESC closes it</span></div>
+    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The world forest, the deep-blue lakes, the 23,000 km whole-world zoom and the true 1:1 Earth are untouched</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -9441,7 +9442,7 @@ document.getElementById('b-build').addEventListener('click', () => {
     <p>Everything starts on the ground — city sidewalks or open country:</p>
     <div class="kv"><span class="k">GREEN $ SPOTS</span><span class="v">Click to buy — sidewalk spots in cities, roadside plots in the wild</span></div>
     <div class="kv"><span class="k">YOUR PLOT</span><span class="v">Click again → park a food cart</span></div>
-    <div class="kv"><span class="k">TOWERS</span><span class="v">Hover → click to lease office suites</span></div>
+    <div class="kv"><span class="k">BUILDINGS</span><span class="v">Click any building to open it and pick a floor or a room — leasable towers carry their LEASE SUITE button in the panel</span></div>
     <div class="kv"><span class="k">CARTS</span><span class="v">Stand close → [E] to serve the queue</span></div>
     <div class="kv"><span class="k">CREWS</span><span class="v">Business panel → hire star vendors</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn" id="hb-x" style="flex:1">GOT IT</button></div>`);
@@ -10230,51 +10231,43 @@ window.WF = WF;   // QA surface
 
 // ======== section: 46_openhouse.js ========
 // ====================================================================
-// v2.40 — OPEN HOUSE. The ask: "allow people to see the rooms inside
-// of buildings." This whole section is ADDITIVE: not one existing line
-// above was modified or removed (only the version strings and the
-// What's-New panel carry the new build number, exactly as every
-// release does). The lakes, the world forest, the 23,000 km zoom, the
-// streets and the economy all ride exactly as v2.39 shipped them.
-//
-// What is new: walk your tycoon up to any building — or pan the view
-// right up to one — and it opens like a dollhouse. The mechanism is a
-// world-space clip rig (renderer.localClippingEnabled + one horizontal
-// cut plane and up to 12 vertical hull planes on the BUILDING SHELL
-// materials only, with clipIntersection so a fragment is cut only when
-// it is inside the prism AND above the cut):
-//   - the shell meshes are captured precisely at build time (the
-//     capture window is the city builder's own "Raising … buildings"
-//     status phase, so walls, shopfronts, roofs, parapets and rooftop
-//     clutter are caught, and roads / ground / trees / cars never are);
-//   - the opened building's own shell is sliced at 1.45 m — walls stay
-//     as waist-high rims, the roof and upper walls lift away, and every
-//     OTHER building keeps its full silhouette (the prism hugs the
-//     footprint's convex hull + 22 cm, so only geometry standing inside
-//     that column above the cut is removed);
-//   - inside, a furnished interior is generated deterministically per
-//     building (seeded by its own bkey): floor slabs with stair-core
-//     openings, partitions with doorways, and rooms dressed by type —
-//     offices with desks/monitors/chairs, apartments with beds and
-//     wardrobes, lobbies with reception counters and planters, retail
-//     floors with counters, shelves and crates. One merged vertex-color
-//     Lambert mesh, cast-shadowed, DoubleSide so every winding is safe;
-//   - step away (or zoom past ~340 m) and the building heals instantly.
-//     Interiors stream from a tiny LRU cache (max 4 meshes) and die
-//     with the city group like every other city mesh.
-// Nothing spawns in water, nothing existing is regenerated, and every
-// openhouse call is try/caught so a mistake here can never touch the
-// world. window.OH exposes the state for QA.
+// v2.41 — FLOOR PLAN. The ask evolved: "allow people to see the rooms
+// inside of buildings" shipped as v2.40's proximity dollhouse; the
+// follow-up ask is "when people CLICK on a building, they should be
+// able to select a FLOOR for big buildings and ROOMS for smaller
+// ones" — so the trigger is now a click, and the section grew a
+// building inspector on top of the proven v2.40 rig:
+//   - click any building (true mesh raycast first, so a tower's
+//     facade maps to THAT tower; a ground-plane fallback catches the
+//     base, matching the hover semantics) and it opens like a
+//     dollhouse with an inspector panel beside it;
+//   - BIG BUILDINGS (3+ floors) list their floors — pick one and the
+//     shell is sliced at that floor's ceiling while the interior's
+//     drawRange shows ONLY that floor's furnished rooms (one merged
+//     mesh, emitted floor-by-floor, so a floor is a vertex range —
+//     zero extra draw calls, zero recompiles);
+//   - SMALLER BUILDINGS (1-2 floors) list their rooms BY NAME —
+//     Living Room, Kitchen, Bedroom, Stock Room… — deterministic
+//     from the building's own seed, and the picked room glows: a
+//     pulsing floor quad plus a room-volume outline;
+//   - the camera glides level with the pick (any grab/WASD cancels);
+//     ✕, ESC, walking 650 m away or zooming past 900 m closes it;
+//   - leasable towers keep their suite flow: the inspector carries
+//     the LEASE / MANAGE SUITE button.
+// The clip rig itself is v2.40's proven machinery, untouched in
+// spirit: renderer.localClippingEnabled + one horizontal cut plane
+// and up to 12 vertical hull planes on the BUILDING SHELL materials
+// only (clipIntersection), captured exactly at build time during the
+// city builder's own "Raising … buildings" phase. Every openhouse
+// call is try/caught so a mistake here can never touch the world.
+// window.OH exposes the state for QA.
 // ====================================================================
 const OH = (() => {
   // ---- tuning -------------------------------------------------------
   const CUT = 1.45;            // dollhouse cut height above the pad
   const MARGIN = .22;          // prism grows past the wall line so the shell's own zero-thickness quads clip
-  const OPEN_R = 40;           // focus-to-centroid radius that opens a building
-  const HEAL_R = 58;           // heal radius (hysteresis band)
-  const SWITCH_F = .7;         // a rival must be this much closer to steal an opening
-  const ZOOM_OPEN = 280;       // open only at street-ish views
-  const ZOOM_HEAL = 340;       // heal once the view pulls back past this
+  const CLOSE_D = 650;         // v2.41: the inspector is manual — wandering this far away closes it
+  const CLOSE_ZOOM = 900;      // v2.41: pulling the view out past this closes it too
   const FH = 3.2;              // the game's own floor height (h / 3.2)
   const SLAB0 = .21;           // ground-floor finish height (clear of the .16 pad)
   const SKIRT = .24;           // slab edge band so each floor reads as a plate
@@ -10416,6 +10409,11 @@ const OH = (() => {
     const P = b.poly, ax = anchor.x, az = anchor.z;
     const rnd = _mulberry(hashStr('oh' + b.bkey));
     const nF = Math.max(1, Math.round(b.h / FH));
+    // v2.41: the inspector's data — house-sized footprints get home rooms,
+    // 1-2 floor buildings get the ROOM picker, 3+ get the FLOOR picker
+    const house = b.area < 170 && b.h < 9.5;
+    const small = nF <= 2;
+    const floorRanges = [], floorTypes = [], rooms = [];
     const pos = [], nor = [], uv = [], col = [];
     let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
     for (const v of P) { x0 = Math.min(x0, v[0]); x1 = Math.max(x1, v[0]); z0 = Math.min(z0, v[1]); z1 = Math.max(z1, v[1]); }
@@ -10569,6 +10567,7 @@ const OH = (() => {
     // ---- per-floor assembly ----
     const lobby = b.h >= 12 || b.area >= 200;
     for (let i = 0; i < nF; i++) {
+      const fStart = pos.length / 3;              // v2.41: this floor's drawRange start
       const yb = SLAB0 + i * FH;
       const fc = i === 0 ? (lobby ? FLOOR_LOBBY : FLOOR_RETAIL)
         : (b.h >= 24 ? FLOORS_OFF[i % 2] : FLOORS_HOME[i % 2]);
@@ -10592,14 +10591,38 @@ const OH = (() => {
           box(stX, yb, yb + (k + 1) * rise, stZ + (k + .5) * .28, .55, .16, C_STAIR);
       }
 
-      // rooms + furniture
-      const type = i === 0 ? (lobby ? 'lobby' : 'retail')
-        : (b.h >= 24 ? (rnd() < .72 ? 'office' : 'home') : (rnd() < .42 ? 'office' : 'home'));
+      // rooms + furniture (v2.41: house-sized small buildings dress as HOMES —
+      // their room list says Living Room / Bedroom, and the beds agree)
+      const type = i === 0 ? (lobby ? 'lobby' : (small && house ? 'home' : 'retail'))
+        : (b.h >= 24 ? (rnd() < .72 ? 'office' : 'home') : (small && house ? 'home' : (rnd() < .42 ? 'office' : 'home')));
+      floorTypes.push(type);
       const xsL = [x0 + .55, ...vs, x1 - .55];
       const zsL = [z0 + .55, ...hs, z1 - .55];
       for (let a = 0; a < xsL.length - 1; a++)
-        for (let bq = 0; bq < zsL.length - 1; bq++)
-          furnishRoom(xsL[a] + .45, xsL[a + 1] - .45, zsL[bq] + .45, zsL[bq + 1] - .45, yb, type, rnd);
+        for (let bq = 0; bq < zsL.length - 1; bq++) {
+          const rx0 = xsL[a] + .45, rx1 = xsL[a + 1] - .45, rz0 = zsL[bq] + .45, rz1 = zsL[bq + 1] - .45;
+          furnishRoom(rx0, rx1, rz0, rz1, yb, type, rnd);
+          rooms.push({ floor: i, x0: rx0, x1: rx1, z0: rz0, z1: rz1, type, name: '' });   // v2.41: a clickable room
+        }
+      floorRanges.push({ start: fStart, count: pos.length / 3 - fStart });   // v2.41: floors are vertex ranges
+    }
+
+    // v2.41: deterministic room names — the biggest cell on a floor gets the
+    // headline name (Living Room, Shop Floor…), same seed on every visit, so
+    // the panel, the furniture and the glow always agree
+    const RNAMES = {
+      home: ['Living Room', 'Kitchen', 'Bedroom', 'Bathroom', 'Study', 'Den', 'Guest Room'],
+      office: ['Corner Office', 'Open Office', 'Meeting Room', 'Copy Nook', 'Team Room', 'Office', 'Office'],
+      retail: ['Shop Floor', 'Stock Room', 'Back Office', 'Break Room', 'Fitting Room'],
+      lobby: ['Lobby', 'Reception', 'Waiting Area', 'Mail Room', 'Back Office'],
+    };
+    for (let i = 0; i < nF; i++) {
+      const fr = rooms.filter(r => r.floor === i)
+        .sort((a, c) => (c.x1 - c.x0) * (c.z1 - c.z0) - (a.x1 - a.x0) * (a.z1 - a.z0));
+      const pool = RNAMES[floorTypes[i]] || RNAMES.office;
+      fr.forEach((r, k) => {
+        r.name = (k < pool.length ? pool[k] : 'Room ' + (k + 1)) + (i === 1 && small ? ' · up' : '');
+      });
     }
 
     const g = new THREE.BufferGeometry();
@@ -10612,12 +10635,16 @@ const OH = (() => {
     m.castShadow = true; m.receiveShadow = true;
     m.visible = false;
     m.name = 'oh-interior-' + b.bkey;
-    return m;
+    // v2.41: the mesh plus its inspector data — floors are vertex ranges of
+    // this exact geometry, rooms are world-space rects on named floors
+    return { mesh: m, layout: { nF, floorRanges, floorTypes, rooms, house, small } };
   }
 
-  // ---- open / heal / tick -------------------------------------------
-  let lastGroup = null, cur = null, curMesh = null, lastScan = 0, pinned = null;
-  const cache = new Map();          // bkey -> { mesh, b } (LRU, max CACHE_MAX)
+  // ---- open / close / selection -------------------------------------
+  let lastGroup = null, cur = null, curMesh = null, curLayout = null, pinned = null;
+  let sel = { floor: null, room: null };   // v2.41: the inspector's pick
+  let glide = null, hl = null, hlT = 0;    // v2.41: camera glide + room glow
+  const cache = new Map();          // bkey -> { mesh, layout, b } (LRU, max CACHE_MAX)
   function dropCache() {
     for (const e of cache.values()) {
       try {
@@ -10633,7 +10660,8 @@ const OH = (() => {
     if (!e || (e.mesh.parent !== CITY.group)) {
       if (e) { try { e.mesh.geometry.dispose(); e.mesh.material.dispose(); } catch (er) { } cache.delete(b.bkey); }
       const anchor = CITY.anchor || { x: 0, z: 0 };
-      e = { mesh: buildInterior(b, anchor), b };
+      const built = buildInterior(b, anchor);
+      e = { mesh: built.mesh, layout: built.layout, b };
       cache.set(b.bkey, e);
       while (cache.size > CACHE_MAX) {                       // LRU eviction (insertion order)
         const oldK = cache.keys().next().value;
@@ -10644,71 +10672,278 @@ const OH = (() => {
       }
       try { CITY.group.add(e.mesh); } catch (er) { }
     }
-    cur = b; curMesh = e.mesh;
+    for (const oe of cache.values()) if (oe !== e) oe.mesh.visible = false;   // v2.41: one dollhouse at a time
+    cur = b; curMesh = e.mesh; curLayout = e.layout;
     setPrism(b.poly);
     curMesh.visible = true;
+    applySel();
+  }
+  // v2.41: the inspector's selection — FLOOR isolation slices the shell at
+  // that floor's ceiling and drawRanges the interior to that floor's own
+  // vertex range (the mesh was emitted floor-by-floor, so a floor IS a
+  // range); ROOM picks glow instead. null/null = the full dollhouse.
+  function applySel() {
+    if (!curMesh || !curLayout) return;
+    clearHighlight();
+    const R = curLayout.floorRanges;
+    if (sel.floor != null && R[sel.floor] && R[sel.floor].count > 0) {
+      const top = sel.floor === curLayout.nF - 1;          // the roof deck itself must lift
+      planes[0].constant = top
+        ? Math.min(SLAB0 + (sel.floor + 1) * FH - .06, .15 + cur.h - .25)
+        : SLAB0 + (sel.floor + 1) * FH - .06;
+      try { curMesh.geometry.setDrawRange(R[sel.floor].start, R[sel.floor].count); } catch (er) { }
+    } else {
+      planes[0].constant = CUT;                            // waist-high rims, every floor visible
+      try { curMesh.geometry.setDrawRange(0, Infinity); } catch (er) { }
+      if (sel.room != null && curLayout.rooms[sel.room]) highlightRoom(curLayout.rooms[sel.room]);
+    }
   }
   function heal() {
-    cur = null; curMesh = null;
+    cur = null; curMesh = null; curLayout = null; pinned = null;
+    sel = { floor: null, room: null }; glide = null;
     parkAll();
-    for (const e of cache.values()) e.mesh.visible = false;
+    clearHighlight();
+    hidePanel();
+    for (const e of cache.values()) {
+      e.mesh.visible = false;
+      try { e.mesh.geometry.setDrawRange(0, Infinity); } catch (er) { }
+    }
   }
   function force(bkey) {
-    if (bkey == null) { pinned = null; heal(); return 'healed'; }
+    if (bkey == null) { heal(); return 'healed'; }
     const B = CITY.buildingPolys || [];
     const b = B.find(x => x.bkey === bkey) || null;
     if (!b) return 'no building ' + bkey;
     pinned = b;
+    sel = { floor: null, room: null };
     open(b);
+    showPanel();
     return 'open ' + bkey;
   }
+  // v2.41: the CLICK — a building becomes the inspected one, opens as a
+  // full dollhouse and its panel lists floors (big) or rooms (small)
+  function select(b) {
+    if (!b) return false;
+    if (cur && cur.bkey === b.bkey && panelOpen()) return true;   // already inspecting this one
+    pinned = b;
+    sel = { floor: null, room: null };
+    open(b);
+    showPanel();
+    return true;
+  }
+  function panelOpen() { return !!(panel && !panel.classList.contains('hidden')); }
+
+  // ---- room glow ------------------------------------------------------
+  function clearHighlight() {
+    if (!hl) return;
+    try {
+      if (hl.quad.parent) hl.quad.parent.remove(hl.quad);
+      hl.quad.geometry.dispose(); hl.quad.material.dispose();
+      if (hl.box.parent) hl.box.parent.remove(hl.box);
+      hl.box.geometry.dispose(); hl.box.material.dispose();
+    } catch (er) { }
+    hl = null;
+  }
+  function highlightRoom(r) {
+    clearHighlight();
+    try {
+      const anchor = CITY.anchor || { x: 0, z: 0 };
+      const y = SLAB0 + r.floor * FH + .03;
+      const x0 = r.x0 + .12, x1 = r.x1 - .12, z0 = r.z0 + .12, z1 = r.z1 - .12;
+      const quad = new THREE.Mesh(
+        new THREE.PlaneGeometry(x1 - x0, z1 - z0),
+        new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: .3, depthWrite: false, side: THREE.DoubleSide }));
+      quad.rotation.x = -Math.PI / 2;
+      quad.position.set((x0 + x1) / 2 - anchor.x, y, (z0 + z1) / 2 - anchor.z);
+      quad.renderOrder = 2;
+      const box = new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.BoxGeometry(x1 - x0, PART_H, z1 - z0)),
+        new THREE.LineBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: .85 }));
+      box.position.set((x0 + x1) / 2 - anchor.x, y + PART_H / 2, (z0 + z1) / 2 - anchor.z);
+      CITY.group.add(quad); CITY.group.add(box);
+      hl = { quad, box };
+    } catch (er) { }
+  }
+
+  // ---- camera glide ---------------------------------------------------
+  function startGlide(tx, tz, el, dist) {
+    try {
+      camCtl.follow = false;                       // the glide owns the view for a moment
+      camCtl.distT = THREE.MathUtils.clamp(dist, 55, 900);
+      glide = { tx, tz, el, t0: performance.now() };
+    } catch (er) { }
+  }
+  function startGlideFloor(i) {
+    if (!cur || !curLayout) return;
+    const yb = SLAB0 + i * FH;
+    const el = THREE.MathUtils.clamp(.6 + (yb / Math.max(cur.h, 8)) * .5, .62, 1.05);
+    startGlide(cur.x, cur.z, el, Math.max(70, (yb + 62) / Math.sin(el)));
+  }
+  function startGlideRoom(r) {
+    if (!r) return;
+    const yb = SLAB0 + r.floor * FH;
+    startGlide((r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2, .78, Math.max(60, (yb + 50) / Math.sin(.78)));
+  }
+
+  // ---- the inspector panel -------------------------------------------
+  let panel = null;
+  function buildPanel() {
+    if (panel) return;
+    try {
+      const st = document.createElement('style');
+      st.textContent = [
+        '#ohpanel{position:fixed;right:12px;top:70px;width:252px;max-height:min(430px,56vh);display:flex;flex-direction:column;',
+        ' background:var(--panel2);border:1px solid rgba(255,255,255,.1);border-radius:12px;z-index:60;overflow:hidden;',
+        ' box-shadow:0 10px 34px rgba(0,0,0,.55);font-size:12px;color:var(--txt)}',
+        '#ohpanel.hidden{display:none}',
+        '#ohp-h{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 4px}',
+        '#ohp-t{font-weight:800;font-size:13px;color:#fff;letter-spacing:.3px;padding-right:8px}',
+        '#ohp-x{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#cbd5e1;background:rgba(255,255,255,.06);flex:none}',
+        '#ohp-x:hover{background:rgba(255,255,255,.14);color:#fff}',
+        '#ohp-s{padding:0 12px 8px;color:var(--mut);border-bottom:1px solid rgba(255,255,255,.08)}',
+        '#ohp-su{padding:8px 12px 0}',
+        '#ohp-su button{width:100%}',
+        '#ohp-l{padding:9px 12px 3px;font-size:10px;letter-spacing:1.3px;color:#7dd3fc;font-weight:700}',
+        '#ohp-list{overflow:auto;padding:2px 6px 8px}',
+        '.ohp-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:7px 8px;border-radius:8px;cursor:pointer}',
+        '.ohp-row:hover{background:rgba(125,211,252,.13)}',
+        '.ohp-row.on{background:rgba(56,189,248,.22);box-shadow:inset 0 0 0 1px rgba(56,189,248,.5)}',
+        '.ohp-row b{font-weight:700;white-space:nowrap}',
+        '.ohp-row span{color:var(--mut);text-align:right}',
+        '@media(max-width:760px){#ohpanel{right:8px;top:64px;width:196px;max-height:38vh}}',
+      ].join('');
+      document.head.appendChild(st);
+      panel = document.createElement('div');
+      panel.id = 'ohpanel';
+      panel.className = 'hidden';
+      panel.innerHTML = '<div id="ohp-h"><span id="ohp-t">Building</span><span id="ohp-x" title="Close">\u2715</span></div>' +
+        '<div id="ohp-s"></div><div id="ohp-su"></div><div id="ohp-l"></div><div id="ohp-list"></div>';
+      document.body.appendChild(panel);
+      panel.querySelector('#ohp-x').addEventListener('click', () => heal());
+    } catch (er) { }
+  }
+  function showPanel() {
+    buildPanel();
+    if (!panel || !cur || !curLayout) return;
+    const b = cur, L = curLayout;
+    const suite = (CITY.suites || []).find(s => s.bkey === b.bkey);
+    const mine = suite && STATE.offices.find(o => o.bkey === suite.bkey);
+    panel.querySelector('#ohp-t').textContent = suite ? suite.name : (L.house ? 'Private House' : 'Private Building');
+    panel.querySelector('#ohp-s').textContent =
+      Math.round(b.h) + ' m \u00b7 ' + L.nF + (L.nF > 1 ? ' floors \u00b7 ' : ' floor \u00b7 ') +
+      Math.round(b.area) + ' m\u00b2' + (suite ? ' \u00b7 $' + suite.rate + '/day suite' : '');
+    const su = panel.querySelector('#ohp-su');
+    su.innerHTML = suite ? '<button class="btn ' + (mine ? 'good' : 'primary') + '" id="ohp-lease">' +
+      (mine ? 'MANAGE SUITE' : 'LEASE SUITE \u2014 $' + suite.rate + '/day') + '</button>' : '';
+    if (suite) su.querySelector('#ohp-lease').addEventListener('click', () => {
+      try { ECO.clickAt(b.x, b.z); } catch (er) { }        // the game's own lease/manage flow
+    });
+    const lbl = panel.querySelector('#ohp-l'), list = panel.querySelector('#ohp-list');
+    const rows = [];
+    if (L.nF >= 3) {
+      lbl.textContent = 'FLOORS \u2014 PICK ONE';
+      rows.push({ k: 'all', t: '<b>All floors</b>', s: 'full dollhouse', on: sel.floor == null });
+      for (let i = L.nF - 1; i >= 0; i--) {
+        const nm = i === 0 ? 'Ground' : 'Floor ' + (i + 1);
+        const tp = L.floorTypes[i] === 'office' ? 'Offices'
+          : L.floorTypes[i] === 'home' ? (i === L.nF - 1 && L.nF >= 5 ? 'Penthouse' : 'Apartments')
+            : L.floorTypes[i] === 'lobby' ? 'Lobby' : (L.house ? 'Home' : 'Shops');
+        rows.push({ k: 'f' + i, t: '<b>' + nm + '</b>', s: tp, on: sel.floor === i });
+      }
+    } else {
+      lbl.textContent = 'ROOMS \u2014 PICK ONE';
+      if (L.rooms.length) L.rooms.forEach((r, i) => rows.push({
+        k: 'r' + i, t: '<b>' + r.name + '</b>',
+        s: Math.max(1, Math.round((r.x1 - r.x0) * (r.z1 - r.z0))) + ' m\u00b2', on: sel.room === i,
+      }));
+      else rows.push({ k: 'all', t: '<b>Whole building</b>', s: '', on: sel.room == null });
+    }
+    list.innerHTML = rows.map(r =>
+      '<div class="ohp-row' + (r.on ? ' on' : '') + '" data-k="' + r.k + '">' + r.t +
+      (r.s ? '<span>' + r.s + '</span>' : '') + '</div>').join('');
+    list.querySelectorAll('.ohp-row').forEach(el => el.addEventListener('click', () => {
+      const k = el.dataset.k;
+      if (k === 'all') sel = { floor: null, room: null };
+      else if (k.charAt(0) === 'f') { sel = { floor: +k.slice(1), room: null }; startGlideFloor(sel.floor); }
+      else { sel = { floor: null, room: +k.slice(1) }; startGlideRoom(curLayout.rooms[sel.room]); }
+      applySel();
+      showPanel();
+    }));
+    panel.classList.remove('hidden');
+    try { const on = list.querySelector('.ohp-row.on'); if (on) on.scrollIntoView({ block: 'nearest' }); } catch (er) { }
+  }
+  function hidePanel() { if (panel) panel.classList.add('hidden'); }
+
+  // ---- the click (raycast the real shells; fall back to the ground) ---
+  const _ndc = new THREE.Vector2();
+  const _pt = new THREE.Vector3();
+  function pick(cx, cy) {
+    try {
+      if (STATE.mode !== 'city' || !CITY.group || !CITY.buildingPolys || !CITY.buildingPolys.length) return false;
+      _ndc.set((cx / window.innerWidth) * 2 - 1, -(cy / window.innerHeight) * 2 + 1);
+      ray.setFromCamera(_ndc, camera);
+      const hits = ray.intersectObjects(CITY.group.children, true);
+      for (let i = 0; i < hits.length; i++) {
+        const h = hits[i];
+        if (!h || !h.point) continue;
+        const b = CITY.pointInBuilding(h.point.x, h.point.z);
+        if (b && h.point.y < b.h + 14) return select(b);      // a true wall/roof hit
+      }
+      const pt = ray.ray.intersectPlane(groundPlane, _pt);    // hover semantics: the base counts too
+      if (pt) {
+        const b = CITY.pointInBuilding(pt.x, pt.z);
+        if (b) return select(b);
+      }
+    } catch (er) { console.error('[openhouse]', er); }
+    return false;
+  }
+
+  // ---- listeners (once) ----------------------------------------------
+  try {
+    window.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      const mw = document.getElementById('modalwrap');
+      if (mw && !mw.classList.contains('hidden')) return;     // a real modal wins
+      if (cur) heal();
+    });
+    canvas.addEventListener('pointerdown', () => { glide = null; }, { passive: true });   // any grab cancels the glide
+  } catch (er) { }
 
   function tick(dt, px, pz, camDist) {
     const g = CITY.group;
     if (g !== lastGroup) {          // a new city (or none) — heal, unpin and drop the cache
       lastGroup = g;
-      pinned = null;
       heal(); dropCache();
       return;
     }
     if (!g) return;
-    if (pinned) { if (!cur || cur.bkey !== pinned.bkey) open(pinned); return; }
-    // same focus rule as the world forest: the character while following,
-    // the panned view while roaming
-    const fx = camCtl.follow ? px : camCtl.tx;
-    const fz = camCtl.follow ? pz : camCtl.tz;
-    const now = performance.now();
+    if (pinned && (!cur || cur.bkey !== pinned.bkey)) { open(pinned); showPanel(); }
     if (cur) {
-      const d = Math.hypot(fx - cur.x, fz - cur.z);
-      if (d > HEAL_R || camDist > ZOOM_HEAL) { heal(); return; }
-      if (now - lastScan > 300) {                  // sticky handover to a much closer rival
-        lastScan = now;
-        const B = CITY.buildingPolys;
-        let best = null, bestD = 1e9;
-        for (let i = 0; i < B.length; i++) {
-          const b = B[i];
-          const bd = Math.hypot(fx - b.x, fz - b.z);
-          if (bd < bestD) { bestD = bd; best = b; }
-        }
-        if (best && best !== cur && bestD < OPEN_R * .6 && bestD < d * SWITCH_F) open(best);
-      }
-    } else if (camDist < ZOOM_OPEN) {
-      if (now - lastScan > 120) {
-        lastScan = now;
-        const B = CITY.buildingPolys;
-        let best = null, bestD = 1e9;
-        for (let i = 0; i < B.length; i++) {
-          const b = B[i];
-          const bd = Math.hypot(fx - b.x, fz - b.z);
-          if (bd < bestD) { bestD = bd; best = b; }
-        }
-        if (best && bestD < OPEN_R) open(best);
+      // v2.41: the inspector is MANUAL — it only closes itself when the view
+      // has truly wandered off (or a city swap healed it above)
+      const fx = camCtl.follow ? px : camCtl.tx;
+      const fz = camCtl.follow ? pz : camCtl.tz;
+      if (Math.hypot(fx - cur.x, fz - cur.z) > CLOSE_D || camDist > CLOSE_ZOOM) { heal(); return; }
+    }
+    // v2.41: the camera glide to the picked floor / room (input cancels it)
+    if (glide) {
+      let cancel = false;
+      try { cancel = ACTORS.navInput().active; } catch (er) { }
+      if (cancel) glide = null;
+      else {
+        const k = Math.min(1, dt * 3);
+        camCtl.tx += (glide.tx - camCtl.tx) * k;
+        camCtl.tz += (glide.tz - camCtl.tz) * k;
+        camCtl.el += (glide.el - camCtl.el) * Math.min(1, dt * 2.4);
+        if (performance.now() - glide.t0 > 2600) glide = null;
       }
     }
+    if (hl) { hlT += dt; try { hl.quad.material.opacity = .2 + .13 * (Math.sin(hlT * 2.6) * .5 + .5); } catch (er) { } }
   }
 
   return {
-    tick, force, heal,
+    tick, force, heal, pick,
+    close() { heal(); },
     get shells() { return shellMeshes.length; },
     rig() { return planes.map(p => [p.normal.x, p.normal.y, p.normal.z, p.constant]); },
     probe(x, y, z) {          // QA: is a world point inside the live clip prism (above cut)?
@@ -10724,14 +10959,29 @@ const OH = (() => {
       }
       return out;
     },
+    rooms() { return curLayout ? curLayout.rooms.map(r => r.name) : []; },   // QA
+    selectFloor(i) {          // QA: pick a floor of the open building
+      if (!cur || !curLayout || i == null || i < 0 || i >= curLayout.nF) return false;
+      sel = { floor: i, room: null }; applySel(); startGlideFloor(i); showPanel(); return true;
+    },
+    selectRoom(i) {           // QA: pick a room of the open building
+      if (!cur || !curLayout || i == null || !curLayout.rooms[i]) return false;
+      sel = { floor: null, room: i }; applySel(); startGlideRoom(curLayout.rooms[i]); showPanel(); return true;
+    },
     state() {
       return {
         open: cur ? {
-          bkey: cur.bkey, h: Math.round(cur.h), floors: Math.max(1, Math.round(cur.h / FH)),
+          bkey: cur.bkey, h: Math.round(cur.h),
+          floors: curLayout ? curLayout.nF : Math.max(1, Math.round(cur.h / FH)),
           x: Math.round(cur.x), z: Math.round(cur.z),
+          floor: sel.floor,
+          room: (sel.room != null && curLayout && curLayout.rooms[sel.room]) ? curLayout.rooms[sel.room].name : null,
+          rooms: curLayout ? curLayout.rooms.length : 0,
+          drawRange: curMesh ? curMesh.geometry.drawRange : null,
           verts: curMesh ? curMesh.geometry.attributes.position.count : 0,
         } : null,
         pinned: pinned ? pinned.bkey : null,
+        panel: panelOpen(),
         planesActive, shells: shellMeshes.length, cached: cache.size,
       };
     },
@@ -10751,7 +11001,17 @@ WORLD.update = function (dt, px, pz, camDist) {
   return req;
 };
 
-console.log('%cOPEN WORLD v2.40 — OPEN HOUSE', 'color:#38BDF8;font-weight:700', 'ready.');
+// v2.41 ADDITIVE hook — the CLICK path: a tap that lands on a building
+// opens the inspector BEFORE the game's own click routing runs (plots,
+// suites, walk orders). Same wrap pattern as WORLD.update above; if the
+// openhouse pass ever throws, the original click flow still runs.
+const __ohClickPick = clickPick;
+clickPick = function (cx, cy) {
+  try { if (OH.pick(cx, cy)) return; } catch (e) { console.error('[openhouse]', e); }
+  return __ohClickPick(cx, cy);
+};
+
+console.log('%cOPEN WORLD v2.41 — FLOOR PLAN', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
