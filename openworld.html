@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.42</title>
+<title>Open World — v2.43</title>
 <style>
 /* ==================================================================
    OPEN WORLD v2.42 — NEIGHBORHOODS: "make houses and neighborhoods
@@ -731,7 +731,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.42 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), and the same streets, buildings, plots and roads on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.43 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), every one of those rooms and floors for sale or for rent (buy it outright — yours forever, tenants pay you daily — or rent it with a two-day deposit; your holdings glow gold and pay you every day), and the same streets, buildings, plots and roads on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -767,7 +767,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.42';
+const GAME_VERSION = 'v2.43';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -1186,6 +1186,7 @@ const STATE = {
   placing: null,                 // {kind:'cart'|'plot'} while placing
   plots: [],                     // owned: {id, cityKey, x, z(world), cart:{cuisine}, crew:[], office?}
   offices: [],                   // leased: {id, cityKey, bkey, name, sqm, rate}
+  rooms: [],                     // v2.43 TITLE DEEDS: bought/rented units {id, cityKey, cityName, bkey, kind:'floor'|'room', index, name, area, rate, mode:'owned'|'rented', price, x, z}
   market: null,                  // MARKET module state (positions/orders)
   lastCityKey: null,
   seenNews: false,
@@ -1210,6 +1211,7 @@ function saveGame() {
         crew: (p.crew || []).map(c => ({ name: c.name, stars: c.stars })),
       })),
       offices: STATE.offices.map(o => ({ id: o.id, cityKey: o.cityKey, bkey: o.bkey, name: o.name, sqm: o.sqm, rate: o.rate })),
+      rooms: (STATE.rooms || []).map(r => ({ id: r.id, cityKey: r.cityKey, cityName: r.cityName || null, bkey: r.bkey, kind: r.kind, index: r.index, name: r.name, area: r.area, rate: r.rate, mode: r.mode, price: r.price, x: r.x, z: r.z })),   // v2.43 TITLE DEEDS (optional field — older builds ignore it)
       market: STATE.market ? STATE.market.pack() : null,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(pack));
@@ -1274,6 +1276,10 @@ function loadGame() {
       return q;
     });
     STATE.offices = p.offices || [];
+    // v2.43 TITLE DEEDS: rooms/floors you bought or rented (absent on older saves)
+    STATE.rooms = (p.rooms || []).filter(r => r && (r.kind === 'floor' || r.kind === 'room') &&
+      (r.mode === 'owned' || r.mode === 'rented') && r.bkey !== undefined && typeof r.index === 'number')
+      .map(r => ({ id: r.id, cityKey: r.cityKey, cityName: r.cityName || null, bkey: r.bkey, kind: r.kind, index: r.index, name: r.name || r.kind, area: +r.area || 0, rate: +r.rate || 0, mode: r.mode, price: +r.price || 0, x: +r.x || 0, z: +r.z || 0 }));
     STATE.marketPack = p.market || null;
     // v2.05 starter guide: fresh players start at step 0; returning
     // players who already own a business are exempt
@@ -9845,13 +9851,13 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.42 — NEIGHBORHOODS', `
-    <p><b>Every city now wears a ring of real neighborhoods.</b></p>
-    <div class="kv"><span class="k">HOUSES AROUND TOWN</span><span class="v">Six curved ring roads and sixteen tree-named lanes (Maple Lane, Oak Street…) fill the green belt around every city with houses — bright lawns, driveways, porches, gable roofs with dormers and chimneys</span></div>
-    <div class="kv"><span class="k">THEY'RE REAL BUILDINGS</span><span class="v">Click any house and the v2.41 inspector opens it like any other building — houses list their rooms by name, and the room you pick glows</span></div>
-    <div class="kv"><span class="k">WALK THE STREETS</span><span class="v">Sidewalks, street trees, ring lamps, parked cars in driveways and neighbors out walking — the city now stays standing while you explore its neighborhoods, and the woodland belt picks up where the last yard ends</span></div>
-    <div class="kv"><span class="k">DRY LAND ONLY</span><span class="v">Streets, lawns and houses stop at every real shoreline — a ring crossing a bay comes back as dry arcs, exactly like the city streets do</span></div>
-    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The click-to-inspect floors and rooms, the world forest, the deep-blue lakes, the 23,000 km whole-world zoom and the true 1:1 Earth are untouched</span></div>
+  openModal('Welcome to v2.43 — TITLE DEEDS', `
+    <p><b>Every room and floor in the world is now yours to buy or rent.</b></p>
+    <div class="kv"><span class="k">PICK, THEN OWN</span><span class="v">Click any building or house and pick a floor (big buildings) or a named room (houses and small shops) — the deal sits right under the list: BUY it outright or RENT it</span></div>
+    <div class="kv"><span class="k">BUY</span><span class="v">Yours forever — the tenants pay you DOUBLE rent every day, it counts toward your net worth, and you can sell it back any time for 60%</span></div>
+    <div class="kv"><span class="k">RENT</span><span class="v">A two-day deposit and the unit pays its rent every day — end the lease whenever you like (the office-suite model, at room and floor size)</span></div>
+    <div class="kv"><span class="k">YOUR EMPIRE</span><span class="v">Every deed lists in the Empire panel with one-tap TRAVEL to its doorstep — the inspector even opens on arrival — and your holdings glow gold (owned) or green (rented)</span></div>
+    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The inspector, the neighborhoods, the world forest, the deep-blue lakes, the 23,000 km whole-world zoom and the true 1:1 Earth are untouched</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -9869,7 +9875,7 @@ document.getElementById('b-build').addEventListener('click', () => {
     <p>Everything starts on the ground — city sidewalks or open country:</p>
     <div class="kv"><span class="k">GREEN $ SPOTS</span><span class="v">Click to buy — sidewalk spots in cities, roadside plots in the wild</span></div>
     <div class="kv"><span class="k">YOUR PLOT</span><span class="v">Click again → park a food cart</span></div>
-    <div class="kv"><span class="k">BUILDINGS</span><span class="v">Click any building to open it and pick a floor or a room — leasable towers carry their LEASE SUITE button in the panel</span></div>
+    <div class="kv"><span class="k">BUILDINGS</span><span class="v">Click any building to open it and pick a floor or a room — then <b>BUY</b> it outright or <b>RENT</b> it from the panel (your holdings pay you daily); leasable towers keep their LEASE SUITE button</span></div>
     <div class="kv"><span class="k">CARTS</span><span class="v">Stand close → [E] to serve the queue</span></div>
     <div class="kv"><span class="k">CREWS</span><span class="v">Business panel → hire star vendors</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn" id="hb-x" style="flex:1">GOT IT</button></div>`);
@@ -9976,7 +9982,8 @@ function buildTicker() {
     const stats = MARKET.tickerStats();
     const items = stats.map(s =>
       `<span class="tk"><span class="s">${s.sym}</span><span class="p">$${s.price.toFixed(2)}</span><span class="${s.chg >= 0 ? 'up' : 'dn'}">${s.chg >= 0 ? '▲' : '▼'}${Math.abs(s.chg).toFixed(1)}%</span></span>`).join('');
-    const worth = STATE.money + STATE.offices.reduce((s2, o) => s2 + o.rate * 8, 0);
+    const worth = STATE.money + STATE.offices.reduce((s2, o) => s2 + o.rate * 8, 0)
+      + (STATE.rooms || []).reduce((s2, r) => s2 + (r.mode === 'owned' ? r.price : 0), 0);   // v2.43: owned property counts at purchase price
     track.innerHTML = items +
       `<span class="tk"><span class="s g">GDP</span><span class="p">${fmtK(STATE.gdp)}</span><span class="up">▲</span></span>` +
       `<span class="tk"><span class="s o">WORTH</span><span class="p">${fmtK(worth)}</span></span>` +
@@ -11145,7 +11152,11 @@ const OH = (() => {
     } else {
       planes[0].constant = CUT;                            // waist-high rims, every floor visible
       try { curMesh.geometry.setDrawRange(0, Infinity); } catch (er) { }
-      if (sel.room != null && curLayout.rooms[sel.room]) highlightRoom(curLayout.rooms[sel.room]);
+      if (sel.room != null && curLayout.rooms[sel.room]) {
+        let own = null;
+        try { own = PROP.status(cur.bkey, 'room', sel.room); } catch (er) { }   // v2.43: gold glow on owned, green on rented
+        highlightRoom(curLayout.rooms[sel.room], own);
+      }
     }
   }
   function heal() {
@@ -11194,21 +11205,23 @@ const OH = (() => {
     } catch (er) { }
     hl = null;
   }
-  function highlightRoom(r) {
+  function highlightRoom(r, own) {          // v2.43 TITLE DEEDS: own = {mode:'owned'|'rented'} tints the glow
     clearHighlight();
     try {
+      const qC = own ? (own.mode === 'owned' ? 0xf5cc74 : 0x48bb78) : 0x38bdf8;
+      const bC = own ? (own.mode === 'owned' ? 0xf6d365 : 0x7ee2a8) : 0x7dd3fc;
       const anchor = CITY.anchor || { x: 0, z: 0 };
       const y = SLAB0 + r.floor * FH + .03;
       const x0 = r.x0 + .12, x1 = r.x1 - .12, z0 = r.z0 + .12, z1 = r.z1 - .12;
       const quad = new THREE.Mesh(
         new THREE.PlaneGeometry(x1 - x0, z1 - z0),
-        new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: .3, depthWrite: false, side: THREE.DoubleSide }));
+        new THREE.MeshBasicMaterial({ color: qC, transparent: true, opacity: .3, depthWrite: false, side: THREE.DoubleSide }));
       quad.rotation.x = -Math.PI / 2;
       quad.position.set((x0 + x1) / 2 - anchor.x, y, (z0 + z1) / 2 - anchor.z);
       quad.renderOrder = 2;
       const box = new THREE.LineSegments(
         new THREE.EdgesGeometry(new THREE.BoxGeometry(x1 - x0, PART_H, z1 - z0)),
-        new THREE.LineBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: .85 }));
+        new THREE.LineBasicMaterial({ color: bC, transparent: true, opacity: .85 }));
       box.position.set((x0 + x1) / 2 - anchor.x, y + PART_H / 2, (z0 + z1) / 2 - anchor.z);
       CITY.group.add(quad); CITY.group.add(box);
       hl = { quad, box };
@@ -11261,13 +11274,23 @@ const OH = (() => {
         '.ohp-row b{font-weight:700;white-space:nowrap}',
         '.ohp-row span{color:var(--mut);text-align:right}',
         '@media(max-width:760px){#ohpanel{right:8px;top:64px;width:196px;max-height:38vh}}',
+        // v2.43 TITLE DEEDS — the buy/rent deal block + the gold holdings rows
+        '#ohp-deal{flex:none;padding:8px 10px 10px;border-top:1px solid rgba(255,255,255,.08);display:none}',
+        '#ohp-deal.on{display:block}',
+        '#ohp-dl{font-size:10px;letter-spacing:1.3px;color:#f5cc74;font-weight:700;margin-bottom:4px}',
+        '.ohp-kv{display:flex;justify-content:space-between;color:var(--mut);padding:2px 0;font-size:11px}',
+        '.ohp-kv b{color:var(--txt);font-weight:700}',
+        '#ohp-deal .btn{width:100%;margin-top:6px;padding:7px 8px;font-size:11px}',
+        '.ohp-row.mine{background:rgba(245,204,116,.14);box-shadow:inset 0 0 0 1px rgba(245,204,116,.45)}',
+        '.ohp-row.mine:hover{background:rgba(245,204,116,.22)}',
+        '.ohp-row.mine .ohp-mine{color:#f5cc74;font-weight:700;white-space:nowrap}',
       ].join('');
       document.head.appendChild(st);
       panel = document.createElement('div');
       panel.id = 'ohpanel';
       panel.className = 'hidden';
       panel.innerHTML = '<div id="ohp-h"><span id="ohp-t">Building</span><span id="ohp-x" title="Close">\u2715</span></div>' +
-        '<div id="ohp-s"></div><div id="ohp-su"></div><div id="ohp-l"></div><div id="ohp-list"></div>';
+        '<div id="ohp-s"></div><div id="ohp-su"></div><div id="ohp-l"></div><div id="ohp-list"></div><div id="ohp-deal"></div>';   // v2.43: the deal block rides under the list
       document.body.appendChild(panel);
       panel.querySelector('#ohp-x').addEventListener('click', () => heal());
     } catch (er) { }
@@ -11291,27 +11314,44 @@ const OH = (() => {
     const lbl = panel.querySelector('#ohp-l'), list = panel.querySelector('#ohp-list');
     const rows = [];
     if (L.nF >= 3) {
-      lbl.textContent = 'FLOORS \u2014 PICK ONE';
+      lbl.textContent = 'FLOORS \u2014 PICK, BUY OR RENT';   // v2.43
       rows.push({ k: 'all', t: '<b>All floors</b>', s: 'full dollhouse', on: sel.floor == null });
       for (let i = L.nF - 1; i >= 0; i--) {
         const nm = i === 0 ? 'Ground' : 'Floor ' + (i + 1);
         const tp = L.floorTypes[i] === 'office' ? 'Offices'
           : L.floorTypes[i] === 'home' ? (i === L.nF - 1 && L.nF >= 5 ? 'Penthouse' : 'Apartments')
             : L.floorTypes[i] === 'lobby' ? 'Lobby' : (L.house ? 'Home' : 'Shops');
-        rows.push({ k: 'f' + i, t: '<b>' + nm + '</b>', s: tp, on: sel.floor === i });
+        // v2.43 TITLE DEEDS: each floor carries its market rent, and yours wears the gold tag
+        let own = null, rt = 0;
+        try { own = PROP.status(b.bkey, 'floor', i); rt = PROP.rateOf(b, 'floor', i, b.area); } catch (er) { }
+        rows.push({
+          k: 'f' + i, t: '<b>' + nm + '</b>', mine: own ? own.mode : null,
+          s: own ? tp + ' \u00b7 <span class="ohp-mine">' + (own.mode === 'owned' ? '\u2713 OWNED' : '\u2713 RENTED') + '</span>'
+            : tp + ' \u00b7 $' + rt + '/d',
+          on: sel.floor === i,
+        });
       }
     } else {
-      lbl.textContent = 'ROOMS \u2014 PICK ONE';
-      if (L.rooms.length) L.rooms.forEach((r, i) => rows.push({
-        k: 'r' + i, t: '<b>' + r.name + '</b>',
-        s: Math.max(1, Math.round((r.x1 - r.x0) * (r.z1 - r.z0))) + ' m\u00b2', on: sel.room === i,
-      }));
+      lbl.textContent = 'ROOMS \u2014 PICK, BUY OR RENT';   // v2.43
+      if (L.rooms.length) L.rooms.forEach((r, i) => {
+        const a = Math.max(1, Math.round((r.x1 - r.x0) * (r.z1 - r.z0)));
+        // v2.43 TITLE DEEDS: each room carries its market rent, and yours wears the gold tag
+        let own = null, rt = 0;
+        try { own = PROP.status(b.bkey, 'room', i); rt = PROP.rateOf(b, 'room', i, a); } catch (er) { }
+        rows.push({
+          k: 'r' + i, t: '<b>' + r.name + '</b>', mine: own ? own.mode : null,
+          s: own ? a + ' m\u00b2 \u00b7 <span class="ohp-mine">' + (own.mode === 'owned' ? '\u2713 OWNED' : '\u2713 RENTED') + '</span>'
+            : a + ' m\u00b2 \u00b7 $' + rt + '/d',
+          on: sel.room === i,
+        });
+      });
       else rows.push({ k: 'all', t: '<b>Whole building</b>', s: '', on: sel.room == null });
     }
     list.innerHTML = rows.map(r =>
-      '<div class="ohp-row' + (r.on ? ' on' : '') + '" data-k="' + r.k + '">' + r.t +
+      '<div class="ohp-row' + (r.on ? ' on' : '') + (r.mine ? ' mine' : '') + '" data-k="' + r.k + '">' + r.t +   // v2.43: gold tint on your holdings
       (r.s ? '<span>' + r.s + '</span>' : '') + '</div>').join('');
     list.querySelectorAll('.ohp-row').forEach(el => el.addEventListener('click', () => {
+      if (!curLayout) return;   // v2.43 hardening: a healed inspector leaves no live rows to click
       const k = el.dataset.k;
       if (k === 'all') sel = { floor: null, room: null };
       else if (k.charAt(0) === 'f') { sel = { floor: +k.slice(1), room: null }; startGlideFloor(sel.floor); }
@@ -11319,6 +11359,7 @@ const OH = (() => {
       applySel();
       showPanel();
     }));
+    try { PROP.dealInto(panel.querySelector('#ohp-deal'), b, L, sel); } catch (er) { }   // v2.43 TITLE DEEDS: the deal block under the list
     panel.classList.remove('hidden');
     try { const on = list.querySelector('.ohp-row.on'); if (on) on.scrollIntoView({ block: 'nearest' }); } catch (er) { }
   }
@@ -11394,6 +11435,12 @@ const OH = (() => {
   return {
     tick, force, heal, pick,
     close() { heal(); },
+    refresh() { if (cur) { applySel(); showPanel(); } },   // v2.43 TITLE DEEDS: re-render after a purchase (row tags, glow, deal)
+    roomRect(i) {   // v2.43 TITLE DEEDS: the open building's room rect (QA + property pricing)
+      if (!curLayout || !curLayout.rooms[i]) return null;
+      const r = curLayout.rooms[i];
+      return { name: r.name, floor: r.floor, x0: r.x0, x1: r.x1, z0: r.z0, z1: r.z1, area: Math.max(1, Math.round((r.x1 - r.x0) * (r.z1 - r.z0))) };
+    },
     get shells() { return shellMeshes.length; },
     rig() { return planes.map(p => [p.normal.x, p.normal.y, p.normal.z, p.constant]); },
     probe(x, y, z) {          // QA: is a world point inside the live clip prism (above cut)?
@@ -11480,7 +11527,394 @@ WORLD.update = function (dt, px, pz, camDist) {
   return req;
 };
 
-console.log('%cOPEN WORLD v2.42 — NEIGHBORHOODS', 'color:#38BDF8;font-weight:700', 'ready.');
+// ======== section: 47_property.js ========
+// ====================================================================
+// v2.43 — TITLE DEEDS. The ask: "allow people to buy or rent certain
+// rooms or floors in the houses and buildings." The v2.41 inspector
+// already picks a FLOOR (big buildings) or a ROOM (houses and small
+// shops); this section turns every one of those picks into property
+// with a price tag:
+//   - every floor row / room row in the inspector panel now carries
+//     its market rent, and your holdings wear a gold OWNED / green
+//     RENTED tag (gold row tint, gold room glow);
+//   - picking a floor or room reveals the DEAL BLOCK under the list:
+//     BUY it outright — yours forever, tenants pay you double rent,
+//     it counts toward your WORTH, sell it back any time for 60% —
+//     or RENT it: a two-day deposit, the unit pays its rent every
+//     day, end the lease whenever you like (the office-suite model,
+//     at room and floor granularity);
+//   - income accrues on the same beat as office suites ($rate per 90 s
+//     game-day), every deed lists in the Empire panel with one-tap
+//     TELEPORT / TRAVEL to its doorstep (the inspector even opens on
+//     arrival), and it all persists in the save — a new optional
+//     "rooms" pack field that older builds simply ignore (pack stays
+//     v5, so the old plot migrations are untouched);
+//   - prices are deterministic from the building's own key, so the
+//     deal you saw yesterday is the deal you see today.
+// Touchpoints outside this section (each annotated "v2.43"): the
+// STATE/save/load room field, the WORTH ticker, three lines in the
+// v2.41 inspector (deal container + row tags + gold glow), one help
+// line, and the version surfaces. Every property call is try/caught
+// so a mistake here can never touch the world. window.PROP is the
+// QA surface.
+// ====================================================================
+const PROP = (() => {
+  const CAP = 60;            // holdings cap — bounds the accrual and the Empire list
+  const BUY_MULT = 12;       // buy price = 12 days of rent
+  const OWN_YIELD = 2;       // owned units earn DOUBLE rent (no landlord to pay)
+  const DEPOSIT = 2;         // renting costs a 2-day deposit (the suite model)
+  const SELL_BACK = .6;      // selling returns 60% of the buy price
+  let acc = 0;               // income accrual accumulator (1 s ticks, like offices)
+  let propArrival = null, arrivalT = 0;   // cross-city travel: open the inspector when the building stands
+
+  // ---- robust building facts (barns register without area/x/z) -----
+  function areaOf(b) {
+    if (b && b.area) return b.area;
+    try {
+      const P = (b && b.poly) || [];
+      if (P.length) {
+        let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+        for (const v of P) { x0 = Math.min(x0, v[0]); x1 = Math.max(x1, v[0]); z0 = Math.min(z0, v[1]); z1 = Math.max(z1, v[1]); }
+        return (x1 - x0) * (z1 - z0);
+      }
+    } catch (e) { }
+    return 40;    // a sane fallback (a modest room)
+  }
+  function centerOf(b) {
+    if (b && typeof b.x === 'number' && typeof b.z === 'number') return { x: b.x, z: b.z };
+    try {
+      const P = (b && b.poly) || [];
+      if (P.length) {
+        let sx = 0, sz = 0;
+        for (const v of P) { sx += v[0]; sz += v[1]; }
+        return { x: sx / P.length, z: sz / P.length };
+      }
+    } catch (e) { }
+    return { x: 0, z: 0 };
+  }
+  function tier() { try { return Math.min(4, (CITY.rec && CITY.rec.tier) || 2); } catch (e) { return 2; } }
+
+  // ---- deterministic pricing ----------------------------------------
+  // A floor prices its whole plate (area ~ the footprint); a room is a
+  // finished little home so it earns more per m². Same seed every visit.
+  function rateOf(b, kind, index, area) {
+    const a = Math.max(4, Math.round(area != null ? area : areaOf(b)));
+    if (kind === 'floor')
+      return Math.max(25, Math.round(a * .3 + tier() * 9 + hashStr('pf' + b.bkey + '#' + index) % 28));
+    return Math.max(4, Math.round(a * .85 + hashStr('pr' + b.bkey + '#' + index) % 9));
+  }
+  const priceOf = rate => Math.round(rate * BUY_MULT);
+  const incOf = r => (r.mode === 'owned' ? Math.round(r.rate * OWN_YIELD) : Math.round(r.rate));
+
+  function status(bkey, kind, index) {
+    const R = STATE.rooms || [];
+    if (!R.length) return null;
+    return R.find(r => r.bkey === bkey && r.kind === kind && r.index === index) || null;
+  }
+  const unitName = (kind, index) => kind === 'floor' ? (index === 0 ? 'Ground floor' : 'Floor ' + (index + 1)) : null;
+
+  // ---- the purchase core (shared by the modal flow and QA) ----------
+  // act = 'buy' | 'rent'. Returns {ok, why?, cost?, rate?, entry?}.
+  function commit(b, kind, index, name, area, act) {
+    const R = STATE.rooms || (STATE.rooms = []);
+    if (status(b.bkey, kind, index)) return { ok: false, why: 'taken' };
+    if (R.length >= CAP) return { ok: false, why: 'cap' };
+    const rt = rateOf(b, kind, index, area);
+    const cost = act === 'buy' ? priceOf(rt) : rt * DEPOSIT;
+    if (!spend(cost)) return { ok: false, why: 'funds', cost, rate: rt };
+    const c = centerOf(b), city = CITY.rec || {};
+    const entry = {
+      id: 'p' + b.bkey + '-' + kind.charAt(0) + index,
+      cityKey: city.key || 'rural', cityName: city.name || null,
+      bkey: b.bkey, kind, index, name,
+      area: Math.max(1, Math.round(area)), rate: rt,
+      mode: act === 'buy' ? 'owned' : 'rented',
+      price: act === 'buy' ? cost : 0,
+      x: c.x, z: c.z,
+    };
+    R.push(entry);
+    try { saveGame(); } catch (e) { }
+    try { OH.refresh(); } catch (e) { }
+    return { ok: true, cost, rate: rt, entry };
+  }
+
+  // ---- the deal block (rendered INTO the v2.41 inspector panel) ----
+  function forSaleHTML(name, area, rt) {
+    return '<div id="ohp-dl">' + name.toUpperCase() + ' \u2014 FOR SALE OR RENT</div>' +
+      '<div class="ohp-kv"><span>Area</span><b>' + Math.max(1, Math.round(area)) + ' m\u00b2</b></div>' +
+      '<div class="ohp-kv"><span>Market rent</span><b>$' + rt + '/day</b></div>' +
+      '<button class="btn good" data-pd="buy">BUY \u2014 ' + fmt$(priceOf(rt)) + ' (yours forever)</button>' +
+      '<button class="btn primary" data-pd="rent">RENT \u2014 $' + rt + '/day \u00b7 deposit ' + fmt$(rt * DEPOSIT) + '</button>';
+  }
+  function mineHTML(o, name) {
+    const inc = incOf(o);
+    return '<div id="ohp-dl" style="color:' + (o.mode === 'owned' ? '#f5cc74' : '#7ee2a8') + '">' +
+      name.toUpperCase() + ' \u2014 ' + (o.mode === 'owned' ? 'YOU OWN IT' : 'RENTED BY YOU') + '</div>' +
+      '<div class="ohp-kv"><span>Income</span><b style="color:#48BB78">+$' + inc + '/day</b></div>' +
+      (o.mode === 'owned'
+        ? '<div class="ohp-kv"><span>Resale value</span><b>' + fmt$(Math.round(o.price * SELL_BACK)) + '</b></div>'
+        : '<div class="ohp-kv"><span>Lease rate</span><b>$' + o.rate + '/day</b></div>') +
+      '<button class="btn" data-pd="man">' + (o.mode === 'owned' ? 'MANAGE PROPERTY' : 'MANAGE LEASE') + '</button>';
+  }
+  function dealInto(el, b, L, sel) {
+    if (!el || !b || !L) return;
+    const hasUnits = L.nF >= 3 || (L.rooms && L.rooms.length > 0);
+    if (!hasUnits) { el.classList.remove('on'); el.innerHTML = ''; return; }
+    let html = '', kind = null, index = null;
+    if (sel.floor != null && L.floorRanges && L.floorRanges[sel.floor]) {
+      const i = sel.floor;
+      kind = 'floor'; index = i;
+      const own = status(b.bkey, 'floor', i);
+      const rt = rateOf(b, 'floor', i, areaOf(b));
+      html = own ? mineHTML(own, own.name || unitName('floor', i)) : forSaleHTML(unitName('floor', i), areaOf(b), rt);
+    } else if (sel.room != null && L.rooms && L.rooms[sel.room]) {
+      const i = sel.room, r = L.rooms[i];
+      kind = 'room'; index = i;
+      const a = Math.max(1, Math.round((r.x1 - r.x0) * (r.z1 - r.z0)));
+      const own = status(b.bkey, 'room', i);
+      const rt = rateOf(b, 'room', i, a);
+      html = own ? mineHTML(own, own.name || r.name) : forSaleHTML(r.name, a, rt);
+    } else {
+      // nothing picked yet — a quiet hint that the picks are property
+      html = '<div id="ohp-dl" style="color:#7dd3fc">SELECT A ' + (L.nF >= 3 ? 'FLOOR' : 'ROOM') +
+        ' \u2014 THEN BUY OR RENT IT</div>';
+    }
+    el.innerHTML = html;
+    el.classList.add('on');
+    const buy = el.querySelector('[data-pd="buy"]'), rent = el.querySelector('[data-pd="rent"]'), man = el.querySelector('[data-pd="man"]');
+    if (buy) buy.onclick = () => openDeal(b, L, kind, index, 'buy');
+    if (rent) rent.onclick = () => openDeal(b, L, kind, index, 'rent');
+    if (man) man.onclick = () => { const o = kind != null ? status(b.bkey, kind, index) : null; if (o) openManage(o); };
+  }
+
+  // ---- the deal modal (the game's own modal engine) ------------------
+  function openDeal(b, L, kind, index, act) {
+    const own = status(b.bkey, kind, index);
+    if (own) { openManage(own); return; }
+    let name, area;
+    if (kind === 'floor') { name = unitName('floor', index); area = areaOf(b); }
+    else {
+      const r = L.rooms[index];
+      if (!r) return;
+      name = r.name; area = Math.max(1, Math.round((r.x1 - r.x0) * (r.z1 - r.z0)));
+    }
+    const rt = rateOf(b, kind, index, area);
+    const buying = act === 'buy';
+    const cost = buying ? priceOf(rt) : rt * DEPOSIT;
+    const city = CITY.rec || {};
+    openModal(name + ' \u2014 ' + (city.name || 'Property'), `
+      <p>${buying
+        ? 'Buy <b>' + name + '</b> outright in <b>' + (city.name || 'this city') + '</b> \u2014 it is yours forever: the tenants pay you <b>$' + Math.round(rt * OWN_YIELD) + '/day</b>, it counts toward your net worth, and you can sell it back any time for 60%.'
+        : 'Rent <b>' + name + '</b> in <b>' + (city.name || 'this city') + '</b> \u2014 a two-day deposit, the unit pays you <b>$' + rt + '/day</b>, and you can end the lease whenever you like.'}</p>
+      <div class="kv"><span class="k">SIZE</span><span class="v">${Math.max(1, Math.round(area))} m\u00b2</span></div>
+      <div class="kv"><span class="k">${buying ? 'PRICE' : 'DEPOSIT'}</span><span class="v g">${fmt$(cost)}</span></div>
+      <div class="kv"><span class="k">INCOME</span><span class="v g">+$${buying ? Math.round(rt * OWN_YIELD) : rt}/day</span></div>
+      <div class="kv"><span class="k">BALANCE</span><span class="v">${fmt$(STATE.money)}</span></div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button class="btn good" id="pd-go" style="flex:1">${buying ? 'BUY ' + name.toUpperCase() : 'RENT ' + name.toUpperCase()}</button>
+        <button class="btn" id="pd-x">CLOSE</button>
+      </div>`);
+    document.getElementById('pd-go').onclick = () => {
+      const res = commit(b, kind, index, name, area, act);
+      if (!res.ok) {
+        if (res.why === 'cap') toast('<b>Property cap reached</b> (' + CAP + '). Sell or end a lease first.', 'warn');
+        else if (res.why === 'funds') toast('<b>Not enough money.</b> Serve some food first.', 'warn');
+        else toast('That one is already yours.', 'warn');
+        return;
+      }
+      closeModal();
+      toast(buying
+        ? 'Bought <b>' + name + '</b> for ' + fmt$(res.cost) + ' \u2014 collecting $' + Math.round(rt * OWN_YIELD) + '/day.'
+        : 'Rented <b>' + name + '</b> \u2014 collecting $' + rt + '/day.');
+    };
+    document.getElementById('pd-x').onclick = closeModal;
+  }
+
+  // ---- manage / sell / end-lease --------------------------------------
+  function openManage(o) {
+    if (!o) return;
+    const inc = incOf(o);
+    openModal(o.name + ' \u2014 ' + (o.mode === 'owned' ? 'Your Property' : 'Your Lease'), `
+      <div id="pl"><span class="l">Income</span><span class="v">+$${(inc / 90 * 60).toFixed(2)}/min</span></div>
+      <div class="kv"><span class="k">CITY</span><span class="v">${o.cityName || o.cityKey}</span></div>
+      <div class="kv"><span class="k">SIZE</span><span class="v">${o.area} m\u00b2</span></div>
+      <div class="kv"><span class="k">RATE</span><span class="v g">$${o.rate}.00 /day</span></div>
+      ${o.mode === 'owned' ? '<div class="kv"><span class="k">RESALE VALUE</span><span class="v">' + fmt$(Math.round(o.price * SELL_BACK)) + '</span></div>' : ''}
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button class="btn bad" id="pm-end" style="flex:1">${o.mode === 'owned' ? 'SELL \u2014 ' + fmt$(Math.round(o.price * SELL_BACK)) : 'END LEASE'}</button>
+        <button class="btn" id="pm-x">CLOSE</button>
+      </div>`);
+    document.getElementById('pm-end').onclick = () => {
+      STATE.rooms = (STATE.rooms || []).filter(x => x !== o);
+      if (o.mode === 'owned') {
+        earn(Math.round(o.price * SELL_BACK), false);   // resale proceeds don't count toward GDP
+        toast('Sold <b>' + o.name + '</b> for ' + fmt$(Math.round(o.price * SELL_BACK)) + '.');
+      } else toast('Lease ended on <b>' + o.name + '</b>. The deposit was non-refundable.', 'warn');
+      try { saveGame(); } catch (e) { }
+      closeModal();
+      try { OH.refresh(); } catch (e) { }
+    };
+    document.getElementById('pm-x').onclick = closeModal;
+  }
+
+  // ---- the Empire panel: your title deeds, one-tap travel ------------
+  function empireInto() {
+    const body = document.getElementById('mbody');
+    if (!body) return;
+    const close = document.getElementById('em-x');
+    const anchorEl = close ? close.parentElement : null;
+    const here = CITY.rec && CITY.rec.key;
+    const R = STATE.rooms || [];
+    const rows = R.map((r, i) => {
+      const local = here === r.cityKey && STATE.mode === 'city';
+      return '<div class="kv"><span class="k">' + r.name + ' \u00b7 ' + (r.cityName || r.cityKey) +
+        ' \u00b7 ' + (r.mode === 'owned' ? 'OWNED' : 'RENTED') + ' \u00b7 $' + incOf(r) + '/day</span>' +
+        '<button class="tpbtn" data-pr="' + i + '">' + (local ? 'TELEPORT' : 'TRAVEL') + '</button></div>';
+    }).join('');
+    const inc = R.reduce((s, r) => s + incOf(r), 0);
+    const html = '<div class="msec" style="margin-top:14px">Rooms &amp; floors \u2014 your title deeds</div>' +
+      (rows || '<p>No rooms or floors yet. Click any building or house, pick a floor or a room, then <b>BUY</b> or <b>RENT</b> it from the panel.</p>') +
+      (rows ? '<div class="kv" style="margin-top:10px"><span class="k">PROPERTY INCOME</span><span class="v g">+$' + (inc / 90 * 60).toFixed(2) + '/min</span></div>' : '');
+    if (anchorEl) anchorEl.insertAdjacentHTML('beforebegin', html);
+    else body.insertAdjacentHTML('beforeend', html);
+    body.querySelectorAll('[data-pr]').forEach(b => {
+      b.onclick = () => { travelTo(R[+b.dataset.pr]); };
+    });
+  }
+  const __propEmpire = ECO.openEmpire.bind(ECO);
+  ECO.openEmpire = function () {
+    __propEmpire();
+    try { empireInto(); } catch (e) { console.error('[property]', e); }
+  };
+
+  // ---- travel: one tap to the doorstep (the inspector opens on arrival)
+  function travelTo(r) {
+    if (!r) return;
+    closeModal();
+    const here = CITY.rec && CITY.rec.key;
+    if (here === r.cityKey && STATE.mode === 'city') {
+      let spot = { x: r.x, z: r.z + Math.max(10, Math.sqrt(r.area || 120) + 6) };
+      try {   // snap to the nearest street vertex within 60 m — never inside a wall
+        let best = null;
+        for (const rd of (CITY.roads || [])) {
+          const pts = rd.pts || [];
+          for (let i = 0; i < pts.length; i++) {
+            const d = Math.hypot(pts[i][0] - r.x, pts[i][1] - r.z);
+            if (!best || d < best.d) best = { x: pts[i][0], z: pts[i][1], d };
+          }
+        }
+        if (best && best.d < 60) spot = best;
+      } catch (e) { }
+      try { ACTORS.clearGoal(); } catch (e) { }
+      ACTORS.placePlayer(spot.x, spot.z);
+      camCtl.tx = spot.x; camCtl.tz = spot.z;
+      camCtl.follow = true; camCtl.distT = 64;
+      ECO.arrivalPulse(r.x, r.z);
+      try { OH.force(r.bkey); } catch (e) { }   // the inspector opens on arrival
+      toast('\u26a1 Teleported to your <b>' + r.name + '</b>.', 'warn');
+      return;
+    }
+    // another city (or orbit): dive there and land at the doorstep
+    const c = CITIES.find(x => x.key === r.cityKey);
+    let meta = c ? { key: c.key, name: c.name, lat: c.lat, lon: c.lon, tier: c.tier } : null;
+    if (!meta) {
+      const m = /^ll(-?[0-9.]+)_(-?[0-9.]+)$/.exec(r.cityKey || '');
+      if (m) meta = { key: r.cityKey, name: r.cityName || r.cityKey, lat: +m[1], lon: +m[2], searched: true };
+    }
+    if (!meta) { toast('<b>That city can no longer be found</b> \u2014 travel there from the map first.', 'warn'); return; }
+    propArrival = r; arrivalT = 0;
+    enterWorld(meta, { at: { x: r.x, z: r.z + Math.max(10, Math.sqrt(r.area || 120) + 6) } });
+  }
+
+  // ---- income accrual + arrival watch (the office-suite beat) ---------
+  function tick(dt) {
+    const R = STATE.rooms || [];
+    if (STATE.mode !== 'city' || !R.length) { acc = 0; }
+    else {
+      acc += dt;
+      if (acc >= 1) {
+        const secs = acc; acc = 0;
+        let inc = 0;
+        for (const r of R) inc += incOf(r);
+        if (inc > 0) earn(inc / 90 * secs);
+      }
+    }
+    if (propArrival) {
+      arrivalT += dt;
+      if (arrivalT > 45) { propArrival = null; arrivalT = 0; return; }
+      try {
+        if (CITY.group && CITY.buildingPolys && CITY.buildingPolys.some(x => x.bkey === propArrival.bkey)) {
+          const r = propArrival; propArrival = null; arrivalT = 0;
+          OH.force(r.bkey);
+        }
+      } catch (e) { propArrival = null; arrivalT = 0; }
+    }
+  }
+
+  return {
+    tick, dealInto, travelTo, openManage, status, rateOf, priceOf, incOf,
+    list: () => (STATE.rooms || []).slice(),
+    count: () => (STATE.rooms || []).length,
+    // QA: programmatic purchase/rent of the OPEN building's unit (no modal)
+    buyAt(bkey, kind, index) {
+      const B = (CITY.buildingPolys || []).find(x => x.bkey === bkey);
+      if (!B) return { ok: false, why: 'no building ' + bkey };
+      let name, area;
+      if (kind === 'floor') { name = unitName('floor', index); area = areaOf(B); }
+      else {
+        const rc = OH.roomRect(index);
+        if (!rc) return { ok: false, why: 'no open room ' + index };
+        name = rc.name; area = rc.area;
+      }
+      return commit(B, kind, index, name, area, 'buy');
+    },
+    rentAt(bkey, kind, index) {
+      const B = (CITY.buildingPolys || []).find(x => x.bkey === bkey);
+      if (!B) return { ok: false, why: 'no building ' + bkey };
+      let name, area;
+      if (kind === 'floor') { name = unitName('floor', index); area = areaOf(B); }
+      else {
+        const rc = OH.roomRect(index);
+        if (!rc) return { ok: false, why: 'no open room ' + index };
+        name = rc.name; area = rc.area;
+      }
+      return commit(B, kind, index, name, area, 'rent');
+    },
+    sell(id) {   // QA: instant sell/end of a holding by id
+      const R = STATE.rooms || [];
+      const o = R.find(x => x.id === id);
+      if (!o) return { ok: false, why: 'no holding ' + id };
+      STATE.rooms = R.filter(x => x !== o);
+      if (o.mode === 'owned') earn(Math.round(o.price * SELL_BACK), false);
+      try { saveGame(); } catch (e) { }
+      return { ok: true, got: o.mode === 'owned' ? Math.round(o.price * SELL_BACK) : 0 };
+    },
+    state() {
+      return {
+        holdings: (STATE.rooms || []).length,
+        owned: (STATE.rooms || []).filter(r => r.mode === 'owned').length,
+        rented: (STATE.rooms || []).filter(r => r.mode === 'rented').length,
+        incomePerDay: (STATE.rooms || []).reduce((s, r) => s + incOf(r), 0),
+        accrual: +acc.toFixed(2),
+        arrival: propArrival ? propArrival.id : null,
+      };
+    },
+  };
+})();
+window.PROP = PROP;   // QA surface
+
+// ADDITIVE hook — the property income tick rides the same WORLD.update
+// wrap chain the game already uses (original update -> world forest ->
+// open house -> suburbs LOD -> TITLE DEEDS). Every call is try/caught
+// so a property error can never touch the world.
+const __propOrigUpdate = WORLD.update.bind(WORLD);
+WORLD.update = function (dt, px, pz, camDist) {
+  const req = __propOrigUpdate(dt, px, pz, camDist);
+  try { PROP.tick(dt); } catch (e) { console.error('[property]', e); }
+  return req;
+};
+
+console.log('%cOPEN WORLD v2.43 — TITLE DEEDS', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
