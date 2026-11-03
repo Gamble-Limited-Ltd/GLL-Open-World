@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.44</title>
+<title>Open World — v2.45</title>
 <style>
 /* ==================================================================
    OPEN WORLD v2.42 — NEIGHBORHOODS: "make houses and neighborhoods
@@ -731,7 +731,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.44 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), every one of those rooms and floors for sale or for rent (buy it outright — yours forever, tenants pay you daily — or rent it with a two-day deposit; your holdings glow gold and pay you every day), open land for sale everywhere around the cities (LAND MODE — the parcel button — stakes 30 × 30 m claims on any dry ground past the city belts, with a golden preview, a daily farm lease and resale at 60%), and the same streets, buildings, plots and roads on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.44 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), every one of those rooms and floors for sale or for rent (buy it outright — yours forever, tenants pay you daily — or rent it with a two-day deposit; your holdings glow gold and pay you every day), open land for sale everywhere around the cities (LAND MODE — the parcel button — stakes 30 × 30 m claims on any dry ground past the city belts, with a golden preview, a daily farm lease and resale at 60%), three graphics modes (HIGH — the full approved look — BALANCED, and a speed-first CHROMEBOOK coat that real Chromebooks start on automatically; switch anytime under HELP → GRAPHICS or with [G]), and the same streets, buildings, plots and roads on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -767,8 +767,83 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.44';
+const GAME_VERSION = 'v2.45';
 const SAVE_KEY = 'openworld-v2';
+
+// ---------------- v2.45 — GFX: graphics modes (TURBO) ---------------------
+// The ask: "make different graphics modes for people who are on
+// Chromebooks." One knob, three coats of paint on the same 1:1 Earth.
+// HIGH is the approved v2.44 look, untouched, and stays the default for
+// every device except real Chromebooks, which auto-start on the
+// CHROMEBOOK coat (switchable any time: HELP → GRAPHICS or [G]).
+// The choice lives in its OWN localStorage key (openworld-gfx) so it
+// loads before the renderer is built — anti-aliasing is a context
+// creation flag and cannot be swapped mid-flight (mode switches that
+// change it trigger a quick reload; everything else applies live via
+// GFX.apply() in 90_main). It is a device setting, not progress: a new
+// game or a save reset keeps it.
+const GFX_KEY = 'openworld-gfx';
+const GFX_MODES = {
+  high:       { label: 'HIGH',       aa: true,  px: 2,    shadows: true,  sh: 2048, tree: 1,   prop: 1,   wf: 1,   zoneR: 1,   hemiBoost: 0,
+                hint: 'The full approved look — every tree, soft 2048px shadows, retina-sharp pixels' },
+  balanced:   { label: 'BALANCED',   aa: true,  px: 1.25, shadows: true,  sh: 1024, tree: .75, prop: .8,  wf: .6,  zoneR: .85, hemiBoost: .15,
+                hint: 'A lighter coat for everyday laptops — softer 1024px shadows, a thinner forest' },
+  chromebook: { label: 'CHROMEBOOK', aa: false, px: 1,    shadows: false, sh: 512,  tree: .5,  prop: .55, wf: .35, zoneR: .65, hemiBoost: .45,
+                hint: 'Built for school Chromebooks — shadows off, light forest, crisp pixels' }
+};
+// real Chromebooks say CrOS in the user agent; weak ones (≤4 GB RAM or
+// ≤4 cores) take the CHROMEBOOK coat, beefier ones BALANCED. Phones and
+// desktops stay HIGH until the player chooses otherwise.
+function gfxDetect(ua, nav) {
+  try {
+    if (!/CrOS/.test(ua || '')) return 'high';
+    const mem = nav && nav.deviceMemory, cores = nav && nav.hardwareConcurrency;
+    if ((mem && mem <= 4) || (cores && cores <= 4)) return 'chromebook';
+    return 'balanced';
+  } catch (e) { return 'high'; }
+}
+// deterministic list thinning — even stride, so a thinned street of
+// trees still reads as a street of trees; a factor of 1 returns the
+// list untouched (the exact v2.44 placement).
+function gfxThin(list, f) {
+  if (!f || f >= 1 || !list || !list.length) return list;
+  const keep = Math.round(list.length * f);
+  if (keep >= list.length) return list;
+  if (keep <= 0) return [];
+  const out = new Array(keep), step = list.length / keep;
+  for (let i = 0; i < keep; i++) out[i] = list[Math.floor(i * step)];
+  return out;
+}
+const GFX = (() => {
+  let mode = 'high', auto = true;
+  try {
+    const raw = localStorage.getItem(GFX_KEY);
+    if (raw) { const j = JSON.parse(raw); if (j && GFX_MODES[j.mode]) { mode = j.mode; auto = false; } }
+  } catch (e) { }
+  if (auto) mode = gfxDetect(navigator.userAgent, navigator);
+  function px() { return Math.min(GFX_MODES[mode].px, window.deviceRatio || window.devicePixelRatio || 1); }
+  function set(k) {
+    if (!GFX_MODES[k] || k === mode) return { aaChanged: false };
+    const aaChanged = GFX_MODES[k].aa !== GFX_MODES[mode].aa;
+    mode = k; auto = false;
+    try { localStorage.setItem(GFX_KEY, JSON.stringify({ mode: k })); } catch (e) { }
+    return { aaChanged };
+  }
+  return {
+    get mode() { return mode; }, get auto() { return auto; }, get q() { return GFX_MODES[mode]; },
+    px, set, thin: gfxThin,
+    apply() { },   // replaced by 90_main once the renderer + sun exist
+    detectFor: ua => gfxDetect(ua, navigator)
+  };
+})();
+window.GFX = {   // QA surface: window.GFX.get() / .set(k) / .detected() / .detectFor(ua) / .modes
+  get: () => ({ mode: GFX.mode, auto: GFX.auto, aa: GFX.q.aa, px: GFX.px(), shadows: GFX.q.shadows, sh: GFX.q.sh, tree: GFX.q.tree, prop: GFX.q.prop, wf: GFX.q.wf, zoneR: GFX.q.zoneR }),
+  set: k => GFX.set(k),
+  detected: () => gfxDetect(navigator.userAgent, navigator),
+  detectFor: ua => gfxDetect(ua, navigator),
+  modes: GFX_MODES
+};
+
 
 // ---- deterministic rng --------------------------------------------
 function _ihash(x, y, s) {
@@ -2375,7 +2450,10 @@ const WORLD = (() => {
   const markMatShared = () => _markMat || (_markMat = new THREE.MeshLambertMaterial({ vertexColors: true }));
   const pylMatShared = () => _pylMat || (_pylMat = new THREE.MeshLambertMaterial({ color: 0x9aa2a9 }));
   const isMob = matchMedia('(pointer:coarse)').matches;
-  const CHUNK_R = isMob ? 750 : 1050;
+  // v2.45: the pasture detail zone follows the graphics mode (same zoneR
+  // factor as the world forest's radii, so trees never outrun their
+  // ground); HIGH is exactly the v2.44 radius.
+  const CHUNK_R = Math.round((isMob ? 750 : 1050) * GFX.q.zoneR);
 
   let scene = null, group = null;
   let inited = false;
@@ -4011,7 +4089,7 @@ const WORLD = (() => {
     // scatter, which read as 'a few trees'). addTree's own guards still
     // apply to every tree (off the plate, off roads, dry land only).
     if (nearC.d < CITY_R + 3300 + CH * .75) {
-      const stands = Math.round((3 + rnd() * 3) * mobF);
+      const stands = Math.round((3 + rnd() * 3) * mobF * GFX.q.tree);
       for (let s = 0; s < stands; s++) {
         const sx = x0 + rnd() * CH, sz = z0 + rnd() * CH;
         const sd = distToCity(sx, sz).d;
@@ -4025,7 +4103,7 @@ const WORLD = (() => {
       }
     }
     if (!insideCity) {
-      const groves = Math.round((rnd() < .55 ? 1 + Math.floor(rnd() * 2) : 0) * mobF);
+      const groves = Math.round((rnd() < .55 ? 1 + Math.floor(rnd() * 2) : 0) * mobF * GFX.q.tree);
       for (let gi = 0; gi < groves; gi++) {
         const gx = x0 + 60 + rnd() * (CH - 120), gz = z0 + 60 + rnd() * (CH - 120);
         const cnt = 4 + Math.floor(rnd() * 7);
@@ -4033,7 +4111,7 @@ const WORLD = (() => {
           addTree(B, gx + (rnd() - .5) * 90, gz + (rnd() - .5) * 90, .7 + rnd() * .9, rnd);
         }
       }
-      const lone = Math.floor((rnd() < .6 ? 1 + rnd() * 5 : 0) * mobF);
+      const lone = Math.floor((rnd() < .6 ? 1 + rnd() * 5 : 0) * mobF * GFX.q.tree);
       for (let i = 0; i < lone; i++) addTree(B, x0 + rnd() * CH, z0 + rnd() * CH, .6 + rnd() * .8, rnd);
 
       if (rnd() < .62) {   // fenced paddock with animals
@@ -4047,7 +4125,7 @@ const WORLD = (() => {
           buildPaddock(B, px, pz, w, d, rnd, mobF);
         }
       }
-      const rocks = Math.floor((2 + rnd() * 6) * mobF);
+      const rocks = Math.floor((2 + rnd() * 6) * mobF * GFX.q.prop);
       for (let i = 0; i < rocks; i++) {
         const rx = x0 + rnd() * CH, rz = z0 + rnd() * CH;
         if (distToCity(rx, rz).d < CITY_R + 1950 || nearRoad(rx, rz, 8)) continue;   // v2.42
@@ -4111,12 +4189,12 @@ const WORLD = (() => {
       }
     }
     const cows = rnd() < .55;
-    const nAnim = Math.max(1, Math.round((1 + rnd() * 4) * mobF));
+    const nAnim = Math.max(1, Math.round((1 + rnd() * 4) * mobF * GFX.q.prop));
     for (let i = 0; i < nAnim; i++) {
       const ax = px + (rnd() - .5) * (w - 8), az = pz + (rnd() - .5) * (d - 8);
       addAnimal(B, ax, az, cows ? 'cow' : 'sheep', rnd);
     }
-    const hay = Math.round(rnd() * 3 * mobF);
+    const hay = Math.round(rnd() * 3 * mobF * GFX.q.prop);
     for (let i = 0; i < hay; i++) {
       const hx2 = px + (rnd() < .5 ? hx + 2.4 : -hx - 2.4), hz2 = pz + (rnd() - .5) * d;
       const g = new THREE.CylinderGeometry(.8, .8, 1.3, 9);
@@ -5351,7 +5429,7 @@ const CITY = (() => {
 
     // manhole covers (instanced)
     if (manholes.length) {
-      const n = Math.min(manholes.length, Math.floor(240 * mobF));
+      const n = Math.min(manholes.length, Math.floor(240 * mobF * GFX.q.prop));
       const geo = new THREE.CircleGeometry(.55, 10); geo.rotateX(-Math.PI / 2);
       const inst = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color: 0x2b2f33 }), n);
       const mat4 = new THREE.Matrix4();
@@ -5866,7 +5944,9 @@ const CITY = (() => {
     // crosses (park + lawn trees get the same guarantee here).
     const keptTrees = [];
     let droppedTrees = 0;
-    for (const t of trees) {
+    // v2.45: graphics-mode thinning first (factor 1 = the exact v2.44
+    // list), then the same asphalt guarantee as always
+    for (const t of gfxThin(trees, GFX.q.tree)) {
       if (offAsphalt(t[0], t[1], 1.4)) keptTrees.push(t); else droppedTrees++;
     }
     treeList = keptTrees;
@@ -5949,7 +6029,7 @@ const CITY = (() => {
       }
     }
     if (lamps.length) {
-      const n = Math.min(lamps.length, Math.floor(460 * mobF));
+      const n = Math.min(lamps.length, Math.floor(460 * mobF * GFX.q.prop));
       const poleM = new THREE.MeshLambertMaterial({ color: 0x363b41 });
       const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(.06, .09, 5.6, 7), poleM, n);
       const arm = new THREE.InstancedMesh(new THREE.BoxGeometry(.95, .08, .08), poleM, n);
@@ -5990,7 +6070,7 @@ const CITY = (() => {
       }
     }
     if (hyds.length) {
-      const n = Math.min(hyds.length, Math.floor(90 * mobF));
+      const n = Math.min(hyds.length, Math.floor(90 * mobF * GFX.q.prop));
       const body = new THREE.InstancedMesh(new THREE.CylinderGeometry(.14, .17, .72, 8),
         new THREE.MeshLambertMaterial({ color: 0xb03a2e }), n);
       const cap = new THREE.InstancedMesh(new THREE.CylinderGeometry(.09, .09, .16, 8),
@@ -6011,7 +6091,7 @@ const CITY = (() => {
         const [x, z, th] = lamps[i];
         bins.push([x + Math.cos(th) * .9, z - Math.sin(th) * .9]);   // toward the road a touch
       }
-      const n = Math.min(bins.length, Math.floor(160 * mobF));
+      const n = Math.min(bins.length, Math.floor(160 * mobF * GFX.q.prop));
       const inst = new THREE.InstancedMesh(new THREE.CylinderGeometry(.26, .3, .85, 8),
         new THREE.MeshLambertMaterial({ color: 0x3d444a }), n);
       const mat4 = new THREE.Matrix4();
@@ -6094,7 +6174,7 @@ const CITY = (() => {
       }
     }
     if (spots.length) {
-      const n = Math.min(spots.length, Math.floor(240 * mobF));
+      const n = Math.min(spots.length, Math.floor(240 * mobF * GFX.q.prop));
       const bodyGeo = new THREE.BoxGeometry(4.05, 1.0, 1.76); bodyGeo.translate(0, .58, 0);
       const cabGeo = new THREE.BoxGeometry(2.35, .66, 1.5); cabGeo.translate(-.26, 1.36, 0);
       const whGeo = new THREE.CylinderGeometry(.3, .3, .2, 10); whGeo.rotateZ(Math.PI / 2);
@@ -6749,9 +6829,9 @@ const CITY = (() => {
     if (flat.pos.length) { const m = mkS(flat, null, true); m.receiveShadow = true; group.add(m); }   // lawns/drives: always on (flat + cheap — the pattern from above)
     suburbRec.verts = (wall.pos.length + roof.pos.length + flat.pos.length) / 3 | 0;
     // yard trees — the city's own instancing pass, inside the LOD group
-    if (trees.length) { addTrees(trees, suburbGroup); suburbRec.trees = trees.length; }
+    if (trees.length) { const subTrees = gfxThin(trees, GFX.q.tree); addTrees(subTrees, suburbGroup); suburbRec.trees = subTrees.length; }   // v2.45: graphics-mode thinning
     if (lamps.length) {
-      const n = Math.min(lamps.length, Math.floor(isMob ? 140 : 240));
+      const n = Math.min(lamps.length, Math.floor((isMob ? 140 : 240) * GFX.q.prop));
       const poleM = new THREE.MeshLambertMaterial({ color: 0x363b41 });
       const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(.06, .09, 5.6, 7), poleM, n);
       const arm = new THREE.InstancedMesh(new THREE.BoxGeometry(.95, .08, .08), poleM, n);
@@ -6771,7 +6851,7 @@ const CITY = (() => {
       suburbRec.lamps = n;
     }
     if (cars.length) {
-      const n = Math.min(cars.length, isMob ? 36 : 70);
+      const n = Math.min(cars.length, Math.floor((isMob ? 36 : 70) * GFX.q.prop));
       const bodyGeo = new THREE.BoxGeometry(4.05, 1.0, 1.76); bodyGeo.translate(0, .58, 0);
       const cabGeo = new THREE.BoxGeometry(2.35, .66, 1.5); cabGeo.translate(-.26, 1.36, 0);
       const whGeo = new THREE.CylinderGeometry(.3, .3, .2, 10); whGeo.rotateZ(Math.PI / 2);
@@ -6889,7 +6969,7 @@ const CITY = (() => {
 
     // ---- groves + lone trees ----
     const trees = [];
-    const nG = Math.round((6 + rnd() * 4) * mobF);
+    const nG = Math.round((6 + rnd() * 4) * mobF * GFX.q.tree);
     for (let gi = 0; gi < nG; gi++) {
       const gx = PAX + (rnd() * 2 - 1) * 500, gz = PAZ + (rnd() * 2 - 1) * 500;
       if (Math.hypot(gx - PAX, gz - PAZ) < 120) continue;
@@ -6900,13 +6980,14 @@ const CITY = (() => {
         trees.push([gx + Math.cos(a) * rr, gz + Math.sin(a) * rr]);
       }
     }
-    for (let i = 0; i < Math.round(34 * mobF); i++) {          // lone sentinels
+    for (let i = 0; i < Math.round(34 * mobF * GFX.q.tree); i++) {          // lone sentinels
       const a = rnd() * 6.2832, rr = 130 + rnd() * 430;
       trees.push([PAX + Math.cos(a) * rr, PAZ + Math.sin(a) * rr]);
     }
     const keptTrees = [];
     let droppedTrees = 0;
-    for (const t of trees) {
+    // v2.45: graphics-mode thinning first, same guards as always
+    for (const t of gfxThin(trees, GFX.q.tree)) {
       if (offAsphalt(t[0], t[1], 1.4) && !plotAt(t[0], t[1]) && gateClear(t[0], t[1]) && dry(t[0], t[1])) keptTrees.push(t);
       else droppedTrees++;
     }
@@ -6916,17 +6997,17 @@ const CITY = (() => {
 
     // ---- rocks + bushes + hay bales (instanced) ----
     const rocks = [], bushes = [], bales = [];
-    for (let i = 0; i < Math.round(26 * mobF); i++) {
+    for (let i = 0; i < Math.round(26 * mobF * GFX.q.prop); i++) {
       const a = rnd() * 6.2832, rr = 60 + rnd() * 520;
       const x = PAX + Math.cos(a) * rr, z = PAZ + Math.sin(a) * rr;
       if (dry(x, z) && offAsphalt(x, z, 1.6) && !plotAt(x, z) && gateClear(x, z)) rocks.push([x, z, .5 + rnd() * 1.3, rnd() * 6.28]);
     }
-    for (let i = 0; i < Math.round(46 * mobF); i++) {
+    for (let i = 0; i < Math.round(46 * mobF * GFX.q.prop); i++) {
       const a = rnd() * 6.2832, rr = 40 + rnd() * 560;
       const x = PAX + Math.cos(a) * rr, z = PAZ + Math.sin(a) * rr;
       if (dry(x, z) && offAsphalt(x, z, 1.2) && !plotAt(x, z)) bushes.push([x, z, .7 + rnd() * .8]);
     }
-    for (let i = 0; i < Math.round((6 + rnd() * 8) * mobF); i++) {
+    for (let i = 0; i < Math.round((6 + rnd() * 8) * mobF * GFX.q.prop); i++) {
       const a = rnd() * 6.2832, rr = 150 + rnd() * 380;
       const x = PAX + Math.cos(a) * rr, z = PAZ + Math.sin(a) * rr;
       if (dry(x, z) && offAsphalt(x, z, 2.2) && !plotAt(x, z) && gateClear(x, z)) bales.push([x, z, rnd() * 6.28]);
@@ -9341,10 +9422,14 @@ window.addEventListener('error', e => { (window.__errs = window.__errs || []).pu
 
 // ---------------- renderer / camera ---------------------------------
 const canvas = document.getElementById('gl');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true });
-renderer.setPixelRatio(Math.min(2, window.deviceRatio || window.devicePixelRatio || 1));
+// v2.45 TURBO: the renderer is built from the graphics mode — the pref
+// loaded in core before this line, so anti-aliasing (a context-creation
+// flag) is right on first boot; HIGH builds the exact v2.44 renderer.
+// Live mode switches re-run everything below except aa via GFX.apply().
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: GFX.q.aa, logarithmicDepthBuffer: true });
+renderer.setPixelRatio(GFX.px());
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = GFX.q.shadows;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;   // v2.03: soft toy-matte shadows
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 // v2.37 WHOLE-WORLD ZOOM: "allow me to zoom out farther" — the ceiling
@@ -9364,11 +9449,12 @@ const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerH
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
+  renderer.setPixelRatio(GFX.px());   // v2.45: a monitor change can change the dpr
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
 // ---------------- the ONE WORLD scene --------------------------------
-let worldScene = null, sun = null, skyDome = null;
+let worldScene = null, sun = null, skyDome = null, hemiLight = null;   // v2.45: hemiLight for live mode switches
 // v2.17 BIRD'S EYE command camera: `follow` keeps the view riding on
 // the character; panning (drag / WASD / joystick) detaches it, and any
 // tap-to-move command — or FIND ME / [C] — re-attaches it.
@@ -9423,19 +9509,91 @@ function buildWorldScene() {
   skyDome.scale.setScalar(CAM_FAR * .88);
   skyDome.renderOrder = -1;
   worldScene.add(skyDome);
-  worldScene.add(new THREE.HemisphereLight(0xf0f7fa, 0x97a184, 2.5));   // sky fill, warm green-earth bounce
+  // v2.45: shadow rig + the shadowless hemisphere lift follow the
+  // graphics mode; HIGH rebuilds the exact v2.44 rig (2048 map, radius 5)
+  hemiLight = new THREE.HemisphereLight(0xf0f7fa, 0x97a184, 2.5 + (GFX.q.hemiBoost || 0));   // sky fill, warm green-earth bounce
+  worldScene.add(hemiLight);
   sun = new THREE.DirectionalLight(0xfff3df, 2.1);              // v2.33: a touch brighter — CR's flat bright noon
   sun.position.set(-170, 180, 95);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.castShadow = GFX.q.shadows;
+  sun.shadow.mapSize.set(GFX.q.shadows ? GFX.q.sh : 512, GFX.q.shadows ? GFX.q.sh : 512);
   sun.shadow.camera.left = -240; sun.shadow.camera.right = 240;
   sun.shadow.camera.top = 240; sun.shadow.camera.bottom = -240;
   sun.shadow.camera.near = 20; sun.shadow.camera.far = 1200;
   sun.shadow.bias = -0.0006;
-  sun.shadow.radius = 5;
+  sun.shadow.radius = sun.shadow.mapSize.x >= 2048 ? 5 : 4;
   worldScene.add(sun);
   worldScene.add(sun.target);
 }
+
+// ---------------- v2.45 — GFX live apply + mode picker --------------------
+// Everything except anti-aliasing retunes right here, mid-session:
+// pixel ratio, the shadow rig, the hemisphere lift and the world forest
+// (WF.applyGfx re-streams it); three.js only rebuilds shader programs
+// when materials are flagged, so the traversal below is required after
+// toggling shadow rendering.
+GFX.apply = function () {
+  const q = GFX.q;
+  try {
+    renderer.setPixelRatio(GFX.px());
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = q.shadows;
+    if (sun) {
+      sun.castShadow = q.shadows;
+      const sh = q.shadows ? q.sh : 512;
+      if (sun.shadow.mapSize.x !== sh) {
+        sun.shadow.mapSize.set(sh, sh);
+        if (sun.shadow.map) { try { sun.shadow.map.dispose(); } catch (e) { } sun.shadow.map = null; }
+      }
+      sun.shadow.radius = sh >= 2048 ? 5 : 4;
+    }
+    if (hemiLight) hemiLight.intensity = 2.5 + (q.hemiBoost || 0);
+    const seen = new Set();
+    [worldScene, EARTH.scene].forEach(s => {
+      if (!s) return;
+      s.traverse(o => {
+        const m = o.material; if (!m) return;
+        (Array.isArray(m) ? m : [m]).forEach(x => { if (x && !seen.has(x)) { seen.add(x); x.needsUpdate = true; } });
+      });
+    });
+    if (typeof WF !== 'undefined' && WF.applyGfx) WF.applyGfx();
+  } catch (e) { console.error('[GFX] apply', e); }
+};
+
+function openGfx() {
+  const cur = GFX.mode;
+  const rows = Object.keys(GFX_MODES).map(k => {
+    const m = GFX_MODES[k], on = k === cur;
+    return '<button class="btn' + (on ? ' primary' : '') + '" id="gfx-' + k + '" style="flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:10px 14px">' +
+      '<span style="font-size:12px">' + (on ? '\u25C9 ' : '\u25CB ') + m.label + '</span>' +
+      '<span style="font-size:10.5px;font-weight:400;letter-spacing:0;text-transform:none;color:' + (on ? '#cfe4f7' : 'var(--dim)') + '">' + m.hint + '</span></button>';
+  }).join('');
+  openModal('Graphics Mode — ' + GAME_VERSION, `
+    <p><b>Three coats of paint on the same real Earth.</b> Pick how hard the planet works your machine — the choice saves on this device and applies to every visit.</p>
+    <div style="display:flex;flex-direction:column;gap:8px">${rows}</div>
+    <div class="kv" style="margin-top:12px"><span class="k">RUNNING</span><span class="v">${GFX_MODES[cur].label}${GFX.auto ? ' — auto-detected for this device' : ' — your choice'}</span></div>
+    <div class="kv"><span class="k">APPLIES</span><span class="v">Pixel sharpness, shadows and the world forest update right away; anti-aliasing (HIGH / BALANCED ↔ CHROMEBOOK) finishes with a quick reload. Chromebooks start on the CHROMEBOOK coat automatically.</span></div>
+    <div style="display:flex;gap:8px;margin-top:14px"><button class="btn" id="gfx-x" style="flex:1">CLOSE</button></div>`);
+  document.getElementById('gfx-x').onclick = closeModal;
+  Object.keys(GFX_MODES).forEach(k => {
+    const b = document.getElementById('gfx-' + k);
+    if (b) b.onclick = () => pickGfx(k);
+  });
+}
+function pickGfx(k) {
+  if (k === GFX.mode) return;
+  const r = GFX.set(k);
+  GFX.apply();
+  if (r && r.aaChanged) {
+    toast('Graphics: <b>' + GFX_MODES[k].label + '</b> — reloading to finish anti-aliasing…', 'warn');
+    try { sessionStorage.setItem('ow-gfx-reload', '1'); saveGame(); } catch (e) { }
+    setTimeout(() => location.reload(), 1500);
+  } else {
+    toast('Graphics: <b>' + GFX_MODES[k].label + '</b> applied — forest and shadows re-tuned. City trees finish on your next visit.', 'warn');
+    openGfx();
+  }
+}
+
 
 // ---------------- travel ---------------------------------------------
 // enterWorld: orbit dive / map click / search / instant travel → build
@@ -9795,10 +9953,23 @@ function doEnter() {
     setTimeout(autoEnterLast, 900);
   }
   else toast('Welcome, <b>' + nm + '</b>. Click a glowing city — or any land — to land anywhere on Earth.');
+  // v2.45: an auto-detected lite device (a real Chromebook) gets one
+  // gentle note per session — the mode is already running, this says so
+  if (GFX.auto && GFX.mode !== 'high' && !sessionStorage.getItem('ow-gfx-note')) {
+    sessionStorage.setItem('ow-gfx-note', '1');
+    setTimeout(() => toast(GFX_MODES[GFX.mode].label + ' graphics on — auto-tuned for this device. Switch anytime: HELP → GRAPHICS or [G].', 'warn'), 2600);
+  }
   // v2.24: compare this build to the site's feed once per session
   checkForUpdate();
 }
 enterBtn.addEventListener('click', doEnter);
+// v2.45: a graphics-mode reload (anti-aliasing change) carries a one-shot
+// flag so the game CONTINUEs by itself — the switch feels instant instead
+// of dumping you back at the login screen
+if (sessionStorage.getItem('ow-gfx-reload')) {
+  sessionStorage.removeItem('ow-gfx-reload');
+  if (hadSave && STATE.name) setTimeout(() => { try { doEnter(); } catch (e) { } }, 200);
+}
 pnameEl.addEventListener('keydown', e => { if (e.key === 'Enter') doEnter(); });
 document.querySelectorAll('#boot .foot a').forEach(a => {
   a.onclick = e => {
@@ -9859,13 +10030,12 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.44 — LAND RUSH', `
-    <p><b>The open country is for sale — stake a claim anywhere in the world around the cities.</b></p>
-    <div class="kv"><span class="k">LAND MODE</span><span class="v">The new parcel button on the bottom bar (or [L]): over buyable ground a golden 30 × 30 m claim preview follows your pointer — click to stake it</span></div>
-    <div class="kv"><span class="k">EVERYWHERE</span><span class="v">Any dry land in the world past the cities, their neighborhoods and woodland belts — off the roads and the water; claims snap to a 30 m survey grid so they tile into fields</span></div>
-    <div class="kv"><span class="k">FARM LEASE</span><span class="v">A local farmer grazes your parcel — daily rent on the same beat as offices and rooms, it counts toward your WORTH, and you can sell it back any time for 60%</span></div>
-    <div class="kv"><span class="k">YOUR ESTATES</span><span class="v">Every parcel wears a staked-field look (straw pad, gold boundary, wooden posts, pennant), the forest never grows a tree inside it, and the Empire panel lists them all with one-tap TELEPORT</span></div>
-    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The title deeds, the inspector, the neighborhoods, the world forest, the deep-blue lakes and the true 1:1 Earth are untouched</span></div>
+  openModal('Welcome to v2.45 — TURBO', `
+    <p><b>New graphics modes — pick how hard the real Earth works your machine.</b></p>
+    <div class="kv"><span class="k">THREE MODES</span><span class="v"><b>HIGH</b> — the full approved look, unchanged · <b>BALANCED</b> — softer shadows and a thinner forest for everyday laptops · <b>CHROMEBOOK</b> — shadows off, light forest, crisp pixels: built for school Chromebooks</span></div>
+    <div class="kv"><span class="k">CHROMEBOOKS AUTO</span><span class="v">A real Chromebook now starts on the CHROMEBOOK coat by itself — the smoothest ride — and says so once; everyone else keeps HIGH until they choose</span></div>
+    <div class="kv"><span class="k">SWITCH ANYTIME</span><span class="v">HELP → GRAPHICS or press [G] — pixel sharpness, shadows and the world forest retune instantly (anti-aliasing finishes with a quick reload), and the choice saves on this device</span></div>
+    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">HIGH is the exact v2.44 look — every tree, every shadow, same pixels — and the 1:1 Earth, cities, title deeds and land claims are untouched</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -9913,7 +10083,7 @@ document.getElementById('bb-next').addEventListener('click', () => {
 });
 
 function openHelp() {
-  openModal('Open World v2.44 — Help', `
+  openModal('Open World v2.45 — Help', `
     <p><b>Controls</b></p>
     <div class="kv"><span class="k">MOVE</span><span class="v g">Tap / click anywhere — your tycoon walks there (the only way they move)</span></div>
     <div class="kv"><span class="k">LOOK AROUND</span><span class="v">Drag or WASD / arrows / joystick to glide the bird\u2019s-eye view across the map — no distance cap, roam the whole Earth; detail streams wherever you look</span></div>
@@ -9926,6 +10096,7 @@ function openHelp() {
     <div class="kv"><span class="k">THE EARTH</span><span class="v">the real planet at TRUE SCALE — 40,007 km around, real distances between cities. Cross continents by orbit flight, search or the world map [M]; sea bridges still span the straits</span></div>
     <div class="kv"><span class="k">EMPIRE</span><span class="v">avatar (top right) → TELEPORT to any plot you own</span></div>
     <div class="kv"><span class="k">BUY LAND</span><span class="v g">Parcel button (or [L]) → LAND MODE: click dry open country past the city belts to stake 30 × 30 m claims — a farmer leases them for daily rent, and they list in your Empire</span></div>
+    <div class="kv"><span class="k">GRAPHICS</span><span class="v g">[G] or the GRAPHICS button — HIGH / BALANCED / CHROMEBOOK modes; real Chromebooks start on CHROMEBOOK automatically</span></div>
     <div class="kv"><span class="k">SERVE</span><span class="v">[E] when standing at your cart</span></div>
     <div class="kv"><span class="k">MARKET</span><span class="v">📈 button · limit &amp; market orders</span></div>
     <p style="margin-top:12px"><b>The loop</b></p>
@@ -9933,10 +10104,12 @@ function openHelp() {
     <p style="font-size:11px;color:var(--dim)">Map data © OpenStreetMap contributors (ODbL). This game runs 100% in your browser; your world saves locally.</p>
     <div style="display:flex;gap:8px;margin-top:14px">
       <button class="btn" id="hp-tut" style="flex:1">REPLAY TUTORIAL</button>
+      <button class="btn" id="hp-gfx" style="flex:1">GRAPHICS</button>
       <button class="btn" id="hp-x" style="flex:1">CLOSE</button>
     </div>`);
   document.getElementById('hp-x').onclick = closeModal;
   document.getElementById('hp-tut').onclick = () => { closeModal(); TUT.restart(); };
+  document.getElementById('hp-gfx').onclick = () => { closeModal(); openGfx(); };   // v2.45
 }
 
 // search box
@@ -10260,6 +10433,7 @@ window.addEventListener('keydown', e => {
   if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;   // v2.06
   if (e.key.toLowerCase() === 'm' && STATE.mode === 'city' && !e.repeat) openBigMap();
   if (e.key.toLowerCase() === 'c' && STATE.mode === 'city' && !e.repeat) recenterOnPlayer();   // v2.17 FIND ME
+  if (e.key.toLowerCase() === 'g' && !e.repeat) openGfx();   // v2.45 TURBO: graphics modes
 });
 
 // ---------------- main loop -------------------------------------------
@@ -10464,9 +10638,13 @@ const WF = (() => {
   const BELT_R = CITY_R + 3300;         // the v2.35 woodland belt owns everything inside this
   const MOB = matchMedia('(pointer:coarse)').matches;
   const MOBF = MOB ? .55 : 1;
-  const BASE_R = MOB ? 750 : 1050;      // matches WORLD.CHUNK_R at street level
-  const MAX_R = MOB ? 1300 : 2000;      // treed zone breathing room with altitude
-  const DISPOSE_R = MAX_R + 450;        // fixed hysteresis — no churn on zoom cycles
+  // v2.45: the treed zone follows the graphics mode (the same zoneR
+  // factor as WORLD's CHUNK_R, so the forest never outruns its ground)
+  // and a density factor rides every stand — applyGfx() re-streams live.
+  let BASE_R = Math.round((MOB ? 750 : 1050) * GFX.q.zoneR);
+  let MAX_R = Math.round((MOB ? 1300 : 2000) * GFX.q.zoneR);
+  let DISPOSE_R = MAX_R + 450;
+  let WF_F = GFX.q.wf;
 
   const chunks = new Map();             // 'cx,cz' -> group | null (null = built empty)
   let queue = [], lastUpd = 0, root = null, trees = 0;
@@ -10581,7 +10759,7 @@ const WF = (() => {
     // real clearings, leaner per-tree geometry keeps ~7k verts a chunk
     const density = .4 + rnd() * .6;     // woodland character: thick woods ↔ open savanna
     const B = GeoB(xm, zm);
-    const stands = Math.max(4, Math.round((14 + rnd() * 10) * density * MOBF));
+    const stands = Math.max(WF_F >= 1 ? 4 : 2, Math.round((14 + rnd() * 10) * density * MOBF * WF_F));
     for (let s = 0; s < stands; s++) {
       const sx = x0 + 40 + rnd() * (CH - 80), sz = z0 + 40 + rnd() * (CH - 80);
       if (nearCity(sx, sz) < BELT_R + 160) continue;   // stand head past the belt edge
@@ -10589,7 +10767,7 @@ const WF = (() => {
       for (let i = 0; i < cnt; i++)
         addTree(B, sx + (rnd() - .5) * 320, sz + (rnd() - .5) * 320, .8 + rnd() * .7, rnd);
     }
-    const fill = Math.round((14 + rnd() * 16) * density * MOBF);
+    const fill = Math.round((14 + rnd() * 16) * density * MOBF * WF_F);
     for (let i = 0; i < fill; i++)
       addTree(B, x0 + rnd() * CH, z0 + rnd() * CH, .6 + rnd() * .6, rnd);
     if (B.count < 6) return;
@@ -10608,6 +10786,16 @@ const WF = (() => {
   function reset() {
     for (const key of [...chunks.keys()]) dispose(key);
     queue = []; trees = 0;
+  }
+
+  // v2.45: live graphics-mode switch — new density and zone radii, then
+  // a clean re-stream on the next ticks (HIGH rebuilds the v2.44 forest)
+  function applyGfx() {
+    WF_F = GFX.q.wf;
+    BASE_R = Math.round((MOB ? 750 : 1050) * GFX.q.zoneR);
+    MAX_R = Math.round((MOB ? 1300 : 2000) * GFX.q.zoneR);
+    DISPOSE_R = MAX_R + 450;
+    reset();
   }
 
   function tick(dt, px, pz, camDist) {
@@ -10661,7 +10849,7 @@ const WF = (() => {
     }
     return { trees, badCity, badWater, badRoad };
   }
-  return { tick, reset, audit, get count() { return chunks.size; }, get meshed() { let n = 0; for (const v of chunks.values()) if (v) n++; return n; }, get trees() { return trees; },
+  return { tick, reset, applyGfx, audit, get count() { return chunks.size; }, get meshed() { let n = 0; for (const v of chunks.values()) if (v) n++; return n; }, get trees() { return trees; },
     // QA: world-frame data of every standing forest chunk (null = built empty)
     get debug() { return [...chunks.entries()].map(([k, g]) => g ? { k, x: g.children[0].position.x, z: g.children[0].position.z, verts: g.children[0].geometry.attributes.position.count } : { k, empty: true }); } };
 })();
@@ -12354,7 +12542,7 @@ WORLD.update = function (dt, px, pz, camDist) {
   return req;
 };
 
-console.log('%cOPEN WORLD v2.44 — LAND RUSH', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.45 — TURBO', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
