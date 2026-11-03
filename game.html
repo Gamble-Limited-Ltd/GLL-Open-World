@@ -3,9 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.41</title>
+<title>Open World — v2.42</title>
 <style>
 /* ==================================================================
+   OPEN WORLD v2.42 — NEIGHBORHOODS: "make houses and neighborhoods
+   around the cities." Every catalog city now wears a suburb ring
+   from its edge out to ~2.4 km: six curved collector rings and
+   sixteen radial lanes (they join the street list before the
+   dry-land clip, so real shorelines trim them like any imported
+   street), house lots along every street — lawns, driveways,
+   porches, gable roofs with dormers and chimneys — merged into
+   city-local meshes. Houses register as buildings, so the v2.41
+   inspector opens them (rooms for houses). The chunk pass's wild
+   content (belt trees, groves, paddocks, rocks, ponds) moves out
+   past the ring, the forest belt's inner edge follows (CITY_R+1900),
+   a lawn-green suburb decal renders under it at every zoom, and
+   LEAVE_DIST lifts to 2900 m so the city + neighborhoods stay
+   standing while you walk them. True 1:1 Earth untouched.
    OPEN WORLD v2.38 — DEEP-BLUE LAKES: the last green-bleed mechanism
    is dead, at every altitude. The land rings are outer-contour only,
    so lake interiors clipped as "land" — the grass shield rendered
@@ -717,7 +731,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.41 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, woodland belts around the cities, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), and the same streets, buildings, plots and roads on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.42 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), and the same streets, buildings, plots and roads on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -753,7 +767,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.41';
+const GAME_VERSION = 'v2.42';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -2302,7 +2316,7 @@ const WORLD = (() => {
   const CH = 500;                    // pasture chunk size (m)
   const CITY_R = 745;                // city import extent radius
   const BUILD_DIST = 950;            // detailed city streams in
-  const LEAVE_DIST = 1250;           // detailed city streams out
+  const LEAVE_DIST = 2900;           // v2.42: streams out past the suburb ring (was 1250)
   // v2.29 REAL JUNCTIONS: inter-city roads end at the first street of
   // the city they serve, not at the anchor. The last TAIL_CAP meters
   // of every land route before each city are a re-trimmable TAIL (a
@@ -3244,8 +3258,11 @@ const WORLD = (() => {
 
     // ---- v2.35: the forest belt -----------------------------------------
     // "trees around the cities in the green pastures". A woodland ring
-    // around EVERY city: polar quads from CITY_R+170 (where pasture
-    // patches stop) out to 3.3 km, dry land only, deep woodland greens,
+    // around EVERY city: polar quads out to 3.3 km, dry land only, deep
+    // woodland greens. v2.42: the belt's inner edge moves from CITY_R+170
+    // to CITY_R+1900 — the neighborhoods (see buildSuburbDecal) own the
+    // ring from CITY_R+120 to CITY_R+1615, and the woods pick up where
+    // the last yard ends,
     // 9.5 mm over the land shield in the city's own anchor-local frame
     // (the exact frame as the fine pad — the 9.5 mm separation is real
     // at any range). This decal renders at EVERY zoom: from orbit the
@@ -3253,7 +3270,7 @@ const WORLD = (() => {
     // 3D trees in the same annulus once you walk its way.
     function buildForestBelt(c) {
       const pos = [], norm = [], colr = [];
-      const R0 = CITY_R + 170, R1 = 3300, BANDS = 9, SECT = 44;
+      const R0 = CITY_R + 1900, R1 = 3300, BANDS = 9, SECT = 44;   // v2.42: past the suburbs
       const greens = [0x3d6f2c, 0x477d34, 0x356226, 0x528a3e];
       const step = (R1 - R0) / BANDS;
       for (let i = 0; i < BANDS; i++) {
@@ -3298,9 +3315,57 @@ const WORLD = (() => {
     // for roads at 9.5 cm, hopeless for the 12 mm city plate — so the
     // plate, the streets and the road junctions ride this pad instead,
     // and the coarse cells under it are dropped to −10 cm (nearCityZone).
+
+    // ---- v2.42: the suburb ground decal ---------------------------------
+    // "houses and neighborhoods around the cities": a residential-green
+    // ring under the neighborhood streets — lighter, lawn-toned greens
+    // (the belt's deep woodland colors start where this ends), mottled
+    // like yards, dry land only, the same anchor-local frame and
+    // renderOrder as the belt. The city plate covers the inner part
+    // while the full city stands; beyond it this is the ground the
+    // houses stand on, and it renders at every zoom like the belt does.
+    function buildSuburbDecal(c) {
+      const pos = [], norm = [], colr = [];
+      const R0 = CITY_R + 120, R1 = CITY_R + 1615, BANDS = 7, SECT = 44;
+      const greens = [0x7cb45e, 0x8ec96a, 0x74b056, 0x86c262];
+      const step = (R1 - R0) / BANDS;
+      for (let i = 0; i < BANDS; i++) {
+        const r0 = R0 + i * step, r1 = r0 + step;
+        for (let j = 0; j < SECT; j++) {
+          const a0 = (j / SECT) * 6.2832 + (i % 2) * .07, a1 = ((j + 1) / SECT) * 6.2832 + (i % 2) * .07;
+          const hv = hashStr(c.key + '/s' + i + '/' + j);
+          const jr0 = r0 + (hv % 90) - 45, jr1 = r1 + (Math.floor(hv / 90) % 90) - 45;
+          if (jr1 - jr0 < 40) continue;
+          const P = [[jr0, a0], [jr1, a0], [jr1, a1], [jr0, a1]].map(([r, a]) => [Math.cos(a) * r, Math.sin(a) * r]);
+          if (LANDGEO.isWaterWorld(c.wx + (P[0][0] + P[2][0]) / 2, c.wz + (P[0][1] + P[2][1]) / 2) ||
+              LANDGEO.isWaterWorld(c.wx + P[0][0], c.wz + P[0][1]) ||
+              LANDGEO.isWaterWorld(c.wx + P[1][0], c.wz + P[1][1]) ||
+              LANDGEO.isWaterWorld(c.wx + P[2][0], c.wz + P[2][1]) ||
+              LANDGEO.isWaterWorld(c.wx + P[3][0], c.wz + P[3][1])) continue;
+          const gc = col(greens[hv % 4]);
+          const f = .94 + (Math.floor(hv / 520) % 12) / 100;
+          for (const k of [0, 1, 2, 0, 2, 3]) {
+            pos.push(P[k][0], .0095, P[k][1]);
+            norm.push(0, 1, 0);
+            colr.push(gc[0] * f, gc[1] * f, gc[2] * f);
+          }
+        }
+      }
+      if (!pos.length) return;
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('normal', new THREE.Float32BufferAttribute(norm, 3));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3));
+      const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true }));
+      m.renderOrder = RO_BELT;   // v2.37 flat-ground ladder — same rung as the belt
+      m.position.set(c.wx, 0, c.wz);   // city-anchor-local: exact depth
+      m.receiveShadow = true;
+      group.add(m);
+    }
     if (LANDGEO.ready) {
       for (const c of CITIES) {
         buildForestBelt(c);
+        buildSuburbDecal(c);   // v2.42: lawn-green ring under the neighborhoods
         const R = 12000, N = 16, T = 2 * R / N;
         const pos = [], norm = [], uv = [], col = [];   // v2.33: landMat is vertex-colored now — pads carry white
         for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
@@ -3936,12 +4001,12 @@ const WORLD = (() => {
       for (let s = 0; s < stands; s++) {
         const sx = x0 + rnd() * CH, sz = z0 + rnd() * CH;
         const sd = distToCity(sx, sz).d;
-        if (sd < CITY_R + 170 || sd > CITY_R + 3300) continue;
+        if (sd < CITY_R + 1900 || sd > CITY_R + 3300) continue;   // v2.42: past the suburbs
         const cnt = 9 + Math.floor(rnd() * 10);
         for (let i = 0; i < cnt; i++) {
           const bx = sx + (rnd() - .5) * 150, bz = sz + (rnd() - .5) * 150;
           const bd = distToCity(bx, bz).d;
-          if (bd > CITY_R + 170 && bd < CITY_R + 3300) addTree(B, bx, bz, .95 + rnd() * .65, rnd);
+          if (bd > CITY_R + 1900 && bd < CITY_R + 3300) addTree(B, bx, bz, .95 + rnd() * .65, rnd);   // v2.42
         }
       }
     }
@@ -3961,7 +4026,7 @@ const WORLD = (() => {
         const w = 60 + rnd() * 90, d = 46 + rnd() * 70;
         const px = x0 + w / 2 + 20 + rnd() * Math.max(10, CH - w - 40);
         const pz = z0 + d / 2 + 20 + rnd() * Math.max(10, CH - d - 40);
-        if (distToCity(px, pz).d > CITY_R + 180 && !nearRoad(px, pz, 26) &&
+        if (distToCity(px, pz).d > CITY_R + 1950 && !nearRoad(px, pz, 26) &&   // v2.42: farms past the suburbs
           !(LANDGEO.ready && (LANDGEO.isWaterWorld(px, pz) ||   // v2.36: whole footprint dry
             LANDGEO.isWaterWorld(px - w / 2, pz - d / 2) || LANDGEO.isWaterWorld(px + w / 2, pz - d / 2) ||
             LANDGEO.isWaterWorld(px - w / 2, pz + d / 2) || LANDGEO.isWaterWorld(px + w / 2, pz + d / 2)))) {
@@ -3971,7 +4036,7 @@ const WORLD = (() => {
       const rocks = Math.floor((2 + rnd() * 6) * mobF);
       for (let i = 0; i < rocks; i++) {
         const rx = x0 + rnd() * CH, rz = z0 + rnd() * CH;
-        if (distToCity(rx, rz).d < CITY_R + 30 || nearRoad(rx, rz, 8)) continue;
+        if (distToCity(rx, rz).d < CITY_R + 1950 || nearRoad(rx, rz, 8)) continue;   // v2.42
         if (LANDGEO.ready && LANDGEO.isWaterWorld(rx, rz)) continue;   // v2.18
         const s = .5 + rnd() * 1.6;
         const g = new THREE.IcosahedronGeometry(s, 0);
@@ -3979,7 +4044,7 @@ const WORLD = (() => {
       }
       if (rnd() < .13) {   // pond
         const px = x0 + 60 + rnd() * (CH - 120), pz = z0 + 60 + rnd() * (CH - 120);
-        if (distToCity(px, pz).d > CITY_R + 60 && !nearRoad(px, pz, 20) &&
+        if (distToCity(px, pz).d > CITY_R + 1950 && !nearRoad(px, pz, 20) &&   // v2.42
           !(LANDGEO.ready && LANDGEO.isWaterWorld(px, pz))) {   // v2.18
           const g = new THREE.CircleGeometry(9 + rnd() * 9, 18); g.rotateX(-Math.PI / 2);
           B.addGeo(g, trs(px, .012, pz, 0, 1, 1, 1), col(0x3479bd));
@@ -3995,7 +4060,9 @@ const WORLD = (() => {
   }
 
   function addTree(B, x, z, s, rnd) {
-    if (distToCity(x, z).d < CITY_R + 60 || nearRoad(x, z, 8)) return;
+    // v2.42: CITY_R+1900 — no wild trees inside the city OR its suburb
+    // ring (yard trees come from the suburb builder instead)
+    if (distToCity(x, z).d < CITY_R + 1900 || nearRoad(x, z, 8)) return;
     if (LANDGEO.ready && LANDGEO.isWaterWorld(x, z)) return;   // v2.18: trees don't grow at sea
     const pine = rnd() < .42;
     const trunk = new THREE.CylinderGeometry(.22 * s, .3 * s, 2.2 * s, 6);
@@ -4532,7 +4599,9 @@ const WORLD = (() => {
     // player: inside a built city's footprint → that city; else → rural)
     const near = distToCity(px, pz);
     let dOwn = activeCity ? Math.hypot(px - activeCity.anchor.x, pz - activeCity.anchor.z) : 1e9;
-    const wantRegion = (activeCity && dOwn <= CITY_R) ? activeCity.key : 'rural';
+    // v2.42: the region holds through the neighborhoods (CITY_R+1615 =
+    // the suburb edge) — carts don't vanish while you walk the burbs
+    const wantRegion = (activeCity && dOwn <= CITY_R + 1615) ? activeCity.key : 'rural';
     if (wantRegion !== curRegion) {
       curRegion = wantRegion;
       req = { type: 'region', region: wantRegion };
@@ -5148,8 +5217,10 @@ const CITY = (() => {
               [ax + px - ox, g1, az + pz - oz], [bx + px - ox, g1, bz + pz - oz],
               [bx + px - ox, g0, bz + pz - oz], [ax + px - ox, g0, az + pz - oz],
               [-onx, 0, -onz], [0, 0], [1, 0], [1, 1], [0, 1], cCurb);
-            // concrete slab seams every 2.3 m across the walk
-            for (let d = 1.2; d < len; d += 2.3) {
+            // concrete slab seams every 2.3 m across the walk — v2.42:
+            // suburb streets skip them (they are ~80% of a street's
+            // geometry; the ring would carry ~470k verts of seams alone)
+            if (!rd.sub) for (let d = 1.2; d < len; d += 2.3) {
               const mx = ax + ux * d + px, mz = az + uz * d + pz;
               rib(walk, mx - ox, mz - oz, mx + ox, mz + oz, .07, .163, cSeam);
             }
@@ -5722,6 +5793,7 @@ const CITY = (() => {
           const off = rd.w / 2 + 3.4;
           const tx = ax + ux * d - uz * off * side, tz = az + uz * d + ux * off * side;
           if (plotAt(tx, tz)) continue;                 // keep trees off purchasable land
+          if (pointInBuilding(tx, tz)) continue;        // v2.42: never inside a house either
           trees.push([tx, tz]);
         }
       }
@@ -5814,7 +5886,7 @@ const CITY = (() => {
     }
   }
 
-  function addTrees(list) {
+  function addTrees(list, host) {   // v2.42: optional host group (suburb LOD)
     if (!list.length) return;
     const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(.22, .3, 2.3, 6),
       new THREE.MeshLambertMaterial({ color: 0x6b4f3a }), list.length);
@@ -5830,7 +5902,7 @@ const CITY = (() => {
     });
     can.castShadow = true;
     trunk.position.set(AX, 0, AZ); can.position.set(AX, 0, AZ);   // v2.27
-    group.add(trunk, can);
+    (host || group).add(trunk, can);
   }
 
   // ---------- street furniture + parked cars ------------------------
@@ -6378,6 +6450,346 @@ const CITY = (() => {
     }
   }
 
+
+  // ---------- v2.42 NEIGHBORHOODS: houses around every city -----------
+  // "Make houses and neighborhoods around the cities." Every catalog
+  // city now wears a suburb ring: six curved collector rings and
+  // sixteen radial lanes from the town edge out to ~2.4 km (they join
+  // the street list before the dry-land clip, so shorelines trim them
+  // like any imported street), and house lots along every street —
+  // bright lawns, driveways, porches, gable roofs with dormers and
+  // chimneys — merged into a handful of city-local meshes, one draw
+  // call each. Every house registers as a building, so the v2.41
+  // inspector opens it too (houses list their ROOMS). The chunk pass's
+  // wild content (belt trees, groves, paddocks, rocks, ponds) moves out
+  // past the ring, so nothing wild grows in the yards.
+  const SUB_R0 = 865, SUB_R1 = 2360;   // the ring (CITY_R 745 + verge → +1615)
+  let suburbRec = null;
+  let suburbGroup = null;              // v2.42: distance-LOD host (houses/trees/cars)
+  const SUB_TREES = ['Maple', 'Oak', 'Cedar', 'Elm', 'Pine', 'Birch', 'Willow', 'Aspen', 'Rowan', 'Poplar', 'Hawthorn', 'Juniper'];
+  const SUB_KINDS = ['Lane', 'Street', 'Drive', 'Court', 'Way', 'Terrace', 'Circle', 'Road'];
+
+  function addSuburbRoads(meta, ax, az) {
+    const rnd = _mulberry(hashStr('sub' + (meta.key || meta.name)));
+    const out = [];
+    const rot = rnd() * 6.2832;                    // the whole ring turns per city
+    // six collector rings (cls 2): polygonal circles, a point every ≤44 m,
+    // radii wobbling ±18 m so no ring ever reads as a perfect circle
+    for (let i = 0; i < 6; i++) {
+      const r = 880 + i * 280 + (rnd() - .5) * 70;
+      const n = Math.max(48, Math.ceil(6.2832 * r / 44));
+      const a0 = rot + i * .22, pts = [];
+      for (let k = 0; k <= n; k++) {
+        const a = a0 + k / n * 6.2832;
+        const rr = r + Math.sin(a * 3 + i * 1.7) * 18;
+        pts.push([ax + Math.cos(a) * rr, az + Math.sin(a) * rr]);
+      }
+      out.push({ pts, w: 11.5, cls: 2, sub: 1,
+        name: (i + 1) + ' ' + SUB_TREES[Math.floor(rnd() * SUB_TREES.length)] + ' Ring' });
+    }
+    // sixteen radial lanes (cls 1), each with its own gentle bow
+    for (let i = 0; i < 16; i++) {
+      const a = rot + i / 16 * 6.2832 + (rnd() - .5) * .06;
+      const bow = (rnd() - .5) * 70;
+      const pts = [];
+      for (let k = 0; k <= 10; k++) {
+        const t = k / 10, r = SUB_R0 + t * (SUB_R1 - SUB_R0);
+        const aa = a + Math.sin(t * 3.1416) * (bow / Math.max(r, 1));
+        pts.push([ax + Math.cos(aa) * r, az + Math.sin(aa) * r]);
+      }
+      out.push({ pts, w: 8.5, cls: 1, sub: 1,
+        name: SUB_TREES[Math.floor(rnd() * SUB_TREES.length)] + ' ' + SUB_KINDS[Math.floor(rnd() * SUB_KINDS.length)] });
+    }
+    return out;
+  }
+
+  function buildSuburbs(city) {
+    suburbRec = { roads: 0, houses: 0, trees: 0, lamps: 0, cars: 0, verts: 0 };
+    const subRoads = roads.filter(r => r.sub);
+    if (!subRoads.length) return;
+    suburbRec.roads = subRoads.length;
+    suburbGroup = new THREE.Group();   // v2.42: gated by view distance (see the WORLD.update wrap)
+    const rnd = _mulberry(hashStr('sb' + (city.key || city.name)));
+    const axc = cityAnchor ? cityAnchor.x : 0, azc = cityAnchor ? cityAnchor.z : 0;
+    const MAXH = isMob ? 420 : (city.tier === 3 ? 950 : city.tier === 1 ? 640 : 820);
+    const wall = { pos: [], norm: [], uv: [], col: [] };   // style-2 punched-residential walls
+    const roof = { pos: [], norm: [], uv: [], col: [] };   // pitches, gables, dormers, chimneys, doors
+    const flat = { pos: [], norm: [], uv: [], col: [] };   // lawns + driveways
+    const trees = [], lamps = [], cars = [];
+    const UP = [0, 1, 0];
+
+    // street-oriented box (5 faces) — porches, dormers, chimneys
+    const boxSub = (cx, cz, y0, y1, hu, hd, colr, ux, uz) => {
+      const px = -uz, pz = ux;
+      const F = (du, dv, y) => [cx + ux * du + px * dv, y, cz + uz * du + pz * dv];
+      pushQuadN(roof, F(hu, hd, y0), F(hu, hd, y1), F(hu, -hd, y1), F(hu, -hd, y0), colr, [ux, 0, uz]);
+      pushQuadN(roof, F(-hu, hd, y0), F(-hu, -hd, y0), F(-hu, -hd, y1), F(-hu, hd, y1), colr, [-ux, 0, -uz]);
+      pushQuadN(roof, F(-hu, hd, y0), F(-hu, hd, y1), F(hu, hd, y1), F(hu, hd, y0), colr, [px, 0, pz]);
+      pushQuadN(roof, F(-hu, -hd, y0), F(hu, -hd, y0), F(hu, -hd, y1), F(-hu, -hd, y1), colr, [-px, 0, -pz]);
+      pushQuadN(roof, F(-hu, hd, y1), F(-hu, -hd, y1), F(hu, -hd, y1), F(hu, hd, y1), colr, [0, 1, 0]);
+    };
+
+    // gable roof along the street axis + chimney + a dormer on the street slope
+    const subRoof = (hx, hz, ux, uz, HW, HD, yTop, tint, shinC, sr, side) => {
+      const px = -uz, pz = ux;
+      const hU = HW / 2 + .38, hV = HD / 2 + .38;
+      const rise = Math.min(2.6, hV * .72);
+      const E = (du, dv) => [hx + ux * du + px * dv, yTop, hz + uz * du + pz * dv];
+      const e1 = E(hU, hV), e2 = E(-hU, hV), e3 = E(-hU, -hV), e4 = E(hU, -hV);
+      const r1 = [hx + ux * hU, yTop + rise, hz + uz * hU], r2 = [hx - ux * hU, yTop + rise, hz - uz * hU];
+      pushQuadN(roof, e1, r1, r2, e2, shinC, [px, .5, pz]);        // +v slope
+      pushQuadN(roof, e3, r2, r1, e4, shinC, [-px, .5, -pz]);      // -v slope
+      pushTri(roof, e1, e4, r1, jit(tint, .93), [ux, .4, uz]);     // gable end walls
+      pushTri(roof, e2, e3, r2, jit(tint, .93), [-ux, .4, -uz]);
+      if (sr() < .6) {                                             // chimney near the ridge
+        const cu = (sr() < .5 ? 1 : -1) * (hU - 1.4) * .62;
+        const chx = hx + ux * cu, chz = hz + uz * cu;
+        boxSub(chx, chz, yTop + rise - .55, yTop + rise + 1.25, .32, .32, jit(colOf(0x8a4a3c), .9 + sr() * .2), ux, uz);
+        pushQuadN(roof, [chx - ux * .36 - px * .36, yTop + rise + 1.25, chz - uz * .36 - pz * .36],
+          [chx + ux * .36 - px * .36, yTop + rise + 1.25, chz + uz * .36 - pz * .36],
+          [chx + ux * .36 + px * .36, yTop + rise + 1.42, chz + uz * .36 + pz * .36],
+          [chx - ux * .36 + px * .36, yTop + rise + 1.42, chz - uz * .36 + pz * .36], colOf(0x3a3a3c), [0, 1, 0]);
+      }
+      if (HW > 10.5 && sr() < .5) {                                // dormer on the street-facing slope
+        const dv = -side * hV * .48;
+        const base = yTop + rise * (1 - Math.abs(dv) / hV) - .22;
+        const dx = hx + px * dv, dz = hz + pz * dv;
+        boxSub(dx, dz, base, base + 1.7, .62, .66, jit(tint, 1), ux, uz);
+        const fx = dx - px * side * .72, fz = dz - pz * side * .72; // downhill face
+        pushQuadN(roof,
+          [fx - ux * .4, base + .35, fz - uz * .4], [fx + ux * .4, base + .35, fz + uz * .4],
+          [fx + ux * .4, base + 1.35, fz + uz * .4], [fx - ux * .4, base + 1.35, fz - uz * .4],
+          colOf(0x2c333d), [-px * side, .25, -pz * side]);
+      }
+    };
+
+    // one perimeter wall band — punched-residential UVs, the city's own math
+    const wallBandSub = (p, yA, yB, tint, uOff, vOff) => {
+      let per = 0;
+      for (let i = 0; i < p.length; i++) {
+        const a = p[i], c2 = p[(i + 1) % p.length];
+        const dx = c2[0] - a[0], dz = c2[1] - a[1], len = Math.hypot(dx, dz);
+        if (len < .05) continue;
+        const nx = dz / len, nz = -dx / len;
+        const u0 = per / WIN + uOff, u1 = (per + len) / WIN + uOff;
+        pushQuad(wall,
+          [a[0], yA, a[1]], [a[0], yB, a[1]], [c2[0], yB, c2[1]], [c2[0], yA, c2[1]],
+          [nx, 0, nz], [u0, vOff], [u0, (yB - yA) / WIN + vOff], [u1, (yB - yA) / WIN + vOff], [u1, vOff], tint);
+        per += len;
+      }
+    };
+
+    // ---- lots along every suburb street -----------------------------
+    let placed = 0;
+    const lotGrid = new Map();                     // 40 m cells → lot rects (overlap guard)
+    const G = 40;
+    const overlaps = (x, z, hw, hd) => {
+      for (let gx = -1; gx <= 1; gx++) for (let gz = -1; gz <= 1; gz++) {
+        const arr = lotGrid.get((Math.floor(x / G) + gx) + ',' + (Math.floor(z / G) + gz));
+        if (!arr) continue;
+        for (const L of arr) if (Math.abs(L[0] - x) < L[2] + hw && Math.abs(L[1] - z) < L[3] + hd) return true;
+      }
+      return false;
+    };
+    // inner streets first, so the house cap fills town-outward
+    const ordered = subRoads.slice().sort((a, b) => {
+      const dOf = rd => { let m = 1e9; for (const p of rd.pts) m = Math.min(m, Math.hypot(p[0] - axc, p[1] - azc)); return m; };
+      return dOf(a) - dOf(b);
+    });
+    for (const rd of ordered) {
+      const LOTW = 21 + rnd() * 6;
+      let arc = 0, next = rnd() * 9;               // cumulative arc walk (buildEdgePlots' pattern)
+      for (let i = 0; i < rd.pts.length - 1 && placed < MAXH; i++) {
+        const A = rd.pts[i], B = rd.pts[i + 1];
+        const segL = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1;
+        const ux = (B[0] - A[0]) / segL, uz = (B[1] - A[1]) / segL;
+        const px = -uz, pz = ux;
+        while (next + LOTW <= arc + segL && placed < MAXH) {
+          const d = next + LOTW / 2 - arc;         // lot center along this segment
+          next += LOTW;
+          for (const side of [1, -1]) {
+            if (placed >= MAXH) break;
+            const rr = Math.hypot(A[0] + ux * d - axc, A[1] + uz * d - azc);
+            const fill = rr < SUB_R0 + 620 ? .92 : rr < SUB_R0 + 1180 ? .7 : .52;
+            if (rnd() > fill) continue;
+            const depth = 26 + rnd() * 8;
+            const off0 = rd.w / 2 + 1.75 + 1.2;    // past the sidewalk
+            const lotHW = LOTW / 2 - .7, lotHD = depth / 2;
+            const ov = off0 + depth / 2;
+            const lx = A[0] + ux * d + px * ov * side, lz = A[1] + uz * d + pz * ov * side;
+            const LP = (u, v) => [A[0] + ux * (d + u) + px * v * side, A[1] + uz * (d + u) + pz * v * side];
+            // dry lot (corners + center) — the v2.19 rule
+            if (LANDGEO.ready) {
+              const cs = [LP(-lotHW, off0), LP(lotHW, off0), LP(-lotHW, off0 + depth), LP(lotHW, off0 + depth), [lx, lz]];
+              if (cs.some(c2 => LANDGEO.isWaterWorld(c2[0], c2[1]))) continue;
+            }
+            // clear of every street's asphalt — crossings stay open
+            const dq = distToRoad(lx, lz);
+            if (dq.rd && dq.d < dq.rd.w / 2 + 4) continue;
+            // no inter-city road under the yard
+            if (WORLD.nearRoad && WORLD.nearRoad(lx, lz, 30)) continue;
+            // no neighbor lot
+            if (overlaps(lx, lz, lotHW, lotHD)) continue;
+            const gkk = Math.floor(lx / G) + ',' + Math.floor(lz / G);
+            if (!lotGrid.has(gkk)) lotGrid.set(gkk, []);
+            lotGrid.get(gkk).push([lx, lz, lotHW, lotHD]);
+            // ---- the house ------------------------------------------
+            const HW = 8.5 + rnd() * 4.5, HD = 6.5 + rnd() * 3;
+            const hh = rnd() < .3 ? 7 + rnd() * .9 : 4.4 + rnd() * 1.5;
+            const back = rnd() * Math.max(2, depth - HD - 8);
+            const hv = off0 + 6.5 + back + HD / 2;
+            const hx = A[0] + ux * d + px * hv * side, hz = A[1] + uz * d + pz * hv * side;
+            const srnd = _mulberry(hashStr('h' + (city.key || 'c') + placed));
+            const tint = jit(colOf(PAL_WARM[Math.floor(srnd() * PAL_WARM.length)]), 1.24 + srnd() * .16);
+            const shinC = jit(colOf(SHINGLES[Math.floor(srnd() * SHINGLES.length)]), .9 + srnd() * .2);
+            const uOff = Math.floor(srnd() * 16), vOff = Math.floor(srnd() * 4);
+            let hp = [
+              [hx - ux * HW / 2 - px * HD / 2, hz - uz * HW / 2 - pz * HD / 2],
+              [hx + ux * HW / 2 - px * HD / 2, hz + uz * HW / 2 - pz * HD / 2],
+              [hx + ux * HW / 2 + px * HD / 2, hz + uz * HW / 2 + pz * HD / 2],
+              [hx - ux * HW / 2 + px * HD / 2, hz - uz * HW / 2 + pz * HD / 2]];
+            if (_polyArea(hp) < 0) hp.reverse();
+            wallBandSub(hp, .15, .15 + hh, tint, uOff, vOff);
+            subRoof(hx, hz, ux, uz, HW, HD, .15 + hh, tint, shinC, srnd, side);
+            // door + porch on the street face
+            const fpx = -px * side, fpz = -pz * side;
+            const doorU = (srnd() - .5) * (HW - 3.2);
+            const dcx = hx + ux * doorU + fpx * (HD / 2 + .04);
+            const dcz = hz + uz * doorU + fpz * (HD / 2 + .04);
+            pushQuad(roof,
+              [dcx - ux * .55, .15, dcz - uz * .55], [dcx - ux * .55, 2.2, dcz - uz * .55],
+              [dcx + ux * .55, 2.2, dcz + uz * .55], [dcx + ux * .55, .15, dcz + uz * .55],
+              [fpx, 0, fpz], [0, 0], [0, 1], [1, 1], [1, 0], jit(colOf(0x5f4632), .9 + srnd() * .25));
+            boxSub(hx + ux * doorU + fpx * (HD / 2 + .8), hz + uz * doorU + fpz * (HD / 2 + .8),
+              .12, .34, 1.5, .8, jit(colOf(0x8f8a80), .95 + srnd() * .12), ux, uz);
+            // driveway: street edge → house wall, clear of the door
+            const drvU = doorU + (doorU < 0 ? 1 : -1) * (HW / 2 - 1.6);
+            const v0 = off0 - .8, v1 = hv - HD / 2 + .8;
+            const drvC = [A[0] + ux * (d + drvU), A[1] + uz * (d + drvU)];
+            const dA = [drvC[0] + px * v1 * side + ux * 1.35, drvC[1] + pz * v1 * side + uz * 1.35];
+            const dB = [drvC[0] + px * v1 * side - ux * 1.35, drvC[1] + pz * v1 * side - uz * 1.35];
+            const dC = [drvC[0] + px * v0 * side - ux * 1.35, drvC[1] + pz * v0 * side - uz * 1.35];
+            const dD = [drvC[0] + px * v0 * side + ux * 1.35, drvC[1] + pz * v0 * side + uz * 1.35];
+            const dcol = jit(colOf(0x9a958a), .93 + srnd() * .12);
+            if (side > 0) pushQuad(flat, [dA[0], .066, dA[1]], [dB[0], .066, dB[1]], [dC[0], .066, dC[1]], [dD[0], .066, dD[1]], UP, [0, 0], [1, 0], [1, 1], [0, 1], dcol);
+            else pushQuad(flat, [dA[0], .066, dA[1]], [dD[0], .066, dD[1]], [dC[0], .066, dC[1]], [dB[0], .066, dB[1]], UP, [0, 0], [1, 0], [1, 1], [0, 1], dcol);
+            // lawn: the whole lot, under everything
+            const lawnC = jit(colOf(0x6cc066), .9 + srnd() * .2);
+            const cA = LP(lotHW, off0 + depth), cB = LP(-lotHW, off0 + depth), cC = LP(-lotHW, off0 - .2), cD = LP(lotHW, off0 - .2);
+            if (side > 0) pushQuad(flat, [cA[0], .07, cA[1]], [cB[0], .07, cB[1]], [cC[0], .07, cC[1]], [cD[0], .07, cD[1]], UP, [0, 0], [1, 0], [1, 1], [0, 1], lawnC);
+            else pushQuad(flat, [cA[0], .07, cA[1]], [cD[0], .07, cD[1]], [cC[0], .07, cC[1]], [cB[0], .07, cB[1]], UP, [0, 0], [1, 0], [1, 1], [0, 1], lawnC);
+            // register: the v2.41 inspector opens houses too (rooms, not floors)
+            buildingPolys.push({ poly: hp, h: hh, bkey: 'sb' + (city.key || 'c') + placed, area: HW * HD, x: hx, z: hz, t: {}, sub: 1 });
+            placed++;
+            // yard trees at the back corners (addTrees' own guards apply)
+            if (srnd() < .6) {
+              const tu = (srnd() < .5 ? 1 : -1) * (lotHW - 2);
+              trees.push(LP(tu, off0 + depth - 3.2));
+              if (srnd() < .35) trees.push(LP(-tu, off0 + depth - 3.2));
+            }
+            // a car in the driveway now and then
+            if (srnd() < .12) {
+              const cv = v0 + 4.4;
+              cars.push([drvC[0] + px * cv * side, drvC[1] + pz * cv * side, Math.atan2(px * side, pz * side), srnd()]);
+            }
+          }
+        }
+        arc += segL;
+      }
+    }
+
+    // ---- ring lamps (own sparse pass; the downtown lamp budget is untouched)
+    for (const rd of subRoads) {
+      if (rd.cls < 2) continue;
+      for (let i = 0; i < rd.pts.length - 1; i++) {
+        const A = rd.pts[i], B = rd.pts[i + 1];
+        const len = Math.hypot(B[0] - A[0], B[1] - A[1]);
+        if (len < 20) continue;
+        const ux = (B[0] - A[0]) / len, uz = (B[1] - A[1]) / len;
+        let side = 1;
+        for (let dd = 14; dd < len - 6; dd += 64) {
+          const off = rd.w / 2 + 2.6;
+          const x = A[0] + ux * dd - uz * off * side, z = A[1] + uz * dd + ux * off * side;
+          const s0 = side; side = -side;
+          if (LANDGEO.ready && LANDGEO.isWaterWorld(x, z)) continue;
+          const tx = uz * s0, tz = -ux * s0;            // toward the road
+          lamps.push([x, z, Math.atan2(-tz, tx)]);
+        }
+      }
+    }
+
+    // ---- assemble: city-local merged meshes, the established pattern --
+    const mkS = (arr, tex, two) => {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(arr.pos, 3));
+      g.setAttribute('normal', new THREE.Float32BufferAttribute(arr.norm, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(arr.uv, 2));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(arr.col, 3));
+      const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial(
+        tex ? { map: tex, vertexColors: true } : { vertexColors: true, side: two ? THREE.DoubleSide : THREE.FrontSide }));
+      m.position.set(AX, 0, AZ);   // v2.27: city-local geometry
+      return m;
+    };
+    if (wall.pos.length) { const m = mkS(wall, getWinTex(2)); m.castShadow = true; m.receiveShadow = true; suburbGroup.add(m); }
+    if (roof.pos.length) { const m = mkS(roof, null); m.castShadow = true; suburbGroup.add(m); }
+    if (flat.pos.length) { const m = mkS(flat, null, true); m.receiveShadow = true; group.add(m); }   // lawns/drives: always on (flat + cheap — the pattern from above)
+    suburbRec.verts = (wall.pos.length + roof.pos.length + flat.pos.length) / 3 | 0;
+    // yard trees — the city's own instancing pass, inside the LOD group
+    if (trees.length) { addTrees(trees, suburbGroup); suburbRec.trees = trees.length; }
+    if (lamps.length) {
+      const n = Math.min(lamps.length, Math.floor(isMob ? 140 : 240));
+      const poleM = new THREE.MeshLambertMaterial({ color: 0x363b41 });
+      const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(.06, .09, 5.6, 7), poleM, n);
+      const arm = new THREE.InstancedMesh(new THREE.BoxGeometry(.95, .08, .08), poleM, n);
+      const head = new THREE.InstancedMesh(new THREE.BoxGeometry(.6, .15, .22),
+        new THREE.MeshLambertMaterial({ color: 0xf2f4e6, emissive: 0x55523c }), n);
+      const mat4 = new THREE.Matrix4(), q = new THREE.Quaternion(), Yv = new THREE.Vector3(0, 1, 0), sv = new THREE.Vector3(1, 1, 1);
+      for (let i = 0; i < n; i++) {
+        const [x, z, th] = lamps[i];
+        const cs = Math.cos(th), sn = Math.sin(th);
+        q.setFromAxisAngle(Yv, th);
+        mat4.compose(new THREE.Vector3(x - AX, 2.96, z - AZ), q, sv); pole.setMatrixAt(i, mat4);
+        mat4.compose(new THREE.Vector3(x + .45 * cs - AX, 5.51, z - .45 * sn - AZ), q, sv); arm.setMatrixAt(i, mat4);
+        mat4.compose(new THREE.Vector3(x + .86 * cs - AX, 5.44, z - .86 * sn - AZ), q, sv); head.setMatrixAt(i, mat4);
+      }
+      pole.position.set(AX, 0, AZ); arm.position.set(AX, 0, AZ); head.position.set(AX, 0, AZ);
+      suburbGroup.add(pole, arm, head);
+      suburbRec.lamps = n;
+    }
+    if (cars.length) {
+      const n = Math.min(cars.length, isMob ? 36 : 70);
+      const bodyGeo = new THREE.BoxGeometry(4.05, 1.0, 1.76); bodyGeo.translate(0, .58, 0);
+      const cabGeo = new THREE.BoxGeometry(2.35, .66, 1.5); cabGeo.translate(-.26, 1.36, 0);
+      const whGeo = new THREE.CylinderGeometry(.3, .3, .2, 10); whGeo.rotateZ(Math.PI / 2);
+      const body = new THREE.InstancedMesh(bodyGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }), n);
+      const cab = new THREE.InstancedMesh(cabGeo, new THREE.MeshLambertMaterial({ color: 0x15181d }), n);
+      const wheels = new THREE.InstancedMesh(whGeo, new THREE.MeshLambertMaterial({ color: 0x1d2024 }), n * 4);
+      const CARP = [0xe8e8e6, 0xb9bdc1, 0x2e3134, 0x6f7479, 0x9e3b33, 0x39527a, 0x4a5560];
+      const mat4 = new THREE.Matrix4(), rot = new THREE.Matrix4(), loc = new THREE.Matrix4();
+      const cc = new THREE.Color();
+      for (let i = 0; i < n; i++) {
+        const [x, z, th, r4] = cars[i];
+        rot.makeRotationY(th);
+        mat4.copy(rot); mat4.setPosition(x - AX, 0, z - AZ);
+        body.setMatrixAt(i, mat4);
+        cab.setMatrixAt(i, mat4);
+        body.setColorAt(i, cc.set(CARP[Math.floor(r4 * CARP.length) % CARP.length]));
+        for (let w = 0; w < 4; w++) {
+          loc.makeTranslation(w < 2 ? 1.32 : -1.32, .3, w % 2 ? .79 : -.79);
+          wheels.setMatrixAt(i * 4 + w, new THREE.Matrix4().multiplyMatrices(mat4, loc));
+        }
+      }
+      body.castShadow = true;
+      body.position.set(AX, 0, AZ); cab.position.set(AX, 0, AZ); wheels.position.set(AX, 0, AZ);
+      suburbGroup.add(body, cab, wheels);
+      suburbRec.cars = n;
+    }
+    group.add(suburbGroup);
+    // rebuild the hashes — houses are buildings now (clicks, trees, props)
+    buildSpatialHash();
+    suburbRec.houses = placed;
+  }
+
   // a barn (or two) set back off a country road — walls join the collision
   // footprint so you can't walk through them
   function buildPastureBarns(city) {
@@ -6701,6 +7113,13 @@ const CITY = (() => {
     group = new THREE.Group();
     const shift = pts => pts.map(p => [p[0] + ax, p[1] + az]);
     roads = cityData.roads.map(r => ({ ...r, pts: shift(r.pts) }));
+    // v2.42 NEIGHBORHOODS: the suburb ring streets join the street list
+    // BEFORE the dry-land clip below, so a shoreline trims them exactly
+    // like any imported street (a ring crossing a bay comes back as dry
+    // arcs, the asphalt pulled back from the waterline).
+    if (!cityData.pasture) {
+      try { roads.push(...addSuburbRoads(cityMeta, ax, az)); } catch (e) { console.error('[suburbroads]', e); }
+    }
     buildingPolys = (cityData.buildings || []).map(b => ({ ...b, poly: shift(b.poly) }));
     let greensShift = (cityData.greens || []).map(g => ({ ...g, poly: shift(g.poly) }));
     const watersShift = (cityData.waters || []).map(g => ({ ...g, poly: shift(g.poly) }));
@@ -6835,6 +7254,11 @@ const CITY = (() => {
     buildBuildings(shifted);
     onStatus && onStatus('Marking real estate…'); await _tick();
     buildPlots(shifted);          // before greens/props → trees & cars can avoid plots
+    // v2.42: houses + neighborhoods around the city. Runs AFTER 'Marking
+    // real estate…' on purpose — the v2.40/41 shell-capture window closes
+    // on that status, so these meshes never receive the dollhouse planes.
+    onStatus && onStatus('Building the neighborhoods…'); await _tick();
+    buildSuburbs(shifted);        // houses register as buildings; hash rebuilt inside
     onStatus && onStatus('Planting parks…'); await _tick();
     buildGreensWater(shifted);
     onStatus && onStatus('Parking cars & street furniture…'); await _tick();
@@ -6859,6 +7283,7 @@ const CITY = (() => {
     }
     group = null; roads = []; plotRecs = []; suites = []; buildingPolys = []; benchScratch = []; pitchedRects = []; bHash = rHash = null; treeList = []; treeStats = null;
     gates = [];   // v2.14
+    suburbRec = null; suburbGroup = null;   // v2.42
     cityRec = null; cityAnchor = null;   // v2.15: no stale city state after dispose
   }
   let _winMat = null;
@@ -6925,6 +7350,8 @@ const CITY = (() => {
     get rec() { return cityRec; },
     get anchor() { return cityAnchor; },
     get buildingPolys() { return buildingPolys; },   // v2.21: world-space, water-filtered — the dense-core spawn reads this
+    get suburb() { return suburbRec; },              // v2.42: the neighborhood census (houses/verts/trees…)
+    get suburbGroup() { return suburbGroup; },       // v2.42: distance-LOD host
   };
 })();
 
@@ -9418,13 +9845,13 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.41 — FLOOR PLAN', `
-    <p><b>Click any building and pick what you want to see inside it.</b></p>
-    <div class="kv"><span class="k">CLICK TO INSPECT</span><span class="v">The dollhouse no longer waits for you to stand next to it — click a building (wall, window or rooftop) and it opens on the spot with an inspector panel beside it</span></div>
-    <div class="kv"><span class="k">PICK A FLOOR</span><span class="v">Big buildings list every floor — choose one and the storeys above lift away, leaving that floor's furnished rooms open to the sky; the camera glides level with your pick</span></div>
-    <div class="kv"><span class="k">PICK A ROOM</span><span class="v">Houses and small buildings list their rooms by name — Living Room, Kitchen, Bedroom, Stock Room… — and the room you pick glows on the floor</span></div>
-    <div class="kv"><span class="k">SUITES RIDE ALONG</span><span class="v">Leasable towers open the same inspector, with their LEASE SUITE button right in the panel; ✕ or ESC closes it</span></div>
-    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The world forest, the deep-blue lakes, the 23,000 km whole-world zoom and the true 1:1 Earth are untouched</span></div>
+  openModal('Welcome to v2.42 — NEIGHBORHOODS', `
+    <p><b>Every city now wears a ring of real neighborhoods.</b></p>
+    <div class="kv"><span class="k">HOUSES AROUND TOWN</span><span class="v">Six curved ring roads and sixteen tree-named lanes (Maple Lane, Oak Street…) fill the green belt around every city with houses — bright lawns, driveways, porches, gable roofs with dormers and chimneys</span></div>
+    <div class="kv"><span class="k">THEY'RE REAL BUILDINGS</span><span class="v">Click any house and the v2.41 inspector opens it like any other building — houses list their rooms by name, and the room you pick glows</span></div>
+    <div class="kv"><span class="k">WALK THE STREETS</span><span class="v">Sidewalks, street trees, ring lamps, parked cars in driveways and neighbors out walking — the city now stays standing while you explore its neighborhoods, and the woodland belt picks up where the last yard ends</span></div>
+    <div class="kv"><span class="k">DRY LAND ONLY</span><span class="v">Streets, lawns and houses stop at every real shoreline — a ring crossing a bay comes back as dry arcs, exactly like the city streets do</span></div>
+    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The click-to-inspect floors and rooms, the world forest, the deep-blue lakes, the 23,000 km whole-world zoom and the true 1:1 Earth are untouched</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -10386,6 +10813,29 @@ const OH = (() => {
           }
           attachPlanes();
         }
+        // v2.42: at 'Planting parks…' the NEIGHBORHOOD shells join the
+        // clip rig so a clicked house slices open exactly like a
+        // downtown building. The suburb meshes live in their own
+        // distance-LOD group, so the add-hook above never sees them —
+        // a deduped traverse collects them here (castShadow Lambert
+        // meshes only: downtown shells, suburb walls + roofs; lawns,
+        // instanced trees/lamps/cars stay out, exactly like downtown).
+        // Idle planes park at 1e9 = clip nothing; clipIntersection=true
+        // keeps every other building whole.
+        else if (/^Planting/.test(s)) {
+          win = false;
+          if (CITY.group) {
+            try {
+              const seen = new Set(shellMeshes);
+              CITY.group.traverse(o => {
+                if (o !== CITY.group && o.isMesh && !o.isInstancedMesh && o.castShadow &&
+                  o.material && !Array.isArray(o.material) && o.material.isMeshLambertMaterial &&
+                  !seen.has(o)) { shellMeshes.push(o); seen.add(o); }
+              });
+            } catch (e) { }
+          }
+          attachPlanes();
+        }
       } catch (e) { }
       return st(s);
     } : null;
@@ -11011,7 +11461,26 @@ clickPick = function (cx, cy) {
   return __ohClickPick(cx, cy);
 };
 
-console.log('%cOPEN WORLD v2.41 — FLOOR PLAN', 'color:#38BDF8;font-weight:700', 'ready.');
+// v2.42 ADDITIVE hook — the suburb distance LOD: past ~1 km of view
+// distance the house/tree/car meshes of the neighborhoods hide (they
+// are sub-5px specks up there; the streets, lawns and the suburb decal
+// keep the neighborhood pattern legible from altitude, and the shadow
+// pass skips them too). Same wrap pattern as the forest and openhouse
+// ticks before it — the original update runs untouched.
+const __nbOrigUpdate = WORLD.update.bind(WORLD);
+WORLD.update = function (dt, px, pz, camDist) {
+  const req = __nbOrigUpdate(dt, px, pz, camDist);
+  try {
+    const g = CITY.suburbGroup;
+    if (g) {
+      const vis = camDist < 1000;
+      if (g.visible !== vis) g.visible = vis;
+    }
+  } catch (e) { }
+  return req;
+};
+
+console.log('%cOPEN WORLD v2.42 — NEIGHBORHOODS', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
