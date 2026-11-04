@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.44</title>
+<title>Open World — v2.45</title>
 <style>
 /* ==================================================================
    OPEN WORLD v2.42 — NEIGHBORHOODS: "make houses and neighborhoods
@@ -731,7 +731,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.44 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), every one of those rooms and floors for sale or for rent (buy it outright — yours forever, tenants pay you daily — or rent it with a two-day deposit; your holdings glow gold and pay you every day), a patchwork of buyable farm parcels over every mile of open country around the cities (rectangles of all shapes and sizes in every shade of green like a satellite view — hover one for its price, click to buy it, and the tenant farmers pay you daily), and the same streets, buildings, plots and roads on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.45 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), every one of those rooms and floors for sale or for rent (buy it outright — yours forever, tenants pay you daily — or rent it with a two-day deposit; your holdings glow gold and pay you every day), a patchwork of buyable farm parcels over every mile of open country around the cities (rectangles of all shapes and sizes in every shade of green like a satellite view — hover one for its price, click to buy it, and the tenant farmers pay you daily), and machines you install inside the rooms and floors you own (six kinds from a vending machine to a server rack — click a spot in your own space to set each one down, and every machine pays you every day), and the same streets, buildings, plots and roads on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -767,7 +767,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.44';
+const GAME_VERSION = 'v2.45';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -1212,7 +1212,8 @@ function saveGame() {
         crew: (p.crew || []).map(c => ({ name: c.name, stars: c.stars })),
       })),
       offices: STATE.offices.map(o => ({ id: o.id, cityKey: o.cityKey, bkey: o.bkey, name: o.name, sqm: o.sqm, rate: o.rate })),
-      rooms: (STATE.rooms || []).map(r => ({ id: r.id, cityKey: r.cityKey, cityName: r.cityName || null, bkey: r.bkey, kind: r.kind, index: r.index, name: r.name, area: r.area, rate: r.rate, mode: r.mode, price: r.price, x: r.x, z: r.z })),   // v2.43 TITLE DEEDS (optional field — older builds ignore it)
+      rooms: (STATE.rooms || []).map(r => ({ id: r.id, cityKey: r.cityKey, cityName: r.cityName || null, bkey: r.bkey, kind: r.kind, index: r.index, name: r.name, area: r.area, rate: r.rate, mode: r.mode, price: r.price, x: r.x, z: r.z,
+        machines: (r.machines || []).map(m => ({ t: m.t | 0, x: +(+m.x || 0).toFixed(2), z: +(+m.z || 0).toFixed(2), fl: m.fl | 0 })) })),   // v2.43 TITLE DEEDS + v2.45 MACHINES (optional fields — older builds ignore them)
       acres: (STATE.acres || []).map(a => ({ id: a.id, name: a.name, ha: +a.ha || 0, price: +a.price || 0, rate: +a.rate || 0, x: +a.x || 0, z: +a.z || 0, near: a.near || null, nearKey: a.nearKey || null })),   // v2.44 PATCHWORK (optional field — older builds ignore it)
       market: STATE.market ? STATE.market.pack() : null,
     };
@@ -1285,7 +1286,10 @@ function loadGame() {
       .map(a => ({ id: a.id, name: a.name || 'Farm parcel', ha: +a.ha || 0, price: +a.price || 0, rate: +a.rate || 0, x: +a.x || 0, z: +a.z || 0, near: a.near || null, nearKey: a.nearKey || null }));
     STATE.rooms = (p.rooms || []).filter(r => r && (r.kind === 'floor' || r.kind === 'room') &&
       (r.mode === 'owned' || r.mode === 'rented') && r.bkey !== undefined && typeof r.index === 'number')
-      .map(r => ({ id: r.id, cityKey: r.cityKey, cityName: r.cityName || null, bkey: r.bkey, kind: r.kind, index: r.index, name: r.name || r.kind, area: +r.area || 0, rate: +r.rate || 0, mode: r.mode, price: +r.price || 0, x: +r.x || 0, z: +r.z || 0 }));
+      .map(r => ({ id: r.id, cityKey: r.cityKey, cityName: r.cityName || null, bkey: r.bkey, kind: r.kind, index: r.index, name: r.name || r.kind, area: +r.area || 0, rate: +r.rate || 0, mode: r.mode, price: +r.price || 0, x: +r.x || 0, z: +r.z || 0,
+        // v2.45 MACHINES: the machines installed in that unit (absent on older saves)
+        machines: (Array.isArray(r.machines) ? r.machines : []).filter(m => m && m.t >= 0 && m.t < 6 && isFinite(+m.x) && isFinite(+m.z)).slice(0, 16)
+          .map(m => ({ t: m.t | 0, x: +(+m.x || 0).toFixed(2), z: +(+m.z || 0).toFixed(2), fl: m.fl | 0 })) }));
     STATE.marketPack = p.market || null;
     // v2.05 starter guide: fresh players start at step 0; returning
     // players who already own a business are exempt
@@ -9857,13 +9861,13 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.44 — PATCHWORK', `
-    <p><b>The open country around every city is now a patchwork of buyable farm parcels.</b></p>
-    <div class="kv"><span class="k">THE QUILT</span><span class="v">Fields of all shapes and sizes — green rectangles in every shade, divided by hedge lines, with plough stripes and the odd harvested tan — tile every mile of land past the suburbs, like a satellite view of farm country</span></div>
-    <div class="kv"><span class="k">BUY ANY SQUARE</span><span class="v">Zoom out past ~300 m and the whole quilt becomes a land catalog: hover any field for its size and price, click to buy it — or walk up to a FOR SALE signpost at street level and click that</span></div>
-    <div class="kv"><span class="k">TENANT FARMERS</span><span class="v">An owned field pays rent every day, its hedge border turns GOLD, the sign goes away, and it lists in your Empire panel with one-tap TELEPORT — sell it back any time for 60%</span></div>
-    <div class="kv"><span class="k">EVERYWHERE</span><span class="v">The quilt streams around you wherever you roam on dry land — never inside a city or its neighborhoods, never on the roads, never in the water</span></div>
-    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The title deeds, the inspector, the neighborhoods, the world forest, the deep-blue lakes, the 23,000 km whole-world zoom and the true 1:1 Earth are untouched</span></div>
+  openModal('Welcome to v2.45 — MACHINES', `
+    <p><b>Fill the rooms and floors you own with money-making machines.</b></p>
+    <div class="kv"><span class="k">THE SHOP</span><span class="v">Pick a floor or room you own or rent in the building inspector and hit INSTALL MACHINES — six machines, from a $2,400 Vending Machine to a $52,000 Server Rack</span></div>
+    <div class="kv"><span class="k">PLACE THEM YOURSELF</span><span class="v">A ghost box follows your cursor on your floor — green where it fits, red where it doesn't — and a click sets the machine down right there. Keep clicking to fill the space; DONE or ESC finishes</span></div>
+    <div class="kv"><span class="k">THEY WORK EVERY DAY</span><span class="v">Every machine pays its keep daily (a vending machine $52, a server rack $1,150) on the same beat as your rent — a little work light blinks on top while it runs</span></div>
+    <div class="kv"><span class="k">TRADE UP OR DOWN</span><span class="v">Sell any machine back for 60% from the same shop; your Empire panel counts them per deed, and machines count toward your net worth</span></div>
+    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The patchwork parcels, the title deeds, the inspector, the neighborhoods, the world forest, the deep-blue lakes, the 23,000 km zoom and the true 1:1 Earth are untouched</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -9881,7 +9885,7 @@ document.getElementById('b-build').addEventListener('click', () => {
     <p>Everything starts on the ground — city sidewalks or open country:</p>
     <div class="kv"><span class="k">GREEN $ SPOTS</span><span class="v">Click to buy — sidewalk spots in cities, roadside plots in the wild</span></div>
     <div class="kv"><span class="k">YOUR PLOT</span><span class="v">Click again → park a food cart</span></div>
-    <div class="kv"><span class="k">BUILDINGS</span><span class="v">Click any building to open it and pick a floor or a room — then <b>BUY</b> it outright or <b>RENT</b> it from the panel (your holdings pay you daily); leasable towers keep their LEASE SUITE button</span></div>
+    <div class="kv"><span class="k">BUILDINGS</span><span class="v">Click any building to open it and pick a floor or a room — then <b>BUY</b> it outright or <b>RENT</b> it from the panel (your holdings pay you daily); in your own rooms and floors hit <b>INSTALL MACHINES</b> and click a spot to set them down — every machine earns daily; leasable towers keep their LEASE SUITE button</span></div>
     <div class="kv"><span class="k">FARMLAND</span><span class="v">The open country around every city is a patchwork of buyable farm parcels — zoom out and click any field (or walk up to a FOR SALE sign); your fields pay rent every day</span></div>
     <div class="kv"><span class="k">CARTS</span><span class="v">Stand close → [E] to serve the queue</span></div>
     <div class="kv"><span class="k">CREWS</span><span class="v">Business panel → hire star vendors</span></div>
@@ -9991,7 +9995,8 @@ function buildTicker() {
       `<span class="tk"><span class="s">${s.sym}</span><span class="p">$${s.price.toFixed(2)}</span><span class="${s.chg >= 0 ? 'up' : 'dn'}">${s.chg >= 0 ? '▲' : '▼'}${Math.abs(s.chg).toFixed(1)}%</span></span>`).join('');
     const worth = STATE.money + STATE.offices.reduce((s2, o) => s2 + o.rate * 8, 0)
       + (STATE.rooms || []).reduce((s2, r) => s2 + (r.mode === 'owned' ? r.price : 0), 0)
-      + (STATE.acres || []).reduce((s2, a) => s2 + a.price, 0);   // v2.44: owned farmland counts at purchase price
+      + (STATE.acres || []).reduce((s2, a) => s2 + a.price, 0)
+      + (window.MACH ? MACH.valueOfRooms() : 0);   // v2.44: owned farmland counts at purchase price · v2.45: machines too
     track.innerHTML = items +
       `<span class="tk"><span class="s g">GDP</span><span class="p">${fmtK(STATE.gdp)}</span><span class="up">▲</span></span>` +
       `<span class="tk"><span class="s o">WORTH</span><span class="p">${fmtK(worth)}</span></span>` +
@@ -11225,12 +11230,12 @@ const OH = (() => {
         new THREE.PlaneGeometry(x1 - x0, z1 - z0),
         new THREE.MeshBasicMaterial({ color: qC, transparent: true, opacity: .3, depthWrite: false, side: THREE.DoubleSide }));
       quad.rotation.x = -Math.PI / 2;
-      quad.position.set((x0 + x1) / 2 - anchor.x, y, (z0 + z1) / 2 - anchor.z);
+      quad.position.set((x0 + x1) / 2, y, (z0 + z1) / 2);   // v2.45 fix: CITY.group is at the origin — world coords directly (the glow rendered off-screen since v2.41)
       quad.renderOrder = 2;
       const box = new THREE.LineSegments(
         new THREE.EdgesGeometry(new THREE.BoxGeometry(x1 - x0, PART_H, z1 - z0)),
         new THREE.LineBasicMaterial({ color: bC, transparent: true, opacity: .85 }));
-      box.position.set((x0 + x1) / 2 - anchor.x, y + PART_H / 2, (z0 + z1) / 2 - anchor.z);
+      box.position.set((x0 + x1) / 2, y + PART_H / 2, (z0 + z1) / 2);   // v2.45 fix: same — the outline joins its room
       CITY.group.add(quad); CITY.group.add(box);
       hl = { quad, box };
     } catch (er) { }
@@ -11656,13 +11661,16 @@ const PROP = (() => {
   }
   function mineHTML(o, name) {
     const inc = incOf(o);
+    const mn = (o.machines || []).length, mi = (window.MACH ? MACH.incOfDay(o) : 0);   // v2.45 MACHINES
     return '<div id="ohp-dl" style="color:' + (o.mode === 'owned' ? '#f5cc74' : '#7ee2a8') + '">' +
       name.toUpperCase() + ' \u2014 ' + (o.mode === 'owned' ? 'YOU OWN IT' : 'RENTED BY YOU') + '</div>' +
       '<div class="ohp-kv"><span>Income</span><b style="color:#48BB78">+$' + inc + '/day</b></div>' +
       (o.mode === 'owned'
         ? '<div class="ohp-kv"><span>Resale value</span><b>' + fmt$(Math.round(o.price * SELL_BACK)) + '</b></div>'
         : '<div class="ohp-kv"><span>Lease rate</span><b>$' + o.rate + '/day</b></div>') +
-      '<button class="btn" data-pd="man">' + (o.mode === 'owned' ? 'MANAGE PROPERTY' : 'MANAGE LEASE') + '</button>';
+      '<div class="ohp-kv"><span>Machines</span><b>' + (mn ? mn + ' installed \u00b7 <span style="color:#48BB78">+$' + mi + '/day</span>' : 'none yet') + '</b></div>' +   // v2.45
+      '<button class="btn" data-pd="man">' + (o.mode === 'owned' ? 'MANAGE PROPERTY' : 'MANAGE LEASE') + '</button>' +
+      '<button class="btn good" data-pd="mach">' + (mn ? 'MANAGE MACHINES \u00b7 ' + mn : 'INSTALL MACHINES') + '</button>';   // v2.45
   }
   function dealInto(el, b, L, sel) {
     if (!el || !b || !L) return;
@@ -11693,6 +11701,8 @@ const PROP = (() => {
     if (buy) buy.onclick = () => openDeal(b, L, kind, index, 'buy');
     if (rent) rent.onclick = () => openDeal(b, L, kind, index, 'rent');
     if (man) man.onclick = () => { const o = kind != null ? status(b.bkey, kind, index) : null; if (o) openManage(o); };
+    const mach = el.querySelector('[data-pd="mach"]');   // v2.45 MACHINES: the machine shop on your own unit
+    if (mach) mach.onclick = () => { if (window.MACH) { try { MACH.openShop(b.bkey, kind, index); } catch (er) { } } };
   }
 
   // ---- the deal modal (the game's own modal engine) ------------------
@@ -11747,9 +11757,11 @@ const PROP = (() => {
       <div class="kv"><span class="k">CITY</span><span class="v">${o.cityName || o.cityKey}</span></div>
       <div class="kv"><span class="k">SIZE</span><span class="v">${o.area} m\u00b2</span></div>
       <div class="kv"><span class="k">RATE</span><span class="v g">$${o.rate}.00 /day</span></div>
+      <div class="kv"><span class="k">MACHINES</span><span class="v">${(o.machines || []).length} installed \u00b7 +$${(window.MACH ? MACH.incOfDay(o) : 0)}/day</span></div>   <!-- v2.45 -->
       ${o.mode === 'owned' ? '<div class="kv"><span class="k">RESALE VALUE</span><span class="v">' + fmt$(Math.round(o.price * SELL_BACK)) + '</span></div>' : ''}
       <div style="display:flex;gap:8px;margin-top:16px">
         <button class="btn bad" id="pm-end" style="flex:1">${o.mode === 'owned' ? 'SELL \u2014 ' + fmt$(Math.round(o.price * SELL_BACK)) : 'END LEASE'}</button>
+        <button class="btn primary" id="pm-mach">MACHINES</button>   <!-- v2.45 -->
         <button class="btn" id="pm-x">CLOSE</button>
       </div>`);
     document.getElementById('pm-end').onclick = () => {
@@ -11762,6 +11774,8 @@ const PROP = (() => {
       closeModal();
       try { OH.refresh(); } catch (e) { }
     };
+    const pmm = document.getElementById('pm-mach');   // v2.45 MACHINES: open the shop for this holding
+    if (pmm) pmm.onclick = () => { if (window.MACH) { try { closeModal(); MACH.openShopFor(o); } catch (er) { } } };
     document.getElementById('pm-x').onclick = closeModal;
   }
 
@@ -11775,11 +11789,12 @@ const PROP = (() => {
     const R = STATE.rooms || [];
     const rows = R.map((r, i) => {
       const local = here === r.cityKey && STATE.mode === 'city';
+      const mn = (r.machines || []).length;   // v2.45 MACHINES
       return '<div class="kv"><span class="k">' + r.name + ' \u00b7 ' + (r.cityName || r.cityKey) +
-        ' \u00b7 ' + (r.mode === 'owned' ? 'OWNED' : 'RENTED') + ' \u00b7 $' + incOf(r) + '/day</span>' +
+        ' \u00b7 ' + (r.mode === 'owned' ? 'OWNED' : 'RENTED') + ' \u00b7 $' + (incOf(r) + (window.MACH ? MACH.incOfDay(r) : 0)) + '/day' + (mn ? ' \u00b7 ' + mn + ' mach' : '') + '</span>' +
         '<button class="tpbtn" data-pr="' + i + '">' + (local ? 'TELEPORT' : 'TRAVEL') + '</button></div>';
     }).join('');
-    const inc = R.reduce((s, r) => s + incOf(r), 0);
+    const inc = R.reduce((s, r) => s + incOf(r) + (window.MACH ? MACH.incOfDay(r) : 0), 0);
     const html = '<div class="msec" style="margin-top:14px">Rooms &amp; floors \u2014 your title deeds</div>' +
       (rows || '<p>No rooms or floors yet. Click any building or house, pick a floor or a room, then <b>BUY</b> or <b>RENT</b> it from the panel.</p>') +
       (rows ? '<div class="kv" style="margin-top:10px"><span class="k">PROPERTY INCOME</span><span class="v g">+$' + (inc / 90 * 60).toFixed(2) + '/min</span></div>' : '');
@@ -12540,7 +12555,496 @@ WORLD.update = function (dt, px, pz, camDist) {
   return req;
 };
 
-console.log('%cOPEN WORLD v2.44 — PATCHWORK', 'color:#38BDF8;font-weight:700', 'ready.');
+// ======== section: 49_machines.js ========
+// ====================================================================
+// v2.45 — MACHINES. The ask: "I want people to be able to put machines
+// inside their rooms or floors." It builds straight on the v2.43 TITLE
+// DEEDS: every unit you own or rent (a floor of a big building, a named
+// room of a house or small shop) can now be filled with working
+// machines — you buy them in the MACHINE SHOP and set them down
+// YOURSELF, click by click, wherever you like inside your space:
+//   - the deal block of a unit you hold gains an INSTALL MACHINES
+//     button -> the shop modal (the game's own modal engine) lists six
+//     machines, from a $2,400 Vending Machine to a $52,000 Server Rack,
+//     each earning every day (payback ~45 days, so machines are the
+//     strong play once you hold property);
+//   - INSTALL switches to placement mode: a translucent ghost box
+//     follows your cursor on your unit's floor — green where it fits
+//     (inside your room / floor, clear of walls and other machines),
+//     red where it doesn't — and a click sets the real machine down
+//     right there. Keep clicking to fill the space; DONE / ESC ends.
+//     Machines never overlap (0.8 m clearance) and respect a per-unit
+//     cap from the unit's area (1 per 6 m², 16 max);
+//   - in the world every machine is a real little 3D prop — body, top
+//     and a blinking work light — visible whenever its building is
+//     inspected (and only on the picked floor of a big building,
+//     exactly like the dollhouse interior itself);
+//   - income accrues on the same beat as the title deeds ($inc per 90 s
+//     game-day) through the established additive WORLD.update wrap
+//     chain, the WORTH ticker counts machines at purchase price, the
+//     Empire panel's deed rows count machines and include their income,
+//     the MANAGE modal shows the machine line, and any machine sells
+//     back for 60% from the same shop;
+//   - machines persist in the save as a `machines` array on each rooms
+//     entry (pack stays v5 — optional nested field; older builds and
+//     older saves simply ignore it).
+// Touchpoints outside this section (each annotated "v2.45"): saveGame/
+// loadGame machine lists, the WORTH ticker, the v2.43 deal block
+// (machine line + INSTALL MACHINES button + wiring), the v2.43 manage
+// modal (machine line + MACHINES button), the v2.43 Empire rows (count
+// + income), one help-modal BUILDINGS line, and the version surfaces.
+// Every machines call is try/caught so a mistake here can never touch
+// the world. window.MACH is the QA surface.
+// ====================================================================
+const MACH = (() => {
+  // ---- the catalog ---------------------------------------------------
+  // payback ~45 days each; bigger machines = fewer clicks per dollar.
+  const TYPES = [
+    { key: 'vending', name: 'Vending Machine', cost: 2400, inc: 52, w: .95, d: .75, h: 1.85, body: 0xc0392b, top: 0xe74c3c, led: 0xffe08a },
+    { key: 'arcade', name: 'Arcade Cabinet', cost: 4800, inc: 105, w: .85, d: .85, h: 1.75, body: 0x6c3d9a, top: 0x8e5bbf, led: 0x7df9ff },
+    { key: 'laundry', name: 'Laundry Pair', cost: 3900, inc: 86, w: 1.55, d: .8, h: 1.15, body: 0xecf0f1, top: 0xbdc3c7, led: 0x6fd6ff },
+    { key: 'coffee', name: 'Coffee Kiosk', cost: 9800, inc: 215, w: 1.5, d: .95, h: 1.25, body: 0x8d5524, top: 0xd9a066, led: 0xffd27d },
+    { key: 'printer', name: '3D Printer', cost: 21000, inc: 465, w: 1.25, d: 1.05, h: 1.45, body: 0x5d6d7e, top: 0x85929e, led: 0x9ff9a0 },
+    { key: 'server', name: 'Server Rack', cost: 52000, inc: 1150, w: .75, d: .95, h: 1.95, body: 0x212f3d, top: 0x2e4053, led: 0x4dff88 },
+  ];
+  const CAP_MAX = 16;              // per-unit machine cap ceiling
+  const SELL_BACK = .6;            // sell a machine back for 60% (the property rate)
+  const CLEAR = .8;                // min distance between machine centers
+  const INSET = .45;               // keep off the walls (the furniture inset)
+  const SLAB0 = .21, FH = 3.2;     // the interior builder's own constants
+  let acc = 0;                      // income accumulator (the office-suite beat)
+  let placing = null;               // { o, b, rects, fl, yF, t, cap }
+  let ghost = null, ghostMat = null, ghostT = -1;
+  let lastPtr = null;              // {x, y} from pointermove (the ghost follows it)
+  let lastGroup = null;            // city swap detector (the OH pattern)
+  const built = new Map();         // bkey -> [{ o, g, led }]
+
+  const capOf = area => Math.min(CAP_MAX, Math.max(1, Math.floor((area || 12) / 6)));
+  const yOf = fl => SLAB0 + fl * FH;
+  const incOfDay = o => (o && o.machines || []).reduce((s, m) => s + (TYPES[m.t] ? TYPES[m.t].inc : 0), 0);
+  const valueOfRooms = () => (STATE.rooms || []).reduce((s, r) => s + (r.machines || []).reduce((t, m) => t + (TYPES[m.t] ? TYPES[m.t].cost : 0), 0), 0);
+
+  // ---- the 3D prop ---------------------------------------------------
+  function buildMesh(t) {
+    const T = TYPES[t] || TYPES[0];
+    const g = new THREE.Group();
+    try {
+      const body = new THREE.Mesh(new THREE.BoxGeometry(T.w, T.h, T.d),
+        new THREE.MeshLambertMaterial({ color: T.body }));
+      body.position.y = T.h / 2; body.castShadow = true;
+      const top = new THREE.Mesh(new THREE.BoxGeometry(T.w + .07, .07, T.d + .07),
+        new THREE.MeshLambertMaterial({ color: T.top }));
+      top.position.y = T.h + .035;
+      const led = new THREE.Mesh(new THREE.BoxGeometry(.11, .06, .11),
+        new THREE.MeshBasicMaterial({ color: T.led }));
+      led.position.set(T.w / 2 - .08, T.h + .1, T.d / 2 - .08);
+      g.add(body); g.add(top); g.add(led);
+      g.userData.led = led;
+    } catch (e) { }
+    return g;
+  }
+
+  // build/refresh the meshes of every machine holding in one building:
+  // rebuild the wanted list, reuse a mesh that already matches (holding
+  // + type + spot), dispose the rest — so installs appear instantly and
+  // sold machines / ended leases clean themselves up
+  function ensureBuilt(bkey) {
+    const holdings = (STATE.rooms || []).filter(r => r.bkey === bkey && r.machines && r.machines.length);
+    const old = built.get(bkey) || [];
+    const out = [];
+    for (const h of holdings) {
+      for (const m of h.machines) {
+        let e = null;
+        for (const v of old) if (v.o === h && v.t === m.t && v.x === m.x && v.z === m.z && v.g) { e = v; break; }
+        if (!e) {
+          const g = buildMesh(m.t);
+          // CITY.group sits at the origin with children in WORLD coordinates
+          // (the arrivalPulse convention) — machines go straight to world coords
+          g.position.set(m.x, yOf(m.fl), m.z);
+          g.visible = false;
+          try { CITY.group.add(g); } catch (er) { }
+          e = { o: h, g, led: g.userData.led, t: m.t, x: m.x, z: m.z };
+        }
+        out.push(e);
+      }
+    }
+    for (const e of old) if (out.indexOf(e) < 0) { try { if (e.g.parent) e.g.parent.remove(e.g); } catch (er) { } }
+    built.set(bkey, out);
+    return out;
+  }
+  function disposeAll() {
+    for (const list of built.values())
+      for (const e of list) { try { if (e.g && e.g.parent) e.g.parent.remove(e.g); } catch (er) { } }
+    built.clear();
+  }
+  // machines show only while their building is inspected — and a big
+  // building's floor units follow the picked floor, exactly like the
+  // dollhouse's own drawRange
+  function syncVisibility(st) {
+    for (const [bkey, list] of built) {
+      const on = !!(st && st.open && st.open.bkey === bkey);
+      for (const e of list) {
+        let vis = on;
+        if (vis && e.o.kind === 'floor' && st.open.floor != null) vis = st.open.floor === e.o.index;
+        e.g.visible = vis;
+      }
+    }
+  }
+
+  // ---- placement geometry -------------------------------------------
+  // rects: the room rect (room units) or the room rects of that floor
+  // (floor units — keeps machines off the partition walls); null-safe.
+  function unitRects(o, b) {
+    const rects = [];
+    try {
+      if (o.kind === 'room') {
+        const rc = OH.roomRect(o.index);
+        if (rc) rects.push({ x0: rc.x0, x1: rc.x1, z0: rc.z0, z1: rc.z1, fl: rc.floor });
+      } else {
+        const n = (OH.rooms() || []).length;
+        for (let i = 0; i < n; i++) {
+          const rc = OH.roomRect(i);
+          if (rc && rc.floor === o.index) rects.push({ x0: rc.x0, x1: rc.x1, z0: rc.z0, z1: rc.z1, fl: rc.floor });
+        }
+      }
+    } catch (er) { }
+    if (!rects.length && b && b.poly && b.poly.length) {   // fallback: the whole plate
+      let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+      for (const v of b.poly) { x0 = Math.min(x0, v[0]); x1 = Math.max(x1, v[0]); z0 = Math.min(z0, v[1]); z1 = Math.max(z1, v[1]); }
+      rects.push({ x0, x1, z0, z1, fl: o.kind === 'floor' ? o.index : 0 });
+    }
+    return rects;
+  }
+  function validSpot(x, z, o, rects) {
+    if (!placing || !rects || !rects.length) return { ok: false, why: 'no space data' };
+    const T = TYPES[placing.t];
+    const hw = T.w / 2 + .05, hd = T.d / 2 + .05;
+    let inside = false;
+    for (const rc of rects) {
+      if (x - hw >= rc.x0 + INSET && x + hw <= rc.x1 - INSET && z - hd >= rc.z0 + INSET && z + hd <= rc.z1 - INSET) { inside = true; break; }
+    }
+    if (!inside) return { ok: false, why: 'inside' };
+    for (const r of (STATE.rooms || [])) {
+      if (r.bkey !== o.bkey || !r.machines) continue;
+      for (const m of r.machines)
+        if (Math.hypot(m.x - x, m.z - z) < CLEAR) return { ok: false, why: 'clear' };
+    }
+    return { ok: true };
+  }
+  const _rc = new THREE.Raycaster();
+  const _ndc = new THREE.Vector2();
+  const _pt = new THREE.Vector3();
+  const _plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  function rayToFloor(cx, cy) {
+    try {
+      _ndc.set((cx / window.innerWidth) * 2 - 1, -(cy / window.innerHeight) * 2 + 1);
+      _rc.setFromCamera(_ndc, camera);
+      _plane.constant = -placing.yF;
+      const pt = _rc.ray.intersectPlane(_plane, _pt);
+      return pt ? { x: pt.x, z: pt.z } : null;
+    } catch (er) { return null; }
+  }
+
+  // ---- the ghost + hint bar -----------------------------------------
+  try {   // the shop cards + the placement bar styles (injected once)
+    const st = document.createElement('style');
+    st.textContent = [
+      '#mshop{display:flex;flex-direction:column;gap:6px;margin-top:10px}',
+      '.mshop-card{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09)}',
+      '.mshop-card.dim{opacity:.45}',
+      '.mshop-info{display:flex;flex-direction:column;gap:2px;font-size:12px}',
+      '.mshop-info span{color:var(--mut);font-size:10.5px}',
+      '.mshop-buy{display:flex;align-items:center;gap:8px;flex:none}',
+      '.mshop-buy span{font-weight:700;font-size:12px}',
+      '.mshop-buy .btn{padding:6px 12px;font-size:11px;margin:0}',
+      '#mh-bar{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:70;display:flex;align-items:center;gap:10px',
+      ' background:var(--panel2);border:1px solid rgba(77,255,136,.35);border-radius:10px;padding:8px 12px;font-size:12px;',
+      ' color:var(--txt);box-shadow:0 8px 26px rgba(0,0,0,.55);white-space:nowrap;max-width:92vw;overflow:hidden}',
+      '#mh-bar.hidden{display:none}',
+      '#mh-bar b{color:#4dff88}',
+      '#mh-bar .mh-x{flex:none;padding:5px 12px;border-radius:7px;background:rgba(77,255,136,.16);color:#4dff88;font-weight:700;cursor:pointer}',
+      '#mh-bar .mh-x:hover{background:rgba(77,255,136,.3)}',
+    ].join('');
+    document.head.appendChild(st);
+  } catch (er) { }
+  function ensureGhost() {
+    if (ghost && ghostT === placing.t) return;
+    killGhost();
+    const T = TYPES[placing.t];
+    ghostMat = new THREE.MeshBasicMaterial({ color: 0x4dff88, transparent: true, opacity: .42, depthWrite: false });
+    ghost = new THREE.Mesh(new THREE.BoxGeometry(T.w, T.h, T.d), ghostMat);
+    ghost.renderOrder = 3;
+    ghostT = placing.t;
+    try { CITY.group.add(ghost); } catch (er) { }
+  }
+  function killGhost() {
+    if (!ghost) return;
+    try { if (ghost.parent) ghost.parent.remove(ghost); ghost.geometry.dispose(); ghostMat.dispose(); } catch (er) { }
+    ghost = null; ghostMat = null; ghostT = -1;
+  }
+  function ensureBar() {
+    let bar = document.getElementById('mh-bar');
+    if (bar) return bar;
+    try {
+      bar = document.createElement('div');
+      bar.id = 'mh-bar';
+      document.body.appendChild(bar);
+    } catch (er) { }
+    return bar;
+  }
+  function barHTML() {
+    const T = TYPES[placing.t];
+    const n = (placing.o.machines || []).length;
+    return '<span>PLACING <b>' + T.name.toUpperCase() + '</b> \u00b7 click a spot inside <b>' + placing.o.name +
+      '</b> \u00b7 ' + fmt$(T.cost) + ' each \u00b7 ' + (n + 1) + '/' + placing.cap +
+      ' \u00b7 <span style="color:var(--mut)">' + fmt$(STATE.money) + '</span></span>' +
+      '<span class="mh-x" id="mh-done">DONE</span>';
+  }
+
+  // ---- placement mode --------------------------------------------------
+  function startPlacing(o, b, rects, t) {
+    const fl = o.kind === 'floor' ? o.index : (rects[0] ? rects[0].fl : 0);
+    placing = { o, b, rects, fl, yF: yOf(fl) + .02, t, cap: capOf(o.area) };
+    try { closeModal(); } catch (er) { }
+    ensureBar();
+    const bar = document.getElementById('mh-bar');
+    if (bar) {
+      bar.innerHTML = barHTML();
+      bar.classList.remove('hidden');
+      const done = bar.querySelector('#mh-done');
+      if (done) done.onclick = () => exitPlacing(true);
+    }
+    ensureGhost();
+    try { OH.refresh(); } catch (er) { }
+    toast('Click a spot inside <b>' + o.name + '</b> to set the ' + TYPES[t].name + ' down. ESC or DONE to finish.', 'warn');
+  }
+  function exitPlacing(done) {
+    placing = null;
+    killGhost();
+    const bar = document.getElementById('mh-bar');
+    if (bar) { bar.classList.add('hidden'); bar.innerHTML = ''; }
+    try { OH.refresh(); } catch (er) { }
+    if (done) try { toast('Machine work finished \u2014 every machine pays you daily.', 'warn'); } catch (er) { }
+  }
+  function placeAt(x, z) {
+    const o = placing.o, T = TYPES[placing.t];
+    const v = validSpot(x, z, o, placing.rects);
+    if (!v.ok) {
+      toast(v.why === 'clear' ? '<b>Too close to another machine.</b> Give it ' + CLEAR + ' m of clearance.'
+        : '<b>That spot is outside your space.</b> Click inside ' + o.name + '.', 'warn');
+      return;
+    }
+    if ((o.machines || []).length >= placing.cap) { toast('<b>' + o.name + ' is full</b> (' + placing.cap + ' machines).', 'warn'); exitPlacing(true); return; }
+    if (!spend(T.cost)) { toast('<b>Not enough money.</b> The ' + T.name + ' costs ' + fmt$(T.cost) + '.', 'warn'); exitPlacing(true); return; }
+    (o.machines || (o.machines = [])).push({ t: placing.t, x: +x.toFixed(2), z: +z.toFixed(2), fl: placing.fl });
+    try { saveGame(); } catch (er) { }
+    ensureBuilt(o.bkey);          // the machine appears right now
+    const bar = document.getElementById('mh-bar');
+    if (bar) bar.innerHTML = barHTML();
+    const done = bar && bar.querySelector('#mh-done');
+    if (done) done.onclick = () => exitPlacing(true);
+    try { OH.refresh(); } catch (er) { }
+    if ((o.machines || []).length >= placing.cap || STATE.money < T.cost) exitPlacing(true);
+  }
+  // the click: while placing, EVERY canvas click is a placement attempt
+  // (this wrap runs before the farm claim, the openhouse and the walk
+  // orders — installing never walks the character)
+  function click(cx, cy) {
+    if (!placing) return false;
+    const pt = rayToFloor(cx, cy);
+    if (!pt) { toast('Aim at your floor — the camera needs to see it.', 'warn'); return true; }
+    placeAt(pt.x, pt.z);
+    return true;
+  }
+
+  // ---- the shop modal -------------------------------------------------
+  function openShop(bkey, kind, index) {
+    const o = (STATE.rooms || []).find(r => r.bkey === bkey && r.kind === kind && r.index === index);
+    if (!o) { toast('Buy or rent that ' + (kind === 'floor' ? 'floor' : 'room') + ' first \u2014 machines go in your own space.', 'warn'); return; }
+    const b = (CITY.buildingPolys || []).find(x => x.bkey === bkey);
+    if (!b) { toast('That building is not standing here \u2014 travel to ' + (o.cityName || o.cityKey) + ' first.', 'warn'); return; }
+    let st = null;
+    try { st = OH.state(); } catch (er) { }
+    if (!st || !st.open || st.open.bkey !== bkey) {
+      try { OH.force(bkey); } catch (er) { }        // open it: the layout drives the rects
+      // keep the unit PICKED after the force (force resets the pick) so the
+      // deal block stays coherent while the shop is up
+      try { if (kind === 'floor') OH.selectFloor(index); else OH.selectRoom(index); } catch (er) { }
+    }
+    const rects = unitRects(o, b);
+    if (!rects.length) { toast('Could not open that ' + (kind === 'floor' ? 'floor' : 'room') + ' here.', 'warn'); return; }
+    renderShop(o, b, rects);
+  }
+  function openShopFor(o) { if (o) openShop(o.bkey, o.kind, o.index); }
+  function renderShop(o, b, rects) {
+    const cap = capOf(o.area), n = (o.machines || []).length;
+    const cards = TYPES.map((T, i) =>
+      '<div class="mshop-card' + (n >= cap || STATE.money < T.cost ? ' dim' : '') + '">' +
+      '<div class="mshop-info"><b>' + T.name + '</b><span>+$' + T.inc + '/day \u00b7 ' + T.w.toFixed(2) + ' \u00d7 ' + T.d.toFixed(2) + ' m</span></div>' +
+      '<div class="mshop-buy"><span>' + fmt$(T.cost) + '</span>' +
+      '<button class="btn primary" data-mi="' + i + '"' + (n >= cap ? ' disabled' : '') + '>INSTALL</button></div></div>').join('');
+    const mine = (o.machines || []).map((m, i) => TYPES[m.t] ?
+      '<div class="kv"><span class="k">' + TYPES[m.t].name + ' \u00b7 +$' + TYPES[m.t].inc + '/day</span>' +
+      '<button class="tpbtn" data-ms="' + i + '">SELL ' + fmt$(Math.round(TYPES[m.t].cost * SELL_BACK)) + '</button></div>' : '').join('');
+    openModal('MACHINES \u2014 ' + o.name, `
+      <p>Fill <b>${o.name}</b> with working machines. Pick one, then <b>click a spot inside your space</b> to set it down \u2014 each machine pays you every day, and sells back for ${Math.round(SELL_BACK * 100)}%.</p>
+      <div class="kv"><span class="k">YOUR SPACE</span><span class="v">${o.area} m\u00b2 \u00b7 ${n}/${cap} machines installed</span></div>
+      <div class="kv"><span class="k">MACHINE INCOME</span><span class="v g">+$${incOfDay(o)}/day</span></div>
+      <div id="mshop">${cards}</div>
+      ${mine ? '<div class="msec" style="margin-top:12px">Installed \u2014 sell any back for ' + Math.round(SELL_BACK * 100) + '%</div>' + mine : ''}
+      <div style="display:flex;gap:8px;margin-top:16px"><button class="btn" id="ms-x" style="flex:1">CLOSE</button></div>`);
+    document.querySelectorAll('#mshop [data-mi]').forEach(el => {
+      el.onclick = () => {
+        const t = +el.dataset.mi;
+        if (n >= cap) { toast('<b>' + o.name + ' is full</b> (' + cap + ' machines for ' + o.area + ' m\u00b2).', 'warn'); return; }
+        if (STATE.money < TYPES[t].cost) { toast('<b>Not enough money.</b> The ' + TYPES[t].name + ' costs ' + fmt$(TYPES[t].cost) + '.', 'warn'); return; }
+        startPlacing(o, b, rects, t);
+      };
+    });
+    document.querySelectorAll('[data-ms]').forEach(el => {
+      el.onclick = () => {
+        const i = +el.dataset.ms;
+        const m = (o.machines || [])[i];
+        if (!m || !TYPES[m.t]) return;
+        o.machines.splice(i, 1);
+        earn(Math.round(TYPES[m.t].cost * SELL_BACK), false);   // resale doesn't count toward GDP
+        try { saveGame(); } catch (er) { }
+        ensureBuilt(o.bkey);
+        toast('Sold the <b>' + TYPES[m.t].name + '</b> for ' + fmt$(Math.round(TYPES[m.t].cost * SELL_BACK)) + '.');
+        renderShop(o, b, rects);
+      };
+    });
+    const x = document.getElementById('ms-x');
+    if (x) x.onclick = closeModal;
+  }
+
+  // ---- income + tick ---------------------------------------------------
+  function tick(dt) {
+    try {
+      // city swap -> drop every built mesh (they lived in the old group)
+      if (CITY.group !== lastGroup) { lastGroup = CITY.group; disposeAll(); if (placing) exitPlacing(false); }
+      // income on the office-suite beat
+      const R = STATE.rooms || [];
+      if (STATE.mode !== 'city' || !R.length) acc = 0;
+      else {
+        acc += dt;
+        if (acc >= 1) {
+          const secs = acc; acc = 0;
+          let inc = 0;
+          for (const r of R) inc += incOfDay(r);
+          if (inc > 0) earn(inc / 90 * secs);
+        }
+      }
+      // the inspector drives visibility (and placement ends when it closes)
+      let st = null;
+      try { st = OH.state(); } catch (er) { }
+      if (placing && (!st || !st.open || st.open.bkey !== placing.o.bkey)) exitPlacing(false);
+      if (st && st.open) ensureBuilt(st.open.bkey);
+      syncVisibility(st);
+      // the ghost follows the cursor (world coords — CITY.group is at origin)
+      if (placing && lastPtr && ghost && ghostMat) {
+        const pt = rayToFloor(lastPtr.x, lastPtr.y);
+        if (pt) {
+          ghost.visible = true;
+          ghost.position.set(pt.x, placing.yF + (TYPES[placing.t].h / 2), pt.z);
+          const v = validSpot(pt.x, pt.z, placing.o, placing.rects);
+          ghostMat.color.setHex(v.ok ? 0x4dff88 : 0xff5d5d);
+        } else ghost.visible = false;
+      } else if (ghost) ghost.visible = false;
+      // blinking work lights on the visible machines (phase per machine)
+      if (st && st.open) {
+        const now = performance.now() / 900;
+        const list = built.get(st.open.bkey) || [];
+        for (const e of list) {
+          if (!e.g.visible || !e.led) continue;
+          e.led.visible = ((now + (e.x * .37 + e.z * .11)) % 1) < .55;
+        }
+      }
+    } catch (e) { console.error('[machines]', e); }
+  }
+
+  // ---- listeners (once) -------------------------------------------------
+  try {
+    canvas.addEventListener('pointermove', e => { lastPtr = { x: e.clientX, y: e.clientY }; }, { passive: true });
+    canvas.addEventListener('pointerleave', () => { lastPtr = null; }, { passive: true });
+    window.addEventListener('keydown', e => {           // capture: ESC ends placement BEFORE the inspector's own ESC
+      if (e.key !== 'Escape' || !placing) return;
+      try { e.stopPropagation(); } catch (er) { }
+      exitPlacing(true);
+    }, true);
+  } catch (er) { }
+
+  return {
+    tick, click, openShop, openShopFor, incOfDay, capOf, exitPlacing,
+    TYPES,
+    valueOfRooms,
+    // QA: programmatic install (no modal, no ghost) — same validation
+    install(bkey, kind, index, t, x, z) {
+      const o = (STATE.rooms || []).find(r => r.bkey === bkey && r.kind === kind && r.index === index);
+      if (!o) return { ok: false, why: 'not yours' };
+      const b = (CITY.buildingPolys || []).find(v => v.bkey === bkey);
+      if (!b) return { ok: false, why: 'no building' };
+      const rects = unitRects(o, b);
+      const fl = o.kind === 'floor' ? o.index : (rects[0] ? rects[0].fl : 0);
+      const saved = placing;
+      placing = { o, b, rects, fl, yF: yOf(fl) + .02, t, cap: capOf(o.area) };
+      const v = validSpot(x, z, o, placing.rects);
+      if (!v.ok) { placing = saved; return { ok: false, why: v.why }; }
+      if ((o.machines || []).length >= placing.cap) { placing = saved; return { ok: false, why: 'cap' }; }
+      if (!spend(TYPES[t].cost)) { placing = saved; return { ok: false, why: 'funds', cost: TYPES[t].cost }; }
+      (o.machines || (o.machines = [])).push({ t, x: +x.toFixed(2), z: +z.toFixed(2), fl });
+      try { saveGame(); } catch (er) { }
+      ensureBuilt(bkey);
+      placing = saved;
+      return { ok: true };
+    },
+    // QA: remove the i-th machine of a holding (pays 60%)
+    removeAt(bkey, kind, index, i) {
+      const o = (STATE.rooms || []).find(r => r.bkey === bkey && r.kind === kind && r.index === index);
+      const m = o && (o.machines || [])[i];
+      if (!m || !TYPES[m.t]) return { ok: false, why: 'no machine' };
+      o.machines.splice(i, 1);
+      earn(Math.round(TYPES[m.t].cost * SELL_BACK), false);
+      try { saveGame(); } catch (er) { }
+      ensureBuilt(bkey);
+      return { ok: true, got: Math.round(TYPES[m.t].cost * SELL_BACK) };
+    },
+    placing() { return placing ? { bkey: placing.o.bkey, kind: placing.o.kind, index: placing.o.index, t: placing.t, cap: placing.cap } : null; },
+    meshCount(bkey) { return (built.get(bkey) || []).length; },
+    state() {
+      const R = STATE.rooms || [];
+      return {
+        machines: R.reduce((s, r) => s + (r.machines || []).length, 0),
+        incomePerDay: R.reduce((s, r) => s + incOfDay(r), 0),
+        value: valueOfRooms(),
+        placing: !!placing,
+        accrual: +acc.toFixed(2),
+      };
+    },
+  };
+})();
+window.MACH = MACH;   // QA surface
+
+// ADDITIVE hooks — the same wrap pattern the game already uses.
+// 1. the click chain: a machine placement runs FIRST (before the farm
+//    claim, the openhouse inspector and the walk orders) so installing
+//    never walks the character or re-picks the building.
+const __machClickPick = clickPick;
+clickPick = function (cx, cy) {
+  try { if (MACH.click(cx, cy)) return; } catch (e) { console.error('[machines]', e); }
+  return __machClickPick(cx, cy);
+};
+// 2. the update chain: original -> world forest -> open house -> suburbs
+//    -> title deeds -> patchwork -> MACHINES. Every call is try/caught
+//    so a machines error can never touch the world.
+const __machOrigUpdate = WORLD.update.bind(WORLD);
+WORLD.update = function (dt, px, pz, camDist) {
+  const req = __machOrigUpdate(dt, px, pz, camDist);
+  try { MACH.tick(dt); } catch (e) { console.error('[machines]', e); }
+  return req;
+};
+
+console.log('%cOPEN WORLD v2.45 — MACHINES', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
