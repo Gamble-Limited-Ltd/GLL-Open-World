@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.46</title>
+<title>Open World — v2.47</title>
 <style>
 /* ==================================================================
    OPEN WORLD v2.42 — NEIGHBORHOODS: "make houses and neighborhoods
@@ -731,7 +731,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.46 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), every one of those rooms and floors for sale or for rent (buy it outright — yours forever, tenants pay you daily — or rent it with a two-day deposit; your holdings glow gold and pay you every day), a patchwork of buyable farm parcels over every mile of open country around the cities (rectangles of all shapes and sizes in every shade of green like a satellite view — hover one for its price, click to buy it, and the tenant farmers pay you daily — at premium prices since v2.46: about ten times the cost for about three times the rent), and machines you install inside the rooms and floors you own (six kinds from a vending machine to a server rack — click a spot in your own space to set each one down, and every machine pays you every day), and the same streets, buildings, plots and roads on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.46 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), every one of those rooms and floors for sale or for rent (buy it outright — yours forever, tenants pay you daily — or rent it with a two-day deposit; your holdings glow gold and pay you every day), a patchwork of buyable farm parcels over every mile of open country around the cities (rectangles of all shapes and sizes in every shade of green like a satellite view — hover one for its price, click to buy it, and the tenant farmers pay you daily — at premium prices since v2.46: about ten times the cost for about three times the rent), landlord rentals at your own price (list any plot, office suite, room, floor or farm parcel you own and tenants pay your daily rate — price it above the local market and it may sit empty while the market looks), and machines you install inside the rooms and floors you own (six kinds from a vending machine to a server rack — click a spot in your own space to set each one down, and every machine pays you every day), and the same streets, buildings, plots and roads on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -767,7 +767,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.46';
+const GAME_VERSION = 'v2.47';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -1188,6 +1188,7 @@ const STATE = {
   offices: [],                   // leased: {id, cityKey, bkey, name, sqm, rate}
   rooms: [],                     // v2.43 TITLE DEEDS: bought/rented units {id, cityKey, cityName, bkey, kind:'floor'|'room', index, name, area, rate, mode:'owned'|'rented', price, x, z}
   acres: [],                     // v2.44 PATCHWORK: bought farm parcels {id, name, ha, price, rate, x, z, near, nearKey}
+  rentals: [],                   // v2.47 LANDLORD: listings {id, price, on, tenant, term, next}
   market: null,                  // MARKET module state (positions/orders)
   lastCityKey: null,
   seenNews: false,
@@ -1207,7 +1208,7 @@ function saveGame() {
       wx: ACTORS.player ? +ACTORS.player.group.position.x.toFixed(1) : null,
       wz: ACTORS.player ? +ACTORS.player.group.position.z.toFixed(1) : null,
       plots: STATE.plots.map(p => ({
-        id: p.id, cityKey: p.cityKey, cityName: p.cityName || null, x: +p.x.toFixed(2), z: +p.z.toFixed(2),
+        id: p.id, cityKey: p.cityKey, cityName: p.cityName || null, price: p.price || 0, x: +p.x.toFixed(2), z: +p.z.toFixed(2),   // v2.47 LANDLORD: price feeds the land market rate
         cart: p.cart ? { cuisine: p.cart.cuisine } : null,
         crew: (p.crew || []).map(c => ({ name: c.name, stars: c.stars })),
       })),
@@ -1215,6 +1216,7 @@ function saveGame() {
       rooms: (STATE.rooms || []).map(r => ({ id: r.id, cityKey: r.cityKey, cityName: r.cityName || null, bkey: r.bkey, kind: r.kind, index: r.index, name: r.name, area: r.area, rate: r.rate, mode: r.mode, price: r.price, x: r.x, z: r.z,
         machines: (r.machines || []).map(m => ({ t: m.t | 0, x: +(+m.x || 0).toFixed(2), z: +(+m.z || 0).toFixed(2), fl: m.fl | 0 })) })),   // v2.43 TITLE DEEDS + v2.45 MACHINES (optional fields — older builds ignore them)
       acres: (STATE.acres || []).map(a => ({ id: a.id, name: a.name, ha: +a.ha || 0, price: +a.price || 0, rate: +a.rate || 0, x: +a.x || 0, z: +a.z || 0, near: a.near || null, nearKey: a.nearKey || null })),   // v2.44 PATCHWORK (optional field — older builds ignore it)
+      rentals: (STATE.rentals || []).map(x => ({ id: x.id, price: +x.price || 0, on: !!x.on, tenant: x.tenant || null, term: x.term | 0, next: +(+x.next || 0).toFixed(1) })),   // v2.47 LANDLORD (optional field — older builds ignore it)
       market: STATE.market ? STATE.market.pack() : null,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(pack));
@@ -1290,6 +1292,11 @@ function loadGame() {
         // v2.45 MACHINES: the machines installed in that unit (absent on older saves)
         machines: (Array.isArray(r.machines) ? r.machines : []).filter(m => m && m.t >= 0 && m.t < 6 && isFinite(+m.x) && isFinite(+m.z)).slice(0, 16)
           .map(m => ({ t: m.t | 0, x: +(+m.x || 0).toFixed(2), z: +(+m.z || 0).toFixed(2), fl: m.fl | 0 })) }));
+    // v2.47 LANDLORD: your rental listings (absent on older saves)
+    STATE.rentals = (p.rentals || []).filter(x => x && typeof x.id === 'string' && +x.price > 0)
+      .map(x => ({ id: x.id, price: Math.round(+x.price), on: !!x.on, tenant: (typeof x.tenant === 'string' && x.tenant) || null, term: Math.max(0, x.term | 0), next: Math.max(0, +x.next || 0) }))
+      .filter(x => STATE.plots.some(q => q.id === x.id) || STATE.offices.some(q => q.id === x.id) ||
+        STATE.rooms.some(q => q.id === x.id) || STATE.acres.some(q => q.id === x.id));
     STATE.marketPack = p.market || null;
     // v2.05 starter guide: fresh players start at step 0; returning
     // players who already own a business are exempt
@@ -8450,7 +8457,7 @@ const ECO = (() => {
       </div>`);
     document.getElementById('bp-buy').onclick = () => {
       if (!spend(plot.price)) { toast('<b>Not enough money.</b> Sell some food first.', 'warn'); return; }
-      const st = { id: plot.id, cityKey: plot.cityKey || (CITY.rec ? CITY.rec.key : 'rural'), cityName: plot.rural ? 'Countryside' : (CITY.rec ? CITY.rec.name : null), x: plot.x, z: plot.z, cart: null, crew: [] };   // v2.10: cityName for travel
+      const st = { id: plot.id, cityKey: plot.cityKey || (CITY.rec ? CITY.rec.key : 'rural'), cityName: plot.rural ? 'Countryside' : (CITY.rec ? CITY.rec.name : null), x: plot.x, z: plot.z, price: plot.price || 0, cart: null, crew: [] };   // v2.10: cityName for travel; v2.47 LANDLORD: price feeds the land market rate
       STATE.plots.push(st);
       markPlotOwned(plot);
       saveGameSafe();
@@ -8467,9 +8474,11 @@ const ECO = (() => {
     openModal('Park a Food Cart', `
       <p>Choose your cuisine${permit ? ' — includes your first <b>$' + permit + '</b> street-vending permit' : ''}.</p>
       <div class="cuisine-grid">${grid}</div>
-      <div style="display:flex;gap:8px;margin-top:14px"><button class="btn" id="bc-x" style="flex:1">CLOSE</button></div>`);
+      <button class="btn good" id="bc-rent" style="width:100%;margin-top:14px">RENT OUT THE LAND — SET YOUR PRICE</button>
+      <div style="display:flex;gap:8px;margin-top:10px"><button class="btn" id="bc-x" style="flex:1">CLOSE</button></div>`);
     document.querySelectorAll('.cui').forEach(el => {
       el.onclick = () => {
+        if (window.LORD && LORD.isListed(plotState.id)) { toast('<b>This plot is on the rental market.</b> Take it off first (RENT OUT THE LAND \u2192 TAKE OFF MARKET).', 'warn'); return; }   // v2.47 LANDLORD
         const id = el.dataset.c;
         const cost = ECON.cartCost + permit;
         if (!spend(cost)) { toast('<b>Not enough money.</b>', 'warn'); return; }
@@ -8481,6 +8490,8 @@ const ECO = (() => {
       };
     });
     document.getElementById('bc-x').onclick = closeModal;
+    const bcr = document.getElementById('bc-rent');   // v2.47 LANDLORD: rent the empty plot out at your own price
+    if (bcr) bcr.onclick = () => { try { LORD.open(plotState.id); } catch (er) { } };
   }
 
   function revPerMin(plotState) {
@@ -8493,6 +8504,9 @@ const ECO = (() => {
 
   function openBusiness(plotState) {
     if (!plotState.cart) {
+      // v2.47 LANDLORD: a tenanted plot manages its lease; an empty plot
+      // with no local rec (restored far away) still manages the land rental
+      if (window.LORD && (LORD.isTenanted(plotState.id) || !findPlotRec(plotState.id))) { try { LORD.open(plotState.id); } catch (er) { } return; }
       const rec = findPlotRec(plotState.id);
       if (rec) { openBuild(plotState, rec); return; }
     }
@@ -8610,6 +8624,8 @@ const ECO = (() => {
       <div id="pl"><span class="l">Rent income</span><span class="v">+$${(o.rate / 90 * 60).toFixed(2)}/min</span></div>
       <div class="kv"><span class="k">SIZE</span><span class="v">${o.sqm} m²</span></div>
       <div class="kv"><span class="k">RATE</span><span class="v g">$${o.rate}.00 /day</span></div>
+      ${(function () { try { return window.LORD ? LORD.tagLine(o.id, true) : ''; } catch (er) { return ''; } })()}   <!-- v2.47 LANDLORD -->
+      <button class="btn good" id="om-sub" style="width:100%;margin-top:14px">RENT IT OUT — SET YOUR PRICE</button>
       <div style="display:flex;gap:8px;margin-top:16px">
         <button class="btn bad" id="om-end" style="flex:1">END LEASE</button>
         <button class="btn" id="om-x">CLOSE</button>
@@ -8620,6 +8636,8 @@ const ECO = (() => {
       toast('Lease ended. The deposit was non-refundable.', 'warn');
     };
     document.getElementById('om-x').onclick = closeModal;
+    const oms = document.getElementById('om-sub');   // v2.47 LANDLORD: sublet the suite at your own price
+    if (oms) oms.onclick = () => { try { LORD.open(o.id); } catch (er) { } };
   }
 
   function openEmpire() {
@@ -9861,13 +9879,13 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.46 — PREMIUM LAND', `
-    <p><b>The plots around the world now cost what land should.</b></p>
-    <div class="kv"><span class="k">TEN TIMES THE PRICE</span><span class="v">A farm field that ran $80–$340 now runs roughly $750–$3,400 — buying land is a real investment, not pocket change</span></div>
-    <div class="kv"><span class="k">THREE TIMES THE RENT</span><span class="v">Tenant farmers pay about three times more too ($13–$72 a day per field), so land pays for itself in about 47 days — the machines' own beat (it was 14)</span></div>
-    <div class="kv"><span class="k">WHAT YOU OWN IS SAFE</span><span class="v">Fields you already bought keep the price you paid and the rent they came with — nothing was repriced out from under you</span></div>
-    <div class="kv"><span class="k">SAME PATCHWORK</span><span class="v">Every field is still there in all shapes and sizes — hover for its price, click to buy (or its FOR SALE sign), 60% sellback, Empire + Worth as before</span></div>
-    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The machines, the title deeds, the inspector, the neighborhoods, the world forest, the deep-blue lakes, the 23,000 km zoom and the true 1:1 Earth are untouched</span></div>
+  openModal('Welcome to v2.47 — LANDLORD', `
+    <p><b>Rent anything you own back to other people — at a price you set.</b></p>
+    <div class="kv"><span class="k">YOUR PRICE</span><span class="v">List an empty plot, an office suite, a room, a floor or a farm parcel at any daily rate — type it or use MARKET / +10% / −10%, with the local market rate for an honest reference and an OUTLOOK line that calls the demand</span></div>
+    <div class="kv"><span class="k">THE DEAL</span><span class="v">Listing puts it on the market — its own tenant moves out, prospective tenants view it on the game-day beat, and when one signs they pay YOUR price for a 4–12 day lease</span></div>
+    <div class="kv"><span class="k">THE GAMBLE</span><span class="v">A unit priced at market lets almost surely; past 3× market nobody ever signs — overprice it and it sits vacant at $0/day, price it right and it beats the income you gave up</span></div>
+    <div class="kv"><span class="k">WHERE</span><span class="v">RENT IT OUT buttons live in the panels you already use — the park-a-cart panel on an empty plot, your office panel, the title-deed MANAGE modal and your farmland panel — and the Empire panel tracks the whole portfolio</span></div>
+    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The machines, the premium land, the patchwork, the title deeds, the inspector, the neighborhoods, the world forest and the true 1:1 Earth are untouched</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -9887,6 +9905,7 @@ document.getElementById('b-build').addEventListener('click', () => {
     <div class="kv"><span class="k">YOUR PLOT</span><span class="v">Click again → park a food cart</span></div>
     <div class="kv"><span class="k">BUILDINGS</span><span class="v">Click any building to open it and pick a floor or a room — then <b>BUY</b> it outright or <b>RENT</b> it from the panel (your holdings pay you daily); in your own rooms and floors hit <b>INSTALL MACHINES</b> and click a spot to set them down — every machine earns daily; leasable towers keep their LEASE SUITE button</span></div>
     <div class="kv"><span class="k">FARMLAND</span><span class="v">The open country around every city is a patchwork of buyable farm parcels — zoom out and click any field (or walk up to a FOR SALE sign); your fields pay rent every day</span></div>
+    <div class="kv"><span class="k">LANDLORD</span><span class="v">Anything you own — a plot, an office, a room, a floor or a farm parcel — can be rented out at <b>your own price</b>: list it and tenants view it on the game-day beat, paying you daily; price it above the local market and it may sit empty (RENT IT OUT buttons live in the panels you already use)</span></div>
     <div class="kv"><span class="k">CARTS</span><span class="v">Stand close → [E] to serve the queue</span></div>
     <div class="kv"><span class="k">CREWS</span><span class="v">Business panel → hire star vendors</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn" id="hb-x" style="flex:1">GOT IT</button></div>`);
@@ -11669,6 +11688,7 @@ const PROP = (() => {
         ? '<div class="ohp-kv"><span>Resale value</span><b>' + fmt$(Math.round(o.price * SELL_BACK)) + '</b></div>'
         : '<div class="ohp-kv"><span>Lease rate</span><b>$' + o.rate + '/day</b></div>') +
       '<div class="ohp-kv"><span>Machines</span><b>' + (mn ? mn + ' installed \u00b7 <span style="color:#48BB78">+$' + mi + '/day</span>' : 'none yet') + '</b></div>' +   // v2.45
+      (function () { try { return window.LORD ? LORD.tagLine(o.id) : ''; } catch (er) { return ''; } })() +   // v2.47 LANDLORD
       '<button class="btn" data-pd="man">' + (o.mode === 'owned' ? 'MANAGE PROPERTY' : 'MANAGE LEASE') + '</button>' +
       '<button class="btn good" data-pd="mach">' + (mn ? 'MANAGE MACHINES \u00b7 ' + mn : 'INSTALL MACHINES') + '</button>';   // v2.45
   }
@@ -11759,6 +11779,8 @@ const PROP = (() => {
       <div class="kv"><span class="k">RATE</span><span class="v g">$${o.rate}.00 /day</span></div>
       <div class="kv"><span class="k">MACHINES</span><span class="v">${(o.machines || []).length} installed \u00b7 +$${(window.MACH ? MACH.incOfDay(o) : 0)}/day</span></div>   <!-- v2.45 -->
       ${o.mode === 'owned' ? '<div class="kv"><span class="k">RESALE VALUE</span><span class="v">' + fmt$(Math.round(o.price * SELL_BACK)) + '</span></div>' : ''}
+      ${(function () { try { return window.LORD ? LORD.tagLine(o.id, true) : ''; } catch (er) { return ''; } })()}   <!-- v2.47 LANDLORD -->
+      <button class="btn good" id="pm-rent" style="width:100%;margin-top:14px">${o.mode === 'owned' ? 'RENT IT OUT \u2014 SET YOUR PRICE' : 'SUBLET IT \u2014 SET YOUR PRICE'}</button>
       <div style="display:flex;gap:8px;margin-top:16px">
         <button class="btn bad" id="pm-end" style="flex:1">${o.mode === 'owned' ? 'SELL \u2014 ' + fmt$(Math.round(o.price * SELL_BACK)) : 'END LEASE'}</button>
         <button class="btn primary" id="pm-mach">MACHINES</button>   <!-- v2.45 -->
@@ -11774,6 +11796,8 @@ const PROP = (() => {
       closeModal();
       try { OH.refresh(); } catch (e) { }
     };
+    const pmr = document.getElementById('pm-rent');   // v2.47 LANDLORD: rent the unit out at your own price
+    if (pmr) pmr.onclick = () => { try { LORD.open(o.id); } catch (er) { } };
     const pmm = document.getElementById('pm-mach');   // v2.45 MACHINES: open the shop for this holding
     if (pmm) pmm.onclick = () => { if (window.MACH) { try { closeModal(); MACH.openShopFor(o); } catch (er) { } } };
     document.getElementById('pm-x').onclick = closeModal;
@@ -12295,6 +12319,8 @@ const FARM = (() => {
       <div class="kv"><span class="k">SIZE</span><span class="v">${a.ha.toFixed(1)} ha</span></div>
       <div class="kv"><span class="k">RENT</span><span class="v g">$${a.rate}.00 /day</span></div>
       <div class="kv"><span class="k">RESALE VALUE</span><span class="v">${fmt$(Math.round(a.price * SELL_BACK))}</span></div>
+      ${(function () { try { return window.LORD ? LORD.tagLine(a.id, true) : ''; } catch (er) { return ''; } })()}   <!-- v2.47 LANDLORD -->
+      <button class="btn good" id="fm-rent" style="width:100%;margin-top:14px">RENT OUT THE FARM — SET YOUR PRICE</button>
       <div style="display:flex;gap:8px;margin-top:16px">
         <button class="btn primary" id="fm-tp" style="flex:1">TELEPORT THERE</button>
         <button class="btn bad" id="fm-sell">SELL \u2014 ${fmt$(Math.round(a.price * SELL_BACK))}</button>
@@ -12310,6 +12336,8 @@ const FARM = (() => {
       toast('Sold <b>' + a.name + '</b> for ' + fmt$(Math.round(a.price * SELL_BACK)) + '.');
     };
     document.getElementById('fm-x').onclick = closeModal;
+    const fmr = document.getElementById('fm-rent');   // v2.47 LANDLORD: rent the field out at your own price
+    if (fmr) fmr.onclick = () => { try { LORD.open(a.id); } catch (er) { } };
   }
 
   // ---- travel (one world, one tap) ---------------------------------------
@@ -13044,7 +13072,348 @@ WORLD.update = function (dt, px, pz, camDist) {
   return req;
 };
 
-console.log('%cOPEN WORLD v2.46 — PREMIUM LAND', 'color:#38BDF8;font-weight:700', 'ready.');
+
+// ======== section: 50_landlord.js ========
+// ====================================================================
+// v2.47 — LANDLORD. The ask: "If people buy a plot, building, floor,
+// or room — allow them to rent it back to other people at a price
+// they can set." Everything you hold can now go on the rental market
+// at YOUR price:
+//   - an empty street plot (no cart on it), an office suite in a
+//     tower, a bought room/floor, a leased one (sublet) and a farm
+//     parcel — each panel you already use grows a RENT IT OUT button
+//     (the park-a-cart panel, your office panel, the title-deed
+//     MANAGE modal, your farmland panel);
+//   - the rent-out modal has a price YOU set (type it, or MARKET /
+//     +10% / -10%), the local market rate for an honest reference,
+//     and a live OUTLOOK line that calls the demand before you
+//     commit;
+//   - listing puts the unit ON THE MARKET: its own tenant moves out
+//     (that income stops), prospective tenants view it on the
+//     game-day beat, and they sign a 4-12 day lease paying YOUR price
+//     — the take-probability falls linearly from ~95% at market to
+//     zero at 3x market, so overpricing means long vacant stretches
+//     at $0/day while the market looks. That is the gamble;
+//   - income is an additive delta on the same 90 s game-day beat the
+//     offices, deeds, acres and machines already use: tenanted ->
+//     the asset pays (your price - its normal income), listed &
+//     empty -> (0 - its normal income), unlisted -> no entry at all,
+//     the original income stands untouched. The delta is clamped so
+//     money never dips below zero, and machine income is separate
+//     and never touched;
+//   - leases run down a day at a time, tenants move out on their own
+//     and the unit re-lets; you can EVICT early, reprice between
+//     tenants, or TAKE IT OFF THE MARKET any time;
+//   - every listing shows in the Empire panel (Landlord section,
+//     with net-vs-normal income) and persists in the save as a new
+//     optional "rentals" field (pack stays v5; older builds ignore
+//     it), sanitized on load and swept when you sell or end a lease.
+// Touchpoints outside this section (each annotated "v2.47"): the
+// STATE/save/load rentals field + the plot purchase price now saved
+// (it feeds the land market rate), the RENT OUT buttons + status
+// lines in openBuild / openOfficeMine / the title-deed MANAGE modal /
+// the farmland panel / the inspector deal block, the openBusiness
+// routing for tenanted plots, one help-modal line, and the version
+// surfaces. Every landlord call is try/caught so a mistake here can
+// never touch the world. window.LORD is the QA surface.
+// ====================================================================
+const LORD = (() => {
+  const DAY = 90;              // seconds per game day (the office/deed/acres beat)
+  const NAMES = ['M. Alvarez', 'K. Osei', 'S. Nakamura', 'R. Novak', 'A. Diallo', 'J. Whitfield',
+    'L. Marchetti', 'T. Okafor', 'P. Lindqvist', 'D. Fontaine', 'H. Yamada', 'C. Mwangi',
+    'N. Petrov', 'E. Sandoval', 'B. Kowalski', 'F. Haddad', 'G. Iversen', 'I. Moreau',
+    'V. Castillo', 'W. Adeyemi'];
+  let acc = 0;                 // income accumulator (1 s ticks, like the offices)
+  let dayT = 0;                // game-day beat accumulator (leases run down)
+
+  // ---- resolve an asset id -> facts the market needs ----------------
+  // base = the daily income the asset pays right now (unlisted);
+  // fair = the market-rate price tenants compare YOUR price against.
+  function assetOf(id) {
+    let a = (STATE.plots || []).find(p => p.id === id);
+    if (a) {
+      // land lease: 1/12 of the purchase price per day (the title-deed
+      // convention); older saves without a stored price get a sane default
+      const fair = Math.max(4, Math.round((a.price || 900) / 12));
+      return { kind: 'plot', obj: a, name: (a.cityName || 'Countryside') + ' plot', city: a.cityName || a.cityKey, fair, base: 0, cart: !!a.cart };
+    }
+    a = (STATE.offices || []).find(o => o.id === id);
+    if (a) return { kind: 'office', obj: a, name: a.name, city: a.cityKey, fair: Math.max(1, Math.round(a.rate)), base: Math.max(1, Math.round(a.rate)) };
+    a = (STATE.rooms || []).find(r => r.id === id);
+    if (a) {
+      const base = a.mode === 'owned' ? Math.round(a.rate * 2) : Math.round(a.rate);   // the deed's own income (machines are separate)
+      return { kind: 'unit', obj: a, name: a.name, city: a.cityName || a.cityKey, fair: Math.max(1, base), base, sublet: a.mode === 'rented' };
+    }
+    a = (STATE.acres || []).find(x => x.id === id);
+    if (a) return { kind: 'acre', obj: a, name: a.name, city: a.near || 'open country', fair: Math.max(1, Math.round(a.rate)), base: Math.max(1, Math.round(a.rate)) };
+    return null;
+  }
+  const entryOf = id => (STATE.rentals || []).find(x => x.id === id) || null;
+  const isListed = id => { const e = entryOf(id); return !!(e && e.on); };
+  const isTenanted = id => { const e = entryOf(id); return !!(e && e.tenant); };
+
+  // ---- the demand curve: P(a viewing tenant signs) vs price/market --
+  const CURVE = [[.9, .97], [1, .95], [1.25, .85], [1.5, .62], [1.75, .42], [2, .22], [2.25, .10], [2.5, .045], [2.75, .015], [3, 0]];
+  function takeProb(ratio) {
+    if (ratio <= CURVE[0][0]) return CURVE[0][1];
+    for (let i = 1; i < CURVE.length; i++) {
+      if (ratio <= CURVE[i][0]) {
+        const [x0, y0] = CURVE[i - 1], [x1, y1] = CURVE[i];
+        return y0 + (y1 - y0) * (ratio - x0) / (x1 - x0);
+      }
+    }
+    return 0;
+  }
+  function verdict(ratio) {
+    if (ratio <= 1.05) return ['Tenants will snap this up', '#48BB78'];
+    if (ratio <= 1.5) return ['Priced to move — steady interest', '#48BB78'];
+    if (ratio <= 2) return ['Above market — expect vacancies', '#F5CC74'];
+    if (ratio <= 2.5) return ['Steep — long empty stretches likely', '#FB923C'];
+    return ['Nobody will pay this price', '#F87171'];
+  }
+  const tenantName = () => NAMES[Math.floor(Math.random() * NAMES.length)];
+
+  // ---- list / reprice / unlist / evict -------------------------------
+  function listFor(id, price) {
+    const a = assetOf(id);
+    if (!a) return { ok: false, why: 'no asset' };
+    if (a.kind === 'plot' && a.cart) return { ok: false, why: 'cart' };
+    price = Math.max(1, Math.min(999999, Math.round(price)));
+    const R = STATE.rentals || (STATE.rentals = []);
+    let e = entryOf(id);
+    if (!e) { e = { id, price, on: true, tenant: null, term: 0, next: 6 + Math.random() * 9 }; R.push(e); }
+    else { e.price = price; e.on = true; if (!e.tenant) e.next = Math.min(e.next || 12, 12); }
+    try { saveGame(); } catch (er) { }
+    return { ok: true, entry: e, fair: a.fair };
+  }
+  function unlist(id) {
+    if (!entryOf(id)) return { ok: false };
+    STATE.rentals = STATE.rentals.filter(x => x.id !== id);
+    try { saveGame(); } catch (er) { }
+    return { ok: true };
+  }
+  function evict(id) {
+    const e = entryOf(id);
+    if (!e || !e.tenant) return { ok: false };
+    e.tenant = null; e.term = 0; e.next = 15 + Math.random() * 30;
+    try { saveGame(); } catch (er) { }
+    return { ok: true };
+  }
+
+  // ---- the lease clock: one game day at a time -----------------------
+  function dayBeat() {
+    for (const e of (STATE.rentals || []).slice()) {
+      if (!assetOf(e.id)) {   // sold / lease-ended under us — sweep it
+        STATE.rentals = STATE.rentals.filter(x => x !== e);
+        continue;
+      }
+      if (!e.tenant) continue;
+      if (--e.term <= 0) {
+        const a = assetOf(e.id);
+        try { toast((a ? '<b>' + a.name + '</b>' : 'Your rental') + ' — ' + e.tenant + ' moved out. Back on the market.', 'warn'); } catch (er) { }
+        e.tenant = null; e.term = 0; e.next = 15 + Math.random() * 30;
+      }
+    }
+    try { saveGame(); } catch (er) { }
+  }
+  function letView(e, a) {   // one prospective tenant looks at a vacant listing
+    if (Math.random() < takeProb(e.price / a.fair)) {
+      e.tenant = tenantName();
+      e.term = 4 + Math.floor(Math.random() * 9);
+      try { toast('<b>' + e.tenant + '</b> rented your <b>' + a.name + '</b> — paying $' + e.price + '/day for ' + e.term + ' days.'); } catch (er) { }
+      return true;
+    }
+    return false;
+  }
+
+  // ---- income: additive delta on the office/deed/acres beat ----------
+  // tenanted -> the asset now pays YOUR price (delta = price - base);
+  // listed & empty -> the market has it, nobody pays (delta = -base);
+  // unlisted -> no entry, the original income stands untouched.
+  function tick(dt) {
+    const R = STATE.rentals || [];
+    if (STATE.mode !== 'city' || !R.length) { acc = 0; dayT = 0; return; }
+    acc += dt; dayT += dt;
+    if (acc >= 1) {
+      const secs = acc; acc = 0;
+      let d = 0;
+      for (const e of R) {
+        const a = assetOf(e.id);
+        if (!a) continue;
+        d += (e.on && e.tenant ? e.price - a.base : (e.on ? -a.base : 0)) / DAY * secs;
+      }
+      if (d) {
+        if (d < 0) d = Math.max(d, -STATE.money);   // never below zero
+        if (d) earn(d);
+      }
+      for (const e of R) {   // viewings run their own countdown while vacant
+        if (!e.on || e.tenant) continue;
+        if ((e.next -= secs) <= 0) {
+          const a = assetOf(e.id);
+          if (a && letView(e, a)) { try { saveGame(); } catch (er) { } }
+          else e.next = DAY;   // next viewing one game day out
+        }
+      }
+    }
+    if (dayT >= DAY) { dayT -= DAY; dayBeat(); }
+  }
+
+  // ---- status lines for the panels you already use -------------------
+  function tagLine(id, modalForm) {
+    const e = entryOf(id);
+    if (!e) return '';
+    if (modalForm) return e.tenant
+      ? '<div class="kv"><span class="k">RENTED OUT</span><span class="v" style="color:#48BB78">' + e.tenant + ' pays $' + e.price + '/day \u00b7 ' + e.term + ' day' + (e.term === 1 ? '' : 's') + ' left</span></div>'
+      : '<div class="kv"><span class="k">ON THE MARKET</span><span class="v" style="color:#F5CC74">$' + e.price + '/day \u00b7 vacant, tenants viewing</span></div>';
+    return e.tenant
+      ? '<div class="ohp-kv"><span>Tenant</span><b style="color:#48BB78">' + e.tenant + ' \u00b7 $' + e.price + '/day \u00b7 ' + e.term + 'd left</b></div>'
+      : '<div class="ohp-kv"><span>On the market</span><b style="color:#F5CC74">$' + e.price + '/day \u00b7 waiting for a tenant</b></div>';
+  }
+
+  // ---- the rent-out modal --------------------------------------------
+  function open(id) {
+    const a = assetOf(id);
+    if (!a) return;
+    const label = a.kind === 'office' || a.sublet ? 'Sublet It Out' : 'Rent It Out';
+    const renter = a.kind === 'acre' ? 'tenant farmers' : 'tenants';
+    const render = (preset) => {
+      const e = entryOf(id);
+      const price = preset != null ? preset : (e ? e.price : Math.max(1, Math.round(a.fair * 1.4)));
+      const [vt, vc] = verdict(price / a.fair);
+      const status = !e
+        ? 'Not listed — earning <b>' + (a.base > 0 ? '$' + a.base + '/day</b>' : 'nothing</b> (empty land)')
+        : (e.tenant
+          ? '<b style="color:#48BB78">' + e.tenant + '</b> pays <b style="color:#48BB78">$' + e.price + '/day</b> \u00b7 ' + e.term + ' day' + (e.term === 1 ? '' : 's') + ' left on the lease'
+          : 'On the market — <b style="color:#F5CC74">vacant</b>, earning $0/day while ' + renter + ' view it');
+      openModal(a.name + ' \u2014 ' + label, `
+        <div id="pl"><span class="l">Landlord</span><span class="v">${a.city || 'Worldwide'}</span></div>
+        <div class="kv"><span class="k">MARKET RATE</span><span class="v">$${a.fair}/day \u2014 what ${renter} pay around here</span></div>
+        <div class="kv"><span class="k">STATUS</span><span class="v">${status}</span></div>
+        <div class="kv"><span class="k">YOUR PRICE</span><span class="v"><input id="lr-p" type="number" min="1" step="1" value="${price}" style="width:110px;background:#0b1220;border:1px solid #2a3a52;color:#e6edf3;padding:8px 10px;border-radius:8px;font-weight:700;text-align:center;font-size:16px"> /day</span></div>
+        <div class="kv"><span class="k">OUTLOOK</span><span class="v" id="lr-o" style="color:${vc}">${vt}</span></div>
+        ${e && e.tenant ? '<p style="margin:10px 0 0">The price is locked until this lease ends \u2014 or evict ' + e.tenant + ' now and re-list at any price.</p>' : ''}
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <button class="btn" id="lr-mk" style="flex:1">MARKET $${a.fair}</button>
+          <button class="btn" id="lr-up" style="flex:1">+10%</button>
+          <button class="btn" id="lr-dn" style="flex:1">\u221210%</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          ${e && e.tenant
+            ? '<button class="btn bad" id="lr-go" style="flex:1">EVICT \u2014 RELIST AT MY PRICE</button>'
+            : '<button class="btn good" id="lr-go" style="flex:1">' + (e ? 'UPDATE PRICE' : 'LIST IT FOR RENT') + '</button>'}
+          ${e && !e.tenant ? '<button class="btn bad" id="lr-off" style="flex:1">TAKE OFF MARKET</button>' : ''}
+          <button class="btn" id="lr-x">CLOSE</button>
+        </div>`);
+      const inp = document.getElementById('lr-p');
+      const cur = () => Math.max(1, Math.min(999999, Math.round(+inp.value || 1)));
+      const liveVerdict = () => {
+        const [t, c] = verdict(cur() / a.fair);
+        const o = document.getElementById('lr-o');
+        if (o) { o.textContent = t; o.style.color = c; }
+      };
+      inp.oninput = liveVerdict;
+      document.getElementById('lr-mk').onclick = () => { inp.value = a.fair; liveVerdict(); };
+      document.getElementById('lr-up').onclick = () => { inp.value = Math.round(cur() * 1.1); liveVerdict(); };
+      document.getElementById('lr-dn').onclick = () => { inp.value = Math.max(1, Math.round(cur() * .9)); liveVerdict(); };
+      document.getElementById('lr-go').onclick = () => {
+        if (e && e.tenant) {   // (e re-read below — this branch uses the live entry)
+          const cur2 = entryOf(id);
+          if (cur2 && cur2.tenant) { evict(id); toast(cur2.tenant + ' moved out \u2014 the unit is back on the market.', 'warn'); }
+          render();
+          return;
+        }
+        const r = listFor(id, cur());
+        if (!r.ok) {
+          toast(r.why === 'cart'
+            ? '<b>The cart uses this land.</b> Scrap it first to rent the plot out.'
+            : 'Not yours to rent.', 'warn');
+          return;
+        }
+        toast('Listed <b>' + a.name + '</b> at <b>$' + cur() + '/day</b> \u2014 ' + renter + ' are viewing it now.');
+        render(cur());
+      };
+      const off = document.getElementById('lr-off');
+      if (off) off.onclick = () => {
+        unlist(id);
+        toast('Took <b>' + a.name + '</b> off the market \u2014 its normal income resumes.');
+        closeModal();
+      };
+      document.getElementById('lr-x').onclick = closeModal;
+    };
+    render();
+  }
+
+  // ---- the Empire panel: your rental portfolio ------------------------
+  function empireInto() {
+    const body = document.getElementById('mbody');
+    if (!body) return;
+    const close = document.getElementById('em-x');
+    const R = (STATE.rentals || []).slice();
+    const rows = R.map((e, i) => {
+      const a = assetOf(e.id);
+      if (!a) return '';
+      const st = e.tenant
+        ? '<span style="color:#48BB78">' + e.tenant + ' \u00b7 $' + e.price + '/day \u00b7 ' + e.term + 'd left</span>'
+        : '<span style="color:#F5CC74">vacant \u00b7 $' + e.price + '/day</span>';
+      return '<div class="kv"><span class="k">' + a.name + ' \u00b7 ' + st + '</span>' +
+        '<button class="tpbtn" data-lr="' + i + '">MANAGE</button></div>';
+    }).join('');
+    const net = R.reduce((s, e) => {
+      const a = assetOf(e.id);
+      return s + (a ? (e.tenant ? e.price - a.base : -a.base) : 0);
+    }, 0);
+    const html = '<div class="msec" style="margin-top:14px">Landlord \u2014 your rentals</div>' +
+      (rows || '<p>No rentals listed. Anything you own \u2014 a plot, an office, a room, a floor or a farm parcel \u2014 can be rented out at <b>your own price</b>.</p>') +
+      (rows ? '<div class="kv" style="margin-top:10px"><span class="k">RENTAL NET</span><span class="v ' + (net >= 0 ? 'g' : '') + '">' + (net >= 0 ? '+' : '\u2212') + '$' + Math.abs(net / 90 * 60).toFixed(2) + '/min vs. normal income</span></div>' : '');
+    const anchorEl = close ? close.parentElement : null;
+    if (anchorEl) anchorEl.insertAdjacentHTML('beforebegin', html);
+    else body.insertAdjacentHTML('beforeend', html);
+    body.querySelectorAll('[data-lr]').forEach(b => {
+      b.onclick = () => { const e2 = R[+b.dataset.lr]; if (e2) open(e2.id); };
+    });
+  }
+  const __landEmpire = ECO.openEmpire.bind(ECO);
+  ECO.openEmpire = function () {
+    __landEmpire();
+    try { empireInto(); } catch (e) { console.error('[landlord]', e); }
+  };
+
+  return {
+    open, tick, listFor, unlist, evict, isListed, isTenanted, tagLine,
+    assetOf, verdict, takeProb,
+    list: () => (STATE.rentals || []).slice(),
+    state() {
+      const R = STATE.rentals || [];
+      return {
+        listings: R.length,
+        tenanted: R.filter(e => e.tenant).length,
+        vacant: R.filter(e => e.on && !e.tenant).length,
+        netPerDay: R.reduce((s, e) => { const a = assetOf(e.id); return s + (a ? (e.tenant ? e.price - a.base : -a.base) : 0); }, 0),
+      };
+    },
+    qaDay(n) { for (let i = 0; i < (n || 1); i++) dayBeat(); },        // QA: run lease days instantly
+    qaLet(id) {                                                        // QA: force a tenant into a vacant listing
+      const e = entryOf(id);
+      if (e && !e.tenant) { e.tenant = tenantName(); e.term = 8; }
+      return entryOf(id);
+    },
+  };
+})();
+window.LORD = LORD;   // QA surface
+
+// ADDITIVE hook — the landlord tick rides the same WORLD.update wrap
+// chain the game already uses (original -> world forest -> open house
+// -> suburbs -> title deeds -> patchwork -> machines -> LANDLORD).
+// Every call is try/caught so a landlord error can never touch the
+// world.
+const __landOrigUpdate = WORLD.update.bind(WORLD);
+WORLD.update = function (dt, px, pz, camDist) {
+  const req = __landOrigUpdate(dt, px, pz, camDist);
+  try { LORD.tick(dt); } catch (e) { console.error('[landlord]', e); }
+  return req;
+};
+
+console.log('%cOPEN WORLD v2.47 — LANDLORD', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
