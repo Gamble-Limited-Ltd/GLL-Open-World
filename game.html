@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.48</title>
+<title>Open World — v2.49</title>
 <style>
 /* ==================================================================
    OPEN WORLD v2.42 — NEIGHBORHOODS: "make houses and neighborhoods
@@ -732,7 +732,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.48 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), every one of those rooms and floors for sale or for rent (buy it outright — yours forever, tenants pay you daily — or rent it with a two-day deposit; your holdings glow gold and pay you every day), a patchwork of buyable farm parcels over every mile of open country around the cities (rectangles of all shapes and sizes in every shade of green like a satellite view — hover one for its price, click to buy it, and the tenant farmers pay you daily — at premium prices since v2.46: about ten times the cost for about three times the rent), landlord rentals at your own price (list any plot, office suite, room, floor or farm parcel you own and tenants pay your daily rate — price it above the local market and it may sit empty while the market looks), and machines you install inside the rooms and floors you own (six kinds from a vending machine to a server rack — click a spot in your own space to set each one down, and every machine pays you every day), mining claims you stake yourself in the open country (select any rectangle of land past the suburbs, set your machinery on its ring and dig — the ore sells daily and the pit terraces deeper until it’s worked out), and the same streets, buildings, plots and roads on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.49 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), every one of those rooms and floors for sale or for rent (buy it outright — yours forever, tenants pay you daily — or rent it with a two-day deposit; your holdings glow gold and pay you every day), a patchwork of buyable farm parcels over every mile of open country around the cities (rectangles of all shapes and sizes in every shade of green like a satellite view — hover one for its price, click to buy it, and the tenant farmers pay you daily — at premium prices since v2.46: about ten times the cost for about three times the rent), landlord rentals at your own price (list any plot, office suite, room, floor or farm parcel you own and tenants pay your daily rate — price it above the local market and it may sit empty while the market looks), and machines you install inside the rooms and floors you own (six kinds from a vending machine to a server rack — click a spot in your own space to set each one down, and every machine pays you every day), mining claims you stake yourself in the open country (select any rectangle of land past the suburbs, set your machinery on its ring and dig — the ore sells daily and the pit terraces deeper until it’s worked out), and the same streets, buildings, plots and roads on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -768,7 +768,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.48';
+const GAME_VERSION = 'v2.49';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -9885,16 +9885,19 @@ function checkForUpdate() {
 }
 
 // ---------------- What's New ------------------------------------------
+// v2.49 — QUICK START: the ask was "make the summary of the page
+// shorter when I first login." This card pops right after ENTER
+// WORLD whenever a build is new to you; it used to carry five dense
+// paragraph rows (~280 words) and now reads as three tight lines.
+// The long-form how-to detail still lives in HELP / How to Build.
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.48 — MOTHERLODE', `
+  openModal('Welcome to v2.49 — QUICK START', `
     <p><b>Select an area and mine it out with machinery.</b></p>
-    <div class="kv"><span class="k">STAKE A CLAIM</span><span class="v">Press MINE, STAKE A CLAIM, then click two corners of any rectangle of open country — a live gold rectangle follows your cursor between the clicks — and the assay prices what’s underneath (ore type, grade $/t, reserve tonnes, gross value at the spot price)</span></div>
-    <div class="kv"><span class="k">MACHINERY</span><span class="v">Buy machines from an $18,000 Wheel Loader (60 t/day) to a $520,000 Bucket-Wheel Excavator (4,200 t/day) and set each one down yourself — a ghost follows your cursor on the claim’s rim bench, green where it fits, red where it doesn’t</span></div>
-    <div class="kv"><span class="k">THE PIT</span><span class="v">The ore sells itself on the game-day beat, the reserve runs down, and the pit you carve cuts a terrace per sixth mined — the dump rim rises past 17 m as the benches step down to the ore face, spoil heaps growing on the corners — until the assay is WORKED OUT and the income stops</span></div>
-    <div class="kv"><span class="k">WHERE</span><span class="v">The MINE button sits in the bottom bar next to MARKET; every mine lists in the Empire panel with one-tap TELEPORT, counts in your WORTH, machinery sells back for 60%, and a worked-out mine reclaims the land for free — it all saves with the game</span></div>
-    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The landlord rentals, the machines, the premium land, the patchwork, the title deeds, the inspector, the neighborhoods, the world forest and the true 1:1 Earth are untouched</span></div>
+    <div class="kv"><span class="k">STAKE</span><span class="v">MINE → STAKE A CLAIM → click two corners of open country</span></div>
+    <div class="kv"><span class="k">MACHINERY</span><span class="v">Buy it at the yard, click the claim’s rim to set it down</span></div>
+    <div class="kv"><span class="k">THE PIT</span><span class="v">Ore sells itself daily — until it’s WORKED OUT</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -14356,7 +14359,7 @@ WORLD.update = function (dt, px, pz, camDist) {
   return req;
 };
 
-console.log('%cOPEN WORLD v2.48 — MOTHERLODE', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.49 — QUICK START', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
