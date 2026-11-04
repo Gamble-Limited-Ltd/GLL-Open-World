@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.45</title>
+<title>Open World — v2.46</title>
 <style>
 /* ==================================================================
    OPEN WORLD v2.42 — NEIGHBORHOODS: "make houses and neighborhoods
@@ -731,7 +731,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.45 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), every one of those rooms and floors for sale or for rent (buy it outright — yours forever, tenants pay you daily — or rent it with a two-day deposit; your holdings glow gold and pay you every day), a patchwork of buyable farm parcels over every mile of open country around the cities (rectangles of all shapes and sizes in every shade of green like a satellite view — hover one for its price, click to buy it, and the tenant farmers pay you daily), and machines you install inside the rooms and floors you own (six kinds from a vending machine to a server rack — click a spot in your own space to set each one down, and every machine pays you every day), and the same streets, buildings, plots and roads on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.46 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), every one of those rooms and floors for sale or for rent (buy it outright — yours forever, tenants pay you daily — or rent it with a two-day deposit; your holdings glow gold and pay you every day), a patchwork of buyable farm parcels over every mile of open country around the cities (rectangles of all shapes and sizes in every shade of green like a satellite view — hover one for its price, click to buy it, and the tenant farmers pay you daily — at premium prices since v2.46: about ten times the cost for about three times the rent), and machines you install inside the rooms and floors you own (six kinds from a vending machine to a server rack — click a spot in your own space to set each one down, and every machine pays you every day), and the same streets, buildings, plots and roads on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -767,7 +767,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.45';
+const GAME_VERSION = 'v2.46';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -9861,13 +9861,13 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.45 — MACHINES', `
-    <p><b>Fill the rooms and floors you own with money-making machines.</b></p>
-    <div class="kv"><span class="k">THE SHOP</span><span class="v">Pick a floor or room you own or rent in the building inspector and hit INSTALL MACHINES — six machines, from a $2,400 Vending Machine to a $52,000 Server Rack</span></div>
-    <div class="kv"><span class="k">PLACE THEM YOURSELF</span><span class="v">A ghost box follows your cursor on your floor — green where it fits, red where it doesn't — and a click sets the machine down right there. Keep clicking to fill the space; DONE or ESC finishes</span></div>
-    <div class="kv"><span class="k">THEY WORK EVERY DAY</span><span class="v">Every machine pays its keep daily (a vending machine $52, a server rack $1,150) on the same beat as your rent — a little work light blinks on top while it runs</span></div>
-    <div class="kv"><span class="k">TRADE UP OR DOWN</span><span class="v">Sell any machine back for 60% from the same shop; your Empire panel counts them per deed, and machines count toward your net worth</span></div>
-    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The patchwork parcels, the title deeds, the inspector, the neighborhoods, the world forest, the deep-blue lakes, the 23,000 km zoom and the true 1:1 Earth are untouched</span></div>
+  openModal('Welcome to v2.46 — PREMIUM LAND', `
+    <p><b>The plots around the world now cost what land should.</b></p>
+    <div class="kv"><span class="k">TEN TIMES THE PRICE</span><span class="v">A farm field that ran $80–$340 now runs roughly $750–$3,400 — buying land is a real investment, not pocket change</span></div>
+    <div class="kv"><span class="k">THREE TIMES THE RENT</span><span class="v">Tenant farmers pay about three times more too ($13–$72 a day per field), so land pays for itself in about 47 days — the machines' own beat (it was 14)</span></div>
+    <div class="kv"><span class="k">WHAT YOU OWN IS SAFE</span><span class="v">Fields you already bought keep the price you paid and the rent they came with — nothing was repriced out from under you</span></div>
+    <div class="kv"><span class="k">SAME PATCHWORK</span><span class="v">Every field is still there in all shapes and sizes — hover for its price, click to buy (or its FOR SALE sign), 60% sellback, Empire + Worth as before</span></div>
+    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The machines, the title deeds, the inspector, the neighborhoods, the world forest, the deep-blue lakes, the 23,000 km zoom and the true 1:1 Earth are untouched</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -12069,7 +12069,7 @@ const FARM = (() => {
       const base = (h2 % 100) < 9 ? RARE[h % RARE.length] : PAL[h % PAL.length];
       const jit = .94 + (h2 % 100) / 100 * .12;
       const nc = nearestCity(cx, cz);
-      const rate = Math.max(2, Math.round(4 + ha * 2.6 + (h % 5)));
+      const rate = Math.max(6, Math.round(12 + ha * 7.8 + (h % 5) * 3));   // v2.46 PREMIUM LAND: 3x the tenant rent (was 4+ha*2.6+h%5)
       arr.push({
         id, x0: rx0, z0: rz0, x1: rx1, z1: rz1, cx, cz, w, d, ha,
         color: [base[0] * jit, base[1] * jit, base[2] * jit],
@@ -12077,7 +12077,7 @@ const FARM = (() => {
         ry: (h % 628) / 100,
         name: FN[h % FN.length] + ' ' + FS[h2 % FS.length],
         rate,
-        price: Math.max(80, Math.round(rate * 14 / 10) * 10),
+        price: Math.max(750, Math.round(rate * 47 / 10) * 10),   // v2.46 PREMIUM LAND: ~10x the sticker, 47-day payback (was 14 days / $80 floor)
         near: nc && nc.d < 120000 ? nc.c.name : null,
         nearKey: nc ? nc.c.key : null,
         usable: null,                                          // lazy — LANDGEO may still be loading
@@ -13044,7 +13044,7 @@ WORLD.update = function (dt, px, pz, camDist) {
   return req;
 };
 
-console.log('%cOPEN WORLD v2.45 — MACHINES', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.46 — PREMIUM LAND', 'color:#38BDF8;font-weight:700', 'ready.');
 
 </script>
 </body>
