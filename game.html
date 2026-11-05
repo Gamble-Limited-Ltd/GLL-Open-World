@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.53</title>
+<title>Open World — v2.54</title>
 <style>
 /* ==================================================================
    OPEN WORLD v2.42 — NEIGHBORHOODS: "make houses and neighborhoods
@@ -734,7 +734,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.53 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), every one of those rooms and floors for sale or for rent (buy it outright — yours forever, tenants pay you daily — or rent it with a two-day deposit; your holdings glow gold and pay you every day), a patchwork of buyable farm parcels over every mile of open country around the cities (rectangles of all shapes and sizes in every shade of green like a satellite view — hover one for its price, click to buy it, and the tenant farmers pay you daily — at premium prices since v2.46: about ten times the cost for about three times the rent), landlord rentals at your own price (list any plot, office suite, room, floor or farm parcel you own and tenants pay your daily rate — price it above the local market and it may sit empty while the market looks), and machines you install inside the rooms and floors you own (six kinds from a vending machine to a server rack — click a spot in your own space to set each one down, and every machine pays you every day), mining claims you stake yourself in the open country (select any rectangle of land past the suburbs, set your machinery on its ring and hire the crew that digs it — their wages come out of the daily ore sale, and the pit terraces deeper until it’s worked out), the Money List that ranks your WORTH against fifteen rival tycoons around the real Earth (their fortunes move on every game-day beat — small piles sprint, old money compounds — pass them one by one, and your live rank rides the WORTH ticker chip), the Ore Exchange where the resources your crews dig stack up tonne by tonne in a stockpile and sell on a market of twelve daily-moving prices (each ore trades around its par value — watch the ▲▼ day change, sell half or all whenever it suits you, and the pile counts in your WORTH at today’s prices), the Works where twelve refining machines turn the ore in your stockpile into refined goods — steel from iron, coke from coal, glass from quartz — poured on the game-day beat for power at $0.25 a tonne and traded on the same exchange for more than the ore that went in (any machine scraps back for 60%), and the same streets, buildings, plots and roads on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.54 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), every one of those rooms and floors for sale or for rent (buy it outright — yours forever, tenants pay you daily — or rent it with a two-day deposit; your holdings glow gold and pay you every day), a patchwork of buyable farm parcels over every mile of open country around the cities (rectangles of all shapes and sizes in every shade of green like a satellite view — hover one for its price, click to buy it, and the tenant farmers pay you daily — at premium prices since v2.46: about ten times the cost for about three times the rent), landlord rentals at your own price (list any plot, office suite, room, floor or farm parcel you own and tenants pay your daily rate — price it above the local market and it may sit empty while the market looks), and machines you install inside the rooms and floors you own (six kinds from a vending machine to a server rack — click a spot in your own space to set each one down, and every machine pays you every day), mining claims you stake yourself in the open country (select any rectangle of land past the suburbs, set your machinery on its ring and hire the crew that digs it — their wages come out of the daily ore sale, and the pit terraces deeper until it’s worked out), the Money List that ranks your WORTH against fifteen rival tycoons around the real Earth (their fortunes move on every game-day beat — small piles sprint, old money compounds — pass them one by one, and your live rank rides the WORTH ticker chip), the Ore Exchange where the resources your crews dig stack up tonne by tonne in a stockpile and sell on a market of twelve daily-moving prices (each ore trades around its par value — watch the ▲▼ day change, sell half or all whenever it suits you, and the pile counts in your WORTH at today’s prices), the Works where twelve refining machines turn the ore in your stockpile into refined goods — steel from iron, coke from coal, glass from quartz — poured on the game-day beat for power at $0.25 a tonne and traded on the same exchange for more than the ore that went in (any machine scraps back for 60%), and the same streets, buildings, plots and roads on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -770,7 +770,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.53';
+const GAME_VERSION = 'v2.54';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -8079,6 +8079,7 @@ const ECO = (() => {
   // ---------------- recruits (deterministic per plot+slot) ----------
   function recruit(plotId, slot) {
     const h = hashStr(plotId + '#' + slot);
+    const stars = 1 + (_ihash(h & 1023, slot, 77) * 5 | 0);   // v2.54 CREW CALL: restored verbatim from the v2.00 source — this line was lost in a v2.1x rebuild, and its absence made recruit() throw (stars is not defined), which silently killed every food-cart business panel on click
     return { name: NAMES[h % NAMES.length], stars: Math.min(5, stars) };
   }
   const hireFee = stars => Math.round(300 * (.5 + stars * .25));
@@ -9917,12 +9918,11 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.53 — THE WORKS', `
-    <p><b>Machines that refine your resources into other resources.</b></p>
-    <div class="kv"><span class="k">THE WORKS</span><span class="v">Twelve refining machines — from a $22,000 Briquette Press to a $64,000 Alloy Works — bought outright and set on the line; OPEN from the WORKS row on the MINE panel, the THE WORKS button on the exchange board, or the Empire panel</span></div>
-    <div class="kv"><span class="k">THE POUR</span><span class="v">Every game day each machine draws ore from your stockpile and pours refined goods back into it — 3 t of iron becomes 1 t of Steel, 1.6 t of quartz becomes 1 t of Glass, 5 t of copper becomes 1 t of Cathode — with power billed at $0.25 a tonne processed</span></div>
-    <div class="kv"><span class="k">THE EXCHANGE</span><span class="v">Refined goods trade beside the ores (24 rows in two groups) and generally for more than the ore that went in — sell them the same way, watch the ▲▼ day change, and feed the works by holding some ore back</span></div>
-    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The crews, the pits, the landlord, the machines, the premium land, the patchwork, the title deeds, the inspector, the neighborhoods, the world forest, the Money List and the true 1:1 Earth are untouched</span></div>
+  openModal('Welcome to v2.54 — CREW CALL', `
+    <p><b>Click your carts — the business panel opens again.</b></p>
+    <div class="kv"><span class="k">THE FIX</span><span class="v">A single line of code lost in an old rebuild had been throwing an error the moment a cart's crew panel drew — so clicking any food cart you own (your coffee shop, your taco stand) silently did nothing</span></div>
+    <div class="kv"><span class="k">WHAT'S BACK</span><span class="v">Click any cart you own: the live P&L, the menu, hiring your five vendors and scrapping the cart — all exactly as it always was, on every save</span></div>
+    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The crews, the pits, the exchange, the works, the landlord, the machines, the Money List and the true 1:1 Earth are untouched</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -15420,7 +15420,7 @@ WORLD.update = function (dt, px, pz, camDist) {
   return req;
 };
 
-console.log('%cOPEN WORLD v2.53 — THE WORKS', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.54 — CREW CALL', 'color:#38BDF8;font-weight:700', 'ready.');
 
 
 </script>
