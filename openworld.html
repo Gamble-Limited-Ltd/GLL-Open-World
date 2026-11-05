@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.52</title>
+<title>Open World — v2.53</title>
 <style>
 /* ==================================================================
    OPEN WORLD v2.42 — NEIGHBORHOODS: "make houses and neighborhoods
@@ -734,7 +734,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.52 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), every one of those rooms and floors for sale or for rent (buy it outright — yours forever, tenants pay you daily — or rent it with a two-day deposit; your holdings glow gold and pay you every day), a patchwork of buyable farm parcels over every mile of open country around the cities (rectangles of all shapes and sizes in every shade of green like a satellite view — hover one for its price, click to buy it, and the tenant farmers pay you daily — at premium prices since v2.46: about ten times the cost for about three times the rent), landlord rentals at your own price (list any plot, office suite, room, floor or farm parcel you own and tenants pay your daily rate — price it above the local market and it may sit empty while the market looks), and machines you install inside the rooms and floors you own (six kinds from a vending machine to a server rack — click a spot in your own space to set each one down, and every machine pays you every day), mining claims you stake yourself in the open country (select any rectangle of land past the suburbs, set your machinery on its ring and hire the crew that digs it — their wages come out of the daily ore sale, and the pit terraces deeper until it’s worked out), the Money List that ranks your WORTH against fifteen rival tycoons around the real Earth (their fortunes move on every game-day beat — small piles sprint, old money compounds — pass them one by one, and your live rank rides the WORTH ticker chip), the Ore Exchange where the resources your crews dig stack up tonne by tonne in a stockpile and sell on a market of twelve daily-moving prices (each ore trades around its par value — watch the ▲▼ day change, sell half or all whenever it suits you, and the pile counts in your WORTH at today’s prices), and the same streets, buildings, plots and roads on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.53 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), every one of those rooms and floors for sale or for rent (buy it outright — yours forever, tenants pay you daily — or rent it with a two-day deposit; your holdings glow gold and pay you every day), a patchwork of buyable farm parcels over every mile of open country around the cities (rectangles of all shapes and sizes in every shade of green like a satellite view — hover one for its price, click to buy it, and the tenant farmers pay you daily — at premium prices since v2.46: about ten times the cost for about three times the rent), landlord rentals at your own price (list any plot, office suite, room, floor or farm parcel you own and tenants pay your daily rate — price it above the local market and it may sit empty while the market looks), and machines you install inside the rooms and floors you own (six kinds from a vending machine to a server rack — click a spot in your own space to set each one down, and every machine pays you every day), mining claims you stake yourself in the open country (select any rectangle of land past the suburbs, set your machinery on its ring and hire the crew that digs it — their wages come out of the daily ore sale, and the pit terraces deeper until it’s worked out), the Money List that ranks your WORTH against fifteen rival tycoons around the real Earth (their fortunes move on every game-day beat — small piles sprint, old money compounds — pass them one by one, and your live rank rides the WORTH ticker chip), the Ore Exchange where the resources your crews dig stack up tonne by tonne in a stockpile and sell on a market of twelve daily-moving prices (each ore trades around its par value — watch the ▲▼ day change, sell half or all whenever it suits you, and the pile counts in your WORTH at today’s prices), the Works where twelve refining machines turn the ore in your stockpile into refined goods — steel from iron, coke from coal, glass from quartz — poured on the game-day beat for power at $0.25 a tonne and traded on the same exchange for more than the ore that went in (any machine scraps back for 60%), and the same streets, buildings, plots and roads on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -770,7 +770,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.52';
+const GAME_VERSION = 'v2.53';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -1196,6 +1196,7 @@ const STATE = {
   rivals: [],                    // v2.51 MONEY LIST: the fifteen rival fortunes by roster slot (worth only — names/trades live in code)
   res: {},                       // v2.52 ORE EXCHANGE: the resource stockpile {resource: tonnes} — what your mines dug, unsold
   mkt: {},                       // v2.52 ORE EXCHANGE: the market multipliers {resource: {m, pm}} — today's and yesterday's rate around par
+  works: {},                     // v2.53 THE WORKS: the refining machine counts {machineId: n}
   market: null,                  // MARKET module state (positions/orders)
   lastCityKey: null,
   seenNews: false,
@@ -1228,6 +1229,7 @@ function saveGame() {
       rivals: (STATE.rivals || []).map(w => isFinite(+w) ? Math.round(+w) : null),   // v2.51 MONEY LIST (optional field — older builds ignore it)
       res: (() => { const o = {}; for (const k in (STATE.res || {})) { const v = +(STATE.res[k] || 0); if (isFinite(v) && v > 0) o[k] = +v.toFixed(2); } return o; })(),   // v2.52 ORE EXCHANGE (optional field — older builds ignore it)
       mkt: (() => { const o = {}; for (const k in (STATE.mkt || {})) { const e = STATE.mkt[k]; if (e && typeof e === 'object' && isFinite(+e.m)) o[k] = { m: +(+e.m).toFixed(3), pm: +(+e.pm || 1).toFixed(3) }; } return o; })(),   // v2.52 ORE EXCHANGE (optional field — older builds ignore it)
+      works: (() => { const o = {}; for (const k in (STATE.works || {})) { const v = STATE.works[k] | 0; if (v > 0) o[k] = Math.min(99, v); } return o; })(),   // v2.53 THE WORKS (optional field — older builds ignore it)
       market: STATE.market ? STATE.market.pack() : null,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(pack));
@@ -1324,6 +1326,10 @@ function loadGame() {
     STATE.mkt = {};
     const __exm = (p.mkt && typeof p.mkt === 'object') ? p.mkt : {};
     for (const k in __exm) { const e = __exm[k]; if (typeof k === 'string' && k.length && k.length <= 12 && e && typeof e === 'object' && isFinite(+e.m)) STATE.mkt[k] = { m: Math.max(.55, Math.min(1.7, +e.m)), pm: Math.max(.55, Math.min(1.7, +(e.pm || 1))) }; }
+    // v2.53 THE WORKS: the refining machine counts (absent on older saves — none built)
+    STATE.works = {};
+    const __wk = (p.works && typeof p.works === 'object') ? p.works : {};
+    for (const k in __wk) { if (typeof k === 'string' && k.length && k.length <= 12 && isFinite(+__wk[k]) && +__wk[k] > 0) STATE.works[k] = Math.min(99, Math.round(+__wk[k])); }
     STATE.marketPack = p.market || null;
     // v2.05 starter guide: fresh players start at step 0; returning
     // players who already own a business are exempt
@@ -9911,11 +9917,11 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.52 — THE ORE EXCHANGE', `
-    <p><b>Your mines now dig up real resources — and sell them on a market.</b></p>
-    <div class="kv"><span class="k">THE STOCKPILE</span><span class="v">The crew’s ore no longer sells itself — it stacks up tonne by tonne as resources, tracked on the MINE panel and every mine’s MANAGE modal</span></div>
-    <div class="kv"><span class="k">THE EXCHANGE</span><span class="v">The new ORE button (bottom bar, next to MINE) opens the market — twelve resource prices move every game day; sell half or all, or hold for a better price</span></div>
-    <div class="kv"><span class="k">PAYDAY & WORTH</span><span class="v">Wages are still paid daily in cash — keep selling to cover them — and the stockpile counts in your WORTH at today’s prices</span></div>
+  openModal('Welcome to v2.53 — THE WORKS', `
+    <p><b>Machines that refine your resources into other resources.</b></p>
+    <div class="kv"><span class="k">THE WORKS</span><span class="v">Twelve refining machines — from a $22,000 Briquette Press to a $64,000 Alloy Works — bought outright and set on the line; OPEN from the WORKS row on the MINE panel, the THE WORKS button on the exchange board, or the Empire panel</span></div>
+    <div class="kv"><span class="k">THE POUR</span><span class="v">Every game day each machine draws ore from your stockpile and pours refined goods back into it — 3 t of iron becomes 1 t of Steel, 1.6 t of quartz becomes 1 t of Glass, 5 t of copper becomes 1 t of Cathode — with power billed at $0.25 a tonne processed</span></div>
+    <div class="kv"><span class="k">THE EXCHANGE</span><span class="v">Refined goods trade beside the ores (24 rows in two groups) and generally for more than the ore that went in — sell them the same way, watch the ▲▼ day change, and feed the works by holding some ore back</span></div>
     <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The crews, the pits, the landlord, the machines, the premium land, the patchwork, the title deeds, the inspector, the neighborhoods, the world forest, the Money List and the true 1:1 Earth are untouched</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
@@ -9939,6 +9945,7 @@ document.getElementById('b-build').addEventListener('click', () => {
     <div class="kv"><span class="k">LANDLORD</span><span class="v">Anything you own — a plot, an office, a room, a floor or a farm parcel — can be rented out at <b>your own price</b>: list it and tenants view it on the game-day beat, paying you daily; price it above the local market and it may sit empty (RENT IT OUT buttons live in the panels you already use)</span></div>
     <div class="kv"><span class="k">MINING</span><span class="v">Stake a rectangular claim anywhere in the open country (the <b>MINE</b> button in the bottom bar), set machinery on the claim’s ring and <b>hire the crew that digs it</b> — every worker earns $95/day paid daily in cash, a short crew runs the machinery slower, and if payday ever comes up short the crew walks off; the ore they dig stacks up as resources in your stockpile, the pit grows a terrace deeper as they dig, and when the assay runs out the mine is worked out</span></div>
     <div class="kv"><span class="k">ORE EXCHANGE</span><span class="v">The <b>ORE</b> button in the bottom bar opens the market for the resources your mines dig — twelve prices that move every game day around each ore’s par value (watch the ▲▼ day change); sell half or all of any pile whenever the price suits you, and the stockpile counts in your WORTH at today’s prices</span></div>
+    <div class="kv"><span class="k">REFINING</span><span class="v">The <b>WORKS</b> row on the MINE panel (and THE WORKS button on the exchange board) sells twelve refining machines that turn stockpiled ore into refined goods — steel from iron, coke from coal, glass from quartz — pouring on the game-day beat for power at $0.25/t; the goods trade on the ORE exchange for more than the ore that went in, and any machine scraps back for 60%</span></div>
     <div class="kv"><span class="k">MONEY LIST</span><span class="v">The <b>RANK</b> button in the bottom bar opens the leaderboard of the richest — fifteen rival tycoons around the real Earth and you, ranked by <b>WORTH</b> (cash plus everything you own); their fortunes move on every game-day beat (small piles sprint, old money compounds slow), passing a rival — or being passed — toasts it, and your live rank rides the WORTH ticker chip</span></div>
     <div class="kv"><span class="k">CARTS</span><span class="v">Stand close → [E] to serve the queue</span></div>
     <div class="kv"><span class="k">CREWS</span><span class="v">Business panel → hire star vendors</span></div>
@@ -14835,7 +14842,7 @@ WORLD.update = function (dt, px, pz, camDist) {
 // get from mining, and sell on a market." This is the MARKET half of
 // the pair (51_mining.js is the resource half — the crew's dig now
 // becomes stockpiled resource instead of selling itself):
-//   - the new ORE button (bottom bar, next to MINE) opens THE ORE
+//   - the ORE button (bottom bar, next to MINE) opens THE ORE
 //     EXCHANGE — twelve resource rows (Iron, Copper, Coal, Bauxite,
 //     Nickel, Lignite, Gypsum, Salt, Zinc, Tin, Silver, Quartz), each
 //     trading around its PAR value at a market MULTIPLIER;
@@ -14861,21 +14868,37 @@ WORLD.update = function (dt, px, pz, camDist) {
 //   - persistence: the optional `res` + `mkt` fields in the save
 //     pack (pack stays v5 — older builds ignore them), sanitized on
 //     load; multipliers default to par (×1.00).
+// v2.53 — THE WORKS rework (the market half of the refining pair;
+// 54_works.js is the machine half): the board now carries the
+// REFINED GOODS the works pour alongside the ores — 24 rows in two
+// groups (THE ORES / REFINED GOODS), each good trading around the
+// par its machine sets, the same daily drift, the same SELL buttons,
+// the same WORTH — and a THE WORKS button on the board opens the
+// refiners. addGoods() (called once by 54_works.js at boot) extends
+// the tradable list; every loop over RES picks the goods up from
+// then on. The ready log moved to 54_works.js (the last section).
 // Everything lives in this one additive section; the only outside
-// touchpoints are annotated "v2.52" (STATE/save/load res+mkt, the
-// WORTH ticker, the ORE button + wiring, the help-modal line, the
-// What's-New modal, the attrib footer and the version surfaces).
+// touchpoints are annotated "v2.52"/"v2.53" (STATE/save/load res+mkt,
+// the WORTH ticker, the ORE button + wiring, the help-modal line,
+// the What's-New modal, the attrib footer and the version surfaces).
 // window.EXCH is the QA surface. Every exchange call is try/caught.
 // ====================================================================
 
 const EXCH = (() => {
   const DAY = 90;               // seconds per game day (the office/deed/acres/rivals beat)
-  // the tradable resources (51_mining.js's ORES, in the same order)
-  const RES = ['Iron', 'Copper', 'Coal', 'Bauxite', 'Nickel', 'Lignite', 'Gypsum', 'Salt', 'Zinc', 'Tin', 'Silver', 'Quartz'];
-  // the par table lives in the mining section (single source of
-  // truth); this fallback only matters if 51 ever evals after 53
-  const FALLBACK = { Iron: 13, Copper: 22, Coal: 12, Bauxite: 15, Nickel: 24, Lignite: 12, Gypsum: 14, Salt: 16, Zinc: 19, Tin: 21, Silver: 26, Quartz: 17 };
-  const BASE = (window.MINE && MINE.BASE) || FALLBACK;
+  // the mined ores (51_mining.js's ORES, in the same order)
+  const ORES = ['Iron', 'Copper', 'Coal', 'Bauxite', 'Nickel', 'Lignite', 'Gypsum', 'Salt', 'Zinc', 'Tin', 'Silver', 'Quartz'];
+  // the full tradable list — the refined goods (54_works.js) join it
+  // at boot via addGoods(); every loop below reads RES live, so the
+  // goods ride the multipliers, the board, WORTH and SELL EVERYTHING
+  // with no further wiring
+  let RES = ORES.slice();
+  // the par tables: the ores' live in the mining section and the
+  // refined goods' in the works section (single sources of truth);
+  // this fallback only matters if 51/54 ever eval after 53
+  const FALLBACK = { Iron: 13, Copper: 22, Coal: 12, Bauxite: 15, Nickel: 24, Lignite: 12, Gypsum: 14, Salt: 16, Zinc: 19, Tin: 21, Silver: 26, Quartz: 17,
+    Steel: 58, Coke: 31, Aluminium: 102, Cathode: 170, Superalloy: 152, 'Zinc Ingot': 88, 'Tin Solder': 74, 'Silver Bar': 86, Glass: 38, Plaster: 29, 'Soda Ash': 47, Briquette: 24 };
+  const parOf = r => (window.MINE && MINE.BASE && MINE.BASE[r]) || (window.WORKS && WORKS.BASE && WORKS.BASE[r]) || FALLBACK[r] || 14;
   const LO = .55, HI = 1.7;     // the multiplier band
   const STEP = .16;             // ±8% a day
 
@@ -14904,14 +14927,14 @@ const EXCH = (() => {
       for (const m of (STATE.mines || [])) {
         if (!m) continue;
         if (!m.res) m.res = String(m.name || 'Ore').split(' ')[0];
-        const b = BASE[m.res];
+        const b = (window.MINE && MINE.BASE) ? MINE.BASE[m.res] : FALLBACK[m.res];
         if (b && Math.abs((+m.grade || 0) - b) > .01) m.grade = b;
       }
     } catch (er) { }
   }
   const mult = r => { const e = STATE.mkt && STATE.mkt[r]; return (e && isFinite(+e.m) && +e.m > 0) ? +e.m : 1; };
   const pmv = r => { const e = STATE.mkt && STATE.mkt[r]; return (e && isFinite(+e.pm) && +e.pm > 0) ? +e.pm : 1; };
-  const price = r => (BASE[r] || 14) * mult(r);
+  const price = r => parOf(r) * mult(r);
   const pctOf = r => { const p = pmv(r); return p ? (mult(r) / p - 1) * 100 : 0; };
   const held = r => +(+((STATE.res && STATE.res[r]) || 0)) || 0;
   const stockT = () => { ensure(); return RES.reduce((s, r) => s + held(r), 0); };
@@ -14935,7 +14958,7 @@ const EXCH = (() => {
     if (dayT >= DAY) { dayT -= DAY; try { day(); } catch (er) { console.error('[exchange]', er); } }
   }
 
-  // ---- the stockpile (fed by the mining tick) --------------------------
+  // ---- the stockpile (fed by the mining tick and the works pour) ------
   function pile(res, tons) {
     if (!isFinite(+tons) || +tons <= 0) return held(res);
     ensure();
@@ -14981,9 +15004,10 @@ const EXCH = (() => {
   // ---- the board ------------------------------------------------------------
   function rowHTML(r) {
     const px = price(r), pc = pctOf(r), h = held(r), up = pc >= 0;
+    const from = (window.WORKS && WORKS.inOf) ? WORKS.inOf(r) : null;   // v2.53: refined goods carry their ore
     const pcs = '<span style="color:' + (up ? '#4dff88' : '#ff5470') + '">' + (up ? '▲' : '▼') + Math.abs(pc).toFixed(1) + '% today</span>';
     return '<div class="ox-row' + (h > 0 ? ' hot' : '') + '">' +
-      '<div class="ox-name"><b>' + r.toUpperCase() + '</b><span>par $' + (BASE[r] || 14) + '/t · ' + (h > 0 ? h.toFixed(1) + ' t held ≈ ' + fmt$(h * px) : 'none held') + '</span></div>' +
+      '<div class="ox-name"><b>' + r.toUpperCase() + '</b><span>' + (from ? 'refined from ' + from.toLowerCase() + ' · ' : '') + 'par $' + parOf(r) + '/t · ' + (h > 0 ? h.toFixed(1) + ' t held ≈ ' + fmt$(h * px) : 'none held') + '</span></div>' +
       '<div class="ox-px">$' + (Math.round(px * 10) / 10) + '/t<span>' + pcs + '</span></div>' +
       '<div class="ox-btns">' + (h > 0
         ? '<button class="tpbtn" data-eh="' + r + '">SELL HALF</button><button class="tpbtn" data-es="' + r + '">SELL ALL</button>'
@@ -14996,9 +15020,13 @@ const EXCH = (() => {
     const t = stockT(), v = stockValue();
     const sum = document.getElementById('ox-sum');
     if (sum) sum.innerHTML =
-      '<div class="kv"><span class="k">STOCKPILE</span><span class="v' + (t > 0 ? ' g' : '') + '">' + (t > 0 ? t.toFixed(1) + ' t of ore ≈ ' + fmt$(v) + ' at today\u2019s prices' : 'empty — the ore your crews dig stacks up here') + '</span></div>' +
-      '<div class="kv" style="margin-top:6px"><span class="k">THE MARKET</span><span class="v">12 resources · par × the day\u2019s multiplier · moves every game day</span></div>';
-    list.innerHTML = [...RES.filter(r => held(r) > 0.005), ...RES.filter(r => held(r) <= 0.005)].map(rowHTML).join('');   // what you hold rides the top
+      '<div class="kv"><span class="k">STOCKPILE</span><span class="v' + (t > 0 ? ' g' : '') + '">' + (t > 0 ? t.toFixed(1) + ' t of ore and goods ≈ ' + fmt$(v) + ' at today\u2019s prices' : 'empty — the ore your crews dig stacks up here') + '</span></div>' +
+      '<div class="kv" style="margin-top:6px"><span class="k">THE MARKET</span><span class="v">' + ORES.length + ' ores + ' + Math.max(0, RES.length - ORES.length) + ' refined goods · par × the day\u2019s multiplier · moves every game day</span></div>';
+    const sorter = rs => [...rs.filter(r => held(r) > 0.005), ...rs.filter(r => held(r) <= 0.005)];   // what you hold rides the top of its group
+    const ores = RES.filter(r => ORES.indexOf(r) >= 0);
+    const goods = RES.filter(r => ORES.indexOf(r) < 0);
+    list.innerHTML = '<div class="ox-sec">THE ORES — what your mines dig</div>' + sorter(ores).map(rowHTML).join('') +
+      (goods.length ? '<div class="ox-sec" style="margin-top:10px">REFINED GOODS — what the works pour</div>' + sorter(goods).map(rowHTML).join('') : '');
     list.querySelectorAll('[data-eh]').forEach(b => { b.onclick = () => { try { sellHalf(b.dataset.eh); } catch (er) { } render(); }; });
     list.querySelectorAll('[data-es]').forEach(b => { b.onclick = () => { try { sellAll(b.dataset.es); } catch (er) { } render(); }; });
     const all = document.getElementById('ox-all');
@@ -15008,14 +15036,16 @@ const EXCH = (() => {
   function open() {
     ensure(); migrate();
     openModal('THE ORE EXCHANGE — the resource market', `
-      <p>The market for everything your mines dig. Every resource trades around its <b>par value</b> at a multiplier that moves on each game-day beat — sell when it suits you, or hold the pile and wait for a better price. The stockpile counts in your <b>WORTH</b> at today's prices.</p>
+      <p>The market for everything your mines dig <b>and your works pour</b>. Every resource trades around its <b>par value</b> at a multiplier that moves on each game-day beat — sell when it suits you, or hold the pile and wait for a better price. The stockpile counts in your <b>WORTH</b> at today's prices.</p>
       <div id="ox-sum"></div>
       <div id="ox-list" style="max-height:44vh;overflow:auto;padding-right:2px"></div>
-      <p style="margin-top:10px">Prices drift up to ±8% a day around par (clamped ×0.55–×1.70). Wages are still paid daily in cash — keep selling to cover payday.</p>
-      <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" id="ox-all" style="flex:1">SELL EVERYTHING</button><button class="btn" id="ox-x" style="flex:1">CLOSE</button></div>`);
+      <p style="margin-top:10px">Prices drift up to ±8% a day around par (clamped ×0.55–×1.70). Wages are still paid daily in cash — keep selling to cover payday. Refined goods come from <b>THE WORKS</b>, machines that turn ore into goods worth more.</p>
+      <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" id="ox-all" style="flex:1">SELL EVERYTHING</button><button class="btn good" id="ox-works" style="flex:1">THE WORKS</button><button class="btn" id="ox-x" style="flex:1">CLOSE</button></div>`);
     render();
     const x = document.getElementById('ox-x');
     if (x) x.onclick = closeModal;
+    const wk = document.getElementById('ox-works');   // v2.53 THE WORKS: refine, don't just sell
+    if (wk) wk.onclick = () => { try { if (window.WORKS) WORKS.open(); } catch (er) { } };
   }
 
   // ---- the Empire panel section (the market, one glance) -----------------
@@ -15045,6 +15075,8 @@ const EXCH = (() => {
       '.ox-row{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:9px;',
       ' background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);margin-top:6px}',
       '.ox-row.hot{background:rgba(245,204,116,.10);border-color:rgba(245,204,116,.45)}',
+      '.ox-sec{font-size:9.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);',
+      ' font-weight:700;margin-top:12px;padding-bottom:1px}',
       '.ox-name{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}',
       '.ox-name b{font-size:12px;letter-spacing:.4px}',
       '.ox-name span{font-size:9.5px;color:var(--mut)}',
@@ -15061,7 +15093,10 @@ const EXCH = (() => {
 
   return {
     open, empireInto, tick, pile, sell, sellAll, sellHalf, sellEverything,
-    price, mult, held, stockT, stockValue, list: () => RES.slice(), BASE,
+    price, mult, held, stockT, stockValue, list: () => RES.slice(), BASE: (window.MINE && MINE.BASE) || { Iron: 13, Copper: 22, Coal: 12, Bauxite: 15, Nickel: 24, Lignite: 12, Gypsum: 14, Salt: 16, Zinc: 19, Tin: 21, Silver: 26, Quartz: 17 },
+    parOf,
+    // v2.53 THE WORKS: the refined goods join the tradable list at boot
+    addGoods(list) { for (const g of (list || [])) if (typeof g === 'string' && RES.indexOf(g) < 0) RES.push(g); return RES.slice(); },
     // QA: run whole market-days of drift instantly (same math as the beat)
     qaDay(n) { for (let i = 0; i < (n || 1); i++) { try { day(); } catch (er) { } } return this.state(); },
     state() {
@@ -15085,7 +15120,8 @@ ECO.openEmpire = function () {
 // 2. the update chain: original → world forest → open house → suburbs →
 //    title deeds → patchwork → machines → landlord → MOTHERLODE →
 //    MONEY LIST → ORE EXCHANGE. Every call is try/caught so an
-//    exchange error can never touch the world.
+//    exchange error can never touch the world. (v2.53: THE WORKS
+//    wraps this same chain one section later.)
 const __exchOrigUpdate = WORLD.update.bind(WORLD);
 WORLD.update = function (dt, px, pz, camDist) {
   const req = __exchOrigUpdate(dt, px, pz, camDist);
@@ -15093,7 +15129,298 @@ WORLD.update = function (dt, px, pz, camDist) {
   return req;
 };
 
-console.log('%cOPEN WORLD v2.52 — THE ORE EXCHANGE', 'color:#38BDF8;font-weight:700', 'ready.');
+// ======== section: 54_works.js ========
+// ====================================================================
+// v2.53 — THE WORKS. The ask: "Make machines that people can use to
+// refine these resources into other resources." This is the machine
+// half of the refining pair (53_exchange.js re-shipped alongside it
+// so the refined goods trade on the market):
+//   - twelve REFINING MACHINES, one per ore, from a $22,000
+//     Briquette Press (560 t lignite/day → 400 t briquettes) to a
+//     $64,000 Alloy Works (320 t nickel/day → 80 t superalloy) —
+//     a Blast Furnace pours Steel from iron (3 t → 1 t), a Coke
+//     Oven pours Coke from coal, a Glass Kiln pours Glass from
+//     quartz, a Copper Smelter pours Cathode from copper;
+//   - THE POUR: every 90 s game-day beat each machine draws ore
+//     from the shared stockpile (up to its t/day) and pours refined
+//     goods back into it — a short pile runs the line slower, the
+//     same way a short crew runs a mine slower; power is billed at
+//     $0.25 per tonne processed (never dipping the balance below
+//     zero), and the pour saves with the game;
+//   - BUYING: OPEN THE WORKS from the WORKS row on the MINE panel,
+//     the THE WORKS button on the exchange board or the Empire
+//     panel's Works section — each card states its feed, its pour,
+//     the ore it needs and what's on hand; any machine scraps back
+//     for 60% any time;
+//   - THE GOODS: refined goods trade on the ORE exchange beside the
+//     ores (24 rows, two groups), each around the par its machine
+//     sets — Steel $58/t, Cathode $170/t, Superalloy $152/t — and
+//     generally for more than the ore that went in; the pile counts
+//     in WORTH at today's prices exactly like ore;
+//   - persistence: the optional `works` field in the save pack
+//     (pack stays v5 — older builds ignore it), sanitized on load;
+//     the goods themselves ride the v2.52 `res`/`mkt` fields, whose
+//     sanitizers already accept any resource key.
+// Everything lives in this one additive section; the only outside
+// touchpoints are annotated "v2.53" (STATE/save/load works, the
+// help-modal REFINING line, the What's-New modal, the attrib footer
+// and the version surfaces). window.WORKS is the QA surface. Every
+// works call is try/caught.
+// ====================================================================
+
+const WORKS = (() => {
+  const DAY = 90;               // seconds per game day (the exchange/wages beat)
+  const POWER = .25;            // $ per tonne processed (billed on the pour)
+  const SELL_BACK = .6;         // scrap any machine back for 60%
+  // the catalog — one machine per ore, cheapest first (the yard's
+  // order); `n` is tonnes of ore per tonne of goods, `par` the
+  // refined good's par $/t (single source of truth — the exchange
+  // reads it through WORKS.BASE)
+  const MACH = [
+    { id: 'press',   name: 'Briquette Press',   cost: 22000, tpd: 560, in: 'Lignite', out: 'Briquette',  n: 1.4, par: 24 },
+    { id: 'pmill',   name: 'Plaster Mill',      cost: 26000, tpd: 500, in: 'Gypsum',  out: 'Plaster',    n: 1.5, par: 29 },
+    { id: 'kiln',    name: 'Glass Kiln',        cost: 29000, tpd: 400, in: 'Quartz',  out: 'Glass',     n: 1.6, par: 38 },
+    { id: 'mint',    name: 'Bullion Mint',      cost: 30000, tpd: 160, in: 'Silver',  out: 'Silver Bar', n: 2,   par: 86 },
+    { id: 'solvay',  name: 'Solvay Tower',      cost: 33000, tpd: 420, in: 'Salt',    out: 'Soda Ash',  n: 2.1, par: 47 },
+    { id: 'solder',  name: 'Solder Line',       cost: 34000, tpd: 300, in: 'Tin',     out: 'Tin Solder', n: 2.5, par: 74 },
+    { id: 'oven',    name: 'Coke Oven',         cost: 38000, tpd: 500, in: 'Coal',    out: 'Coke',      n: 1.6, par: 31 },
+    { id: 'zinc',    name: 'Zinc Works',        cost: 41000, tpd: 480, in: 'Zinc',    out: 'Zinc Ingot', n: 3,  par: 88 },
+    { id: 'blast',   name: 'Blast Furnace',     cost: 46000, tpd: 600, in: 'Iron',    out: 'Steel',     n: 3,   par: 58 },
+    { id: 'alsm',    name: 'Aluminium Smelter', cost: 58000, tpd: 480, in: 'Bauxite', out: 'Aluminium', n: 4,   par: 102 },
+    { id: 'cusm',    name: 'Copper Smelter',    cost: 62000, tpd: 400, in: 'Copper',  out: 'Cathode',   n: 5,   par: 170 },
+    { id: 'alloy',   name: 'Alloy Works',       cost: 64000, tpd: 320, in: 'Nickel',  out: 'Superalloy', n: 4,  par: 152 },
+  ];
+  const BASE = {}; for (const T of MACH) BASE[T.out] = T.par;   // the refined par table (the exchange reads this)
+  const INOF = {}; for (const T of MACH) INOF[T.out] = T.in;    // Cathode ← Copper, for the board's "refined from" line
+  const BYID = {}; MACH.forEach(T => { BYID[T.id] = T; });
+
+  let dayT = 0;                 // game-day beat accumulator
+  let toldFirst = false;        // the first-pour toast fires once per session
+  let last = null;              // the previous day's pour (rides the modal + panels)
+
+  // ---- state helpers (all lazy — a save load can replace STATE) ------
+  function ensure() {
+    if (!STATE.works || typeof STATE.works !== 'object') STATE.works = {};
+    for (const k in STATE.works) {
+      if (!BYID[k] || !isFinite(+STATE.works[k]) || +STATE.works[k] <= 0) delete STATE.works[k];
+      else STATE.works[k] = Math.min(99, Math.round(+STATE.works[k]));
+    }
+    return STATE.works;
+  }
+  const cnt = id => Math.max(0, (STATE.works && STATE.works[id]) | 0);
+  const machines = () => MACH.reduce((s, T) => s + cnt(T.id), 0);
+  const held = r => { try { return window.EXCH ? (+EXCH.held(r) || 0) : 0; } catch (er) { return 0; } };
+  const outTpd = T => Math.round(T.tpd / T.n);
+
+  // ---- the pour: every machine draws ore, pours goods --------------------
+  function day() {
+    ensure();
+    let ran = 0, made = 0, power = 0, firstOut = null;
+    for (const T of MACH) {
+      const n = cnt(T.id);
+      if (!n) continue;
+      const have = held(T.in);
+      const run = Math.min(n * T.tpd, have);   // a short pile runs the line slower
+      if (!(run > .01)) continue;
+      try {
+        const left = +(have - run).toFixed(2);
+        if (left > .005) STATE.res[T.in] = left; else delete STATE.res[T.in];
+        if (window.EXCH) EXCH.pile(T.out, +(run / T.n).toFixed(2));   // rounding + the once-toast live in the exchange
+        else STATE.res[T.out] = +(((+STATE.res[T.out] || 0) + run / T.n)).toFixed(2);
+      } catch (er) { }
+      const p = Math.round(run * POWER * 100) / 100;
+      const bill = Math.min(p, Math.max(0, STATE.money));   // power never dips the balance below zero
+      STATE.money = +(STATE.money - bill).toFixed(2);
+      power += bill;
+      ran += run; made += run / T.n;
+      if (!firstOut) firstOut = T.out;
+    }
+    if (made > 0) {
+      last = { ran: Math.round(ran * 10) / 10, made: Math.round(made * 10) / 10, power: Math.round(power), at: firstOut };
+      try { uiBalance(); } catch (er) { }
+      try { saveGame(); } catch (er) { }
+      if (!toldFirst) {
+        toldFirst = true;
+        try { toast('🏭 <b>The works poured their first ' + firstOut + '.</b> Refined goods trade on the <b>ORE exchange</b> — sell them like ore, when the price suits.', 'warn'); } catch (er) { }
+      }
+      try { renderIfOpen(); } catch (er) { }
+    }
+  }
+  function tick(dt) {
+    if (STATE.mode === 'boot') return;
+    dayT += dt;
+    if (dayT >= DAY) { dayT -= DAY; try { day(); } catch (er) { console.error('[works]', er); } }
+  }
+
+  // ---- buying / scrapping ---------------------------------------------------
+  function buy(id) {
+    ensure();
+    const T = BYID[id];
+    if (!T) return { ok: false, why: 'no machine' };
+    if (cnt(id) >= 99) { try { toast('<b>The line is full</b> — 99 of them is enough ' + T.name + 's for anyone.', 'warn'); } catch (er) { } return { ok: false, why: 'cap' }; }
+    if (STATE.money < T.cost) { try { toast('<b>Not enough money.</b> The ' + T.name + ' costs ' + fmt$(T.cost) + '.', 'warn'); } catch (er) { } return { ok: false, why: 'cash' }; }
+    if (!spend(T.cost)) return { ok: false, why: 'cash' };
+    STATE.works[id] = cnt(id) + 1;
+    try { saveGame(); } catch (er) { }
+    try { toast('🔥 <b>The ' + T.name + ' is on the line</b> — ' + fmt$(T.cost) + '. At full feed it pours ' + outTpd(T).toLocaleString('en-US') + ' t of ' + T.out.toLowerCase() + ' a day' + (held(T.in) > 1 ? '.' : ' — stockpile some ' + T.in.toLowerCase() + ' for it first.'), 'warn'); } catch (er) { }
+    try { renderIfOpen(); } catch (er) { }
+    return { ok: true, n: STATE.works[id] };
+  }
+  function scrap(id) {
+    ensure();
+    const T = BYID[id];
+    if (!T || cnt(id) <= 0) return { ok: false, why: 'none' };
+    STATE.works[id] = cnt(id) - 1;
+    earn(Math.round(T.cost * SELL_BACK), false);   // resale doesn't count toward GDP
+    try { saveGame(); } catch (er) { }
+    try { toast('Scrapped the <b>' + T.name + '</b> for ' + fmt$(Math.round(T.cost * SELL_BACK)) + ' (60%).'); } catch (er) { }
+    try { renderIfOpen(); } catch (er) { }
+    return { ok: true, n: STATE.works[id] };
+  }
+
+  // ---- the yard -----------------------------------------------------------
+  function cardHTML(T) {
+    const n = cnt(T.id);
+    const feed = held(T.in);
+    const px = (window.EXCH && EXCH.price) ? EXCH.price(T.out) : T.par;
+    return '<div class="wk-card' + (STATE.money < T.cost ? ' dim' : '') + '">' +
+      '<div class="wk-info"><b>' + T.name + (n ? ' <span class="wk-n">×' + n + '</span>' : '') + '</b>' +
+      '<span>' + T.tpd.toLocaleString('en-US') + ' t ' + T.in.toLowerCase() + '/day → ' + outTpd(T).toLocaleString('en-US') + ' t ' + T.out.toLowerCase() + '/day · ' +
+      (T.n % 1 ? T.n.toFixed(1) : T.n) + ' t ' + T.in.toLowerCase() + ' per t ' + T.out.toLowerCase() + ' · power ≈ $' + Math.round(T.tpd * POWER) + '/day at full feed</span>' +
+      '<span>' + (feed > 1 ? '<span class="g">' + Math.round(feed).toLocaleString('en-US') + ' t of ' + T.in.toLowerCase() + ' on hand</span>' : 'no ' + T.in.toLowerCase() + ' in the stockpile yet') +
+      (n ? ' · pours ≈ ' + fmt$(outTpd(T) * n * px) + '/day of ' + T.out.toLowerCase() + ' at today\u2019s $' + (Math.round(px * 10) / 10) + '/t' : '') + '</span></div>' +
+      '<div class="wk-buy"><span>' + fmt$(T.cost) + '</span>' +
+      '<button class="btn primary" data-wb="' + T.id + '">BUY</button>' +
+      (n ? '<button class="tpbtn" data-ws="' + T.id + '">SCRAP +' + fmt$(Math.round(T.cost * SELL_BACK)) + '</button>' : '') +
+      '</div></div>';
+  }
+  function render() {
+    const list = document.getElementById('wk-list');
+    if (!list) return;
+    ensure();
+    const t = window.EXCH ? EXCH.stockT() : 0, v = window.EXCH ? EXCH.stockValue() : 0;
+    const sum = document.getElementById('wk-sum');
+    if (sum) sum.innerHTML =
+      '<div class="kv"><span class="k">STOCKPILE</span><span class="v">' + (t > 0 ? t.toFixed(1) + ' t of ore and goods ≈ ' + fmt$(v) + ' at today\u2019s prices' : 'empty — the works draw the ore your crews dig') + '</span></div>' +
+      '<div class="kv" style="margin-top:6px"><span class="k">LAST POUR</span><span class="v' + (last ? ' g' : '') + '">' + (last ? last.ran.toLocaleString('en-US') + ' t of ore in → ' + last.made.toLocaleString('en-US') + ' t of goods out · power ' + fmt$(last.power) : 'nothing yet — machines pour on the game-day beat') + '</span></div>' +
+      '<div class="kv" style="margin-top:6px"><span class="k">THE LINE</span><span class="v">' + machines() + ' machine' + (machines() === 1 ? '' : 's') + ' on the line · power $' + POWER.toFixed(2) + '/t processed · scrap back ' + Math.round(SELL_BACK * 100) + '%</span></div>';
+    list.innerHTML = MACH.map(cardHTML).join('');
+    list.querySelectorAll('[data-wb]').forEach(b => { b.onclick = () => { try { buy(b.dataset.wb); } catch (er) { } }; });
+    list.querySelectorAll('[data-ws]').forEach(b => { b.onclick = () => { try { scrap(b.dataset.ws); } catch (er) { } }; });
+  }
+  function renderIfOpen() { if (document.getElementById('wk-list')) render(); }
+  function open() {
+    ensure();
+    openModal('THE WORKS — refining machines', `
+      <p>Machines that <b>refine resources into other resources</b>. Every game day each machine draws ore from your stockpile and pours refined goods back into it — <b>steel from iron, coke from coal, glass from quartz</b> — and the goods trade on the <b>ORE exchange</b> for more than the ore that went in. Power is billed at $0.25 per tonne processed; any machine scraps back for 60%.</p>
+      <div id="wk-sum"></div>
+      <div id="wk-list" style="max-height:44vh;overflow:auto;padding-right:2px"></div>
+      <p style="margin-top:10px">The pour lands on the same 90 s game-day beat as the exchange prices — feed the works by holding some ore back, and sell the goods when the price suits.</p>
+      <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" id="wk-exch" style="flex:1">OPEN THE EXCHANGE</button><button class="btn" id="wk-x" style="flex:1">CLOSE</button></div>`);
+    render();
+    const x = document.getElementById('wk-x');
+    if (x) x.onclick = closeModal;
+    const ex = document.getElementById('wk-exch');
+    if (ex) ex.onclick = () => { try { if (window.EXCH) EXCH.open(); } catch (er) { } };
+  }
+
+  // ---- the MINE panel row (above STAKE A CLAIM) ---------------------------
+  function mineInto() {
+    const stake = document.getElementById('mp-stake');
+    if (!stake) return;
+    ensure();
+    const n = machines();
+    const html = '<div class="kv" style="margin-top:8px"><span class="k">THE WORKS — ' + (n ? n + ' refining machine' + (n === 1 ? '' : 's') + ' on the line' + (last ? ' · last pour ' + last.made.toLocaleString('en-US') + ' t of goods' : '') : 'refine your ore into goods') + '</span><button class="tpbtn" id="mp-works">OPEN</button></div>';
+    stake.insertAdjacentHTML('beforebegin', html);
+    const b = document.getElementById('mp-works');
+    if (b) b.onclick = () => { try { open(); } catch (er) { } };
+  }
+
+  // ---- the Empire panel section --------------------------------------------
+  function empireInto() {
+    const body = document.getElementById('mbody');
+    if (!body) return;
+    const close = document.getElementById('em-x');
+    const anchorEl = close ? close.parentElement : null;
+    ensure();
+    const n = machines();
+    const html = '<div class="msec" style="margin-top:14px">The Works — your refiners</div>' +
+      '<div class="kv"><span class="k">' + (n ? n + ' machine' + (n === 1 ? '' : 's') + ' on the line' + (last ? ' · last pour ' + last.made.toLocaleString('en-US') + ' t of goods out' : '') : 'none yet — machines that refine ore into goods') + '</span><button class="tpbtn" id="em-wk">OPEN</button></div>';
+    if (anchorEl) anchorEl.insertAdjacentHTML('beforebegin', html);
+    else body.insertAdjacentHTML('beforeend', html);
+    const b = document.getElementById('em-wk');
+    if (b) b.onclick = () => { try { open(); } catch (er) { } };
+  }
+
+  // ---- styles -----------------------------------------------------------------
+  try {
+    const st = document.createElement('style');
+    st.textContent = [
+      '#wk-list{display:flex;flex-direction:column}',
+      '.wk-card{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;',
+      ' background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);margin-top:6px}',
+      '.wk-card.dim{opacity:.55}',
+      '.wk-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}',
+      '.wk-info b{font-size:12px;letter-spacing:.4px}',
+      '.wk-info span{font-size:9.5px;color:var(--mut)}',
+      '.wk-n{font-size:8.5px;letter-spacing:1px;background:#f5cc74;color:#241d08;',
+      ' border-radius:4px;padding:1.5px 5px;vertical-align:1px;margin-left:4px}',
+      '.wk-buy{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex:none}',
+      '.wk-buy span{font-size:11px;font-weight:800;font-family:var(--mono);color:var(--ink,#e8e4d8)}',
+      '.wk-buy .tpbtn{margin:0;white-space:nowrap}',
+    ].join('');
+    document.head.appendChild(st);
+  } catch (er) { }
+
+  ensure();   // seed a fresh save's works (empty until the first machine)
+  // v2.53: the refined goods join the exchange's tradable list NOW, at
+  // boot — every multiplier, board row, WORTH term and SELL button
+  // picks them up from this moment on
+  try { if (window.EXCH && EXCH.addGoods) EXCH.addGoods(MACH.map(T => T.out)); } catch (er) { }
+
+  return {
+    open, mineInto, empireInto, tick, buy, scrap,
+    goods: () => MACH.map(T => T.out), BASE, inOf: r => INOF[r] || null,
+    count: cnt, machines, list: () => MACH.map(T => ({ id: T.id, name: T.name, cost: T.cost, tpd: T.tpd, n: T.n, in: T.in, out: T.out, par: T.par, n_owned: cnt(T.id) })),
+    // QA: run whole game-days of pouring instantly (same math as the beat)
+    qaDay(n) { for (let i = 0; i < (n || 1); i++) { try { day(); } catch (er) { } } return this.state(); },
+    state() {
+      ensure();
+      return {
+        machines: machines(), power: POWER, goods: MACH.length,
+        kinds: MACH.filter(T => cnt(T.id) > 0).map(T => ({ id: T.id, name: T.name, n: cnt(T.id), in: T.in, out: T.out })),
+        last,
+      };
+    },
+  };
+})();
+window.WORKS = WORKS;   // QA surface
+
+// ADDITIVE hooks — the same wrap pattern the game already uses.
+// 1. the MINE panel gains THE WORKS row (above STAKE A CLAIM)
+const __wkMinePanel = MINE.openPanel.bind(MINE);
+MINE.openPanel = function () {
+  __wkMinePanel();
+  try { WORKS.mineInto(); } catch (e) { console.error('[works]', e); }
+};
+// 2. the Empire panel gains the Works section (after the exchange's)
+const __wkEmpire = ECO.openEmpire.bind(ECO);
+ECO.openEmpire = function () {
+  __wkEmpire();
+  try { WORKS.empireInto(); } catch (e) { console.error('[works]', e); }
+};
+// 3. the update chain: original → world forest → open house → suburbs →
+//    title deeds → patchwork → machines → landlord → MOTHERLODE →
+//    MONEY LIST → ORE EXCHANGE → THE WORKS. Every call is try/caught
+//    so a works error can never touch the world.
+const __wkOrigUpdate = WORLD.update.bind(WORLD);
+WORLD.update = function (dt, px, pz, camDist) {
+  const req = __wkOrigUpdate(dt, px, pz, camDist);
+  try { WORKS.tick(dt); } catch (e) { console.error('[works]', e); }
+  return req;
+};
+
+console.log('%cOPEN WORLD v2.53 — THE WORKS', 'color:#38BDF8;font-weight:700', 'ready.');
 
 
 </script>
