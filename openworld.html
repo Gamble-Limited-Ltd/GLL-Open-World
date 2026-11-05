@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.51</title>
+<title>Open World — v2.52</title>
 <style>
 /* ==================================================================
    OPEN WORLD v2.42 — NEIGHBORHOODS: "make houses and neighborhoods
@@ -678,6 +678,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
       <div class="bb-side">
         <button class="bb-btn" id="b-market"><span class="tip">MARKET</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 14 4-5 3 3 5-7"/></svg></button>
         <button class="bb-btn" id="b-mine"><span class="tip">MINE</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21 16.5 7.5"/><path d="M9.5 2.5c4.5-.5 9 1.5 11.5 6-3.8-2.3-7.7-2.7-10.7-1.2"/><path d="M9.5 2.5c.6 3-.4 6.2-2.7 8.9"/></svg></button>
+        <button class="bb-btn" id="b-ore"><span class="tip">ORE</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12l4 6-10 12L2 9l4-6z"/><path d="M2 9h20"/><path d="M9.5 3 8 9l4 12"/><path d="M14.5 3 16 9l-4 12"/></svg></button>
         <button class="bb-btn" id="b-rank"><span class="tip">RANK</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21v-6h4v6"/><path d="M10 21V10h4v11"/><path d="M15 21v-8h4v8"/></svg></button>
         <button class="bb-btn" id="b-locate"><span class="tip">FIND ME</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="2"/><path d="M12 1.5v3.2M12 19.3v3.2M1.5 12h3.2M19.3 12h3.2"/></svg></button>
         <button class="bb-btn" id="b-help"><span class="tip">HELP</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.4 2.3c-.8.3-1.4 1-1.4 1.9v.8"/><circle cx="12" cy="17.5" r=".5" fill="currentColor"/></svg></button>
@@ -733,7 +734,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.51 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), every one of those rooms and floors for sale or for rent (buy it outright — yours forever, tenants pay you daily — or rent it with a two-day deposit; your holdings glow gold and pay you every day), a patchwork of buyable farm parcels over every mile of open country around the cities (rectangles of all shapes and sizes in every shade of green like a satellite view — hover one for its price, click to buy it, and the tenant farmers pay you daily — at premium prices since v2.46: about ten times the cost for about three times the rent), landlord rentals at your own price (list any plot, office suite, room, floor or farm parcel you own and tenants pay your daily rate — price it above the local market and it may sit empty while the market looks), and machines you install inside the rooms and floors you own (six kinds from a vending machine to a server rack — click a spot in your own space to set each one down, and every machine pays you every day), mining claims you stake yourself in the open country (select any rectangle of land past the suburbs, set your machinery on its ring and hire the crew that digs it — their wages come out of the daily ore sale, and the pit terraces deeper until it’s worked out), the Money List that ranks your WORTH against fifteen rival tycoons around the real Earth (their fortunes move on every game-day beat — small piles sprint, old money compounds — pass them one by one, and your live rank rides the WORTH ticker chip), and the same streets, buildings, plots and roads on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.52 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), every one of those rooms and floors for sale or for rent (buy it outright — yours forever, tenants pay you daily — or rent it with a two-day deposit; your holdings glow gold and pay you every day), a patchwork of buyable farm parcels over every mile of open country around the cities (rectangles of all shapes and sizes in every shade of green like a satellite view — hover one for its price, click to buy it, and the tenant farmers pay you daily — at premium prices since v2.46: about ten times the cost for about three times the rent), landlord rentals at your own price (list any plot, office suite, room, floor or farm parcel you own and tenants pay your daily rate — price it above the local market and it may sit empty while the market looks), and machines you install inside the rooms and floors you own (six kinds from a vending machine to a server rack — click a spot in your own space to set each one down, and every machine pays you every day), mining claims you stake yourself in the open country (select any rectangle of land past the suburbs, set your machinery on its ring and hire the crew that digs it — their wages come out of the daily ore sale, and the pit terraces deeper until it’s worked out), the Money List that ranks your WORTH against fifteen rival tycoons around the real Earth (their fortunes move on every game-day beat — small piles sprint, old money compounds — pass them one by one, and your live rank rides the WORTH ticker chip), the Ore Exchange where the resources your crews dig stack up tonne by tonne in a stockpile and sell on a market of twelve daily-moving prices (each ore trades around its par value — watch the ▲▼ day change, sell half or all whenever it suits you, and the pile counts in your WORTH at today’s prices), and the same streets, buildings, plots and roads on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -769,7 +770,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.51';
+const GAME_VERSION = 'v2.52';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -1193,6 +1194,8 @@ const STATE = {
   rentals: [],                   // v2.47 LANDLORD: listings {id, price, on, tenant, term, next}
   mines: [],                     // v2.48 MOTHERLODE: staked mining claims {id, name, x, z, w, d, price, grade, ore, got, machines} · v2.50 HIRED HANDS: crew, walked, wageAcc
   rivals: [],                    // v2.51 MONEY LIST: the fifteen rival fortunes by roster slot (worth only — names/trades live in code)
+  res: {},                       // v2.52 ORE EXCHANGE: the resource stockpile {resource: tonnes} — what your mines dug, unsold
+  mkt: {},                       // v2.52 ORE EXCHANGE: the market multipliers {resource: {m, pm}} — today's and yesterday's rate around par
   market: null,                  // MARKET module state (positions/orders)
   lastCityKey: null,
   seenNews: false,
@@ -1221,8 +1224,10 @@ function saveGame() {
         machines: (r.machines || []).map(m => ({ t: m.t | 0, x: +(+m.x || 0).toFixed(2), z: +(+m.z || 0).toFixed(2), fl: m.fl | 0 })) })),   // v2.43 TITLE DEEDS + v2.45 MACHINES (optional fields — older builds ignore them)
       acres: (STATE.acres || []).map(a => ({ id: a.id, name: a.name, ha: +a.ha || 0, price: +a.price || 0, rate: +a.rate || 0, x: +a.x || 0, z: +a.z || 0, near: a.near || null, nearKey: a.nearKey || null })),   // v2.44 PATCHWORK (optional field — older builds ignore it)
       rentals: (STATE.rentals || []).map(x => ({ id: x.id, price: +x.price || 0, on: !!x.on, tenant: x.tenant || null, term: x.term | 0, next: +(+x.next || 0).toFixed(1) })),   // v2.47 LANDLORD (optional field — older builds ignore it)
-      mines: (STATE.mines || []).map(m => ({ id: m.id, name: m.name, x: +m.x || 0, z: +m.z || 0, w: +m.w || 0, d: +m.d || 0, price: +m.price || 0, grade: +m.grade || 0, ore: Math.round(+m.ore || 0), got: +(+m.got || 0).toFixed(1), near: m.near || null, nearKey: m.nearKey || null, machines: (m.machines || []).map(x => ({ t: x.t | 0, x: +(+x.x || 0).toFixed(1), z: +(+x.z || 0).toFixed(1) })), crew: m.crew | 0, walked: !!m.walked, wageAcc: +(+m.wageAcc || 0).toFixed(2) })),   // v2.48 MOTHERLODE · v2.50 HIRED HANDS: crew/walked/wageAcc (optional fields — older builds ignore them)
+      mines: (STATE.mines || []).map(m => ({ id: m.id, name: m.name, x: +m.x || 0, z: +m.z || 0, w: +m.w || 0, d: +m.d || 0, price: +m.price || 0, grade: +m.grade || 0, ore: Math.round(+m.ore || 0), got: +(+m.got || 0).toFixed(1), near: m.near || null, nearKey: m.nearKey || null, machines: (m.machines || []).map(x => ({ t: x.t | 0, x: +(+x.x || 0).toFixed(1), z: +(+x.z || 0).toFixed(1) })), crew: m.crew | 0, walked: !!m.walked, wageAcc: +(+m.wageAcc || 0).toFixed(2), res: m.res || null })),   // v2.48 MOTHERLODE · v2.50 HIRED HANDS: crew/walked/wageAcc · v2.52 ORE EXCHANGE: res (optional fields — older builds ignore them)
       rivals: (STATE.rivals || []).map(w => isFinite(+w) ? Math.round(+w) : null),   // v2.51 MONEY LIST (optional field — older builds ignore it)
+      res: (() => { const o = {}; for (const k in (STATE.res || {})) { const v = +(STATE.res[k] || 0); if (isFinite(v) && v > 0) o[k] = +v.toFixed(2); } return o; })(),   // v2.52 ORE EXCHANGE (optional field — older builds ignore it)
+      mkt: (() => { const o = {}; for (const k in (STATE.mkt || {})) { const e = STATE.mkt[k]; if (e && typeof e === 'object' && isFinite(+e.m)) o[k] = { m: +(+e.m).toFixed(3), pm: +(+e.pm || 1).toFixed(3) }; } return o; })(),   // v2.52 ORE EXCHANGE (optional field — older builds ignore it)
       market: STATE.market ? STATE.market.pack() : null,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(pack));
@@ -1309,9 +1314,16 @@ function loadGame() {
       .map(m => ({ id: m.id, name: m.name || 'Mine', x: +m.x || 0, z: +m.z || 0, w: Math.min(320, +m.w || 40), d: Math.min(320, +m.d || 40), price: +m.price || 0, grade: Math.max(1, +m.grade || 12), ore: Math.max(0, Math.round(+m.ore || 0)), got: Math.min(Math.max(0, +m.got || 0), Math.max(0, Math.round(+m.ore || 0))), near: m.near || null, nearKey: m.nearKey || null,
         machines: (Array.isArray(m.machines) ? m.machines : []).filter(x => x && x.t >= 0 && x.t < 5 && isFinite(+x.x) && isFinite(+x.z)).slice(0, 14)
           .map(x => ({ t: x.t | 0, x: +(+x.x || 0).toFixed(1), z: +(+x.z || 0).toFixed(1) })),
-        crew: Math.min(60, Math.max(0, m.crew | 0)), walked: !!m.walked, wageAcc: +(+m.wageAcc || 0).toFixed(2) }));   // v2.50 HIRED HANDS (clamped 0–60)
+        crew: Math.min(60, Math.max(0, m.crew | 0)), walked: !!m.walked, wageAcc: +(+m.wageAcc || 0).toFixed(2), res: (typeof m.res === 'string' && m.res) ? m.res.slice(0, 12) : null }));   // v2.50 HIRED HANDS (clamped 0–60) · v2.52 ORE EXCHANGE: the resource key (older saves re-derive it from the mine's name at boot)
     // v2.51 MONEY LIST: the rival fortunes (absent on older saves — defaults seed at boot)
     STATE.rivals = (Array.isArray(p.rivals) ? p.rivals : []).slice(0, 15).map(w => (isFinite(+w) && +w >= 500) ? Math.round(+w) : null);
+    // v2.52 ORE EXCHANGE: the resource stockpile + the market multipliers (absent on older saves — multipliers seed at par)
+    STATE.res = {};
+    const __exr = (p.res && typeof p.res === 'object') ? p.res : {};
+    for (const k in __exr) { if (typeof k === 'string' && k.length && k.length <= 12 && isFinite(+__exr[k]) && +__exr[k] > 0) STATE.res[k] = Math.min(1e9, +(+__exr[k]).toFixed(2)); }
+    STATE.mkt = {};
+    const __exm = (p.mkt && typeof p.mkt === 'object') ? p.mkt : {};
+    for (const k in __exm) { const e = __exm[k]; if (typeof k === 'string' && k.length && k.length <= 12 && e && typeof e === 'object' && isFinite(+e.m)) STATE.mkt[k] = { m: Math.max(.55, Math.min(1.7, +e.m)), pm: Math.max(.55, Math.min(1.7, +(e.pm || 1))) }; }
     STATE.marketPack = p.market || null;
     // v2.05 starter guide: fresh players start at step 0; returning
     // players who already own a business are exempt
@@ -9899,12 +9911,12 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.51 — THE MONEY LIST', `
-    <p><b>A leaderboard of the richest — and you’re on it.</b></p>
-    <div class="kv"><span class="k">THE LIST</span><span class="v">Fifteen rival tycoons around the real Earth, ranked with you by WORTH — press the new RANK button in the bottom bar</span></div>
-    <div class="kv"><span class="k">THE RACE</span><span class="v">Every fortune moves on the game-day beat — small piles sprint, old money compounds slow — and passing a rival toasts it</span></div>
-    <div class="kv"><span class="k">YOUR RANK</span><span class="v">Rides the WORTH ticker chip — a fresh start is #16 of 16, and June Park of Seoul ($26K, a first food cart) is the first name to beat</span></div>
-    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The hired crews, the mines, the landlord, the machines, the premium land, the patchwork, the title deeds, the inspector, the neighborhoods, the world forest and the true 1:1 Earth are untouched</span></div>
+  openModal('Welcome to v2.52 — THE ORE EXCHANGE', `
+    <p><b>Your mines now dig up real resources — and sell them on a market.</b></p>
+    <div class="kv"><span class="k">THE STOCKPILE</span><span class="v">The crew’s ore no longer sells itself — it stacks up tonne by tonne as resources, tracked on the MINE panel and every mine’s MANAGE modal</span></div>
+    <div class="kv"><span class="k">THE EXCHANGE</span><span class="v">The new ORE button (bottom bar, next to MINE) opens the market — twelve resource prices move every game day; sell half or all, or hold for a better price</span></div>
+    <div class="kv"><span class="k">PAYDAY & WORTH</span><span class="v">Wages are still paid daily in cash — keep selling to cover them — and the stockpile counts in your WORTH at today’s prices</span></div>
+    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The crews, the pits, the landlord, the machines, the premium land, the patchwork, the title deeds, the inspector, the neighborhoods, the world forest, the Money List and the true 1:1 Earth are untouched</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -9925,7 +9937,8 @@ document.getElementById('b-build').addEventListener('click', () => {
     <div class="kv"><span class="k">BUILDINGS</span><span class="v">Click any building to open it and pick a floor or a room — then <b>BUY</b> it outright or <b>RENT</b> it from the panel (your holdings pay you daily); in your own rooms and floors hit <b>INSTALL MACHINES</b> and click a spot to set them down — every machine earns daily; leasable towers keep their LEASE SUITE button</span></div>
     <div class="kv"><span class="k">FARMLAND</span><span class="v">The open country around every city is a patchwork of buyable farm parcels — zoom out and click any field (or walk up to a FOR SALE sign); your fields pay rent every day</span></div>
     <div class="kv"><span class="k">LANDLORD</span><span class="v">Anything you own — a plot, an office, a room, a floor or a farm parcel — can be rented out at <b>your own price</b>: list it and tenants view it on the game-day beat, paying you daily; price it above the local market and it may sit empty (RENT IT OUT buttons live in the panels you already use)</span></div>
-    <div class="kv"><span class="k">MINING</span><span class="v">Stake a rectangular claim anywhere in the open country (the <b>MINE</b> button in the bottom bar), set machinery on the claim’s ring and <b>hire the crew that digs it</b> — every worker earns $95/day paid out of the daily ore sale, a short crew runs the machinery slower, and if payday ever comes up short the crew walks off; the pit grows a terrace deeper as they dig, and when the assay runs out the mine is worked out</span></div>
+    <div class="kv"><span class="k">MINING</span><span class="v">Stake a rectangular claim anywhere in the open country (the <b>MINE</b> button in the bottom bar), set machinery on the claim’s ring and <b>hire the crew that digs it</b> — every worker earns $95/day paid daily in cash, a short crew runs the machinery slower, and if payday ever comes up short the crew walks off; the ore they dig stacks up as resources in your stockpile, the pit grows a terrace deeper as they dig, and when the assay runs out the mine is worked out</span></div>
+    <div class="kv"><span class="k">ORE EXCHANGE</span><span class="v">The <b>ORE</b> button in the bottom bar opens the market for the resources your mines dig — twelve prices that move every game day around each ore’s par value (watch the ▲▼ day change); sell half or all of any pile whenever the price suits you, and the stockpile counts in your WORTH at today’s prices</span></div>
     <div class="kv"><span class="k">MONEY LIST</span><span class="v">The <b>RANK</b> button in the bottom bar opens the leaderboard of the richest — fifteen rival tycoons around the real Earth and you, ranked by <b>WORTH</b> (cash plus everything you own); their fortunes move on every game-day beat (small piles sprint, old money compounds slow), passing a rival — or being passed — toasts it, and your live rank rides the WORTH ticker chip</span></div>
     <div class="kv"><span class="k">CARTS</span><span class="v">Stand close → [E] to serve the queue</span></div>
     <div class="kv"><span class="k">CREWS</span><span class="v">Business panel → hire star vendors</span></div>
@@ -9934,6 +9947,9 @@ document.getElementById('b-build').addEventListener('click', () => {
 });
 document.getElementById('b-mine').addEventListener('click', () => {   // v2.48 MOTHERLODE: the mining panel
   try { MINE.openPanel(); } catch (er) { console.error('[mining]', er); }
+});
+document.getElementById('b-ore').addEventListener('click', () => {   // v2.52 ORE EXCHANGE: the resource market
+  try { EXCH.open(); } catch (er) { console.error('[exchange]', er); }
 });
 document.getElementById('b-rank').addEventListener('click', () => {   // v2.51 MONEY LIST: the leaderboard
   try { RIVALS.openBoard(); } catch (er) { console.error('[rivals]', er); }
@@ -10043,7 +10059,8 @@ function buildTicker() {
       + (STATE.rooms || []).reduce((s2, r) => s2 + (r.mode === 'owned' ? r.price : 0), 0)
       + (STATE.acres || []).reduce((s2, a) => s2 + a.price, 0)
       + (window.MACH ? MACH.valueOfRooms() : 0)
-      + (window.MINE ? MINE.valueOf() : 0));      // v2.51 MONEY LIST: one formula feeds the ticker chip and the board
+      + (window.MINE ? MINE.valueOf() : 0)
+      + (window.EXCH ? EXCH.stockValue() : 0));   // v2.51 MONEY LIST + v2.52 ORE EXCHANGE: one formula feeds the ticker chip and the board
     track.innerHTML = items +
       `<span class="tk"><span class="s g">GDP</span><span class="p">${fmtK(STATE.gdp)}</span><span class="up">▲</span></span>` +
       `<span class="tk"><span class="s o">WORTH</span><span class="p">${fmtK(worth)}</span><span class="up">${window.RIVALS ? '#' + RIVALS.rankNo() + '/' + RIVALS.count() : ''}</span></span>` +   // v2.51 MONEY LIST: your live rank rides the WORTH chip
@@ -13444,51 +13461,40 @@ WORLD.update = function (dt, px, pz, camDist) {
 
 // ======== section: 51_mining.js ========
 // ====================================================================
-// v2.50 — HIRED HANDS (on v2.48 MOTHERLODE). The ask: "Instead of
-// the mining be instant, make the person hire workers to start
-// digging on the area that they pick." Machinery no longer digs a
-// claim by itself — a WORK CREW does:
-//   - the MINE button (bottom bar, next to MARKET) opens the mining
-//     panel -> STAKE A CLAIM arms selection mode: click one corner of
-//     anywhere, click the opposite corner — a live gold rectangle
-//     follows the cursor between the two clicks — and the claim modal
-//     prices the rectangle ($4/m²) with its assay (ore type, grade
-//     $/t, reserve tons, gross value at the spot price);
-//   - guards: open country only (past every city's 2.4 km suburb
-//     ring), dry land (9-point water check), never on a road, a
-//     vending plot, your farmland or another mine; sides 40–320 m;
-//   - BUY MACHINERY opens the yard: five machines from an $18,000
-//     Wheel Loader (60 t/day, 1 operator) to a $520,000 Bucket-Wheel
-//     Excavator (4,200 t/day, 12 operators); INSTALL switches to
-//     placement mode — a ghost machine follows the cursor on the
-//     claim's dirt ring, green where it fits, red where it doesn't,
-//     and a click sets the real machine down right there
-//     (clearance-checked, never inside the pit, capped by the ring's
-//     area);
-//   - THE CREW: machinery alone digs NOTHING. Hire workers from the
-//     CREW line in the machinery yard or the mine's MANAGE modal
-//     (+1 / +5 / FULL CREW / lay off). Every machine needs operators
-//     at full tilt (1 / 2 / 4 / 6 / 12 by class), a short crew digs
-//     proportionally slower, and every worker earns $95/day in wages,
-//     paid on the same 90 s game-day beat the ore sells on — wages
-//     come due FIRST, and a balance that can't cover them means the
-//     crews WALK OFF on the spot (re-hire when you can pay). While
-//     the crew digs, hi-vis workers stand around the pit rim and the
-//     machine beacons blink; when the assay runs dry the mine is
-//     WORKED OUT and the crew is released;
-//   - every mine lists in the Empire panel with one-tap TELEPORT,
-//     counts in the WORTH ticker (claim + machinery), machines sell
-//     back for 60% from the yard any time, and a worked-out (or
-//     abandoned) mine CLOSES and reclaims the land for free;
-//   - mines persist in the save as a new optional `mines` field
-//     (pack stays v5 — older builds ignore it), sanitized on load.
-// Touchpoints outside this section (each annotated "v2.50" for the
-// crew field, "v2.48" where untouched): the STATE/save/load mines
-// field (now carrying `crew`), the WORTH ticker, the MINE button +
-// wiring, one help-modal MINING line, the What's-New modal, the
-// attrib footer and the version surfaces. Every mining call is
-// try/caught so a mistake here can never touch the world.
-// window.MINE is the QA surface.
+// v2.52 — THE ORE EXCHANGE (on v2.48 MOTHERLODE · v2.50 HIRED
+// HANDS). The ask: "Make resources that people can get from mining,
+// and sell on a market." Ore no longer sells itself — it becomes a
+// PHYSICAL RESOURCE STOCKPILE that trades on a market:
+//   - every mine digs the RESOURCE its assay names (Iron, Copper,
+//     Coal, Bauxite, Nickel, Lignite, Gypsum, Salt, Zinc, Tin,
+//     Silver, Quartz) — tonne by tonne the crew's dig moves from the
+//     claim's reserve into your shared stockpile (STATE.res), and NO
+//     money arrives until you sell;
+//   - each ore carries a PAR price $/t (the BASE table below); the
+//     ORE EXCHANGE (53_exchange.js, the new ORE button in the bottom
+//     bar) is the market that swings a daily multiplier around par
+//     (±8%/game-day, clamped ×0.55–×1.70) — sell any or all of the
+//     pile at today's price, hold for a better day, wages still come
+//     due daily in CASH so a hoarding tycoon can lose the crew;
+//   - NEW claims assay their ore at par (grade = BASE[ore]) and the
+//     claim modal prices the reserve at today's exchange rate; older
+//     saves migrate at boot — the mine's resource is read back from
+//     its name and its grade is re-marked to par;
+//   - the stockpile counts in WORTH at today's prices (via
+//     EXCH.stockValue(), wired into RIVALS.playerWorth and the ticker
+//     fallback), lists in the Empire panel with an EXCHANGE button,
+//     and shows on the MINE panel and every mine's MANAGE modal;
+//   - staking, guards, machinery placement, crews, wages, walk-offs,
+//     worked-out release, pit terraces, rim workers and TELEPORT are
+//     the v2.48/v2.50 mechanics, untouched below.
+// Touchpoints outside this section (each annotated "v2.52"): the
+// STATE/save/load `res` + `mkt` fields and the mines' `res` field,
+// the WORTH ticker fallback + playerWorth, the ORE button + wiring,
+// the help-modal lines, the What's-New modal, the attrib footer and
+// the version surfaces. Every mining call is try/caught so a
+// mistake here can never touch the world. window.MINE is the QA
+// surface (BASE, resOf, priceOf, qaDay now stockpiles instead of
+// earning).
 // ====================================================================
 const MINE = (() => {
   const DAY = 90;                 // seconds per game day (the office/deed/acres beat)
@@ -13506,6 +13512,10 @@ const MINE = (() => {
   const STAGES = 6, BENCH = 8;      // the pit's terraces (rim rises 2.6 m per stage)
   const ORES = ['Iron', 'Copper', 'Coal', 'Bauxite', 'Nickel', 'Lignite', 'Gypsum', 'Salt', 'Zinc', 'Tin', 'Silver', 'Quartz'];
   const PITS = ['Pit', 'Quarry', 'Cut', 'Bank', 'Workings', 'Dig'];
+  // v2.52 ORE EXCHANGE: every ore's PAR price $/t — the anchor the
+  // market multiplier (53_exchange.js) swings around. New claims
+  // assay their ore at par; the exchange pays par × the day's rate.
+  const BASE = { Iron: 13, Copper: 22, Coal: 12, Bauxite: 15, Nickel: 24, Lignite: 12, Gypsum: 14, Salt: 16, Zinc: 19, Tin: 21, Silver: 26, Quartz: 17 };
 
   // ---- the machinery catalog ------------------------------------------
   // payback ~11-14 days at medium grade; the catch: the ore runs out.
@@ -13539,6 +13549,13 @@ const MINE = (() => {
     return best;
   }
   const mines = () => (STATE.mines || []);
+  // v2.52 ORE EXCHANGE: the RESOURCE a claim digs (its ore type —
+  // older saves read it back from the mine's own name) and what a
+  // tonne trades for right now (par × the day's market rate; falls
+  // back to the claim's own grade before the exchange boots)
+  const resOf = m => m.res || String(m.name || 'Ore').split(' ')[0];
+  const priceOfRes = r => { try { return window.EXCH ? +EXCH.price(r) : (BASE[r] || 14); } catch (er) { return BASE[r] || 14; } };
+  const priceOf = m => priceOfRes(resOf(m));
   // v2.50 HIRED HANDS — the crew math. capTpd is what the installed
   // machinery COULD dig fully crewed; digTpd is what today's crew
   // actually moves (a short staff digs proportionally slower);
@@ -13549,7 +13566,7 @@ const MINE = (() => {
   const digTpd = m => { const ops = opsOf(m); return ops ? capTpd(m) * Math.min(1, crewOf(m) / ops) : 0; };
   const working = m => !!(m.machines || []).length && crewOf(m) > 0 && m.got < m.ore;
   const wageOfDay = m => working(m) ? crewOf(m) * WAGE : 0;
-  const incOfDay = m => working(m) ? digTpd(m) * m.grade - crewOf(m) * WAGE : 0;   // NET of wages
+  const incOfDay = m => working(m) ? digTpd(m) * priceOf(m) - crewOf(m) * WAGE : 0;   // v2.52: NET of wages at today's exchange prices — the money itself lands when the ore is SOLD
   const signedNet = n => (n >= 0 ? '+' : '-') + fmt$(Math.abs(n));
   const stageOf = m => (m.ore > 0 ? Math.min(STAGES, Math.floor(STAGES * m.got / m.ore)) : 0);
   const rimOf = m => 1.4 + stageOf(m) * 2.6;    // the dump rim rises as the pit is dug
@@ -13573,7 +13590,7 @@ const MINE = (() => {
   const statusShort = m => m.got >= m.ore ? 'worked out'
     : !(m.machines || []).length ? 'no machinery yet'
     : m.walked ? 'crew walked off'
-    : crewOf(m) ? signedNet(incOfDay(m)) + '/day net · crew ' + crewOf(m)
+    : crewOf(m) ? signedNet(incOfDay(m)) + '/day net at the exchange · crew ' + crewOf(m)
     : 'no crew — idle';
 
   // ---- the claim guards --------------------------------------------------
@@ -14002,21 +14019,22 @@ const MINE = (() => {
     bar('CLAIM READY — <b>' + Math.round(R.w) + ' × ' + Math.round(R.d) + ' m</b> · review the assay, then stake it', 'CANCEL', () => { exitStake(false); try { closeModal(); } catch (er) { } });
     const area = R.w * R.d;
     const id = 'm' + Math.round((R.x0 + R.x1) / 2) + '_' + Math.round((R.z0 + R.z1) / 2);
-    const h = hashStr(id + 'ore'), h2 = hashStr(id + 'g'), h3 = hashStr(id + 'n');
+    const h = hashStr(id + 'ore'), h3 = hashStr(id + 'n');
     const oreName = ORES[h % ORES.length];
-    const grade = 12 + (h2 % 15);
+    const grade = BASE[oreName] || 14;                     // v2.52: claims assay their ore at PAR — the exchange market swings around it
     const ore = Math.round(area * DENS);
     const price = Math.round(area * CLAIM_RATE / 100) * 100;
     const name = oreName + ' ' + PITS[h3 % PITS.length];
     const nc = nearestCity((R.x0 + R.x1) / 2, (R.z0 + R.z1) / 2);
+    const px = Math.round(priceOfRes(oreName) * 10) / 10;    // today's exchange price $/t
     openModal('Stake this claim?', `
       <p>A <b>${Math.round(R.w)} × ${Math.round(R.d)} m</b> rectangle of open country${nc && nc.d < 120000 ? ' out past <b>' + nc.c.name + '</b>' : ''}. The assay says what's under the grass:</p>
-      <div class="kv"><span class="k">ASSAY</span><span class="v">${name.toUpperCase()} · ${gradeLabel(grade)} · $${grade}/t</span></div>
-      <div class="kv"><span class="k">RESERVE</span><span class="v">${ore.toLocaleString('en-US')} tonnes of ore</span></div>
-      <div class="kv"><span class="k">GROSS VALUE</span><span class="v g">${fmt$(ore * grade)} at the spot price</span></div>
+      <div class="kv"><span class="k">ASSAY</span><span class="v">${name.toUpperCase()} · ${gradeLabel(grade)} · par $${grade}/t</span></div>
+      <div class="kv"><span class="k">RESERVE</span><span class="v">${ore.toLocaleString('en-US')} tonnes of ${oreName.toLowerCase()} resource</span></div>
+      <div class="kv"><span class="k">GROSS VALUE</span><span class="v g">${fmt$(ore * px)} at today's exchange price ($${px}/t)</span></div>
       <div class="kv"><span class="k">CLAIM PRICE</span><span class="v g">${fmt$(price)}</span></div>
       <div class="kv"><span class="k">BALANCE</span><span class="v">${fmt$(STATE.money)}</span></div>
-      <div class="kv" style="margin-top:6px"><span class="k">NEXT</span><span class="v">Buy machinery for its ring, then hire the crew that digs — wages are paid daily out of the ore they sell</span></div>
+      <div class="kv" style="margin-top:6px"><span class="k">NEXT</span><span class="v">Buy machinery for its ring, then hire the crew that digs — the ore stacks up in your stockpile and sells on the ORE exchange; wages are paid daily in cash</span></div>
       <div style="display:flex;gap:8px;margin-top:16px">
         <button class="btn good" id="mc-go" style="flex:1">STAKE THE CLAIM — ${fmt$(price)}</button>
         <button class="btn" id="mc-x">CANCEL</button>
@@ -14026,7 +14044,7 @@ const MINE = (() => {
       if (!spend(price)) { toast('<b>Not enough money.</b> This claim costs ' + fmt$(price) + '.', 'warn'); return; }
       const m = {
         id, name, x: (R.x0 + R.x1) / 2, z: (R.z0 + R.z1) / 2, w: R.w, d: R.d,
-        price, grade, ore, got: 0, machines: [],
+        price, grade, ore, got: 0, machines: [], res: oreName,
         near: nc && nc.d < 120000 ? nc.c.name : null, nearKey: nc ? nc.c.key : null,
       };
       STATE.mines.push(m);
@@ -14034,7 +14052,7 @@ const MINE = (() => {
       exitStake(false);
       ensureOne(id);
       closeModal();
-      toast('⛏ <b>' + name + ' is yours.</b> Now buy machinery — and hire the crew that digs it out.');
+      toast('⛏ <b>' + name + ' is yours.</b> Now buy machinery — and hire the crew that digs it out. The ore stacks up for the ORE exchange.');
       openShop(m);
     };
     document.getElementById('mc-x').onclick = () => { closeModal(); exitStake(false); };
@@ -14118,7 +14136,7 @@ const MINE = (() => {
         : '0 t/day') + '</span></div>';
     s += '<div class="kv"><span class="k">WAGES</span><span class="v">' + (crew && !done ? fmt$(crew * WAGE) + '/day at ' + fmt$(WAGE) + ' each' : '$0/day') + '</span></div>';
     if (ops && !done) {
-      s += '<div class="kv"><span class="k">NET</span><span class="v g">' + signedNet(incOfDay(m)) + '/day after wages</span></div>';
+      s += '<div class="kv"><span class="k">NET</span><span class="v g">' + signedNet(incOfDay(m)) + '/day at today\u2019s exchange — wages included</span></div>';
       s += '<div style="display:flex;gap:8px;margin-top:8px">'
         + '<button class="btn primary" data-ch="1" style="flex:1">+ HIRE 1</button>'
         + '<button class="btn primary" data-ch="5" style="flex:1">+ HIRE 5</button>'
@@ -14138,7 +14156,7 @@ const MINE = (() => {
         if (v !== '0' && n <= before) { toast('<b>Fully staffed</b> — ' + opsOf(m) + ' workers run every machine here.', 'warn'); return; }
         setCrew(m, n);
         const after = crewOf(m);
-        if (after > before) toast('👷 <b>' + (after - before) + ' worker' + (after - before === 1 ? '' : 's') + ' hired.</b> The dig is on — wages ' + fmt$(after * WAGE) + '/day.', 'warn');
+        if (after > before) toast('👷 <b>' + (after - before) + ' worker' + (after - before === 1 ? '' : 's') + ' hired.</b> The dig is on — wages ' + fmt$(after * WAGE) + '/day in cash; the ore stacks up for the ORE exchange.', 'warn');
         else if (after === 0) toast('The crew was laid off — the machinery stands idle.');
         openShop(m);   // re-render (the MANAGE modal routes here too)
       };
@@ -14151,7 +14169,7 @@ const MINE = (() => {
     const cap = capOf(m), n = (m.machines || []).length;
     const cards = TYPES.map((T, i) =>
       '<div class="myard-card' + (n >= cap || STATE.money < T.cost ? ' dim' : '') + '">' +
-      '<div class="myard-info"><b>' + T.name + '</b><span>' + T.tpd.toLocaleString('en-US') + ' t/day · ' + T.ops + ' operator' + (T.ops === 1 ? '' : 's') + ' · ' + fmt$(T.tpd * m.grade) + '/day of ore at $' + m.grade + '/t</span></div>' +
+      '<div class="myard-info"><b>' + T.name + '</b><span>' + T.tpd.toLocaleString('en-US') + ' t/day · ' + T.ops + ' operator' + (T.ops === 1 ? '' : 's') + ' · digs ' + fmt$(T.tpd * priceOf(m)) + '/day of ore at today\u2019s $' + (Math.round(priceOf(m) * 10) / 10) + '/t</span></div>' +
       '<div class="myard-buy"><span>' + fmt$(T.cost) + '</span>' +
       '<button class="btn primary" data-yi="' + i + '"' + (n >= cap ? ' disabled' : '') + '>INSTALL</button></div></div>').join('');
     const yours = (m.machines || []).map((x, i) => TYPES[x.t] ?
@@ -14159,7 +14177,7 @@ const MINE = (() => {
       '<button class="tpbtn" data-ys="' + i + '">SELL ' + fmt$(Math.round(TYPES[x.t].cost * SELL_BACK)) + '</button></div>' : '').join('');
     const pct = m.ore ? Math.round(100 * m.got / m.ore) : 0;
     openModal('MACHINERY & CREW — ' + m.name, `
-      <p>Set machinery down on <b>${m.name}</b>'s dirt ring, then <b>hire the crew that runs it</b> — the ore sells at <b>$${m.grade}/t</b> and every worker earns ${fmt$(WAGE)}/day until the assay runs out.</p>
+      <p>Set machinery down on <b>${m.name}</b>'s dirt ring, then <b>hire the crew that runs it</b> — the ore stacks up as <b>${resOf(m).toLowerCase()} resource</b> for the ORE exchange (today <b>$${Math.round(priceOf(m) * 10) / 10}/t</b>) and every worker earns ${fmt$(WAGE)}/day in cash until the assay runs out.</p>
       <div class="kv"><span class="k">RESERVE</span><span class="v">${Math.round(m.ore - m.got).toLocaleString('en-US')} t left of ${m.ore.toLocaleString('en-US')} t (${pct}% mined)</span></div>
       <div class="mn-prog"><i style="width:${pct}%"></i></div>
       <div class="kv" style="margin-top:8px"><span class="k">OUTPUT</span><span class="v g">${m.got >= m.ore ? 'nothing left to dig' : digTpd(m).toLocaleString('en-US') + ' t/day dug · ' + signedNet(incOfDay(m)) + '/day net'}</span></div>
@@ -14203,11 +14221,12 @@ const MINE = (() => {
     const n = (m.machines || []).length;
     const crew = crewOf(m), ops = opsOf(m);
     const walked = m.walked || false;   // v2.50: unpaid crews walk off
+    const held = (window.EXCH ? EXCH.held(resOf(m)) : 0) || 0;   // v2.52: the resource pile this claim feeds
     openModal(m.name + ' — Your Mine', `
-      <p>${done ? '<b>Worked out.</b> The assay ran dry — the crew is released, the machines are idle and the land can be reclaimed.'
+      <p>${done ? '<b>Worked out.</b> The assay ran dry — the crew is released, the machines are idle and the land can be reclaimed. The stockpile still sells on the exchange.'
         : walked ? '<b>The crew walked off</b> — payday came up short. Re-hire them from the yard when your balance can cover the wages.'
         : 'A <b>' + Math.round(m.w) + ' × ' + Math.round(m.d) + ' m</b> open-pit claim' + (m.near ? ' out past <b>' + m.near + '</b>' : '') + ', dug by a hired crew running the machinery you set down.'}</p>
-      <div class="kv"><span class="k">ASSAY</span><span class="v">${(m.ore > 0 ? gradeLabel(m.grade) : '')} · $${m.grade}/t</span></div>
+      <div class="kv"><span class="k">ASSAY</span><span class="v">${(m.ore > 0 ? gradeLabel(m.grade) : '')} · par $${m.grade}/t · exchange $${Math.round(priceOf(m) * 10) / 10}/t today</span></div>
       <div class="kv"><span class="k">RESERVE</span><span class="v">${Math.round(m.ore - m.got).toLocaleString('en-US')} t left of ${m.ore.toLocaleString('en-US')} t · ${pct}% mined</span></div>
       <div class="mn-prog"><i style="width:${pct}%"></i></div>
       <div class="kv" style="margin-top:8px"><span class="k">PIT</span><span class="v">rim ${Math.round(rimOf(m) * 10) / 10} m · ${stageOf(m)}/${STAGES} terraces cut</span></div>
@@ -14215,7 +14234,9 @@ const MINE = (() => {
       <div class="kv"><span class="k">OUTPUT</span><span class="v ${done || !crew ? '' : 'g'}">${done ? 'nothing left to dig' : !crew ? 'idle — hire a crew to start digging' : digTpd(m).toLocaleString('en-US') + ' t/day dug · ' + signedNet(incOfDay(m)) + '/day net'}</span></div>
       <div class="kv"><span class="k">MACHINERY</span><span class="v">${n}/${capOf(m)} on the ring · ${fmt$((m.machines || []).reduce((s, x) => s + (TYPES[x.t] ? TYPES[x.t].cost : 0), 0))}</span></div>
       <div class="kv"><span class="k">CLAIM VALUE</span><span class="v">${fmt$(m.price)}</span></div>
+      <div class="kv"><span class="k">STOCKPILE</span><span class="v">${held > 0 ? held.toFixed(1) + ' t of ' + resOf(m).toLowerCase() + ' ≈ ' + fmt$(held * priceOf(m)) + ' at today\u2019s exchange' : 'empty — dug ore stacks up here until you sell it'}</span></div>
       <button class="btn good" id="mm-mach" style="width:100%;margin-top:12px">${n ? 'MACHINERY & CREW · ' + n + (crew ? ' + 👷 ' + crew : '') : 'BUY MACHINERY & HIRE A CREW'}</button>
+      <button class="btn primary" id="mm-exch" style="width:100%;margin-top:8px">SELL ${resOf(m).toUpperCase()} ON THE ORE EXCHANGE</button>
       <div style="display:flex;gap:8px;margin-top:10px">
         <button class="btn primary" id="mm-tp" style="flex:1">TELEPORT THERE</button>
         <button class="btn bad" id="mm-close">${done ? 'CLOSE & RECLAIM' : 'ABANDON MINE'}</button>
@@ -14223,6 +14244,8 @@ const MINE = (() => {
       </div>`);
     document.getElementById('mm-mach').onclick = () => openShop(m);
     document.getElementById('mm-tp').onclick = () => travelTo(m);
+    const mex = document.getElementById('mm-exch');
+    if (mex) mex.onclick = () => { try { if (window.EXCH) EXCH.open(); } catch (er) { } };   // v2.52 ORE EXCHANGE
     document.getElementById('mm-close').onclick = () => {
       const refund = (m.machines || []).reduce((s, x) => s + Math.round((TYPES[x.t] ? TYPES[x.t].cost : 0) * SELL_BACK), 0);
       STATE.mines = mines().filter(x => x !== m);
@@ -14244,14 +14267,18 @@ const MINE = (() => {
       '<div class="kv"><span class="k">' + m.name + ' · ' + Math.round(m.w) + '×' + Math.round(m.d) + ' m · ' + statusShort(m) + '</span>' +
       '<button class="tpbtn" data-mp="' + i + '">MANAGE</button></div>').join('');
     const inc = M.reduce((s, m) => s + incOfDay(m), 0);
+    const stT = window.EXCH ? EXCH.stockT() : 0, stV = window.EXCH ? EXCH.stockValue() : 0;   // v2.52: the resource stockpile
     openModal('MINING — the open country', `
-      <p>The land past every city's suburbs holds ore. <b>Stake a rectangular claim</b>, set machinery on its ring, and <b>hire the crew that digs it</b> — the ore sells daily, the wages are paid daily out of it, and the pit you carve grows a terrace deeper the more you take.</p>
+      <p>The land past every city's suburbs holds ore. <b>Stake a rectangular claim</b>, set machinery on its ring, and <b>hire the crew that digs it</b> — the ore they dig stacks up tonne by tonne as <b>resources in your stockpile</b> and sells on the <b>ORE exchange</b>, the wages are paid daily in cash, and the pit you carve grows a terrace deeper the more you take.</p>
       ${rows ? '<div class="msec" style="margin-top:4px">Your mines</div>' + rows +
-      '<div class="kv" style="margin-top:10px"><span class="k">MINING INCOME</span><span class="v g">' + signedNet(inc) + '/day net · wages included</span></div>' : ''}
+      '<div class="kv" style="margin-top:10px"><span class="k">MINING OUTPUT</span><span class="v g">' + signedNet(inc) + '/day net at today\u2019s exchange · wages included</span></div>' : ''}
+      <div class="kv" style="margin-top:8px"><span class="k">STOCKPILE — ${stT > 0 ? stT.toFixed(1) + ' t of ore ≈ ' + fmt$(stV) + ' at today\u2019s prices' : 'empty — the ore your crews dig stacks up here'}</span><button class="tpbtn" id="mp-exch">SELL ON THE EXCHANGE</button></div>
       <button class="btn good" id="mp-stake" style="width:100%;margin-top:14px">STAKE A CLAIM — SELECT AN AREA</button>
       <div style="display:flex;gap:8px;margin-top:10px"><button class="btn" id="mp-x" style="flex:1">CLOSE</button></div>`);
     document.getElementById('mp-stake').onclick = armStake;
     document.getElementById('mp-x').onclick = closeModal;
+    const exb = document.getElementById('mp-exch');
+    if (exb) exb.onclick = () => { try { if (window.EXCH) EXCH.open(); } catch (er) { } };   // v2.52 ORE EXCHANGE
     document.querySelectorAll('[data-mp]').forEach(b => {
       b.onclick = () => { const m = mines()[+b.dataset.mp]; if (m) openManage(m); };
     });
@@ -14287,17 +14314,21 @@ const MINE = (() => {
     const M = mines();
     const rows = M.map((m, i) =>
       '<div class="kv"><span class="k">' + m.name + ' · ' + Math.round(m.w) + '×' + Math.round(m.d) + ' m · ' +
-      (m.got >= m.ore ? 'worked out' : m.walked ? 'crew walked off' : !crewOf(m) ? (!(m.machines || []).length ? 'no machinery yet' : 'needs a crew') : signedNet(incOfDay(m)) + '/day net') + '</span>' +
+      (m.got >= m.ore ? 'worked out' : m.walked ? 'crew walked off' : !crewOf(m) ? (!(m.machines || []).length ? 'no machinery yet' : 'needs a crew') : signedNet(incOfDay(m)) + '/day net at the exchange') + '</span>' +
       '<button class="tpbtn" data-mt="' + i + '">TELEPORT</button></div>').join('');
     const inc = M.reduce((s, m) => s + incOfDay(m), 0);
+    const stT = window.EXCH ? EXCH.stockT() : 0, stV = window.EXCH ? EXCH.stockValue() : 0;   // v2.52: the stockpile rides the Empire panel
     const html = '<div class="msec" style="margin-top:14px">Mines — your claims</div>' +
       (rows || '<p>No mines yet. Press the MINE button, STAKE A CLAIM on any rectangle of open country, set machinery on its ring and hire the crew that digs it.</p>') +
-      (rows ? '<div class="kv" style="margin-top:10px"><span class="k">MINING INCOME</span><span class="v g">' + signedNet(inc) + '/day net · ' + M.length + ' claim' + (M.length === 1 ? '' : 's') + '</span></div>' : '');
+      (rows ? '<div class="kv" style="margin-top:10px"><span class="k">MINING OUTPUT</span><span class="v g">' + signedNet(inc) + '/day net at today\u2019s exchange · ' + M.length + ' claim' + (M.length === 1 ? '' : 's') + '</span></div>' : '') +
+      '<div class="kv"><span class="k">ORE STOCKPILE — ' + stT.toFixed(1) + ' t ≈ ' + fmt$(stV) + ' at today\u2019s exchange</span><button class="tpbtn" id="em-ore">EXCHANGE</button></div>';
     if (anchorEl) anchorEl.insertAdjacentHTML('beforebegin', html);
     else body.insertAdjacentHTML('beforeend', html);
     body.querySelectorAll('[data-mt]').forEach(b => {
       b.onclick = () => { travelTo(M[+b.dataset.mt]); };
     });
+    const ob = document.getElementById('em-ore');
+    if (ob) ob.onclick = () => { try { if (window.EXCH) EXCH.open(); } catch (er) { } };   // v2.52 ORE EXCHANGE
   }
 
   // ---- the hover tip -------------------------------------------------------------
@@ -14319,8 +14350,8 @@ const MINE = (() => {
     const crew = crewOf(m);
     return {
       t: m.name + ' — your mine',
-      s: Math.round(m.w) + '×' + Math.round(m.d) + ' m · $' + m.grade + '/t · 👷 ' + crew + (m.near ? ' · near ' + m.near : ''),
-      p: done ? 'worked out' : m.walked ? 'crew walked off' : !crew ? 'idle — no crew' : signedNet(incOfDay(m)) + '/day net',
+      s: Math.round(m.w) + '×' + Math.round(m.d) + ' m · $' + (Math.round(priceOf(m) * 10) / 10) + '/t on the exchange · 👷 ' + crew + (m.near ? ' · near ' + m.near : ''),
+      p: done ? 'worked out' : m.walked ? 'crew walked off' : !crew ? 'idle — no crew' : signedNet(incOfDay(m)) + '/day net at the exchange',
       a: done ? '⛏ EMPTY' : !crew ? '⛏ IDLE' : '⛏ DIGGING',
       l: 'Click to manage',
     };
@@ -14364,13 +14395,12 @@ const MINE = (() => {
         killStakeGhost(); killMachGhost();
         if (root) ensureAll();
       }
-      // the beat: the crew digs, ore sells, reserves run down, pits deepen
+      // the beat: the crew digs, the stockpile grows, reserves run down, pits deepen
       const M = mines();
       if (STATE.mode === 'city' && M.length) {
         acc += dt;
         if (acc >= 1) {
           const secs = acc; acc = 0;
-          let inc = 0;
           for (const m of M) {
             if (!working(m)) continue;
             const tpd = digTpd(m);              // what today's crew moves
@@ -14378,7 +14408,7 @@ const MINE = (() => {
             let tons = Math.min(tpd / DAY * secs, m.ore - m.got);
             if (tons <= 0) continue;
             m.got = +(m.got + tons).toFixed(2);
-            inc += tons * m.grade;
+            try { if (window.EXCH) EXCH.pile(resOf(m), tons); } catch (er) { }   // v2.52 ORE EXCHANGE: the dig becomes stockpiled resource — it sells on the market, never by itself
             const e = built.get(m.id);
             if (!e || e.stage !== stageOf(m)) ensureOne(m.id);
             // wages accrue and come due as a full day's lump
@@ -14394,10 +14424,9 @@ const MINE = (() => {
               m.crew = 0; m.wageAcc = 0;          // worked out — the crew is released
               try { saveGame(); } catch (er) { }
               ensureOne(m.id);
-              try { toast('⛏ <b>' + m.name + ' is worked out</b> — the assay ran dry and the crew is released. Sell the machinery or reclaim the land.', 'warn'); } catch (er) { }
+              try { toast('⛏ <b>' + m.name + ' is worked out</b> — the assay ran dry and the crew is released. Sell the machinery or reclaim the land; the stockpile still sells on the exchange.', 'warn'); } catch (er) { }
             }
           }
-          if (inc > 0) earn(inc);
         }
       } else acc = 0;
       // ghosts follow the cursor
@@ -14439,6 +14468,7 @@ const MINE = (() => {
     openPanel, openShop, openManage, travelTo, tick, click, tip, empireInto,
     stageOf, rimOf, capOf, incOfDay, mineAt, valueOf, armStake,
     crewOf, opsOf, capTpd, digTpd, wageOfDay,          // v2.50 HIRED HANDS
+    BASE, resOf, priceOfRes, priceOf,                  // v2.52 ORE EXCHANGE (par prices, resource keys, today's $/t)
     list: () => mines().slice(),
     count: () => mines().length,
     TYPES,
@@ -14450,20 +14480,21 @@ const MINE = (() => {
       const R = { x0, z0, x1, z1, w: x1 - x0, d: z1 - z0 };
       const area = R.w * R.d;
       const id = 'm' + Math.round((R.x0 + R.x1) / 2) + '_' + Math.round((R.z0 + R.z1) / 2);
-      const h = hashStr(id + 'ore'), h2 = hashStr(id + 'g'), h3 = hashStr(id + 'n');
+      const h = hashStr(id + 'ore'), h3 = hashStr(id + 'n');
       const price = Math.round(area * CLAIM_RATE / 100) * 100;
       if (!spend(price)) return { ok: false, why: 'funds', cost: price };
       const nc = nearestCity((R.x0 + R.x1) / 2, (R.z0 + R.z1) / 2);
+      const res = ORES[h % ORES.length];
       const m = {
-        id, name: ORES[h % ORES.length] + ' ' + PITS[h3 % PITS.length],
+        id, name: res + ' ' + PITS[h3 % PITS.length],
         x: (R.x0 + R.x1) / 2, z: (R.z0 + R.z1) / 2, w: R.w, d: R.d,
-        price, grade: 12 + (h2 % 15), ore: Math.round(area * DENS), got: 0, machines: [],
+        price, grade: BASE[res] || 14, ore: Math.round(area * DENS), got: 0, machines: [], res,
         near: nc && nc.d < 120000 ? nc.c.name : null, nearKey: nc ? nc.c.key : null,
       };
       STATE.mines.push(m);
       try { saveGame(); } catch (e) { }
       ensureOne(id);
-      return { ok: true, id: m.id, price: m.price, grade: m.grade, ore: m.ore, name: m.name };
+      return { ok: true, id: m.id, price: m.price, grade: m.grade, ore: m.ore, name: m.name, res };
     },
     // QA: programmatic install (no modal, no ghost) — same validation
     install(id, t, lx, lz) {
@@ -14486,32 +14517,35 @@ const MINE = (() => {
       setCrew(m, n);
       return { ok: true, before, crew: crewOf(m), walked: !!m.walked };
     },
-    // QA: run whole game-days of extraction instantly (wages paid, walk-off honored)
+    // QA: run whole game-days of extraction instantly (wages paid, walk-off
+    // honored, the dig becomes STOCKPILED RESOURCE — v2.52: no auto-sale)
     qaDay(n) {
-      let earned = 0, wages = 0, walked = 0;
+      let dug = 0, wages = 0, walked = 0;
       for (let i = 0; i < (n || 1); i++) {
         for (const m of mines()) {
           if (!working(m)) continue;
           const tons = Math.min(digTpd(m), m.ore - m.got);
           if (tons <= 0) continue;
           m.got = +(m.got + tons).toFixed(2);
-          earned += tons * m.grade;
+          dug += tons;
+          try { if (window.EXCH) EXCH.pile(resOf(m), tons); } catch (er) { }
           const due = crewOf(m) * WAGE;
           if (STATE.money >= due) { STATE.money -= due; uiBalance(); wages += due; }
-          else { m.crew = 0; m.walked = true; m.wageAcc = 0; walked++; continue; }
+          else { walkOff(m); walked++; continue; }   // same walk-off path as the live beat (toast + save + rebuild)
           if (m.got >= m.ore) { m.crew = 0; m.wageAcc = 0; ensureOne(m.id); }
         }
       }
-      if (earned > 0) earn(earned);
       ensureAll();
-      return { earned: Math.round(earned), wages, walked };
+      return { dug: Math.round(dug * 10) / 10, wages, walked };
     },
     state() {
       const M = mines();
       return {
         mines: M.length,
-        incomePerDay: M.reduce((s, m) => s + incOfDay(m), 0),
-        grossPerDay: M.reduce((s, m) => s + digTpd(m) * m.grade, 0),
+        incomePerDay: M.reduce((s, m) => s + incOfDay(m), 0),      // v2.52: net at today's exchange prices
+        grossPerDay: M.reduce((s, m) => s + digTpd(m) * priceOf(m), 0),
+        stockT: window.EXCH ? EXCH.stockT() : 0,                   // v2.52 ORE EXCHANGE: the resource stockpile
+        stockValue: window.EXCH ? EXCH.stockValue() : 0,
         wagesPerDay: M.reduce((s, m) => s + wageOfDay(m), 0),
         crew: M.reduce((s, m) => s + crewOf(m), 0),
         walked: M.filter(m => m.walked).length,
@@ -14552,15 +14586,15 @@ ECO.openEmpire = function () {
   try { MINE.empireInto(); } catch (e) { console.error('[mining]', e); }
 };
 // 4. the update chain: original → world forest → open house → suburbs →
-//    title deeds → patchwork → machines → landlord → MOTHERLODE. Every
-//    call is try/caught so a mining error can never touch the world.
+//    title deeds → patchwork → machines → landlord → MOTHERLODE →
+//    MONEY LIST → ORE EXCHANGE. Every call is try/caught so a mining
+//    error can never touch the world.
 const __mineOrigUpdate = WORLD.update.bind(WORLD);
 WORLD.update = function (dt, px, pz, camDist) {
   const req = __mineOrigUpdate(dt, px, pz, camDist);
   try { MINE.tick(dt); } catch (e) { console.error('[mining]', e); }
   return req;
 };
-
 
 // ======== section: 52_rivals.js ========
 // ====================================================================
@@ -14632,13 +14666,15 @@ const RIVALS = (() => {
   }
 
   // the player's WORTH — the exact ticker formula (v2.44 acres ·
-  // v2.45 machines · v2.48 claims), one source for ticker and board
+  // v2.45 machines · v2.48 claims · v2.52 the ore stockpile at
+  // today's exchange prices), one source for ticker and board
   function playerWorth() {
     return STATE.money + STATE.offices.reduce((s2, o) => s2 + o.rate * 8, 0)
       + (STATE.rooms || []).reduce((s2, r) => s2 + (r.mode === 'owned' ? r.price : 0), 0)
       + (STATE.acres || []).reduce((s2, a) => s2 + a.price, 0)
       + (window.MACH ? MACH.valueOfRooms() : 0)
-      + (window.MINE ? MINE.valueOf() : 0);
+      + (window.MINE ? MINE.valueOf() : 0)
+      + (window.EXCH ? EXCH.stockValue() : 0);   // v2.52 ORE EXCHANGE
   }
 
   // the board: sixteen rows, richest first, you among them
@@ -14699,7 +14735,7 @@ const RIVALS = (() => {
       '<span>' + esc(r.city) + ' · ' + esc(r.trade) + '</span></div>' +
       '<div class="lb-worth">' + fmtK(r.w) + '<span>' + (r.you ? 'your worth · #' + (youIdx + 1) : '+' + (r.g * 100).toFixed(2) + '%/day') + '</span></div></div>').join('');
     openModal('THE MONEY LIST — richest on Earth', `
-      <p>Sixteen fortunes on one board — fifteen rival tycoons around the real Earth and <b>you</b>, ranked by <b>WORTH</b> (cash plus every plot, room, field, machine and mine you own). Fortunes move on every game-day beat; pass them one by one.</p>
+      <p>Sixteen fortunes on one board — fifteen rival tycoons around the real Earth and <b>you</b>, ranked by <b>WORTH</b> (cash plus every plot, room, field, machine, mine and ore stockpile you own). Fortunes move on every game-day beat; pass them one by one.</p>
       <div class="kv"><span class="k">YOUR RANK</span><span class="v g">#${youIdx + 1} of ${b.length} · ${fmtK(you.w)}</span></div>
       ${next
         ? '<div class="kv"><span class="k">NEXT UP</span><span class="v">' + esc(next.name) + ' — ' + fmtK(next.w - you.w) + ' away</span></div>'
@@ -14793,7 +14829,272 @@ WORLD.update = function (dt, px, pz, camDist) {
   return req;
 };
 
-console.log('%cOPEN WORLD v2.51 — THE MONEY LIST', 'color:#38BDF8;font-weight:700', 'ready.');
+// ======== section: 53_exchange.js ========
+// ====================================================================
+// v2.52 — THE ORE EXCHANGE. The ask: "Make resources that people can
+// get from mining, and sell on a market." This is the MARKET half of
+// the pair (51_mining.js is the resource half — the crew's dig now
+// becomes stockpiled resource instead of selling itself):
+//   - the new ORE button (bottom bar, next to MINE) opens THE ORE
+//     EXCHANGE — twelve resource rows (Iron, Copper, Coal, Bauxite,
+//     Nickel, Lignite, Gypsum, Salt, Zinc, Tin, Silver, Quartz), each
+//     trading around its PAR value at a market MULTIPLIER;
+//   - THE PRICES MOVE: on every 90 s game-day beat (the same beat as
+//     every other income in the game) each multiplier drifts ±8%,
+//     clamped to ×0.55–×1.70 — the day-change rides every row
+//     (▲/▼ %), rows you hold glow gold, and an open board re-renders
+//     on the beat;
+//   - SELLING: SELL HALF / SELL ALL per resource and SELL EVERYTHING
+//     up top — a sale pays tons × today's price straight into the
+//     balance (and the GDP), saves, and toasts the fill; wages are
+//     still paid daily in CASH, so a tycoon who hoards everything
+//     can still lose the crew;
+//   - THE STOCKPILE: STATE.res (tonnes per resource) is fed by
+//     EXCH.pile() from the mining tick — the first ore in the pile
+//     toasts the exchange once. The pile counts in WORTH at today's
+//     prices (EXCH.stockValue(), wired into RIVALS.playerWorth and
+//     the ticker fallback) and lists in the Empire panel next to the
+//     day's biggest mover;
+//   - MIGRATION: older saves never stockpiled — at boot (and lazily
+//     everywhere) the mines' resource is read back from the mine's
+//     own name and its grade is re-marked to the resource's par;
+//   - persistence: the optional `res` + `mkt` fields in the save
+//     pack (pack stays v5 — older builds ignore them), sanitized on
+//     load; multipliers default to par (×1.00).
+// Everything lives in this one additive section; the only outside
+// touchpoints are annotated "v2.52" (STATE/save/load res+mkt, the
+// WORTH ticker, the ORE button + wiring, the help-modal line, the
+// What's-New modal, the attrib footer and the version surfaces).
+// window.EXCH is the QA surface. Every exchange call is try/caught.
+// ====================================================================
+
+const EXCH = (() => {
+  const DAY = 90;               // seconds per game day (the office/deed/acres/rivals beat)
+  // the tradable resources (51_mining.js's ORES, in the same order)
+  const RES = ['Iron', 'Copper', 'Coal', 'Bauxite', 'Nickel', 'Lignite', 'Gypsum', 'Salt', 'Zinc', 'Tin', 'Silver', 'Quartz'];
+  // the par table lives in the mining section (single source of
+  // truth); this fallback only matters if 51 ever evals after 53
+  const FALLBACK = { Iron: 13, Copper: 22, Coal: 12, Bauxite: 15, Nickel: 24, Lignite: 12, Gypsum: 14, Salt: 16, Zinc: 19, Tin: 21, Silver: 26, Quartz: 17 };
+  const BASE = (window.MINE && MINE.BASE) || FALLBACK;
+  const LO = .55, HI = 1.7;     // the multiplier band
+  const STEP = .16;             // ±8% a day
+
+  const hash = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+
+  let dayT = 0;                 // game-day beat accumulator
+  let dayN = 0;                 // days since boot (seeds the drift)
+  let toldPile = false;         // the first-ore toast fires once per session
+
+  // ---- state helpers (all lazy — a save load can replace STATE) ------
+  function ensure() {
+    if (!STATE.mkt || typeof STATE.mkt !== 'object') STATE.mkt = {};
+    for (const r of RES) {
+      const e = STATE.mkt[r];
+      if (!e || typeof e !== 'object' || !isFinite(+e.m) || +e.m <= 0) STATE.mkt[r] = { m: 1, pm: isFinite(+e && e.pm) ? +e.pm : 1 };
+    }
+    if (!STATE.res || typeof STATE.res !== 'object') STATE.res = {};
+    migrate();   // older saves re-mark on first touch (a load can land after boot)
+    return STATE.mkt;
+  }
+  // v2.52 migration: older saves carry mines without `res` and with
+  // pre-exchange grades — read the resource back from the mine's own
+  // name and re-mark the grade to par (idempotent)
+  function migrate() {
+    try {
+      for (const m of (STATE.mines || [])) {
+        if (!m) continue;
+        if (!m.res) m.res = String(m.name || 'Ore').split(' ')[0];
+        const b = BASE[m.res];
+        if (b && Math.abs((+m.grade || 0) - b) > .01) m.grade = b;
+      }
+    } catch (er) { }
+  }
+  const mult = r => { const e = STATE.mkt && STATE.mkt[r]; return (e && isFinite(+e.m) && +e.m > 0) ? +e.m : 1; };
+  const pmv = r => { const e = STATE.mkt && STATE.mkt[r]; return (e && isFinite(+e.pm) && +e.pm > 0) ? +e.pm : 1; };
+  const price = r => (BASE[r] || 14) * mult(r);
+  const pctOf = r => { const p = pmv(r); return p ? (mult(r) / p - 1) * 100 : 0; };
+  const held = r => +(+((STATE.res && STATE.res[r]) || 0)) || 0;
+  const stockT = () => { ensure(); return RES.reduce((s, r) => s + held(r), 0); };
+  const stockValue = () => { ensure(); return RES.reduce((s, r) => s + held(r) * price(r), 0); };
+
+  // ---- the market day: prices move ------------------------------------
+  function day() {
+    ensure();
+    dayN++;
+    for (const r of RES) {
+      const e = STATE.mkt[r];
+      e.pm = e.m;
+      const wob = ((hash('ex' + r + 'd' + dayN) % 1000) / 1000 - .5) * STEP;
+      e.m = Math.max(LO, Math.min(HI, e.m * (1 + wob)));
+    }
+    try { renderIfOpen(); } catch (er) { }
+  }
+  function tick(dt) {
+    if (STATE.mode === 'boot') return;
+    dayT += dt;
+    if (dayT >= DAY) { dayT -= DAY; try { day(); } catch (er) { console.error('[exchange]', er); } }
+  }
+
+  // ---- the stockpile (fed by the mining tick) --------------------------
+  function pile(res, tons) {
+    if (!isFinite(+tons) || +tons <= 0) return held(res);
+    ensure();
+    const r = String(res || '').slice(0, 12);
+    STATE.res[r] = +(((+STATE.res[r] || 0) + +tons)).toFixed(2);
+    if (!toldPile) {
+      toldPile = true;
+      try { toast('⛏ <b>First ore in the stockpile.</b> The resource stacks up tonne by tonne — sell it on the <b>ORE exchange</b> (bottom bar) whenever the price suits you.', 'warn'); } catch (er) { }
+    }
+    return STATE.res[r];
+  }
+
+  // ---- selling -----------------------------------------------------------
+  function sell(res, tons) {
+    ensure();
+    const r = String(res || '');
+    const have = held(r);
+    let t = Math.min(+tons || 0, have);
+    if (!(t > 0)) return { ok: false, why: 'none', held: have };
+    const px = price(r);
+    const gross = t * px;
+    const left = +(have - t).toFixed(2);
+    if (left > 0.005) STATE.res[r] = left; else delete STATE.res[r];
+    earn(gross);   // a sale is income — money + GDP
+    try { saveGame(); } catch (er) { }
+    try { toast('💰 Sold <b>' + t.toFixed(1) + ' t of ' + r + '</b> for <b>' + fmt$(gross) + '</b> at $' + (Math.round(px * 10) / 10) + '/t on the exchange.'); } catch (er) { }
+    return { ok: true, t: +t.toFixed(2), px: +px.toFixed(3), gross: Math.round(gross * 100) / 100, left };
+  }
+  function sellAll(res) { return sell(res, held(res)); }
+  function sellHalf(res) { return sell(res, held(res) / 2); }
+  function sellEverything() {
+    ensure();
+    let gross = 0, t = 0, kinds = 0;
+    for (const r of RES) {
+      const h = held(r);
+      if (h > 0.005) { gross += h * price(r); t += h; kinds++; sell(r, h); }
+    }
+    if (!kinds) { try { toast('The stockpile is empty — send a crew digging first.', 'warn'); } catch (er) { } return { ok: false }; }
+    try { toast(' Sold <b>everything</b> — ' + t.toFixed(1) + ' t across ' + kinds + ' resource' + (kinds === 1 ? '' : 's') + ' for <b>' + fmt$(gross) + '</b>.'); } catch (er) { }
+    return { ok: true, t: +t.toFixed(1), gross: Math.round(gross), kinds };
+  }
+
+  // ---- the board ------------------------------------------------------------
+  function rowHTML(r) {
+    const px = price(r), pc = pctOf(r), h = held(r), up = pc >= 0;
+    const pcs = '<span style="color:' + (up ? '#4dff88' : '#ff5470') + '">' + (up ? '▲' : '▼') + Math.abs(pc).toFixed(1) + '% today</span>';
+    return '<div class="ox-row' + (h > 0 ? ' hot' : '') + '">' +
+      '<div class="ox-name"><b>' + r.toUpperCase() + '</b><span>par $' + (BASE[r] || 14) + '/t · ' + (h > 0 ? h.toFixed(1) + ' t held ≈ ' + fmt$(h * px) : 'none held') + '</span></div>' +
+      '<div class="ox-px">$' + (Math.round(px * 10) / 10) + '/t<span>' + pcs + '</span></div>' +
+      '<div class="ox-btns">' + (h > 0
+        ? '<button class="tpbtn" data-eh="' + r + '">SELL HALF</button><button class="tpbtn" data-es="' + r + '">SELL ALL</button>'
+        : '') + '</div></div>';
+  }
+  function render() {
+    const list = document.getElementById('ox-list');
+    if (!list) return;
+    ensure();
+    const t = stockT(), v = stockValue();
+    const sum = document.getElementById('ox-sum');
+    if (sum) sum.innerHTML =
+      '<div class="kv"><span class="k">STOCKPILE</span><span class="v' + (t > 0 ? ' g' : '') + '">' + (t > 0 ? t.toFixed(1) + ' t of ore ≈ ' + fmt$(v) + ' at today\u2019s prices' : 'empty — the ore your crews dig stacks up here') + '</span></div>' +
+      '<div class="kv" style="margin-top:6px"><span class="k">THE MARKET</span><span class="v">12 resources · par × the day\u2019s multiplier · moves every game day</span></div>';
+    list.innerHTML = [...RES.filter(r => held(r) > 0.005), ...RES.filter(r => held(r) <= 0.005)].map(rowHTML).join('');   // what you hold rides the top
+    list.querySelectorAll('[data-eh]').forEach(b => { b.onclick = () => { try { sellHalf(b.dataset.eh); } catch (er) { } render(); }; });
+    list.querySelectorAll('[data-es]').forEach(b => { b.onclick = () => { try { sellAll(b.dataset.es); } catch (er) { } render(); }; });
+    const all = document.getElementById('ox-all');
+    if (all) all.onclick = () => { try { sellEverything(); } catch (er) { } render(); };
+  }
+  function renderIfOpen() { if (document.getElementById('ox-list')) render(); }
+  function open() {
+    ensure(); migrate();
+    openModal('THE ORE EXCHANGE — the resource market', `
+      <p>The market for everything your mines dig. Every resource trades around its <b>par value</b> at a multiplier that moves on each game-day beat — sell when it suits you, or hold the pile and wait for a better price. The stockpile counts in your <b>WORTH</b> at today's prices.</p>
+      <div id="ox-sum"></div>
+      <div id="ox-list" style="max-height:44vh;overflow:auto;padding-right:2px"></div>
+      <p style="margin-top:10px">Prices drift up to ±8% a day around par (clamped ×0.55–×1.70). Wages are still paid daily in cash — keep selling to cover payday.</p>
+      <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" id="ox-all" style="flex:1">SELL EVERYTHING</button><button class="btn" id="ox-x" style="flex:1">CLOSE</button></div>`);
+    render();
+    const x = document.getElementById('ox-x');
+    if (x) x.onclick = closeModal;
+  }
+
+  // ---- the Empire panel section (the market, one glance) -----------------
+  function empireInto() {
+    const body = document.getElementById('mbody');
+    if (!body) return;
+    const close = document.getElementById('em-x');
+    const anchorEl = close ? close.parentElement : null;
+    ensure();
+    const rk = RES.map(r => ({ r, pc: pctOf(r), px: price(r) })).sort((a, b) => b.pc - a.pc);
+    const top = rk[0], bot = rk[rk.length - 1];
+    const a2 = p => (p >= 0 ? '▲' : '▼') + Math.abs(p).toFixed(1) + '%';
+    const html = '<div class="msec" style="margin-top:14px">Ore Exchange — the market</div>' +
+      '<div class="kv"><span class="k">' + top.r + ' ' + a2(top.pc) + ' ($' + (Math.round(top.px * 10) / 10) + '/t) · ' + bot.r + ' ' + a2(bot.pc) + ' ($' + (Math.round(bot.px * 10) / 10) + '/t) today</span>' +
+      '<button class="tpbtn" id="em-ox">OPEN</button></div>';
+    if (anchorEl) anchorEl.insertAdjacentHTML('beforebegin', html);
+    else body.insertAdjacentHTML('beforeend', html);
+    const b = document.getElementById('em-ox');
+    if (b) b.onclick = () => { try { open(); } catch (er) { } };
+  }
+
+  // ---- styles ---------------------------------------------------------------
+  try {
+    const st = document.createElement('style');
+    st.textContent = [
+      '#ox-list{display:flex;flex-direction:column}',
+      '.ox-row{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:9px;',
+      ' background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);margin-top:6px}',
+      '.ox-row.hot{background:rgba(245,204,116,.10);border-color:rgba(245,204,116,.45)}',
+      '.ox-name{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}',
+      '.ox-name b{font-size:12px;letter-spacing:.4px}',
+      '.ox-name span{font-size:9.5px;color:var(--mut)}',
+      '.ox-px{text-align:right;flex:none;font-weight:800;font-size:12px;font-family:var(--mono)}',
+      '.ox-px span{display:block;font-size:9px;font-weight:600}',
+      '.ox-btns{display:flex;gap:6px;flex:none}',
+      '.ox-btns .tpbtn{margin:0;white-space:nowrap}',
+    ].join('');
+    document.head.appendChild(st);
+  } catch (er) { }
+
+  ensure();   // seed a fresh save's multipliers at par
+  migrate();  // re-mark older saves' mines to the exchange
+
+  return {
+    open, empireInto, tick, pile, sell, sellAll, sellHalf, sellEverything,
+    price, mult, held, stockT, stockValue, list: () => RES.slice(), BASE,
+    // QA: run whole market-days of drift instantly (same math as the beat)
+    qaDay(n) { for (let i = 0; i < (n || 1); i++) { try { day(); } catch (er) { } } return this.state(); },
+    state() {
+      ensure();
+      return {
+        dayN, stockT: +stockT().toFixed(1), stockValue: Math.round(stockValue()),
+        res: RES.map(r => ({ r, t: +held(r).toFixed(1), px: +price(r).toFixed(2), m: +mult(r).toFixed(3), pm: +pmv(r).toFixed(3), pc: +pctOf(r).toFixed(2) })),
+      };
+    },
+  };
+})();
+window.EXCH = EXCH;   // QA surface
+
+// ADDITIVE hooks — the same wrap pattern the game already uses.
+// 1. the Empire panel gains the market section (after the Money List)
+const __exchEmpire = ECO.openEmpire.bind(ECO);
+ECO.openEmpire = function () {
+  __exchEmpire();
+  try { EXCH.empireInto(); } catch (e) { console.error('[exchange]', e); }
+};
+// 2. the update chain: original → world forest → open house → suburbs →
+//    title deeds → patchwork → machines → landlord → MOTHERLODE →
+//    MONEY LIST → ORE EXCHANGE. Every call is try/caught so an
+//    exchange error can never touch the world.
+const __exchOrigUpdate = WORLD.update.bind(WORLD);
+WORLD.update = function (dt, px, pz, camDist) {
+  const req = __exchOrigUpdate(dt, px, pz, camDist);
+  try { EXCH.tick(dt); } catch (e) { console.error('[exchange]', e); }
+  return req;
+};
+
+console.log('%cOPEN WORLD v2.52 — THE ORE EXCHANGE', 'color:#38BDF8;font-weight:700', 'ready.');
+
 
 </script>
 </body>
