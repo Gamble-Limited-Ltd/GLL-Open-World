@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Open World — v2.54</title>
+<title>Open World — v2.55</title>
 <style>
 /* ==================================================================
    OPEN WORLD v2.42 — NEIGHBORHOODS: "make houses and neighborhoods
@@ -734,7 +734,7 @@ table.menu td.m{font-family:var(--mono);color:var(--green)}
 <div id="toasts"></div>
 <div id="veil"><div class="w">OPEN WORLD</div><div class="s" id="veils">—</div>
   <div class="bar"><i></i></div>
-  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.54 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), every one of those rooms and floors for sale or for rent (buy it outright — yours forever, tenants pay you daily — or rent it with a two-day deposit; your holdings glow gold and pay you every day), a patchwork of buyable farm parcels over every mile of open country around the cities (rectangles of all shapes and sizes in every shade of green like a satellite view — hover one for its price, click to buy it, and the tenant farmers pay you daily — at premium prices since v2.46: about ten times the cost for about three times the rent), landlord rentals at your own price (list any plot, office suite, room, floor or farm parcel you own and tenants pay your daily rate — price it above the local market and it may sit empty while the market looks), and machines you install inside the rooms and floors you own (six kinds from a vending machine to a server rack — click a spot in your own space to set each one down, and every machine pays you every day), mining claims you stake yourself in the open country (select any rectangle of land past the suburbs, set your machinery on its ring and hire the crew that digs it — their wages come out of the daily ore sale, and the pit terraces deeper until it’s worked out), the Money List that ranks your WORTH against fifteen rival tycoons around the real Earth (their fortunes move on every game-day beat — small piles sprint, old money compounds — pass them one by one, and your live rank rides the WORTH ticker chip), the Ore Exchange where the resources your crews dig stack up tonne by tonne in a stockpile and sell on a market of twelve daily-moving prices (each ore trades around its par value — watch the ▲▼ day change, sell half or all whenever it suits you, and the pile counts in your WORTH at today’s prices), the Works where twelve refining machines turn the ore in your stockpile into refined goods — steel from iron, coke from coal, glass from quartz — poured on the game-day beat for power at $0.25 a tonne and traded on the same exchange for more than the ore that went in (any machine scraps back for 60%), and the same streets, buildings, plots and roads on dry land only</div>
+  <div class="at">Map data © OpenStreetMap contributors (ODbL)<br>Open World v2.54 — the real Earth at 1:1 in the Capital Rift look: real lake outlines (10 m source data) so every great lake has its true shape — solid clean blue water shore to shore with green pastures meeting the waterline (the lake plane rides 80 cm clear of the land, past the reach of depth noise at any altitude), zero fog anywhere, free camera roam with no distance cap from your tycoon, and a zoom that now climbs from street level all the way to a 23,000 km whole-world view, neighborhoods of houses around every city (ring roads and tree-named lanes of lawns, driveways and pitched roofs out to ~2.4 km, every house clickable), woodland belts around the cities beyond the last yard, real 3D forest across every other dry-land chunk of the open country (never in the cities, never in water), open-house interiors — click any building to open it like a dollhouse, then pick a floor (big buildings) or a named room (houses and small shops) from the inspector panel (every other building keeps its full silhouette), every one of those rooms and floors for sale or for rent (buy it outright — yours forever, tenants pay you daily — or rent it with a two-day deposit; your holdings glow gold and pay you every day), a patchwork of buyable farm parcels over every mile of open country around the cities (rectangles of all shapes and sizes in every shade of green like a satellite view — hover one for its price, click to buy it, and the tenant farmers pay you daily — at premium prices since v2.46: about ten times the cost for about three times the rent), landlord rentals at your own price (list any plot, office suite, room, floor or farm parcel you own and tenants pay your daily rate — price it above the local market and it may sit empty while the market looks), and machines you install inside the rooms and floors you own (six kinds from a vending machine to a server rack — click a spot in your own space to set each one down, and every machine pays you every day), mining claims you stake yourself in the open country (select any rectangle of land past the suburbs, set your machinery on its ring and hire the crew that digs it — their wages come out of the daily ore sale, and the pit terraces deeper until it’s worked out), the night shift that keeps your hired hands earning while the game is closed (every cart with vendors serves the night crowd and every working mine digs on — the night buyer pays par for every tonne, wages still come due first, and a card greets you on your return with what they made; the shift caps at 24 hours), the Money List that ranks your WORTH against fifteen rival tycoons around the real Earth (their fortunes move on every game-day beat — small piles sprint, old money compounds — pass them one by one, and your live rank rides the WORTH ticker chip), the Ore Exchange where the resources your crews dig stack up tonne by tonne in a stockpile and sell on a market of twelve daily-moving prices (each ore trades around its par value — watch the ▲▼ day change, sell half or all whenever it suits you, and the pile counts in your WORTH at today’s prices), the Works where twelve refining machines turn the ore in your stockpile into refined goods — steel from iron, coke from coal, glass from quartz — poured on the game-day beat for power at $0.25 a tonne and traded on the same exchange for more than the ore that went in (any machine scraps back for 60%), and the same streets, buildings, plots and roads on dry land only</div>
 </div>
 <div id="joy"><div class="base"></div><div class="nub" id="joynub"></div></div>
 
@@ -770,7 +770,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ====================================================================
 // v2.0 — CORE: config, state, save, HUD engine, city catalog
 // ====================================================================
-const GAME_VERSION = 'v2.54';
+const GAME_VERSION = 'v2.55';
 const SAVE_KEY = 'openworld-v2';
 
 // ---- deterministic rng --------------------------------------------
@@ -1210,7 +1210,7 @@ const STATE = {
 function saveGame() {
   try {
     const pack = {
-      v: 5, name: STATE.name, money: STATE.money, gdp: STATE.gdp,
+      v: 5, ts: Date.now(), name: STATE.name, money: STATE.money, gdp: STATE.gdp,   // v2.55 NIGHT SHIFT: every save carries its timestamp — the offline clock reads it on the next load
       lastCityKey: STATE.lastCityKey, seenNews: STATE.seenNews,
       tut: { step: STATE.tut.step, done: STATE.tut.done },
       wx: ACTORS.player ? +ACTORS.player.group.position.x.toFixed(1) : null,
@@ -1240,6 +1240,7 @@ function loadGame() {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return false;
     const p = JSON.parse(raw);
+    STATE.saveTs = (typeof p.ts === 'number' && +p.ts > 0) ? +p.ts : null;   // v2.55 NIGHT SHIFT: the stamp of the last save (absent on pre-v2.55 packs — their first reload measures from the next save)
     STATE.name = p.name || ''; STATE.money = p.money ?? ECON.startMoney;
     STATE.gdp = p.gdp || 0; STATE.lastCityKey = p.lastCityKey || null;
     // per-version news gate: stores the version whose news was seen
@@ -9810,6 +9811,168 @@ if (hadSave && STATE.name) {
   document.querySelector('#boot .row').appendChild(reset);
 }
 
+// ======== section: 66_night.js ========
+// ====================================================================
+// v2.55 — THE NIGHT SHIFT. The ask: "If people have workers, they
+// should make money while they are offline. And when they join back,
+// they should get a pop up of how much money they made while offline."
+// The game is serverless, so "offline" is the time between your last
+// save and this load. Every save now carries a timestamp (a 45 s
+// autosave while you play and a save on pagehide keep the stamp fresh),
+// and on boot — or on refocusing a sleeping tab — the night shift
+// settles the gap on the same rules the day shift runs on:
+//   - VENDORS: every cart with hired vendors serves its own night
+//     crowd at the live rate (a customer every 6.25 s on average, each
+//     vendor serving at their star-paced interval) — the same money a
+//     crewed cart makes at the screen, minute by minute.
+//   - CREWS: every working mine digs its digTpd a day, and the NIGHT
+//     BUYER takes every tonne at PAR — no market timing while you
+//     sleep. Wages come due first, same as every payday: a crew the
+//     balance can't cover WALKS OFF, a claim that can't pay for itself
+//     at par gets the night off, and a worked-out claim releases its
+//     crew — so the offline net can never go negative.
+//   - THE CARD: "While You Were Away" greets you when you join back —
+//     vendors, crews, wages, events, one NET figure at the bottom.
+//   - THE CAP: the shift ends after 24 hours away. The works have no
+//     workers of their own — they sleep, and pour again on your beat.
+// ====================================================================
+const NIGHT = (() => {
+  const CAP_MS = 24 * 3600e3;      // the night shift is 24 hours long
+  const DAY_MS = 90 * 1000;        // one game day, same as every beat
+  let summary = null;
+  // NOTE: settle() touches ECO.CUISINES and MINE.digTpd/BASE, so the
+  // settle CALL is made at the very end of the module (after every
+  // module has attached its window.* surface), right before the ready
+  // log — the section itself only defines and registers listeners.
+
+  // ---- settle the gap between the last save and now -------------------
+  function settle() {
+    const ts = STATE.saveTs;
+    if (!ts || !isFinite(+ts) || +ts <= 0) return null;   // pre-v2.55 pack: no stamp, no shift
+    const away = Date.now() - ts;
+    STATE.saveTs = Date.now();                            // the window is consumed the moment it is read
+    if (away < DAY_MS) return null;                       // under one game day — nobody clocked in
+    const shift = Math.min(away, CAP_MS), capped = away > CAP_MS;
+    const mins = shift / 60000;                           // vendors earn by the minute
+    const days = Math.floor(shift / DAY_MS);              // crews dig by the whole day
+
+    // vendors first — the tills run all night, so payday reads a full till
+    let vendN = 0, cartN = 0, vendInc = 0;
+    for (const p of (STATE.plots || [])) {
+      if (!p || !p.cart || !(p.crew || []).length) continue;
+      const cui = (window.ECO ? ECO.CUISINES : []).find(c => c && c.id === p.cart.cuisine);
+      if (!cui || !cui.menu || !cui.menu.length) continue;
+      const pop = cui.menu.reduce((s, m) => s + (m[2] || 0), 0) || 1;
+      const ticket = cui.menu.reduce((s, m) => s + m[1] * (m[2] || 0), 0) / pop
+        + (ECON.serveTipMin + ECON.serveTipMax) / 2;               // avg item + avg tip
+      const arrivals = 60 / ((ECON.custSpawnMin + ECON.custSpawnMax) / 2);   // this cart's own night crowd
+      const serves = p.crew.reduce((s, v) => s + 60 / Math.max(2.6, ECON.vendorInterval - (v.stars | 0) * .55), 0);
+      vendInc += Math.min(arrivals, serves) * ticket * mins;
+      vendN += p.crew.length; cartN++;
+    }
+    if (vendInc > 0) STATE.money += vendInc;
+
+    // crews: day by day, wages first, the night buyer pays par
+    let dug = 0, sold = 0, wages = 0;
+    const walked = [], workedOut = [], nightOff = [];
+    const BASE = (window.MINE && MINE.BASE) || {};
+    for (const m of (STATE.mines || [])) {
+      if (!m || !(m.machines || []).length || !((m.crew | 0) > 0) || m.got >= m.ore) continue;   // not working
+      const res = (window.MINE && MINE.resOf) ? MINE.resOf(m) : (m.res || 'Ore');
+      const par = BASE[res] || 14;
+      const dig = (window.MINE && MINE.digTpd) ? MINE.digTpd : (() => 0);
+      for (let d = 0; d < days; d++) {
+        if (!((m.crew | 0) > 0) || m.got >= m.ore) break;   // released mid-shift
+        const tons = Math.min(dig(m), m.ore - m.got);
+        const gross = tons * par, due = (m.crew | 0) * 95;  // the same $95/day/worker as the pit
+        if (!(tons > 0) || gross < due) {                   // can't pay for itself at par — the night off
+          if (nightOff.indexOf(m.name) === -1) nightOff.push(m.name);
+          break;
+        }
+        if (STATE.money < due) {                             // payday came up short — the crew walks
+          m.crew = 0; m.walked = true; m.wageAcc = 0;
+          if (walked.indexOf(m.name) === -1) walked.push(m.name);
+          break;
+        }
+        STATE.money = +(STATE.money - due + gross).toFixed(2);
+        wages += due; sold += gross; dug += tons;
+        m.got = +(m.got + tons).toFixed(2);
+        if (m.got >= m.ore) {                               // the assay ran dry — the crew is released
+          m.crew = 0; m.wageAcc = 0;
+          if (workedOut.indexOf(m.name) === -1) workedOut.push(m.name);
+        }
+      }
+    }
+
+    vendInc = +vendInc.toFixed(2);
+    STATE.money = +STATE.money.toFixed(2);
+    const net = +(vendInc + sold - wages).toFixed(2);
+    if (net > 0) STATE.gdp += net;
+    try { uiBalance(); } catch (e) { }
+
+    if (!cartN && !dug && !walked.length && !workedOut.length && !nightOff.length) return null;   // no workers, no shift, no card
+    summary = {
+      awayMs: away, capped, days, mins: Math.round(mins),
+      cartN, vendN, vendInc: Math.round(vendInc),
+      dug: Math.round(dug * 10) / 10, sold: Math.round(sold), wages: Math.round(wages),
+      walked, workedOut, nightOff, net: Math.round(net),
+    };
+    return summary;
+  }
+
+  // ---- the welcome-back card -------------------------------------------
+  function show() {
+    const s = summary; if (!s) return;
+    const h = Math.floor(s.awayMs / 3600e3), mn = Math.round((s.awayMs % 3600e3) / 60000);
+    const awayLabel = (h ? h + 'h ' : '') + mn + 'm';
+    let rows = '';
+    if (s.vendN) rows += '<div class="kv"><span class="k">VENDORS</span><span class="v g">+' + fmt$(s.vendInc) + ' — ' + s.vendN + ' vendor' + (s.vendN > 1 ? 's' : '') + ' served the night crowd across ' + s.cartN + ' cart' + (s.cartN > 1 ? 's' : '') + '</span></div>';
+    if (s.dug) rows += '<div class="kv"><span class="k">CREWS</span><span class="v g">+' + fmt$(s.sold) + ' — dug ' + s.dug.toLocaleString('en-US') + ' t of ore; the night buyer paid par for every tonne</span></div>';
+    if (s.wages) rows += '<div class="kv"><span class="k">WAGES</span><span class="v">-' + fmt$(s.wages) + ' — payday came due as always</span></div>';
+    for (const n of s.walked) rows += '<div class="kv"><span class="k">WALKED OFF</span><span class="v">The ' + n + ' crew — payday came up short. Re-hire them when your balance can cover the wages</span></div>';
+    for (const n of s.workedOut) rows += '<div class="kv"><span class="k">WORKED OUT</span><span class="v">' + n + ' — the assay ran dry and the crew was released</span></div>';
+    for (const n of s.nightOff) rows += '<div class="kv"><span class="k">NIGHT OFF</span><span class="v">' + n + ' — the dig at par wouldn\'t cover the wages, so the crew got the night off</span></div>';
+    rows += '<div class="kv" style="margin-top:6px"><span class="k">NET</span><span class="v g" style="font-size:1.15em">+' + fmt$(s.net) + '</span></div>';
+    if (s.capped) rows += '<div class="kv"><span class="k">THE CAP</span><span class="v">You were away ' + awayLabel + ' — the night shift pays the first 24 hours</span></div>';
+    openModal('🌙 While You Were Away', `
+      <p>You were gone <b>${awayLabel}</b> — <b>${s.days}</b> game day${s.days > 1 ? 's' : ''} of night shift, and your hired hands kept the money moving:</p>
+      ${rows}
+      <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="ns-x" style="flex:1">BACK TO WORK</button></div>`);
+    const b = document.getElementById('ns-x');
+    if (b) b.onclick = closeModal;
+  }
+  // the card queues behind whatever modal is up (the news card goes first)
+  function maybeShow() {
+    if (!summary) return;
+    const t = () => {
+      const mw = document.getElementById('modalwrap');
+      if (mw && !mw.classList.contains('hidden')) { setTimeout(t, 400); return; }
+      try { show(); } catch (e) { console.error('[night]', e); }
+    };
+    setTimeout(t, 1200);
+  }
+
+  // ---- keep the stamp honest while you play -----------------------------
+  setInterval(() => { try { if (STATE.mode !== 'boot' && !document.hidden) saveGame(); } catch (e) { } }, 45000);
+  window.addEventListener('pagehide', () => { try { if (STATE.mode !== 'boot') saveGame(); } catch (e) { } });
+  // a sleeping tab is offline too: refocus settles the gap and shows the
+  // card (the pit's mesh catches up on the next dig second or city entry)
+  document.addEventListener('visibilitychange', () => {
+    try {
+      if (document.visibilityState === 'visible' && STATE.mode !== 'boot') {
+        if (settle()) { show(); try { saveGame(); } catch (e) { } }
+      }
+    } catch (e) { console.error('[night]', e); }
+  });
+
+  return { settle, show, maybeShow, summary: () => summary };
+})();
+window.NIGHT = NIGHT;   // QA surface
+// (the settle invocation lives at the END of the module — see the
+// ready-log insertion below — because MINE/WORKS attach their window
+// surfaces only after this point in the file)
+
+
 // wake up where you left off (used by CONTINUE and after the news modal)
 function autoEnterLast() {
   if (STATE.mode !== 'globe' || !STATE.lastCityKey) return;
@@ -9851,6 +10014,7 @@ function doEnter() {
   else toast('Welcome, <b>' + nm + '</b>. Click a glowing city — or any land — to land anywhere on Earth.');
   // v2.24: compare this build to the site's feed once per session
   checkForUpdate();
+  try { if (window.NIGHT) NIGHT.maybeShow(); } catch (e) { console.error('[night]', e); }   // v2.55 NIGHT SHIFT: the welcome-back card
 }
 enterBtn.addEventListener('click', doEnter);
 pnameEl.addEventListener('keydown', e => { if (e.key === 'Enter') doEnter(); });
@@ -9918,11 +10082,11 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.54 — CREW CALL', `
-    <p><b>Click your carts — the business panel opens again.</b></p>
-    <div class="kv"><span class="k">THE FIX</span><span class="v">A single line of code lost in an old rebuild had been throwing an error the moment a cart's crew panel drew — so clicking any food cart you own (your coffee shop, your taco stand) silently did nothing</span></div>
-    <div class="kv"><span class="k">WHAT'S BACK</span><span class="v">Click any cart you own: the live P&L, the menu, hiring your five vendors and scrapping the cart — all exactly as it always was, on every save</span></div>
-    <div class="kv"><span class="k">NOTHING ELSE MOVED</span><span class="v">The crews, the pits, the exchange, the works, the landlord, the machines, the Money List and the true 1:1 Earth are untouched</span></div>
+  openModal('Welcome to v2.55 — NIGHT SHIFT', `
+    <p><b>Your workers clock in while you're out — the money keeps moving.</b></p>
+    <div class="kv"><span class="k">THE SHIFT</span><span class="v">Close the game and your hired hands keep working: every cart with vendors serves the night crowd minute by minute, and every crewed mine digs its tonnes a day — the <b>night buyer pays par</b> for every tonne (no market timing while you sleep)</span></div>
+    <div class="kv"><span class="k">THE RULES</span><span class="v">Wages still come due first — a crew the balance can't cover walks off, a claim that can't pay for itself at par gets the night off, and the shift ends after <b>24 hours</b> away. The works have no workers — they sleep</span></div>
+    <div class="kv"><span class="k">THE CARD</span><span class="v">Join back and a <b>While You Were Away</b> popup shows exactly what they made — vendors, crews, wages, one NET figure at the bottom</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -9949,6 +10113,7 @@ document.getElementById('b-build').addEventListener('click', () => {
     <div class="kv"><span class="k">MONEY LIST</span><span class="v">The <b>RANK</b> button in the bottom bar opens the leaderboard of the richest — fifteen rival tycoons around the real Earth and you, ranked by <b>WORTH</b> (cash plus everything you own); their fortunes move on every game-day beat (small piles sprint, old money compounds slow), passing a rival — or being passed — toasts it, and your live rank rides the WORTH ticker chip</span></div>
     <div class="kv"><span class="k">CARTS</span><span class="v">Stand close → [E] to serve the queue</span></div>
     <div class="kv"><span class="k">CREWS</span><span class="v">Business panel → hire star vendors</span></div>
+    <div class="kv"><span class="k">NIGHT SHIFT</span><span class="v">Close the game — hired vendors and mining crews keep earning while you're away (the night buyer pays par for ore, wages still come due first); a <b>While You Were Away</b> card shows what they made when you return, and the shift caps at 24 hours</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn" id="hb-x" style="flex:1">GOT IT</button></div>`);
   document.getElementById('hb-x').onclick = closeModal;
 });
@@ -15420,7 +15585,8 @@ WORLD.update = function (dt, px, pz, camDist) {
   return req;
 };
 
-console.log('%cOPEN WORLD v2.54 — CREW CALL', 'color:#38BDF8;font-weight:700', 'ready.');
+try { NIGHT.settle(); } catch (e) { console.error('[night]', e); }   // v2.55 NIGHT SHIFT: settle the offline gap — invoked here, at the END of the module, so ECO/MINE/WORKS are all up (the boot screen blocks until the ready log, so no click can beat it)
+console.log('%cOPEN WORLD v2.55 — NIGHT SHIFT', 'color:#38BDF8;font-weight:700', 'ready.');
 
 
 </script>
