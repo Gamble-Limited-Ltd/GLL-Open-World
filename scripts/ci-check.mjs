@@ -96,6 +96,22 @@ for (const f of ['index.html', 'openworld.html']) {
   }
 }
 
+// 4c. boot-screen fine print (#veil .at) stays under 200 words and keeps the map attribution
+{
+  const mm = /<div class="at">(.*?)<\/div>/s.exec(rd('openworld.html'));
+  if (!mm) say('FAIL', 'at-length', 'openworld.html needs the #veil .at fine-print block');
+  else {
+    const words = mm[1]
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&[a-zA-Z#0-9]+;/g, ' ')
+      .split(/\s+/)
+      .filter((t) => /[A-Za-z0-9]/.test(t)).length;
+    const attr = mm[1].includes('OpenStreetMap contributors');
+    say(words <= 200 && attr ? 'PASS' : 'FAIL', 'at-length',
+      `boot fine print: ${words} words (max 200), OSM attribution ${attr ? 'present' : 'MISSING'}`);
+  }
+}
+
 // 5. version consistency
 const iv = (/class="pill">\s*(v2\.\d+)/.exec(rd('index.html')) || [])[1];
 const ov = (/<title>[^<]*?(v2\.\d+)/.exec(rd('openworld.html')) || [])[1];
