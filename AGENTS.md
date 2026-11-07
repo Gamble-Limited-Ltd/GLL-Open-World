@@ -2,17 +2,23 @@
 
 Shared rules for every agent and human on Open World. Read this first, every session. If something here is wrong, fix it in the same PR.
 
-## The project (v2.33 on the dev branch)
+## The project (v2.60 on the dev branch)
 - 3D Earth game by Kayne (`kayneheffelfinger-cyber`), who owns it and is the main dev. Gamble Limited Ltd. (James, `TheGeneral4757`) hosts it and helps with hosting, error fixing, repo cleanup and docs.
 - Plain HTML/JS, no build step, single-player, no accounts, no backend. State lives in the browser (`localStorage` key `openworld-v2`). Only network calls: OSM Overpass, Nominatim, and same-origin `version.json` (read on boot since v2.24 for the self-update check).
-- Files: `openworld.html` is the game. `game.html` must stay a byte-identical copy of it. `index.html` is the homepage, `home.html` a redirect stub, `version.json` the version feed (the game reads it on boot since v2.24 and offers a one-tap cache-busting update when the feed is newer than the running build). `admin.html` and `supabase-setup.sql` are legacy (old multiplayer version) and should not be extended.
+- Files (since v2.60, the modular rebuild): `openworld.html` is the game — a thin page that loads `css/style.css` and `js/boot.js` (native ES modules, no bundler; the importmap still pins three.js on unpkg). `game.html` is deliberately kept as the pre-v2.59 single-file baseline for A/B comparison — it is NO LONGER a copy of `openworld.html`; do not sync it. `index.html` is the homepage, `version.json` the version feed. `admin.html` and `supabase-setup.sql` are legacy (old multiplayer version) and should not be extended.
+- Module layout (dependencies point one way, bottom → top: config/util/state/save → core → world → render → systems; `js/boot.js` imports everything in the original section order and binds the late references):
+  - `js/config.js` static catalog · `js/util.js` pure helpers · `js/state.js` the shared STATE object · `js/save.js` load/save + migrations
+  - `js/core.js` land mask + coastlines · `js/world/` osm, earth, world, city, actors, worldforest · `js/render/` main, night
+  - `js/systems/` one file per system: economy, market, eco, tutorial, openhouse, property, farmland, machines, landlord, mining, rivals, exchange, works, builder, furniture, power
+  - `js/ui/dom.js` toast/modal/tooltip/veil
+- **New features go in `js/systems/` as a NEW file**, on the additive patch-chain pattern the game already uses: wrap `ECO.openEmpire` / `WORLD.update` / `clickPick` (via `patchClickPick`), attach a `window.X` QA surface, keep state in `STATE`, save through the existing pack fields. Import only from modules earlier in the list; never add a circular import. The five late-bound forward references (`ECO→PWR/LORD`, `night→PWR/MINE/BLD/EXCH/RIVALS/MACH/FURN`, `world→CITY`, `save→ACTORS`, and the system chains) resolve in `js/boot.js` — add new ones there.
 - License: PolyForm Noncommercial 1.0.0 (`LICENSE`). Play money only: no real-money features, ever.
 
 ## Branches and releases
 - `TopTierDevelopment-Thiessen` is Kayne's dev branch and what GitHub Pages serves.
 - `main` is what may go to Gamble Limited's production server, which pulls `main`. Kayne may merge to `main` himself, no review needed. Do not put broken code on `main`.
 - Anyone else works on a branch and opens a PR. `git fetch` before starting: pushes can arrive at any time.
-- When the game changes, bump the version everywhere it appears (`openworld.html` title and footer strings, `index.html` `?v=`, `version.json`) and add a line to `CHANGES.md`. Keep `game.html` identical.
+- When the game changes, bump the version everywhere it appears (`js/config.js` `GAME_VERSION`, `js/render/night.js` What's-New card + `js/boot.js` ready log, `openworld.html` title/footer, `index.html` `?v=` and news blurb, `version.json`) and add a line to `CHANGES.md`. Leave `game.html` untouched (baseline).
 
 ## Rules that keep it hostable (agents: check before you commit)
 - Use relative URLs only. No hardcoded hostnames (the production domain changes and may rotate). No `*.github.io` URLs in game code.

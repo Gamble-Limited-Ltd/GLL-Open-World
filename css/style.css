@@ -1,0 +1,609 @@
+/* ==================================================================
+   OPEN WORLD v2.42 — NEIGHBORHOODS: "make houses and neighborhoods
+   around the cities." Every catalog city now wears a suburb ring
+   from its edge out to ~2.4 km: six curved collector rings and
+   sixteen radial lanes (they join the street list before the
+   dry-land clip, so real shorelines trim them like any imported
+   street), house lots along every street — lawns, driveways,
+   porches, gable roofs with dormers and chimneys — merged into
+   city-local meshes. Houses register as buildings, so the v2.41
+   inspector opens them (rooms for houses). The chunk pass's wild
+   content (belt trees, groves, paddocks, rocks, ponds) moves out
+   past the ring, the forest belt's inner edge follows (CITY_R+1900),
+   a lawn-green suburb decal renders under it at every zoom, and
+   LEAVE_DIST lifts to 2900 m so the city + neighborhoods stay
+   standing while you walk them. True 1:1 Earth untouched.
+   OPEN WORLD v2.38 — DEEP-BLUE LAKES: the last green-bleed mechanism
+   is dead, at every altitude. The land rings are outer-contour only,
+   so lake interiors clipped as "land" — the grass shield rendered
+   UNDER the water, and a 55 km land cell's log-depth interpolation
+   error grows into METERS by a few hundred km of altitude, past any
+   separation the lake plane could ride at: grass bled back through
+   the water exactly in the 100–2000 km band the v2.37 zoom opens
+   (measured: half of Lake Michigan's deep-interior points green at
+   300 km). Cells that touch a lake (plus a 0.55° margin, UNION over
+   every nearby lake so straits cells census against all of them) now
+   build from the lake's own raster on a 6.9 km → 860 m → 215 m grid
+   — fully-wet rects are never emitted (the water is the ONLY surface
+   there), near-shore dry rects subdivide to 860 m so their depth
+   error can never reach back over the water, and the lake plane also
+   rides .8 m clear of every remaining shore sliver. Green pastures,
+   solid blue lakes, zero mixing, from street level to the 23,000 km
+   view. Verified pixel-projected: 0 green lake-interior samples at
+   every zoom band (34 km / 100 km / 300 km / 600 km / 2,000 km /
+   whole-world).
+   OPEN WORLD v2.37 — WHOLE-WORLD ZOOM: the ask was "allow me to zoom
+   out farther" — so the ceiling lifts from 34 km to 23,000 km: the
+   FULL flat Earth (40,075 km wide, 20,038 km tall) fits in one
+   overhead view, with every altitude in between on the same wheel
+   (the glide stays gentle at street level and firms up with height
+   so the climb takes ~35 notches, not ~80). The far plane spans
+   56,000 km so even a tilted whole-world view keeps every corner of
+   the planet inside the clip, and the city beacons scale with the
+   altitude uncapped so the map keeps its dots from orbit.
+   THE FLAT-GROUND LADDER: at 23,000 km the log-depth buffer resolves
+   only ~12-23 m of separation — every centimeter-scale gap between
+   ocean (-1.35), land (0), forest belts (9.5 mm), skyline plates
+   (.05), beaches (.07), lakes (.075), rims (.09) and roads (.095)
+   rounds to the SAME depth, so polygon offset and insertion order
+   (the old tie-breakers) could flicker whole lakes green and paint
+   continents blue exactly at the new zoom. Every flat layer now
+   carries an explicit renderOrder ladder (ocean 0 < shelf .5 < land 1
+   < belt 1.5 < plate 1.6 < skyline 2 < beach 2.5 < lake 3 < rim 3.5
+   < road 4 < marks 4.2) — draw order matches physical height, so
+   the right surface wins at ANY zoom, deterministically.
+   OPEN WORLD v2.36 — TRUE LAKES: the verdict on v2.35 was "MAKE THE
+   LAKE LOOK BETTER, ive told you ten times" — and a ray census agreed:
+   38 of 49 samples across north Lake Michigan hit raw GRASS. The root
+   cause was never the color: the lake rings were Natural Earth 110m —
+   Lake Michigan in 32 points, whole bays and shores cut out of the real
+   lake and painted pasture. THE LAKES ARE REAL NOW: Natural Earth 10m
+   outlines (111 m vertex fidelity, delta-packed at 74 KB) for all 24
+   named lakes, so Green Bay, the Door Peninsula, the south basin and
+   every shore sit where the real Earth puts them; the Caspian keeps its
+   110m ring (absent from the 10m set, and fine at that sea's scale).
+   THE SURFACE CAN'T HOLE: every lake builds a boot-time scanline raster;
+   all-wet 6.9 km subcells fill as one quad, shore subcells lay down
+   444 m raster backstop runs, and the exact vector fragment rides on
+   top only when a cell-by-cell verification proves it matches the
+   raster — Sutherland–Hodgman bowties can neither hole the lake nor
+   spill water over the shore. THE CAMERA CAP IS GONE TOO: "remove the
+   distance cap that I can move my camera from my player" — the pan
+   leash is deleted (world bounds only) and pasture/trees/skyline
+   detail now streams around the VIEW, so pan anywhere on Earth and it
+   stays alive. True 1:1 Earth untouched.
+   OPEN WORLD v2.35 — PASTURE & LAKE: the user's verdict on v2.34 was
+   "there is still the green and light blue in the lake. I just want it
+   to be green pastures and blue lakes. After that looks good enough.
+   Please add trees around the cities in the green pastures." Three
+   things changed. GREEN PASTURES: the land base moves from olive
+   #6d8c49 to true fresh green #58913c (G-R went 31 → 57 — the old base
+   read khaki next to the water), with the same CR three-scale
+   high-contrast mottle, greener tint patches, pasture hills and a
+   matching coast edge. BLUE LAKES: the water family moves from teal
+   #357f9e/#3f8099 to clean blue #3479bd — the SAME family as the orbit
+   globe's own #2C7BB9 ocean (the in-world teal was literally green +
+   light blue mixed; the user read it exactly that way) — sea texture,
+   lake surfaces, coast banks, shelves, ponds, city waters and the globe
+   land all follow. ZERO FOG: even the v2.34 121.9→129.4 km edge band
+   still showed as light blue in the user's lake shot, so scene.fog is
+   now null, period — the 130 km far-plane clip melts optically into a
+   sky dome whose horizon band IS the water blue. TREES: every city
+   gets a woodland belt — a tile-level deep-green ring (CITY_R+170 →
+   3.3 km, dry land only, organic jittered edges) that renders at every
+   zoom, plus real 3D trees planted by the chunk pass in the same
+   annulus, off roads and off the plate. True 1:1 Earth untouched.
+   OPEN WORLD v2.34 — CLEAR DAY: the user's verdict on v2.33 was "why
+   is there grass in Lake Michigan, and get rid of the haze — it just
+   makes the game look worse". Both were real. GRASS IN THE LAKES:
+   Sutherland–Hodgman clips each lake ring to its 8° tile, but a
+   concave shoreline (Green Bay, the south basin) makes the clipped
+   polygon self-intersect and ShapeGeometry silently drops whole
+   stretches of it — a 102-point raycast census measured 26% of Lake
+   Michigan with NO lake surface at all, raw grass at y=0 showing
+   through (and the old whole-cell fallback spilled water across real
+   shoreline wherever it did fire). Lake surfaces now get the same
+   treatment as the land: exact fragment where the clip holds, PLUS an
+   8×8 all-wet subcell top-up (6.9 km — an offline audit of every
+   all-wet subcell found zero land inside; the 55 km whole-cell fill
+   WOULD have watered the Door Peninsula) row-merged into runs, 2 cm
+   under the fragment plane. THE HAZE IS DEAD FOR GOOD: the wide
+   60→128 km gradient still milked the far half of every zoomed-out
+   frame; the fog now lives ONLY in the last 7.5 km before the 130 km
+   far-plane clip (121.9→129.4 km, constant at every zoom) — just
+   enough that the clip edge can't shard against the sky dome.
+   Everything else rides along: true 1:1 Earth, the pre-built 64-city
+   world, junctions, stable ground.
+   OPEN WORLD v2.33 — CRISP RIFT: the user's verdict on v2.32 was "the
+   world looks terrible" — and a frame census agreed: 60% of a
+   zoomed-out frame was literally the fog color. Capital Rift's own
+   screenshots and gameplay reel have NO atmospheric haze — their world
+   is vivid and crisp to hard horizon lines at every distance. So: the
+   street-level fog (420–2100 m in #ccd9dd milky gray-white) moves to
+   the true distance edge (45–120 km, pale azure #bcd4e2) and opens
+   fully with altitude — the max zoom-out is haze-free end to end; the
+   sky dome goes azure → pale-azure with the fog color at the horizon
+   so the teal sea blends into the sky with no seam; the grass gets
+   REAL contrast (three-scale mottle: 3–9 m organic blotches, 0.6–2.5 m
+   patches, near-field grain — the v2.32 mottle at alpha .06–.13
+   averaged to a flat sage wash) on a 512 px canvas over 92 m, plus a
+   deterministic per-cell green tint on the ~3.4 km land cells so the
+   far zoom keeps organic variation; the ocean gains soft tonal drift;
+   distant city masses darken a notch against the vivid land. BUGS: 794
+   world land tiles carried NaN vertices → NaN bounding spheres →
+   culled INVISIBLE (holes in the planet); every land triangle is now
+   NaN-guarded. A stuck loading veil froze the view behind an overlay —
+   a watchdog always clears it after 45 s. 1:1 Earth, the pre-built
+   64-city world, junctions and ground stability untouched.
+   OPEN WORLD v2.32 — GREEN RIFT: the user's verdict on v2.31 was "there
+   is no grass or water like in the capitalrift.com game" — and the CR
+   reference's own world shots agree: their land IS mid olive-green
+   grass (#6e8b4c..#708e4c pixel truth, flat low-poly) and their water
+   IS readable teal-blue (bright on the globe, blue-gray in world
+   shots, pale-aqua shallow glow along every coast). So the taupe land
+   goes back to green (#71904c + light/dark green patches for far-zoom
+   variation), the slate sea becomes teal (#357f9e) with pale-sand
+   fringes and light-aqua shallows, the sky brightens to soft azure
+   (#7cb0d0) over a pale blue-white haze (#ccd9dd — fog and dome still
+   share it), the light warms up, and the street-level fog WIDENS back
+   to 420/2100 m so mid-distance detail stays readable. Far-zoom roads:
+   light-tan shoulders + chunkier cream dashes (0.42 × 4.8 m) sandwich
+   the dark asphalt — CR's distance-legibility trick. 1:1 Earth, cities,
+   junctions and ground stability untouched.
+   OPEN WORLD v2.31 — RIFT LOOK: the world's face now wears the Capital
+   Rift art direction end to end while keeping the true 1:1 Earth: flat
+   warm-taupe land (#b8afa0) instead of grass green, a dark slate sea
+   (#3d4f5f) with dry-fringe coasts instead of sandy beaches and cyan
+   shallows, a desaturated overcast sky (gradient slate zenith → haze
+   horizon, one seamless #a9b4ba atmosphere with a tighter street-level
+   fog), cooler flatter noon light, dry taupe hills, sky-blue city
+   beacons, and distant skylines that finally READ as skylines (darker
+   masses, ×3 distance-LOD heights — true-size walls are sub-pixel at
+   multi-km range). Everything under it is unchanged: true scale, the
+   pre-built 64-city world, real junctions, stable ground.
+   OPEN WORLD v2.30 — STABLE GROUND: the land shield of every 8° world
+   tile is now a 16×16 grid of cell polygons instead of one giant
+   ShapeGeometry. A full-tile quad is two 890 km triangles, and the
+   GPU's perspective interpolation of the logarithmic-depth varying
+   across a triangle that size is only good to a meter or two — every
+   centimeter-scale layer riding the shield lost whole patches to that
+   noise: grass bled through the 12 mm city plates in green z-fight
+   stripes (the "glitchy floor under the cities"), and the inter-city
+   road tails vanished for 10 km past every town ("I can't see the
+   roads connecting the cities") — the v2.29 tails also carried a
+   frame bug: emitTail pushed WORLD-coordinate vertices into a group
+   translated to the city anchor, displacing every tail ~10.8 million
+   meters from its road. Fixed: tails emit ANCHOR-LOCAL vertices
+   (matching their group frame); the land grid cuts the depth error to
+   ~4 cm (roads at 9.5 cm clear it everywhere); the ±12 km around
+   every city rides a FINE city pad — 1.5 km cells at exact y=0 in the
+   city-anchor frame — which the 12 mm plate, the 3–4 cm streets and
+   the road junctions sit on, while the coarse cells under a pad step
+   down to −10 cm so nothing can poke through it. Lake surfaces are
+   grid-clipped the same way (and lifted to .075, beaches to .07–.083,
+   rims to .09 — all clear of the residual grid error, all still under
+   the 9.5 cm road). Grass tint patches no longer spawn under city
+   plates. v2.29 REAL JUNCTIONS kept whole: every land route still
+   ends at the first street of the city it serves, near/far re-trim on
+   enter/leave, junction arcs and the 25 m street-level taper.
+   v2.28 CONNECTED ROADS kept: route ends snap to each city's CURRENT
+   (shoreline-snapped) anchor, the trim cuts at the exact along-route
+   arc length, and the ribbon stack rides above every flat ground
+   layer (whose old 7–19 mm separations lost to float32 depth noise
+   at 1:1 and left the asphalt invisible).
+   v2.27 TRUE SCALE: the whole world is now 1:1 with the
+   real Earth — 111,320 meters per degree, 40,007 km around. Every
+   static chunk of the planet (coasts, lakes, roads, bridges) builds
+   in a LOCAL frame — 8° world tiles, city anchors, chunk centers —
+   because world coordinates reach ±20 million meters, past float32
+   vertex precision; the land/water gate now answers from the vector
+   coastlines the player actually sees. Cities stand at metro scale
+   on the horizon (v2.26 pre-built world, kept) and walking in still
+   upgrades the true downtown core. Older saves migrate to the new
+   scale: city plots keep their offset from their city's anchor,
+   everything else keeps its lat/lon.
+   ================================================================== */
+/* (release history, kept for the record)
+   gives up now says so; enterWorld's teardown is guarded so a bug
+   there can never silently swallow a travel. (v2.24 FRESH BUILD: the
+   game checks its own build against the site's version.json feed and
+   tells the player when their browser is holding a STALE copy
+   (bookmarked direct URL, CDN cache) — one tap reloads with a
+   cache-busting ?v= — so fixes actually reach everyone. (v2.23 FOLLOW THE ROAD: a searched city is always the real
+   city (same streets as a globe dive — never an empty pasture when the
+   live map server is slow), and the map import waits longer for dense
+   downtowns. (v2.20 DRY LAND: nothing generates in the water —
+   streets are clipped along their whole length (real OSM ways run
+   hundreds of meters between vertices; a straight road used to jump
+   clean across a bay), the asphalt pulls back from the waterline so it
+   ends on land, every street-side prop (tree, lamp, hydrant, bench,
+   car, plot) is placed on dry ground only, and the inter-city roads
+   route AROUND the great lakes instead of crossing them. On top of
+   v2.19 SHORELINE CITIES (cities form around their water) + PLANET
+   EARTH + BIRD'S EYE VIEW (free-roam command
+   camera + tap-only movement) + CLEAN HORIZON + STARTER GUIDE + TIGHT
+   CONTROLS + CLEAR STREETS + HAPPY CUSTOMERS + SIDEWALK SPOTS + INSTANT
+   TRAVEL + WORLD ATLAS + OPEN FRONTIER (build anywhere on dry land)
+   Visual system modeled on the Capital Rift reference frame:
+   dark glassmorphism fintech UI (panels #1A202C @85%, 1px #4A5568
+   borders, 4px radius), money-green #48BB78 prices, link-blue
+   #63B3ED actions, mono tabular stat ticker, chibi avatars,
+   bright toy-lit street world.
+   ================================================================== */
+:root{
+  --panel:rgba(26,32,44,.88);
+  --panel2:#141923;
+  --line:#4A5568;
+  --line2:rgba(255,255,255,.06);
+  --txt:#E2E8F0;
+  --mut:#A0AEC0;
+  --dim:#6B7280;
+  --green:#48BB78;
+  --green2:#68D391;
+  --blue:#63B3ED;
+  --accent:#3182CE;
+  --red:#EF4444;
+  --bull:#10B981;
+  --gold:#F5CC74;
+  --r:4px;
+  --mono:ui-monospace,'Cascadia Mono','SF Mono',Consolas,Menlo,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0D1117;
+  font-family:var(--sans);color:var(--txt);font-size:14px}
+#gl{position:fixed;inset:0;display:block;touch-action:none}
+.hidden{display:none !important}
+button{font-family:var(--sans);cursor:pointer;border:none;background:none;color:inherit}
+input{font-family:var(--sans)}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:#39435a;border-radius:4px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ================= BOOT / LANDING ================= */
+#boot{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;background:
+    repeating-linear-gradient(115deg,transparent 0 34px,rgba(125,211,252,.022) 34px 35px),
+    repeating-linear-gradient(65deg,transparent 0 54px,rgba(192,132,252,.02) 54px 55px),
+    linear-gradient(105deg,#0a1f17 0%,#0d1117 42%,#1a0f2e 100%);
+}
+#boot .wordmark{font-weight:900;font-size:clamp(44px,8vw,84px);letter-spacing:-.5px;line-height:1;
+  background:linear-gradient(90deg,#7DD3FC 0%,#38BDF8 30%,#A855F7 75%,#C084FC 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 6px 40px rgba(56,189,248,.18))}
+#boot .sub{margin-top:10px;font-size:11px;letter-spacing:3.5px;color:var(--mut);text-transform:uppercase}
+#boot .card{margin-top:38px;width:min(400px,88vw);background:rgba(20,25,35,.85);
+  border:1px solid rgba(255,255,255,.05);border-radius:10px;padding:26px 26px 22px;
+  box-shadow:0 24px 70px rgba(0,0,0,.5)}
+#boot .headline{font-weight:700;font-size:19px;color:#fff;margin-bottom:4px}
+#boot .note{font-size:12px;color:var(--dim);margin-bottom:18px;line-height:1.5}
+#boot .row{display:flex;gap:10px}
+#boot input{flex:1;background:#1A202C;border:1px solid var(--line);border-radius:6px;
+  padding:12px 14px;color:var(--txt);font-size:14px;outline:none}
+#boot input:focus{border-color:var(--accent)}
+#boot .go{background:#fff;color:#111827;font-weight:800;font-size:13px;letter-spacing:.6px;
+  border-radius:6px;padding:0 22px;white-space:nowrap;transition:transform .08s,box-shadow .12s}
+#boot .go:hover{box-shadow:0 6px 24px rgba(255,255,255,.2)}
+#boot .go:active{transform:scale(.97)}
+#boot .fine{margin-top:14px;font-size:11px;color:#6B7280;line-height:1.5;display:flex;gap:7px;align-items:flex-start}
+#boot .fine svg{flex:none;width:13px;height:13px;color:var(--green2);margin-top:1px}
+#boot .foot{margin-top:34px;font-size:10px;letter-spacing:1.6px;color:#4B5563;text-transform:uppercase}
+#boot .foot a{color:#6B7280;text-decoration:none;margin:0 7px}
+#boot .foot a:hover{color:var(--mut)}
+
+/* ================= SHARED HUD PIECES ================= */
+.glass{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:0 8px 28px rgba(0,0,0,.45);backdrop-filter:blur(8px)}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:var(--r);
+  background:var(--panel);border:1px solid var(--line);font-size:12px;color:var(--mut);
+  box-shadow:0 6px 20px rgba(0,0,0,.35)}
+.money{font-family:var(--mono);color:var(--green);font-weight:700}
+.btn{padding:9px 14px;border-radius:var(--r);font-size:12px;font-weight:700;letter-spacing:.4px;
+  border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--txt);transition:background .1s}
+.btn:hover{background:rgba(255,255,255,.1)}
+.btn.primary{background:var(--accent);border-color:transparent;color:#fff}
+.btn.primary:hover{background:#4295E3}
+.btn.good{background:rgba(72,187,120,.16);border-color:rgba(72,187,120,.45);color:var(--green2)}
+.btn.good:hover{background:rgba(72,187,120,.28)}
+.btn.bad{background:rgba(239,68,68,.14);border-color:rgba(239,68,68,.4);color:#FCA5A5}
+.btn.bad:hover{background:rgba(239,68,68,.25)}
+.btn:disabled{opacity:.42;cursor:not-allowed}
+
+/* ================= IN-GAME HUD ================= */
+#hud{position:fixed;inset:0;z-index:20;pointer-events:none}
+#hud>*{pointer-events:auto}
+
+/* top-left balance */
+#balance{position:absolute;top:12px;left:12px;padding:9px 14px}
+#balance .b{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--green)}
+#balance .g{font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:1px}
+#balance .g b{color:var(--mut);font-weight:600}
+
+/* top-right city + search */
+#topright{position:absolute;top:12px;right:12px;display:flex;gap:8px;align-items:flex-start}
+#citychip{padding:8px 13px;text-align:right}
+#citychip .c{font-weight:700;font-size:13px;color:#fff}
+#citychip .d{font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:2px}
+#searchbtn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;padding:0}
+#searchbtn svg{width:16px;height:16px;color:var(--mut)}
+
+/* search box */
+#searchbox{position:absolute;top:58px;right:12px;width:min(330px,86vw);padding:12px}
+#searchbox .t{font-size:11px;letter-spacing:2px;color:var(--mut);text-transform:uppercase;margin-bottom:9px}
+#searchbox .row{display:flex;gap:8px}
+#searchbox input{flex:1;background:#111827;border:1px solid var(--line);border-radius:var(--r);
+  color:var(--txt);padding:9px 11px;font-size:13px;outline:none}
+#searchbox input:focus{border-color:var(--accent)}
+#searchbox .hint{font-size:10.5px;color:var(--dim);margin-top:8px;line-height:1.45}
+#searchbox .res{max-height:210px;overflow:auto;margin-top:9px;display:none}
+#searchbox .res .r{padding:9px 10px;border-radius:var(--r);cursor:pointer;font-size:12.5px;
+  border:1px solid transparent}
+#searchbox .res .r:hover{background:rgba(99,161,237,.1);border-color:rgba(99,161,237,.3)}
+#searchbox .res .r .n{color:var(--txt);font-weight:600}
+#searchbox .res .r .d{color:var(--dim);font-size:10.5px;margin-top:2px;font-family:var(--mono)}
+
+/* center banner (placement / city messages) */
+#banner{position:absolute;top:16px;left:50%;transform:translateX(-50%);padding:10px 18px;
+  font-size:12.5px;color:var(--txt);text-align:center;max-width:92vw}
+#banner b{color:var(--gold)}
+#banner .k{font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:3px}
+
+/* serve bar */
+#servebar{position:absolute;bottom:118px;left:50%;transform:translateX(-50%);
+  padding:12px 18px;text-align:center;min-width:280px}
+#servebar .q{font-size:13px;color:var(--txt)}
+#servebar .q b{color:var(--green2)}
+#servebar .p{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin:4px 0 9px}
+#servebar .go{width:100%;padding:11px}
+
+/* v2.05 — starter-guide quest chip (left edge, under the balance) */
+#tut{position:absolute;top:112px;left:12px;width:266px;padding:12px 14px}
+#tut .th{display:flex;align-items:center;gap:8px}
+#tut .n{font-family:var(--mono);font-size:10px;font-weight:800;color:#0D1117;
+  background:var(--gold);border-radius:3px;padding:2px 7px;letter-spacing:.5px;flex:none}
+#tut .t{font-size:12px;font-weight:800;letter-spacing:.7px;color:#F7FAFC;flex:1;
+  text-transform:uppercase;line-height:1.25}
+#tut #tut-x{color:var(--dim);font-size:13px;padding:1px 4px;flex:none}
+#tut #tut-x:hover{color:#FCA5A5}
+#tut .b{font-size:11.5px;line-height:1.55;color:var(--mut);margin-top:8px}
+#tut .b b{color:var(--green2)}
+#tut .o{font-family:var(--mono);font-size:10.5px;line-height:1.5;color:var(--gold);
+  margin-top:9px;border-top:1px solid var(--line2);padding-top:8px}
+
+/* ================= BOTTOM BAR (Capital Rift layout) ================= */
+#bottombar{position:absolute;left:0;right:0;bottom:26px;display:flex;flex-direction:column;
+  align-items:center;gap:6px}
+#bb-row{display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:12px;
+  background:rgba(26,32,44,.9);border:1px solid var(--line2);box-shadow:0 10px 34px rgba(0,0,0,.45)}
+.bb-side{display:flex;gap:8px;align-items:center}
+.bb-btn{width:42px;height:42px;border-radius:9px;background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;
+  color:#CBD5E0;transition:background .1s,transform .08s;position:relative}
+.bb-btn svg{width:19px;height:19px}
+.bb-btn:hover{background:rgba(255,255,255,.14)}
+.bb-btn:active{transform:scale(.94)}
+.bb-btn.on{background:var(--accent);border-color:transparent;color:#fff}
+.bb-btn .tip{position:absolute;top:-30px;left:50%;transform:translateX(-50%);white-space:nowrap;
+  font-size:9.5px;letter-spacing:1.2px;color:var(--mut);background:#111827;padding:4px 8px;
+  border-radius:3px;border:1px solid var(--line);opacity:0;pointer-events:none;transition:opacity .12s}
+.bb-btn:hover .tip{opacity:1}
+#avatar-chip{width:54px;height:54px;border-radius:50%;background:#111827;border:2px solid var(--accent);
+  display:flex;align-items:center;justify-content:center;position:relative;flex:none}
+#avatar-chip svg{width:26px;height:32px}
+#bb-loc{position:absolute;top:-22px;left:50%;transform:translateX(-50%);white-space:nowrap;
+  font-size:10px;color:var(--mut);font-family:var(--mono);letter-spacing:.5px;
+  background:rgba(13,17,23,.75);padding:3px 10px;border-radius:3px}
+#bb-next{position:absolute;bottom:132px;left:50%;transform:translateX(-50%);white-space:nowrap;
+  font-family:var(--mono);font-size:11px;color:#ffd27d;background:rgba(13,17,23,.85);
+  border:1px solid rgba(255,201,94,.5);border-radius:999px;padding:6px 16px;cursor:pointer;
+  letter-spacing:.6px;z-index:6;transition:background .12s,color .12s}
+#bb-next:hover{background:rgba(255,201,94,.2);color:#ffe9c0}
+@media (max-width:760px){#bb-next{bottom:150px;font-size:10px;padding:5px 12px}}
+
+/* stats ticker */
+#ticker{position:absolute;left:0;right:0;bottom:0;height:26px;background:#171923;
+  border-top:1px solid rgba(255,255,255,.05);display:flex;align-items:center;overflow:hidden}
+#ticker .track{display:flex;gap:26px;white-space:nowrap;animation:tick 36s linear infinite;
+  padding-left:100%;will-change:transform;font-family:var(--mono);font-size:10px;color:var(--mut)}
+#ticker:hover .track{animation-play-state:paused}
+@keyframes tick{to{transform:translateX(-100%)}}
+.tk{display:inline-flex;gap:6px;align-items:baseline}
+.tk .s{color:#22D3EE;font-weight:700}.tk .s.g{color:var(--green2)}.tk .s.o{color:#FBBF24}
+.tk .p{color:var(--txt)}
+.tk .up{color:var(--bull)}.tk .dn{color:var(--red)}
+
+/* attribution */
+#attrib{position:absolute;bottom:32px;right:8px;font-size:8.5px;color:rgba(160,174,192,.55);
+  background:rgba(13,17,23,.6);padding:3px 7px;border-radius:3px;letter-spacing:.4px}
+
+/* ================= MINIMAP (the one world at a glance) ============== */
+#minimap{position:fixed;right:10px;bottom:96px;width:184px;height:138px;z-index:24;
+  border-radius:10px;border:1px solid rgba(255,255,255,.14);
+  background:rgba(13,17,23,.9);box-shadow:0 10px 30px rgba(0,0,0,.5);cursor:pointer;
+  transition:opacity .15s}
+#minimap:hover{border-color:rgba(56,189,248,.55)}
+@media (max-width:760px){#minimap{width:120px;height:90px;bottom:118px}}
+#bigmap-wrap{display:flex;justify-content:center;margin-top:4px}
+#bigmap{border-radius:10px;border:1px solid rgba(255,255,255,.15);
+  background:rgba(13,17,23,.95);cursor:pointer}
+.maplegend{display:flex;gap:14px;justify-content:center;margin-top:8px;font-size:10.5px;color:var(--dim)}
+.maplegend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+
+/* ================= TOOLTIP (Capital Rift glass card) ================= */
+#tooltip{position:fixed;z-index:60;width:230px;padding:12px 13px;pointer-events:none;
+  opacity:0;transition:opacity .1s;background:rgba(26,32,44,.88);border:1px solid var(--line);
+  border-radius:var(--r);box-shadow:0 6px 22px rgba(0,0,0,.5)}
+#tooltip .tt-t{font-size:13.5px;font-weight:700;color:#fff}
+#tooltip .tt-s{font-size:11px;color:var(--mut);margin-top:2px;font-family:var(--mono)}
+#tooltip .tt-p{font-size:15px;font-weight:800;color:var(--green);margin-top:6px;font-family:var(--mono)}
+#tooltip .tt-a{font-size:11px;color:var(--green2);margin-top:4px}
+#tooltip .tt-l{font-size:11px;color:var(--blue);margin-top:5px}
+
+/* ================= MODALS ================= */
+#modalwrap{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;
+  background:rgba(5,8,12,.6);backdrop-filter:blur(3px)}
+#modal{width:min(560px,94vw);max-height:88vh;overflow:auto;background:var(--panel2);
+  border:1px solid var(--line);border-radius:8px;box-shadow:0 30px 90px rgba(0,0,0,.6)}
+#modal .mh{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;
+  border-bottom:1px solid var(--line2)}
+#modal .mh .t{font-weight:800;font-size:15px;color:#fff;letter-spacing:.3px}
+#modal .mh .x{width:30px;height:30px;border-radius:6px;display:flex;align-items:center;
+  justify-content:center;color:var(--mut);font-size:17px}
+#modal .mh .x:hover{background:rgba(255,255,255,.08);color:#fff}
+#modal .mb{padding:18px 20px}
+#modal .mb p{margin:0 0 10px;line-height:1.6;color:var(--mut);font-size:13px}
+#modal .mb p b{color:var(--txt)}
+.kv{display:flex;justify-content:space-between;align-items:center;padding:7px 0;
+  border-bottom:1px dashed rgba(255,255,255,.06);font-size:12.5px}
+.kv .k{color:var(--dim)}.kv .v{color:var(--txt);font-family:var(--mono)}
+.kv .v.g{color:var(--green2)}.kv .v.r{color:#FCA5A5}
+.tpbtn{padding:7px 12px;border-radius:var(--r);font-size:10.5px;font-weight:800;letter-spacing:.8px;
+  background:rgba(56,189,248,.13);border:1px solid rgba(56,189,248,.5);color:#7DD3FC;cursor:pointer;white-space:nowrap}
+.tpbtn:hover{background:rgba(56,189,248,.26)}
+
+/* plot/business modal specifics */
+.cuisine-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px;margin-top:10px}
+.cui{padding:11px 8px;border:1px solid var(--line);border-radius:var(--r);text-align:center;
+  cursor:pointer;transition:border-color .1s,background .1s}
+.cui:hover{border-color:var(--green);background:rgba(72,187,120,.08)}
+.cui .e{font-size:22px}
+.cui .n{font-size:11px;font-weight:700;color:var(--txt);margin-top:5px}
+.cui .c{font-family:var(--mono);font-size:10.5px;color:var(--green);margin-top:3px}
+.worker-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;
+  border:1px solid var(--line2);border-radius:var(--r);margin-top:6px;background:rgba(255,255,255,.02)}
+.worker-row .w{flex:1;min-width:0}
+.worker-row .nm{font-size:12px;font-weight:700;color:var(--txt)}
+.worker-row .st{font-size:10px;letter-spacing:1.5px;color:var(--gold);margin-top:2px;font-family:var(--mono)}
+.worker-row .ro{font-size:9.5px;color:var(--dim);letter-spacing:1px;text-transform:uppercase}
+.worker-row .btn{padding:6px 10px;font-size:11px}
+.stars{color:var(--gold);font-size:11px;letter-spacing:1px}
+
+/* P&L strip + KPI chips in business modal */
+#pl{display:flex;align-items:baseline;justify-content:space-between;padding:12px 14px;margin-bottom:14px;
+  border:1px solid rgba(72,187,120,.35);border-radius:var(--r);
+  background:linear-gradient(90deg,rgba(72,187,120,.1),rgba(72,187,120,.03))}
+#pl .l{font-size:10px;letter-spacing:2px;color:var(--green2);text-transform:uppercase}
+#pl .v{font-family:var(--mono);font-size:20px;font-weight:800;color:var(--green)}
+#kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:7px;margin-bottom:14px}
+.kpi{padding:8px 10px;border:1px solid var(--line2);border-radius:var(--r);background:rgba(255,255,255,.02)}
+.kpi .k{font-size:8.5px;letter-spacing:1.6px;color:var(--dim);text-transform:uppercase}
+.kpi .v{font-family:var(--mono);font-size:13.5px;font-weight:700;color:var(--txt);margin-top:3px}
+.kpi .v.g{color:var(--green2)}
+table.menu{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:6px}
+table.menu th{text-align:left;color:var(--dim);font-size:9px;letter-spacing:1.5px;
+  text-transform:uppercase;padding:5px 6px;border-bottom:1px solid var(--line2)}
+table.menu td{padding:6px;border-bottom:1px dashed rgba(255,255,255,.05);color:var(--txt)}
+table.menu td.m{font-family:var(--mono);color:var(--green)}
+.apbar{height:3px;background:#1A202C;border-radius:2px;margin-top:4px;overflow:hidden}
+.apbar i{display:block;height:100%;background:linear-gradient(90deg,var(--green),#A3DAFF)}
+
+/* ================= MARKET TERMINAL ================= */
+#market{position:absolute;top:0;right:0;bottom:26px;width:min(400px,94vw);display:flex;flex-direction:column;
+  background:var(--panel2);border-left:1px solid var(--line);box-shadow:-20px 0 60px rgba(0,0,0,.5);
+  transform:translateX(102%);transition:transform .22s ease;z-index:40}
+#market.open{transform:translateX(0)}
+#market .mh2{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;
+  border-bottom:1px solid var(--line2)}
+#market .mh2 .t{font-weight:800;font-size:13px;letter-spacing:1.5px;color:#fff}
+#market .mh2 .x{color:var(--mut);font-size:16px;padding:4px 8px;border-radius:4px}
+#market .mh2 .x:hover{color:#fff;background:rgba(255,255,255,.07)}
+#market .body{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+#comps{display:flex;gap:6px;flex-wrap:wrap}
+.comp{padding:6px 11px;border-radius:3px;border:1px solid var(--line);font-family:var(--mono);
+  font-size:11px;font-weight:700;color:var(--mut);cursor:pointer;letter-spacing:.5px}
+.comp.on{border-color:var(--blue);color:var(--blue);background:rgba(99,161,237,.1)}
+.comp .pp{color:var(--txt);font-weight:600;margin-left:6px}
+#book{border:1px solid var(--line2);border-radius:var(--r);overflow:hidden}
+#book .bh{display:grid;grid-template-columns:1fr 1fr 1fr;padding:7px 10px;font-size:8.5px;
+  letter-spacing:1.5px;color:var(--dim);text-transform:uppercase;border-bottom:1px solid var(--line2)}
+#book .bh span:nth-child(2),#book .bh span:nth-child(3){text-align:right}
+.lvl{display:grid;grid-template-columns:1fr 1fr 1fr;padding:5px 10px;font-family:var(--mono);
+  font-size:11.5px;position:relative;line-height:1.25}
+.lvl .bar{position:absolute;top:0;bottom:0;right:0;opacity:.13}
+.lvl .pr{position:relative;font-weight:700}
+.lvl .sz,.lvl .cu{text-align:right;position:relative;color:var(--mut)}
+.lvl.ask .pr,.lvl.ask .bar{color:var(--red);background:var(--red)}
+.lvl.ask .bar{background:var(--red)}
+.lvl.bid .pr,.lvl.bid .bar{color:var(--bull);background:var(--bull)}
+.lvl.bid .bar{background:var(--bull)}
+.lvl.last{background:rgba(99,161,237,.08);border-top:1px solid var(--line2);border-bottom:1px solid var(--line2);
+  margin:2px 0;font-weight:800}
+.lvl.last .pr{color:#fff;font-size:13px}
+.lvl.last .sz{color:var(--mut);font-size:9.5px}
+.lvl.last .cu{color:var(--blue);font-size:9.5px}
+.lvl .you{color:#22D3EE;font-size:8px;letter-spacing:1px;margin-left:5px;font-weight:800}
+#tape{height:74px;overflow:hidden;border:1px solid var(--line2);border-radius:var(--r);
+  font-family:var(--mono);font-size:10px;padding:5px 0}
+#tape .tr{display:flex;justify-content:space-between;padding:2.5px 10px;color:var(--mut)}
+#tape .tr .p{color:var(--txt)}#tape .tr .p.g{color:var(--green2)}#tape .tr .p.r{color:#FCA5A5}
+#tape .tr .y{color:#22D3EE;font-weight:700}
+#ordertabs{display:flex;gap:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+#ordertabs button{flex:1;padding:8px;font-size:11px;font-weight:700;letter-spacing:1px;color:var(--dim)}
+#ordertabs button.on{background:rgba(99,161,237,.12);color:var(--blue)}
+#oform{border:1px solid var(--line2);border-radius:var(--r);padding:12px}
+#oform .fr{display:flex;gap:8px;margin-bottom:8px}
+#oform input{flex:1;background:#111827;border:1px solid var(--line);border-radius:3px;color:var(--txt);
+  font-family:var(--mono);font-size:12.5px;padding:8px 10px;outline:none;width:0}
+#oform input:focus{border-color:var(--accent)}
+#oform .lb{font-size:9px;letter-spacing:1.5px;color:var(--dim);text-transform:uppercase;margin-bottom:4px}
+#oform .est{font-family:var(--mono);font-size:10.5px;color:var(--mut);margin:8px 0 10px;line-height:1.6}
+#oform .est b{color:var(--green2)}
+#oform .bb{display:flex;gap:8px}
+#oform .bb .btn{flex:1;padding:11px}
+#posline{font-family:var(--mono);font-size:10.5px;color:var(--mut);padding:8px 2px}
+#posline b{color:var(--blue)}
+#openorders .oo{display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);
+  font-size:10.5px;color:var(--mut);padding:6px 4px;border-bottom:1px dashed rgba(255,255,255,.05)}
+#openorders .oo .c{color:#FCA5A5;cursor:pointer;padding:2px 7px;border:1px solid rgba(239,68,68,.3);
+  border-radius:3px;font-size:9px}
+#openorders .oo .c:hover{background:rgba(239,68,68,.12)}
+.msec{font-size:9px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;margin:2px 0 -2px}
+
+/* ================= TOASTS ================= */
+#toasts{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:90;display:flex;
+  flex-direction:column;gap:7px;align-items:center;pointer-events:none}
+.toast{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 16px;
+  font-size:12.5px;color:var(--txt);box-shadow:0 10px 30px rgba(0,0,0,.5);
+  animation:tin .18s ease-out;max-width:88vw;text-align:center}
+.toast b{color:var(--green2)}
+.toast.warn b{color:var(--gold)}
+.toast.err b{color:#FCA5A5}
+@keyframes tin{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+
+/* ================= LOADING / TRANSITION ================= */
+#veil{position:fixed;inset:0;z-index:95;background:#0D1117;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s}
+#veil.on{opacity:1;pointer-events:auto}
+#veil .w{font-weight:900;font-size:26px;letter-spacing:.5px;
+  background:linear-gradient(90deg,#7DD3FC,#A855F7);-webkit-background-clip:text;background-clip:text;
+  color:transparent}
+#veil .s{font-size:11px;letter-spacing:2.5px;color:var(--mut);text-transform:uppercase;margin-top:12px}
+#veil .bar{width:min(300px,70vw);height:3px;background:#1A202C;border-radius:2px;margin-top:22px;overflow:hidden}
+#veil .bar i{display:block;height:100%;width:30%;background:linear-gradient(90deg,#38BDF8,#A855F7);
+  border-radius:2px;animation:vslide 1.1s ease-in-out infinite alternate}
+@keyframes vslide{from{margin-left:-15%}to{margin-left:85%}}
+#veil .at{margin-top:26px;font-size:9.5px;color:#4B5563;letter-spacing:.4px;text-align:center;
+  max-width:80vw;line-height:1.6}
+
+/* ================= MOBILE ================= */
+#joy{position:fixed;left:22px;bottom:110px;width:112px;height:112px;z-index:30;display:none}
+#joy .base{position:absolute;inset:0;border-radius:50%;background:rgba(26,32,44,.55);
+  border:1px solid var(--line2)}
+#joy .nub{position:absolute;width:46px;height:46px;border-radius:50%;background:rgba(99,161,237,.4);
+  border:1.5px solid var(--blue);left:33px;top:33px}
+@media (pointer:coarse),(max-width:760px){#joy{display:block}}
+@media (max-width:640px){
+  #balance{top:8px;left:8px;padding:7px 10px}
+  #balance .b{font-size:14px}
+  #topright{top:8px;right:8px}
+  #searchbox{top:52px;right:8px;width:min(280px,92vw)}
+  #bb-row{gap:6px;padding:7px 10px}
+  .bb-btn{width:38px;height:38px}.bb-btn svg{width:17px;height:17px}
+  #avatar-chip{width:46px;height:46px}
+  #market{width:100vw;bottom:26px}
+  #servebar{bottom:126px;min-width:240px}
+  #tut{top:96px;left:8px;width:226px;padding:10px 12px}
+  #tut .b{font-size:11px}
+  #modal .mb{padding:14px}
+  #tooltip{display:none}
+}

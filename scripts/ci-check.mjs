@@ -10,10 +10,16 @@ const rd = (f) => readFileSync(join(root, f), 'utf8');
 let failed = false;
 const say = (s, name, msg) => { console.log(`${s}: ${name} - ${msg}`); if (s === 'FAIL') failed = true; };
 
-// 1. game.html is a copy of openworld.html
-if (!existsSync(join(root, 'game.html'))) say('PASS', 'game-copy', 'game.html missing, skipped');
-else say(readFileSync(join(root, 'game.html')).equals(readFileSync(join(root, 'openworld.html'))) ? 'PASS' : 'FAIL',
-  'game-copy', 'game.html vs openworld.html byte comparison');
+// 1. since v2.60: openworld.html is the modular shell (css/style.css + js/boot.js);
+//    game.html is the frozen pre-v2.60 single-file baseline, deliberately NOT a copy — do not sync it
+if (!existsSync(join(root, 'game.html'))) say('FAIL', 'game-copy', 'game.html baseline missing');
+else {
+  const shell = /<script[^>]*src=["'][^"']*js\/boot\.js["']/.test(rd('openworld.html')) &&
+    /<link[^>]*href=["'][^"']*css\/style\.css["']/.test(rd('openworld.html'));
+  say(shell ? 'PASS' : 'FAIL', 'game-copy',
+    shell ? 'openworld.html is the modular shell; game.html kept as the frozen baseline'
+          : 'openworld.html must load css/style.css and js/boot.js (see AGENTS.md)');
+}
 
 // 2. inline scripts parse
 const tmp = mkdtempSync(join(tmpdir(), 'ci-'));
@@ -31,6 +37,22 @@ for (const f of ['openworld.html', 'index.html']) {
     catch (e) { bad++; console.log(String(e.stderr).split('\n').slice(0, 4).join('\n')); }
   }
   say(bad ? 'FAIL' : 'PASS', 'script-syntax', `${f}: ${n} inline scripts, ${bad} failed`);
+}
+
+// 2b. every ES module under js/ parses (since v2.60 the game is modular)
+{
+  let files = [];
+  try { files = execFileSync('bash', ['-c', 'find js -name "*.js" 2>/dev/null | sort']).toString().split('\n').filter(Boolean); }
+  catch { files = []; }
+  let bad = 0;
+  for (const f of files) {
+    const p = join(tmp, f.replace(/\//g, '_') + '.mjs');
+    writeFileSync(p, readFileSync(join(root, f)));
+    try { execFileSync(process.execPath, ['--check', p], { stdio: 'pipe' }); }
+    catch (e) { bad++; console.log(String(e.stderr).split('\n').slice(0, 4).join('\n')); }
+  }
+  say(files.length ? (bad ? 'FAIL' : 'PASS') : 'FAIL', 'modules',
+    files.length ? `${files.length} ES modules under js/, ${bad} failed` : 'no js/ modules found');
 }
 
 // 3. secrets in tracked files
