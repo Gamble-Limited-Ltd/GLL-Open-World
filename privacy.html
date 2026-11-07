@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Open World — Privacy Policy</title>
+<style>
+:root{--mut:#9CA3AF;--dim:#6B7280;--green:#48BB78;--blue:#63B3ED;--line:#4A5568}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#0D1117;color:#E2E8F0;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
+  background:
+    repeating-linear-gradient(115deg,transparent 0 34px,rgba(125,211,252,.022) 34px 35px),
+    repeating-linear-gradient(65deg,transparent 0 54px,rgba(192,132,252,.02) 54px 55px),
+    linear-gradient(105deg,#0a1f17 0%,#0d1117 42%,#1a0f2e 100%)}
+.card{margin:40px 0;width:min(640px,92vw);background:rgba(20,25,35,.85);
+  border:1px solid rgba(255,255,255,.05);border-radius:10px;padding:30px 34px}
+.pill{display:inline-block;font-size:10px;font-weight:800;letter-spacing:2px;color:#38BDF8;
+  border:1px solid rgba(56,189,248,.4);border-radius:3px;padding:4px 10px;text-transform:uppercase}
+h1{font-size:22px;margin:14px 0 4px;color:#fff}
+.date{margin:0 0 6px;font:600 10px/1.6 ui-monospace,Consolas,monospace;color:var(--dim);letter-spacing:1px}
+h2{font-size:13px;color:#fff;margin:24px 0 6px;letter-spacing:.5px}
+p{font-size:13px;color:var(--mut);line-height:1.65;margin:0 0 10px}
+ul{margin:0 0 10px;padding-left:18px}
+li{font-size:13px;color:var(--mut);line-height:1.65;margin:0 0 6px}
+a{color:#7DD3FC;text-decoration:none}
+a:hover{text-decoration:underline}
+.nav{margin-top:26px;padding-top:14px;border-top:1px solid rgba(255,255,255,.06);
+  font-size:11px;color:var(--dim);letter-spacing:.4px}
+</style>
+</head>
+<body>
+<div class="card">
+  <span class="pill">Open World · Legal</span>
+  <h1>Privacy Policy</h1>
+  <p class="date">LAST UPDATED: 2026-11-08</p>
+
+  <h2>The short version</h2>
+  <p>Open World runs entirely in your browser. There are no accounts, no sign-up, no analytics, no tracking cookies, no advertising and no payments — and no game server that could collect anything about you. This page says exactly what the game does and does not do.</p>
+
+  <h2>What stays on your device</h2>
+  <p>Everything about your world — your tycoon's name, balance, plots, carts, buildings, mines and machines — is saved in your browser's local storage under the key <b>openworld-v2</b>. It never leaves your device, and we keep no copy: nothing is uploaded, so nothing of yours can leak or be requested from us. Clearing your browser data, using a private window, or switching to another browser, device or site address simply starts a fresh world — that is the trade the game makes for having no accounts.</p>
+
+  <h2>What leaves your browser</h2>
+  <p>The game itself makes only these network calls:</p>
+  <ul>
+    <li><b>City search and street data</b> — OpenStreetMap's Nominatim (search) and Overpass (map data) services receive your search terms or the map area you visit, and your IP address, as with any web request. They are governed by OpenStreetMap's own privacy policy. Map data © OpenStreetMap contributors (ODbL).</li>
+    <li><b>The three.js 3D library</b> — loaded from the unpkg.com CDN, which sees that one script request.</li>
+    <li><b>The update check</b> — on boot the game fetches <b>version.json</b> from this same site to see if a newer build is live. That request stays between your browser and this site.</li>
+  </ul>
+
+  <h2>Hosting logs</h2>
+  <p>Like every website, this site's static host keeps the standard short-lived request logs any web server keeps (page, time, browser, IP). The game adds nothing to that.</p>
+
+  <h2>No payments, no personal data</h2>
+  <p>The game is play money only — there are no purchases, so there is no payment data. And because the game collects no personal data at all, none is collected from children.</p>
+
+  <h2>Changes to this policy</h2>
+  <p>If it ever needs to change, the new version is published right here with a new date.</p>
+
+  <h2>Questions</h2>
+  <p>Open an issue on the project's GitHub repository: <a href="https://github.com/Gamble-Limited-Ltd/GLL-Open-World">Gamble-Limited-Ltd/GLL-Open-World</a>.</p>
+
+  <div class="nav"><a href="index.html">← Back to Open World</a> · <a href="terms.html">Terms of Service</a></div>
+</div>
+</body>
+</html>

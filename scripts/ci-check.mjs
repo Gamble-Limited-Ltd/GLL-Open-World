@@ -70,7 +70,7 @@ for (const f of files) {
 if (files.length) say(hits.length ? 'FAIL' : 'PASS', 'secrets', hits.length ? hits.join(', ') : `${files.length} tracked files scanned`);
 
 // 4. local references exist
-for (const f of ['index.html', 'openworld.html']) {
+for (const f of ['index.html', 'openworld.html', 'privacy.html', 'terms.html']) {
   const missing = new Set();
   for (const m of rd(f).matchAll(/\b(?:src|href)\s*=\s*["']([^"']+)["']/gi)) {
     const u = m[1].trim();
@@ -110,6 +110,25 @@ for (const f of ['index.html', 'openworld.html']) {
     say(words <= 200 && attr ? 'PASS' : 'FAIL', 'at-length',
       `boot fine print: ${words} words (max 200), OSM attribution ${attr ? 'present' : 'MISSING'}`);
   }
+}
+
+// 4d. legal pages exist, dated, and linked from the landing + in-game boot (since 2026-11-08)
+{
+  const need = { 'privacy.html': 'Privacy Policy', 'terms.html': 'Terms of Service' };
+  const bad = [];
+  for (const [f, t] of Object.entries(need)) {
+    if (!existsSync(join(root, f))) { bad.push(`${f} missing`); continue; }
+    const c = rd(f);
+    if (!c.includes(`<title>Open World — ${t}</title>`)) bad.push(`${f}: wrong title`);
+    if (!/LAST UPDATED: \d{4}-\d{2}-\d{2}/.test(c)) bad.push(`${f}: no LAST UPDATED date`);
+    if (!c.includes('href="index.html"')) bad.push(`${f}: no link back to the landing`);
+  }
+  const idx = rd('index.html');
+  for (const f of Object.keys(need)) if (!idx.includes(`href="${f}"`)) bad.push(`index.html does not link ${f}`);
+  let night = '';
+  try { night = rd('js/render/night.js'); } catch {}
+  for (const f of Object.keys(need)) if (!night.includes(`'${f}'`)) bad.push(`js/render/night.js does not link ${f}`);
+  say(bad.length ? 'FAIL' : 'PASS', 'legal', bad.length ? bad.join('; ') : 'privacy.html + terms.html present, dated, linked from the landing footer and the in-game boot modals');
 }
 
 // 5. version consistency
