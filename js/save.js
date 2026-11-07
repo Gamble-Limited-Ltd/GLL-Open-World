@@ -70,7 +70,10 @@ export function loadGame() {
     STATE.plots = (p.plots || []).map(o => {
       const q = { ...o, crew: o.crew || [] };
       q.bld = (Array.isArray(o.bld) ? o.bld : []).filter(b => b && b.t >= 0 && b.t < 4 && isFinite(+b.x) && isFinite(+b.z)).slice(0, 8)
-        .map(b => ({ t: b.t | 0, x: Math.round(+b.x * 10) / 10, z: Math.round(+b.z * 10) / 10, p: Math.max(0, Math.min(3, +(+b.p || 0))) }));   // v2.56 GROUND UP (absent on older saves — nothing built; coords are plot-LOCAL, so world migrations never touch them)
+        .map(b => ({ t: b.t | 0, x: Math.round(+b.x * 10) / 10, z: Math.round(+b.z * 10) / 10, p: Math.max(0, Math.min(3, +(+b.p || 0))),
+          // v2.61 FACTORY FLOOR: the machines on a factory shell's floor (absent on older saves — an empty floor)
+          mach: (Array.isArray(b.mach) ? b.mach : []).filter(m => m && m.t >= 0 && m.t < 16 && isFinite(+m.x) && isFinite(+m.z)).slice(0, 16)
+            .map(m => ({ t: m.t | 0, x: +(+m.x || 0).toFixed(2), z: +(+m.z || 0).toFixed(2) })) }));   // v2.56 GROUND UP (absent on older saves — nothing built; coords are plot-LOCAL, so world migrations never touch them) · v2.61: mach t<6 heavy line, t 10-15 the classic machines
       // v2 (city-local) -> v3 (world) migration via the city's world anchor
       // (v2.27: in old-scale coordinates; the true-scale rescale above
       // has already run, so divide back — ancient saves, best effort)
@@ -165,7 +168,8 @@ export function saveGame() {
         id: p.id, cityKey: p.cityKey, cityName: p.cityName || null, price: p.price || 0, x: +p.x.toFixed(2), z: +p.z.toFixed(2),   // v2.47 LANDLORD: price feeds the land market rate
         cart: p.cart ? { cuisine: p.cart.cuisine } : null,
         crew: (p.crew || []).map(c => ({ name: c.name, stars: c.stars })),
-        bld: (p.bld || []).map(b => ({ t: b.t | 0, x: +(+b.x || 0).toFixed(1), z: +(+b.z || 0).toFixed(1), p: +(+b.p || 0).toFixed(2) })),   // v2.56 GROUND UP (optional field — older builds ignore it)
+        bld: (p.bld || []).map(b => ({ t: b.t | 0, x: +(+b.x || 0).toFixed(1), z: +(+b.z || 0).toFixed(1), p: +(+b.p || 0).toFixed(2),
+          mach: (b.mach || []).map(m => ({ t: m.t | 0, x: +(+m.x || 0).toFixed(2), z: +(+m.z || 0).toFixed(2) })) })),   // v2.56 GROUND UP (optional field — older builds ignore it) · v2.61 FACTORY FLOOR: the machines on the factory floor (optional nested field)
       })),
       offices: STATE.offices.map(o => ({ id: o.id, cityKey: o.cityKey, bkey: o.bkey, name: o.name, sqm: o.sqm, rate: o.rate })),
       rooms: (STATE.rooms || []).map(r => ({ id: r.id, cityKey: r.cityKey, cityName: r.cityName || null, bkey: r.bkey, kind: r.kind, index: r.index, name: r.name, area: r.area, rate: r.rate, mode: r.mode, price: r.price, x: r.x, z: r.z,

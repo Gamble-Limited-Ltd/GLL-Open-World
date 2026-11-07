@@ -327,11 +327,11 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.60 — THE REBUILD', `
-    <p><b>The whole game now runs on a rebuilt engine — same world, same save, nothing you can see has changed.</b></p>
-    <div class="kv"><span class="k">THE SPLIT</span><span class="v">The single 17,000-line file is now thirty-one focused modules — config, world, city, economy, every system its own file — loaded as native ES modules with no build step, still pure static hosting</span></div>
-    <div class="kv"><span class="k">YOUR SAVE</span><span class="v">Same <b>openworld-v2</b> save, byte-for-byte same format — your plots, carts, mines and money carry over untouched</span></div>
-    <div class="kv"><span class="k">FOR BUILDERS</span><span class="v">New features land as small files in <b>js/systems/</b> — the additive patch-chain pattern the game already uses is the documented extension point</span></div>
+  openModal('Welcome to v2.61 — FACTORY FLOOR', `
+    <p><b>Your factory shells can now be filled with working machines — the floor is open.</b></p>
+    <div class="kv"><span class="k">THE SHOP</span><span class="v">Click a finished factory shell → <b>MACHINES</b> — six new heavy machines from a $26,000 Packaging Station to a $160,000 Injection Molder, plus the six classics (vending to server rack): twelve machines can stand on one floor</span></div>
+    <div class="kv"><span class="k">THE FLOOR</span><span class="v">Pick one and click to set it down — the shell itself fades to a cutaway so you can see inside; machines pay every day (~45-day payback), count in WORTH, and sell back for 60%</span></div>
+    <div class="kv"><span class="k">YOUR SAVE</span><span class="v">Same <b>openworld-v2</b> save — factory machines ride the building entries, and older saves keep working untouched</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -382,7 +382,7 @@ document.getElementById('bb-next').addEventListener('click', () => {
 });
 
 function openHelp() {
-  openModal('Open World v2.37 — Help', `
+  openModal('Open World ' + GAME_VERSION + ' — Help', `
     <p><b>Controls</b></p>
     <div class="kv"><span class="k">MOVE</span><span class="v g">Tap / click anywhere — your tycoon walks there (the only way they move)</span></div>
     <div class="kv"><span class="k">LOOK AROUND</span><span class="v">Drag or WASD / arrows / joystick to glide the bird\u2019s-eye view across the map — no distance cap, roam the whole Earth; detail streams wherever you look</span></div>
@@ -395,6 +395,7 @@ function openHelp() {
     <div class="kv"><span class="k">THE EARTH</span><span class="v">the real planet at TRUE SCALE — 40,007 km around, real distances between cities. Cross continents by orbit flight, search or the world map [M]; sea bridges still span the straits</span></div>
     <div class="kv"><span class="k">EMPIRE</span><span class="v">avatar (top right) → TELEPORT to any plot you own</span></div>
     <div class="kv"><span class="k">BUILD</span><span class="v g">BUILD button → pick a house, shop, apartment block or factory shell, stock the materials (wood & stone at the yard; steel & glass at the yard or pulled from your ore-exchange stockpile), then PLACE — a 1 m grid overlays your plot, a ghost follows the cursor and a click sites it; buildings rise over real game days, pay every day and demolish back to 60% of their materials</span></div>
+    <div class="kv"><span class="k">FACTORIES</span><span class="v g">Click a finished factory shell → MACHINES: twelve machines can stand on its floor — six heavy (packaging station, CNC, stamping press, assembly line, weld cell, injection molder) plus the six classics — each pays every day; the shell fades to a cutaway while you place them, and selling back pays 60%</span></div>   <!-- v2.61 FACTORY FLOOR -->
     <div class="kv"><span class="k">FURNISH</span><span class="v g">Hold a room or floor? FURNISH in its panel opens the furniture shop — craft pieces from shed materials or buy with cash, click to place (<b>R</b> rotates the ghost), and click any placed piece to turn, move or sell it back for 60% — computers sit on desks (place the desk first)</span></div>
     <div class="kv"><span class="k">POWER</span><span class="v g">POWER button → every cart you run draws power — the meter spins, the grid bills each game day at a price that moves, and an unpaid bill cuts the power and the income until you pay (PAY &amp; RECONNECT at the cart’s panel or the POWER panel)</span></div>   <!-- v2.59 THE GRID -->
     <div class="kv"><span class="k">SERVE</span><span class="v">[E] when standing at your cart</span></div>
@@ -470,7 +471,8 @@ function buildTicker() {
       + (window.MINE ? MINE.valueOf() : 0)
       + (window.EXCH ? EXCH.stockValue() : 0)
       + (window.BLD ? BLD.valueOf() : 0)
-      + (window.FURN ? FURN.valueOfRooms() : 0));   // v2.51 MONEY LIST + v2.52 ORE EXCHANGE + v2.56 GROUND UP · v2.57 FURNITURE: one formula feeds the ticker chip and the board
+      + (window.FACT ? FACT.valueOf() : 0)
+      + (window.FURN ? FURN.valueOfRooms() : 0));   // v2.51 MONEY LIST + v2.52 ORE EXCHANGE + v2.56 GROUND UP · v2.57 FURNITURE · v2.61 FACTORY FLOOR: one formula feeds the ticker chip and the board
     track.innerHTML = items +
       `<span class="tk"><span class="s g">GDP</span><span class="p">${fmtK(STATE.gdp)}</span><span class="up">▲</span></span>` +
       `<span class="tk"><span class="s o">WORTH</span><span class="p">${fmtK(worth)}</span><span class="up">${window.RIVALS ? '#' + RIVALS.rankNo() + '/' + RIVALS.count() : ''}</span></span>` +   // v2.51 MONEY LIST: your live rank rides the WORTH chip

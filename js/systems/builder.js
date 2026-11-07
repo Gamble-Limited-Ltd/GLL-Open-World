@@ -407,25 +407,37 @@ export const BLD = (() => {
     const T = hit.T, fin = hit.b.p >= T.days;
     const needList = Object.entries(T.mat).map(([k, n]) => k + ' ' + n + ' t').join(' · ');
     const rf = refundOf(T), rfList = Object.entries(rf).filter(([, n]) => n > 0).map(([k, n]) => k + ' ' + n + ' t').join(' · ');
+    // v2.61 FACTORY FLOOR: a finished factory shell opens its floor to
+    // machines — the machine line + the MACHINES button ride the panel
+    const isFact = fin && T.id === 'fact';
+    const mn = (hit.b.mach || []).length;
+    const mi = isFact && window.FACT ? FACT.incomeOf(hit.b) : 0;
+    const cap = isFact && window.FACT ? FACT.CAP() : 0;
     openModal(T.icon + ' ' + T.name + ' — Ground Up', `
       <p>${fin ? 'A finished <b>' + T.name.toLowerCase() + '</b> standing on your plot — it pays every game day.'
         : 'The crew is raising this <b>' + T.name.toLowerCase() + '</b> — it scales up out of its scaffold as the game days pass.'}</p>
       <div class="kv"><span class="k">STATUS</span><span class="v">${fin ? '✓ Finished · ' + fmt$(T.inc) + '/day' : '🔨 ' + Math.round(100 * hit.b.p / T.days) + '% built · ' + Math.max(.5, Math.round((T.days - hit.b.p) * 2) / 2) + ' day' + (T.days - hit.b.p > 1.5 ? 's' : '') + ' left'}</span></div>
       <div class="kv"><span class="k">FOOTPRINT</span><span class="v">${T.w}×${T.d} m · ${T.h} m tall · ${fmt$(T.val)} worth</span></div>
+      ${isFact ? '<div class="kv"><span class="k">MACHINES</span><span class="v g">' + (mn ? mn + '/' + cap + ' installed · +$' + mi + '/day' : 'none yet — the floor is open') + '</span></div>' : ''}
       <div class="kv"><span class="k">MATERIALS</span><span class="v">${needList}</span></div>
-      <div class="kv"><span class="k">DEMOLISH</span><span class="v">Refunds ${rfList} back to your shed (the 60% scrap rate)</span></div>
+      <div class="kv"><span class="k">DEMOLISH</span><span class="v">Refunds ${rfList} back to your shed (the 60% scrap rate)${mn ? ' · machines sell for 60% too' : ''}</span></div>
       <div style="display:flex;gap:8px;margin-top:16px">
+        ${isFact ? '<button class="btn good" id="bd-mach" style="flex:1">MACHINES' + (mn ? ' · ' + mn : '') + '</button>' : ''}
         <button class="btn" id="bd-dem" style="flex:1;color:#ff5470">DEMOLISH — REFUND 60%</button>
         <button class="btn" id="bd-x">CLOSE</button>
       </div>`);
     document.getElementById('bd-x').onclick = closeModal;
+    const mb = document.getElementById('bd-mach');   // v2.61 FACTORY FLOOR: open the machine shop
+    if (mb) mb.onclick = () => { try { if (window.FACT) FACT.openShop(hit.p.id, hit.i); } catch (er) { } };
     document.getElementById('bd-dem').onclick = () => {
+      let machGot = 0;   // v2.61 FACTORY FLOOR: machines sell back with the shell
+      try { if (window.FACT) { const r = FACT.onDemolish(hit.p, hit.b); if (r) machGot = r.got; } } catch (er) { }
       for (const k in rf) if (rf[k] > 0) STATE.mat[k] = Math.min(1e6, +((shed(k)) + rf[k]).toFixed(1));
       hit.p.bld.splice(hit.i, 1);
       try { saveGame(); } catch (er) { }
       ensureRegion();
       closeModal();
-      toast(T.icon + ' <b>' + T.name + ' demolished.</b> ' + rfList + ' back in the shed.');
+      toast(T.icon + ' <b>' + T.name + ' demolished.</b> ' + rfList + ' back in the shed.' + (machGot ? ' Machines sold for <b>' + fmt$(machGot) + '</b>.' : ''));
     };
   }
   function click(x, z) {
@@ -510,7 +522,7 @@ export const BLD = (() => {
         b.p = +(b.p + dt / DAY).toFixed(4);
         if (b.p >= T.days) {
           b.p = T.days; topped++;
-          try { toast(T.icon + ' <b>' + T.name + ' topped out</b> — it pays ' + fmt$(T.inc) + ' every game day.'); } catch (er) { }
+          try { toast(T.icon + ' <b>' + T.name + ' topped out</b> — it pays ' + fmt$(T.inc) + ' every game day.' + (T.id === 'fact' ? ' Click it to open <b>the factory floor</b> for machines.' : '')); } catch (er) { }   // v2.61 FACTORY FLOOR: the shell's floor opens
         }
       }
     }
@@ -547,7 +559,9 @@ export const BLD = (() => {
     const rows = all.map(x => {
       const T = TYPES[x.b.t], fin = x.b.p >= T.days;
       return '<div class="kv"><span class="k">' + T.icon + ' ' + T.name + ' · ' + T.w + '×' + T.d + ' m · ' +
-        (fin ? fmt$(T.inc) + '/day' : Math.round(100 * x.b.p / T.days) + '% built') + '</span>' +
+        (fin ? fmt$(T.inc) + '/day' : Math.round(100 * x.b.p / T.days) + '% built') +
+        ((x.b.mach || []).length ? ' · ' + x.b.mach.length + ' mach' : '') +   // v2.61 FACTORY FLOOR: the row counts the factory's machines
+        '</span>' +
         '<span class="v">' + (x.p.cityName || (x.p.cityKey === 'rural' ? 'Countryside' : '—')) + '</span></div>';
     }).join('');
     const html = '<div class="msec" style="margin-top:14px">Ground up — your buildings</div>' +
@@ -575,13 +589,18 @@ export const BLD = (() => {
       const b = p && p.bld && p.bld[i | 0];
       if (!b) return { ok: false };
       const T = TYPES[b.t], rf = refundOf(T);
+      let machGot = 0;
+      try { if (window.FACT) { const r = FACT.onDemolish(p, b); if (r) machGot = r.got; } } catch (er) { }   // v2.61 FACTORY FLOOR
       for (const k in rf) if (rf[k] > 0) STATE.mat[k] = Math.min(1e6, +((shed(k)) + rf[k]).toFixed(1));
       p.bld.splice(i | 0, 1);
       try { saveGame(); } catch (er) { }
       ensureRegion();
-      return { ok: true, refund: rf };
+      return { ok: true, refund: rf, machines: machGot };
     },
     arming: () => !!placing, TYPES, YARD, MAX_PER_PLOT,
+    // v2.61 FACTORY FLOOR: the factory machine system rides these internals
+    liveAt: key => live.get(key) || null,   // the live root/body of a standing building
+    recOf, toLocal, toWorld,
   };
 })();
 window.BLD = BLD;
