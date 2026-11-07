@@ -81,6 +81,21 @@ for (const f of ['index.html', 'openworld.html']) {
   say(missing.size ? 'FAIL' : 'PASS', 'local-refs', `${f}: ${missing.size ? 'missing ' + [...missing].join(', ') : 'all exist'}`);
 }
 
+// 4b. index.html release summary stays under 200 words (rule since 2026-11-08)
+{
+  const mm = /<div[^>]*class="[^"]*\bnews\b[^"]*"[^>]*>([\s\S]*?)<\/div>/i.exec(rd('index.html'));
+  if (!mm) say('FAIL', 'news-length', 'index.html needs a <div class="news"> release summary block');
+  else {
+    const words = mm[1]
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&[a-zA-Z#0-9]+;/g, ' ')
+      .split(/\s+/)
+      .filter((t) => /[A-Za-z0-9]/.test(t)).length;
+    say(words <= 200 ? 'PASS' : 'FAIL', 'news-length',
+      `index.html release summary: ${words} words (max 200) — newest version in a paragraph, older releases one line each, full log in CHANGES.md`);
+  }
+}
+
 // 5. version consistency
 const iv = (/class="pill">\s*(v2\.\d+)/.exec(rd('index.html')) || [])[1];
 const ov = (/<title>[^<]*?(v2\.\d+)/.exec(rd('openworld.html')) || [])[1];
