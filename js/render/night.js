@@ -340,11 +340,11 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.63 — ONE NETWORK', `
-    <p><b>Every road now reaches every other — the lanes may curve to get there.</b></p>
-    <div class="kv"><span class="k">RINGS→TOWN</span><span class="v">Curved connector lanes tie the suburb rings straight into the downtown streets — the empty grass gap between town and the neighborhoods is gone</span></div>
-    <div class="kv"><span class="k">STRAYS</span><span class="v">Shoreline-clipped arcs and orphaned service roads are knotted back into one web; connectors stay on dry ground and steer around buildings</span></div>
-    <div class="kv"><span class="k">YOUR SAVE</span><span class="v">Same <b>openworld-v2</b> save — roads regenerate as you enter each city, nothing to migrate</span></div>
+  openModal('Welcome to v2.64 — CLEAN STREETS', `
+    <p><b>Junctions draw like junctions now — and no road ever rides on top of another.</b></p>
+    <div class="kv"><span class="k">CLEAN CROSSINGS</span><span class="v">Sidewalks step down to crossing ramps where streets meet — no more curb walls slicing through crossings — and center lines, edge lines and manholes stay out of intersections</span></div>
+    <div class="kv"><span class="k">NO STACKED ROADS</span><span class="v">Connector lanes arrive perpendicular at proper T-junctions, never merge along another street, and one bridge serves each neighborhood — the doubled ribbons are gone, everything still connected</span></div>
+    <div class="kv"><span class="k">CITY BEAUTIFUL</span><span class="v">Tree-lined avenues and rings, richer facade and roof palettes, and every skyline's tallest tower wears a crown, spire and red beacon</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
