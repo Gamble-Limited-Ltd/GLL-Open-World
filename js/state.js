@@ -20,6 +20,7 @@ export const STATE = {
   res: {},                       // v2.52 ORE EXCHANGE: the resource stockpile {resource: tonnes} — what your mines dug, unsold
   mkt: {},                       // v2.52 ORE EXCHANGE: the market multipliers {resource: {m, pm}} — today's and yesterday's rate around par
   works: {},                     // v2.53 THE WORKS: the refining machine counts {machineId: n}
+  rigs: [],                      // v2.62 DEEP WATER: the offshore oil rigs {id, name, x, z, price, ore, got, crew, walked, wageAcc, sto, near, nearKey} — tanked crude + the field's reserve
   mat: { Wood: 0, Stone: 0, Steel: 0, Glass: 0 },   // v2.56 GROUND UP: the materials shed — tonnes of wood/stone/steel/glass for construction
   pow: { g: { m: 1, pm: 1 }, b: {} },   // v2.59 THE GRID: the power state — grid price multiplier {m, pm} + per-business meters {plotId: {m, cut, due}}
   market: null,                  // MARKET module state (positions/orders)
