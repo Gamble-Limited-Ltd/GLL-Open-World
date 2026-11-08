@@ -1648,6 +1648,222 @@ export const CITY = (() => {
     return out;
   }
 
+  // ---------- v2.63 ONE NETWORK: every road reaches every other -------
+  // "I want all the roads connected. It is ok if the roads have to
+  // curve." Two structural gaps used to strand whole neighborhoods:
+  // the VERGE (downtown streets end at the plate edge ~720 m out, the
+  // suburb radials only start at 865 m — a 150–200 m ribbon of grass
+  // between the grid and the rings, so the suburbs read as a separate
+  // world), and the SHORELINE SPLIT (the dry-land clip cuts rings and
+  // lanes into arcs, and a piece with no surviving junction floats
+  // alone — same for short OSM service stubs). This pass runs AFTER the
+  // clip, BEFORE anything downstream (meshes, plots, houses, hashes,
+  // NPC routes all derive from the connected list):
+  //   A. VERGE BRIDGES — every suburb-road tip in the inner annulus
+  //      gets a curved lane down to the nearest real street, so each
+  //      radial visibly ties into the downtown grid.
+  //   B. FOLD — any component still separate is joined to the largest
+  //      one by the shortest valid curved connector.
+  // Connector paths are sampled every ~9 m and must stay dry and clear
+  // of every building (bbox + 5.5 m — conservative, so nothing ever
+  // slices a wall). Water-separated islands that admit no dry path are
+  // left alone (console.warn) — a lane across a bay needs a bridge, and
+  // that is the inter-city road system's job, not the city's.
+  const LINK_NAMES = ['Link Way', 'Union Lane', 'Junction Drive', 'Crossing Street', 'Knot Lane', 'Switchback Street'];
+  function connectRoadNetwork(meta, ax, az) {
+    const out = { added: 0, left: 0 };
+    if (roads.length < 2) return out;
+    const rnd = _mulberry(hashStr('cn' + (meta.key || meta.name || 'c')));
+
+    // ---- 14 m sample grid over every road (spatial hash) ------------
+    const CELL = 56, grid = new Map(), samples = [];
+    const addSample = (ri, x, z, dx, dz) => {
+      samples.push({ ri, x, z, dx, dz });
+      const k = Math.floor(x / CELL) + ',' + Math.floor(z / CELL);
+      let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(samples.length - 1);
+    };
+    roads.forEach((r, ri) => {
+      const p = r.pts;
+      for (let i = 0; i < p.length; i++) {
+        if (i < p.length - 1) {
+          const dx = p[i + 1][0] - p[i][0], dz = p[i + 1][1] - p[i][1];
+          const L = Math.hypot(dx, dz) || 1;
+          const n = Math.min(80, Math.floor(L / 14));
+          addSample(ri, p[i][0], p[i][1], dx / L, dz / L);
+          for (let k = 1; k < n; k++) addSample(ri, p[i][0] + dx * k / n, p[i][1] + dz * k / n, dx / L, dz / L);
+        } else addSample(ri, p[i][0], p[i][1], 0, 1);
+      }
+    });
+    const near = (x, z, rad, fn) => {
+      for (let cx = Math.floor((x - rad) / CELL); cx <= Math.floor((x + rad) / CELL); cx++)
+        for (let cz = Math.floor((z - rad) / CELL); cz <= Math.floor((z + rad) / CELL); cz++) {
+          const a = grid.get(cx + ',' + cz); if (!a) continue;
+          for (let si = 0; si < a.length; si++) fn(samples[a[si]]);
+        }
+    };
+
+    // ---- union-find: roads touch when half widths + 5 m overlap -----
+    const uf = roads.map((_, i) => i);
+    const find = i => { while (uf[i] !== i) { uf[i] = uf[uf[i]]; i = uf[i]; } return i; };
+    const uni = (a, b) => { a = find(a); b = find(b); if (a !== b) uf[a] = b; };
+    for (const s of samples) {
+      const rs = roads[s.ri];
+      near(s.x, s.z, 26, t => {
+        if (t.ri === s.ri) return;
+        if (Math.hypot(t.x - s.x, t.z - s.z) <= (rs.w + roads[t.ri].w) / 2 + 5) uni(s.ri, t.ri);
+      });
+    }
+
+    // ---- obstacle tests: water + buildings ---------------------------
+    const wet = LANDGEO.ready ? (x, z) => LANDGEO.isWaterWorld(x, z) : null;
+    const bbs = buildingPolys.map(b => {
+      let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+      for (const q of b.poly) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); z0 = Math.min(z0, q[1]); z1 = Math.max(z1, q[1]); }
+      return { x0: x0 - 5.5, x1: x1 + 5.5, z0: z0 - 5.5, z1: z1 + 5.5 };
+    });
+    const blocked = (x, z) => {
+      if (wet && wet(x, z)) return true;
+      for (const b of bbs) if (x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1) return true;
+      return false;
+    };
+
+    // ---- the curved connector ----------------------------------------
+    // Cubic bezier leaving P along its road's course and arriving at Q
+    // along Q's (both bow senses), then mid-perp quadratic bows, then
+    // the straight line — first dry, wall-clear path wins.
+    const cubic = (p0, p1, p2, p3) => {
+      const pts = [];
+      const steps = Math.max(8, Math.ceil(Math.hypot(p3[0] - p0[0], p3[1] - p0[1]) / 9));
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps, u = 1 - t;
+        pts.push([
+          u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0],
+          u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1]]);
+      }
+      return pts;
+    };
+    const quad = (p0, p1, p2) => {
+      const pts = [];
+      const steps = Math.max(8, Math.ceil(Math.hypot(p2[0] - p0[0], p2[1] - p0[1]) / 9));
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps, u = 1 - t;
+        pts.push([u * u * p0[0] + 2 * u * t * p1[0] + t * t * p2[0], u * u * p0[1] + 2 * u * t * p1[1] + t * t * p2[1]]);
+      }
+      return pts;
+    };
+    const tryPath = pts => {
+      for (const p of pts) if (blocked(p[0], p[1])) return null;
+      return pts;
+    };
+    const buildPath = (P, Q, tp, tq) => {
+      const d = Math.hypot(Q.x - P.x, Q.z - P.z) || 1;
+      const k = Math.min(90, Math.max(16, d * .3));
+      const cands = [];
+      for (const s of [1, -1])
+        cands.push(cubic([P.x, P.z], [P.x + tp[0] * k * s, P.z + tp[1] * k * s],
+          [Q.x + tq[0] * k * s, Q.z + tq[1] * k * s], [Q.x, Q.z]));
+      const mx = (P.x + Q.x) / 2, mz = (P.z + Q.z) / 2;
+      const nx = -(Q.z - P.z) / d, nz = (Q.x - P.x) / d;
+      for (const b of [.2, .38]) for (const s of [1, -1])
+        cands.push(quad([P.x, P.z], [mx + nx * d * b * s, mz + nz * d * b * s], [Q.x, Q.z]));
+      cands.push([[P.x, P.z], [Q.x, Q.z]]);
+      for (const c of cands) { const r = tryPath(c); if (r) return r; }
+      return null;
+    };
+    const pushConnector = (dense, pRi, qRi) => {
+      const dec = [dense[0]];
+      let acc = 0;
+      for (let k = 1; k < dense.length - 1; k++) {
+        acc += Math.hypot(dense[k][0] - dec[dec.length - 1][0], dense[k][1] - dec[dec.length - 1][1]);
+        if (acc >= 40) { dec.push(dense[k]); acc = 0; }
+      }
+      dec.push(dense[dense.length - 1]);
+      const mid = dec[Math.floor(dec.length / 2)];
+      const sub = Math.hypot(mid[0] - ax, mid[1] - az) > 760 ? 1 : 0;
+      const name = sub
+        ? SUB_TREES[Math.floor(rnd() * SUB_TREES.length)] + ' ' + SUB_KINDS[Math.floor(rnd() * SUB_KINDS.length)]
+        : LINK_NAMES[Math.floor(rnd() * LINK_NAMES.length)];
+      roads.push({ pts: dec, w: 7.5, cls: 1, sub, name, link: 1 });
+      const ri = roads.length - 1;
+      uni(ri, pRi); uni(ri, qRi);
+      // samples for the new lane (later searches + phase B see it)
+      for (let i = 0; i < dec.length - 1; i++) {
+        const dx = dec[i + 1][0] - dec[i][0], dz = dec[i + 1][1] - dec[i][1];
+        const L = Math.hypot(dx, dz) || 1;
+        const n = Math.min(40, Math.floor(L / 14));
+        addSample(ri, dec[i][0], dec[i][1], dx / L, dz / L);
+        for (let k = 1; k < n; k++) addSample(ri, dec[i][0] + dx * k / n, dec[i][1] + dz * k / n, dx / L, dz / L);
+      }
+      out.added++;
+      return ri;
+    };
+
+    // ---- phase A: the verge — every suburb tip reaches town ----------
+    for (const r of roads.slice()) {
+      if (!r.sub || r.link || r.pts.length < 2) continue;
+      for (const e of [0, r.pts.length - 1]) {
+        const p = r.pts[e];
+        if (Math.hypot(p[0] - ax, p[1] - az) > SUB_R0 + 90) continue;      // outer tips are cul-de-sacs by design
+        let best = null, bd = 1e9;
+        near(p[0], p[1], 360, s => {
+          if (roads[s.ri].sub) return;
+          const d = Math.hypot(s.x - p[0], s.z - p[1]);
+          if (d < bd) { bd = d; best = s; }
+        });
+        if (!best || bd <= 9) continue;                                     // already kisses a street
+        const o = e === 0 ? r.pts[1] : r.pts[r.pts.length - 2];
+        const L = Math.hypot(p[0] - o[0], p[1] - o[1]) || 1;
+        const tp = [(p[0] - o[0]) / L, (p[1] - o[1]) / L];                   // continue the lane's course
+        const path = buildPath({ x: p[0], z: p[1] }, best, tp, [best.dx, best.dz]);
+        if (path) pushConnector(path, roads.indexOf(r), best.ri);
+      }
+    }
+
+    // ---- phase B: fold any remaining separate component in -----------
+    const comps = () => {
+      const m = new Map();
+      roads.forEach((_, i) => { const c = find(i); if (!m.has(c)) m.set(c, []); m.get(c).push(i); });
+      return [...m.values()];
+    };
+    const roadLen = idx => idx.reduce((s, i) => {
+      const p = roads[i].pts;
+      for (let j = 1; j < p.length; j++) s += Math.hypot(p[j][0] - p[j - 1][0], p[j][1] - p[j - 1][1]);
+      return s;
+    }, 0);
+    let groups = comps().sort((a, b) => roadLen(b) - roadLen(a));
+    while (groups.length > 1) {
+      const net = new Set(groups[0]);
+      const netSamp = samples.filter(s => net.has(s.ri));
+      let joined = false;
+      for (let gi = 1; gi < groups.length && !joined; gi++) {
+        const cs = new Set(groups[gi]);
+        const cSamp = samples.filter(s => cs.has(s.ri));
+        // nearest (comp point, network point) pairs, best first
+        const pairs = [];
+        for (const s of cSamp) {
+          if (pairs.length > 400) break;
+          for (const t of netSamp) {
+            const d = Math.hypot(t.x - s.x, t.z - s.z);
+            if (d < 700) pairs.push({ s, t, d });
+          }
+        }
+        pairs.sort((a, b) => a.d - b.d);
+        for (let pi = 0; pi < pairs.length && pi < 50 && !joined; pi++) {
+          const { s, t } = pairs[pi];
+          const path = buildPath(s, t, [s.dx, s.dz], [t.dx, t.dz]);
+          if (path) { pushConnector(path, s.ri, t.ri); joined = true; }
+        }
+        if (joined) { groups = comps().sort((a, b) => roadLen(b) - roadLen(a)); }
+      }
+      if (!joined) {
+        console.warn('[netroads] left isolated by water/ buildings:', groups.slice(1).map(g => g.map(i => roads[i].name).slice(0, 3)));
+        out.left += groups.length - 1;
+        break;
+      }
+    }
+    return out;
+  }
+
   function buildSuburbs(city) {
     suburbRec = { roads: 0, houses: 0, trees: 0, lamps: 0, cars: 0, verts: 0 };
     const subRoads = roads.filter(r => r.sub);
@@ -1736,6 +1952,28 @@ export const CITY = (() => {
       }
       return false;
     };
+    // v2.63: curb-to-town lanes run near downtown blocks — a house lot
+    // must not swallow an imported building. Coarse 80 m cells hold the
+    // building bboxes; a lot is rejected when its rect meets one.
+    const BG = 80, bGrid = new Map();
+    for (const b of buildingPolys) {
+      let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+      for (const q of b.poly) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); z0 = Math.min(z0, q[1]); z1 = Math.max(z1, q[1]); }
+      for (let gx = Math.floor(x0 / BG); gx <= Math.floor(x1 / BG); gx++)
+        for (let gz = Math.floor(z0 / BG); gz <= Math.floor(z1 / BG); gz++) {
+          const k = gx + ',' + gz;
+          if (!bGrid.has(k)) bGrid.set(k, []);
+          bGrid.get(k).push([x0, x1, z0, z1]);
+        }
+    }
+    const onBuilding = (x, z, hw, hd) => {
+      for (let gx = -1; gx <= 1; gx++) for (let gz = -1; gz <= 1; gz++) {
+        const arr = bGrid.get((Math.floor(x / BG) + gx) + ',' + (Math.floor(z / BG) + gz));
+        if (!arr) continue;
+        for (const b of arr) if (x + hw > b[0] && x - hw < b[1] && z + hd > b[2] && z - hd < b[3]) return true;
+      }
+      return false;
+    };
     // inner streets first, so the house cap fills town-outward
     const ordered = subRoads.slice().sort((a, b) => {
       const dOf = rd => { let m = 1e9; for (const p of rd.pts) m = Math.min(m, Math.hypot(p[0] - axc, p[1] - azc)); return m; };
@@ -1768,6 +2006,8 @@ export const CITY = (() => {
               const cs = [LP(-lotHW, off0), LP(lotHW, off0), LP(-lotHW, off0 + depth), LP(lotHW, off0 + depth), [lx, lz]];
               if (cs.some(c2 => LANDGEO.isWaterWorld(c2[0], c2[1]))) continue;
             }
+            // v2.63: never on an imported downtown building
+            if (onBuilding(lx, lz, lotHW, lotHD)) continue;
             // clear of every street's asphalt — crossings stay open
             const dq = distToRoad(lx, lz);
             if (dq.rd && dq.d < dq.rd.w / 2 + 4) continue;
@@ -2364,6 +2604,15 @@ export const CITY = (() => {
       buildingPolys = buildingPolys.filter(b => solid(b.poly));
       greensShift = greensShift.filter(g => solid(g.poly));
     }
+    // v2.63 ONE NETWORK — knot every road into one connected web before
+    // anything downstream derives from the list (meshes, plots, houses,
+    // NPC routes). Curved connectors only: they must stay dry and clear
+    // of buildings, so nothing ever slices a wall or fords a bay.
+    onStatus && onStatus('Knotting the road network…'); await _tick();
+    let netRec = { added: 0, left: 0 };
+    try { netRec = connectRoadNetwork(cityMeta, ax, az); } catch (e) { console.error('[netroads]', e); }
+    if (netRec.added || netRec.left)
+      console.log('[netroads] +' + netRec.added + ' connectors, ' + netRec.left + ' left isolated');
     const shifted = { ...cityData, ...cityMeta, roads, buildings: buildingPolys, greens: greensShift, waters: watersShift };
     suites = [];
     benchScratch = [];
