@@ -76,8 +76,8 @@ export const EXCH = (() => {
   // refined goods' in the works section (single sources of truth);
   // this fallback only matters if 51/54 ever eval after 53
   const FALLBACK = { Iron: 13, Copper: 22, Coal: 12, Bauxite: 15, Nickel: 24, Lignite: 12, Gypsum: 14, Salt: 16, Zinc: 19, Tin: 21, Silver: 26, Quartz: 17,
-    Steel: 58, Coke: 31, Aluminium: 102, Cathode: 170, Superalloy: 152, 'Zinc Ingot': 88, 'Tin Solder': 74, 'Silver Bar': 86, Glass: 38, Plaster: 29, 'Soda Ash': 47, Briquette: 24 };
-  const parOf = r => (window.MINE && MINE.BASE && MINE.BASE[r]) || (window.WORKS && WORKS.BASE && WORKS.BASE[r]) || FALLBACK[r] || 14;
+    Steel: 58, Coke: 31, Aluminium: 102, Cathode: 170, Superalloy: 152, 'Zinc Ingot': 88, 'Tin Solder': 74, 'Silver Bar': 86, Glass: 38, Plaster: 29, 'Soda Ash': 47, Briquette: 24, Oil: 95 };   // v2.62 DEEP WATER: crude's par (the live source is OIL.BASE — this is the pre-boot fallback)
+  const parOf = r => (window.MINE && MINE.BASE && MINE.BASE[r]) || (window.WORKS && WORKS.BASE && WORKS.BASE[r]) || (window.OIL && OIL.BASE && OIL.BASE[r]) || FALLBACK[r] || 14;   // v2.62: the rigs' crude rides the same par chain
   const LO = .55, HI = 1.7;     // the multiplier band
   const STEP = .16;             // ±8% a day
 
@@ -200,11 +200,13 @@ export const EXCH = (() => {
     const sum = document.getElementById('ox-sum');
     if (sum) sum.innerHTML =
       '<div class="kv"><span class="k">STOCKPILE</span><span class="v' + (t > 0 ? ' g' : '') + '">' + (t > 0 ? t.toFixed(1) + ' t of ore and goods ≈ ' + fmt$(v) + ' at today\u2019s prices' : 'empty — the ore your crews dig stacks up here') + '</span></div>' +
-      '<div class="kv" style="margin-top:6px"><span class="k">THE MARKET</span><span class="v">' + ORES.length + ' ores + ' + Math.max(0, RES.length - ORES.length) + ' refined goods · par × the day\u2019s multiplier · moves every game day</span></div>';
+      '<div class="kv" style="margin-top:6px"><span class="k">THE MARKET</span><span class="v">' + ORES.length + ' ores + crude oil + ' + Math.max(0, RES.length - ORES.length - 1) + ' refined goods · par × the day\u2019s multiplier · moves every game day</span></div>';   // v2.62: the count line knows the rigs\u2019 crude
     const sorter = rs => [...rs.filter(r => held(r) > 0.005), ...rs.filter(r => held(r) <= 0.005)];   // what you hold rides the top of its group
     const ores = RES.filter(r => ORES.indexOf(r) >= 0);
-    const goods = RES.filter(r => ORES.indexOf(r) < 0);
+    const goods = RES.filter(r => ORES.indexOf(r) < 0 && r !== 'Oil');   // v2.62 DEEP WATER: crude gets its own group
+    const crude = RES.filter(r => r === 'Oil');
     list.innerHTML = '<div class="ox-sec">THE ORES — what your mines dig</div>' + sorter(ores).map(rowHTML).join('') +
+      (crude.length ? '<div class="ox-sec" style="margin-top:10px">CRUDE OIL — what your rigs pump</div>' + sorter(crude).map(rowHTML).join('') : '') +
       (goods.length ? '<div class="ox-sec" style="margin-top:10px">REFINED GOODS — what the works pour</div>' + sorter(goods).map(rowHTML).join('') : '');
     list.querySelectorAll('[data-eh]').forEach(b => { b.onclick = () => { try { sellHalf(b.dataset.eh); } catch (er) { } render(); }; });
     list.querySelectorAll('[data-es]').forEach(b => { b.onclick = () => { try { sellAll(b.dataset.es); } catch (er) { } render(); }; });
