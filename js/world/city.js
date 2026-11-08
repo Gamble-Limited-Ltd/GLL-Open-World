@@ -274,11 +274,18 @@ export const CITY = (() => {
   // ---- the building-color system: muted pastels + earth tones (the
   // reference look), picked warm-or-cool by height so towers read cooler
   // and low-rise blocks read warm ----
-  const PAL_WARM = [0xf2e6d0, 0xf2ead0, 0xe8dcc0, 0xcfb37f, 0xcd9488, 0xc4907f, 0xb08d76, 0xa05252, 0xe0dcd4, 0xc8beac, 0x9db5a0];
-  const PAL_COOL = [0xe1e3e6, 0xb5bdc2, 0x9aa2a8, 0x8e99a6, 0x9a9c9e, 0x4f4f52];
-  const ROOF_DECKS = [0x3f4347, 0x4a3b2f, 0x3a434d, 0x4d5c51, 0x57504a];
-  const SHINGLES = [0x6b4a33, 0x9c4a3c, 0x46505c, 0x3d4043, 0x7a5c48];
-  const TRIMS = [0x3a3f44, 0x4a3b2c, 0x5a4a42, 0x39424a, 0x4f4438];
+  // v2.64 CITY BEAUTIFUL palettes: terracotta/clay warms and slate/
+  // blue-glass cools join the stock pastels; roofs gain gravel-tan,
+  // tar-red and pale concrete so the skyline patchworks like a real
+  // city seen from above instead of one flat gray-brown.
+  const PAL_WARM = [0xf2e6d0, 0xf2ead0, 0xe8dcc0, 0xcfb37f, 0xcd9488, 0xc4907f, 0xb08d76, 0xa05252, 0xe0dcd4, 0xc8beac, 0x9db5a0,
+    0xd9b8a3, 0xb76b5e, 0xc2766b, 0xd8a087];              // terracotta + clay
+  const PAL_COOL = [0xe1e3e6, 0xb5bdc2, 0x9aa2a8, 0x8e99a6, 0x9a9c9e, 0x4f4f52,
+    0x7f8fa0, 0xa8b4c2, 0x6e7b86, 0x8496a8];              // slate + blue-glass
+  const ROOF_DECKS = [0x3f4347, 0x4a3b2f, 0x3a434d, 0x4d5c51, 0x57504a,
+    0x6b5d4a, 0x7a4638, 0x8a8378];                        // gravel-tan, tar-red, pale concrete
+  const SHINGLES = [0x6b4a33, 0x9c4a3c, 0x46505c, 0x3d4043, 0x7a5c48, 0x55603f];
+  const TRIMS = [0x3a3f44, 0x4a3b2c, 0x5a4a42, 0x39424a, 0x4f4438, 0x2f3a41];
   let _winTexs = [null, null, null, null], _asphTex = null, _groundTex = null, _shopTex = null, _dollarTex = null;
   const getWinTex = i => _winTexs[i] || (_winTexs[i] = windowTexture(i));
   const getAsphTex = () => _asphTex || (_asphTex = asphaltTexture());
@@ -299,6 +306,14 @@ export const CITY = (() => {
   }
 
   // ---------- roads + sidewalks + markings --------------------------
+  // v2.64 CLEAN STREETS: junctions draw like junctions now. Every road
+  // samples into a junction index first, then — sidewalks that would
+  // run into ANOTHER road's asphalt step down to a crossing ramp
+  // instead of raising a curb wall through the crossing street; center
+  // dashes, edge lines, manholes and country verges stay out of
+  // junction squares; and each road's asphalt carries its own micro
+  // height so co-class crossings always have a clean winner (no
+  // z-fighting shimmer where two ribbons stack).
   function buildRoads(city) {
     const asph = { pos: [], norm: [], uv: [], col: [] };
     const mark = { pos: [], norm: [], uv: [], col: [] };
@@ -306,8 +321,47 @@ export const CITY = (() => {
     const cAsph = colOf(0xffffff), cYel = colOf(0xe8c243), cWht = colOf(0xe8e4dc), cWalk = colOf(0xc4bcb0);
     const cCurb = colOf(0xb3ab9e), cSeam = colOf(0xa39a8b), cCW = colOf(0xeceae2);
     const cVerge = colOf(0x8f8a7c);   // v2.14: country gravel verge
+    const cRamp = colOf(0xb9b1a5);    // v2.64: crossing-ramp concrete
     const UP = [0, 1, 0];
     const mobF = isMob ? .5 : 1;
+    const WALKY = .16, RAMP0 = .049;
+
+    // ---- v2.64 junction index: every road sampled every ~8 m --------
+    const SCELL = 28, sgrid = new Map(), samps = [];
+    const addS = (ri, x, z) => {
+      samps.push({ ri, x, z });
+      const k = Math.floor(x / SCELL) + ',' + Math.floor(z / SCELL);
+      let a = sgrid.get(k); if (!a) sgrid.set(k, a = []); a.push(samps.length - 1);
+    };
+    roads.forEach((r, ri) => {
+      const p = r.pts;
+      for (let i = 0; i < p.length; i++) {
+        if (i < p.length - 1) {
+          const dx = p[i + 1][0] - p[i][0], dz = p[i + 1][1] - p[i][1];
+          const L = Math.hypot(dx, dz) || 1, n = Math.min(60, Math.floor(L / 8));
+          addS(ri, p[i][0], p[i][1]);
+          for (let k = 1; k < n; k++) addS(ri, p[i][0] + dx * k / n, p[i][1] + dz * k / n);
+        } else addS(ri, p[i][0], p[i][1]);
+      }
+    });
+    let MAXW = 9; roads.forEach(r => { if (r.w > MAXW) MAXW = r.w; });
+    const nearS = (x, z, rad, fn) => {
+      for (let cx = Math.floor((x - rad) / SCELL); cx <= Math.floor((x + rad) / SCELL); cx++)
+        for (let cz = Math.floor((z - rad) / SCELL); cz <= Math.floor((z + rad) / SCELL); cz++) {
+          const a = sgrid.get(cx + ',' + cz); if (!a) continue;
+          for (let si = 0; si < a.length; si++) fn(samps[a[si]]);
+        }
+    };
+    // true when (x,z) enters ANOTHER road's corridor by margin m
+    // (self excluded: a road's own walk band never conflicts with itself)
+    const inJunction = (x, z, self, m) => {
+      let hit = false;
+      nearS(x, z, MAXW / 2 + m + SCELL, s => {
+        if (hit || s.ri === self) return;
+        if (Math.hypot(s.x - x, s.z - z) < roads[s.ri].w / 2 + m) hit = true;
+      });
+      return hit;
+    };
 
     // ribbon quad between (ax,az)-(bx,bz), width w, height y
     // uUnit/vUnit: meters per texture tile along/across (asphalt noise)
@@ -320,14 +374,30 @@ export const CITY = (() => {
         [ax + px, y, az + pz], [bx + px, y, bz + pz], [bx - px, y, bz - pz], [ax - px, y, az - pz],
         UP, [0, 0], [u1, 0], [u1, v1], [0, v1], col);
     };
+    // v2.64: sloped surface quad — the curb-ramp transition where a
+    // raised walk steps down to a crossing ramp
+    const ribSlope = (arr, ax, az, yA, bx, bz, yB, w, col) => {
+      const dx = bx - ax, dz = bz - az, len = Math.hypot(dx, dz) || 1;
+      const px = -dz / len * w / 2, pz = dx / len * w / 2;
+      pushQuad(arr,
+        [ax + px, yA, az + pz], [bx + px, yB, bz + pz], [bx - px, yB, bz - pz], [ax - px, yA, az - pz],
+        UP, [0, 0], [1, 0], [1, 1], [0, 1], col);
+    };
 
     const manholes = [];
-    for (const rd of city.roads) {
+    const FINE = 2.75;
+    roads.forEach((rd, ri) => {
       const pts = rd.pts;
-      const y = rd.cls === 3 ? .030 : rd.cls === 2 ? .034 : .038;
+      // v2.64: per-road micro height (unique by construction) — co-class
+      // crossings always have a winner, never a z-fight. Stays clear of
+      // the ramp (.049+) and marking (.054+) layers below.
+      const yJ = roads.length ? (ri / roads.length) * .007 : 0;
+      const y = (rd.cls === 3 ? .030 : rd.cls === 2 ? .034 : .038) + yJ;
       for (let i = 0; i < pts.length - 1; i++) rib(asph, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], rd.w, y, cAsph, 3.2, 3.2);
       if (rd.country) {
         // v2.14: country highway — no sidewalks, no curbs: gravel verges
+        // (v2.64: verge strips skip the crossing square — two country
+        // lanes crossing at a homestead used to stack gravel-on-gravel)
         for (const side of [1, -1]) {
           const off = rd.w / 2 + 2.1;
           for (let i = 0; i < pts.length - 1; i++) {
@@ -335,7 +405,36 @@ export const CITY = (() => {
             const dx = bx - ax, dz = bz - az, len = Math.hypot(dx, dz) || 1;
             const ux = dx / len, uz = dz / len;
             const px = -uz * off * side, pz = ux * off * side;
-            rib(walk, ax + px, az + pz, bx + px, bz + pz, 3.6, .03, cVerge);
+            const n = Math.max(1, Math.ceil(len / 3.5));
+            for (let k = 0; k < n; k++) {
+              const d0 = k * len / n, d1 = (k + 1) * len / n;
+              const mx = ax + ux * (d0 + d1) / 2 + px, mz = az + uz * (d0 + d1) / 2 + pz;
+              if (inJunction(mx, mz, ri, 2)) continue;
+              rib(walk, ax + ux * d0 + px, az + uz * d0 + pz, ax + ux * d1 + px, az + uz * d1 + pz, 3.6, .03, cVerge);
+            }
+          }
+        }
+      } else if (rd.sub) {
+        // v2.64 CITY BEAUTIFUL: suburb rings, radials and outer lanes
+        // carry thin gravel-grass shoulders instead of full urban
+        // sidewalk + curb. Out in the neighborhoods a concrete walk on
+        // both sides for 55 km read as a triple-band "twin road" from
+        // any distance; a shoulder reads as one road with a verge, and
+        // it saves the curb geometry too. (Downtown keeps real walks.)
+        for (const side of [1, -1]) {
+          const off = rd.w / 2 + 1.35;
+          for (let i = 0; i < pts.length - 1; i++) {
+            const [ax, az] = pts[i], [bx, bz] = pts[i + 1];
+            const dx = bx - ax, dz = bz - az, len = Math.hypot(dx, dz) || 1;
+            const ux = dx / len, uz = dz / len;
+            const px = -uz * off * side, pz = ux * off * side;
+            const n = Math.max(1, Math.ceil(len / 3.5));
+            for (let k = 0; k < n; k++) {
+              const d0 = k * len / n, d1 = (k + 1) * len / n;
+              const mx = ax + ux * (d0 + d1) / 2 + px, mz = az + uz * (d0 + d1) / 2 + pz;
+              if (inJunction(mx, mz, ri, 2)) continue;   // keep the crossing square clear
+              rib(walk, ax + ux * d0 + px, az + uz * d0 + pz, ax + ux * d1 + px, az + uz * d1 + pz, 2.7, .028, cVerge);
+            }
           }
         }
       } else if (!rd.ped) {
@@ -346,33 +445,65 @@ export const CITY = (() => {
             const dx = bx - ax, dz = bz - az, len = Math.hypot(dx, dz) || 1;
             const ux = dx / len, uz = dz / len;
             const px = -uz * off * side, pz = ux * off * side;      // walk centerline offset
-            // walk surface
-            rib(walk, ax + px, az + pz, bx + px, bz + pz, 3.5, .16, cWalk);
-            // raised curb: outer + inner vertical faces
             const ox = -uz * 1.75 * side, oz = ux * 1.75 * side;    // half-walk perpendicular
             const onx = -uz * side, onz = ux * side;                // outward normal
-            const g0 = .02, g1 = .165;
-            // outer face (points away from road)
-            pushQuad(walk,
-              [ax + px + ox, g1, az + pz + oz], [bx + px + ox, g1, bz + pz + oz],
-              [bx + px + ox, g0, bz + pz + oz], [ax + px + ox, g0, az + pz + oz],
-              [onx, 0, onz], [0, 0], [1, 0], [1, 1], [0, 1], cCurb);
-            // inner face (toward the road)
-            pushQuad(walk,
-              [ax + px - ox, g1, az + pz - oz], [bx + px - ox, g1, bz + pz - oz],
-              [bx + px - ox, g0, bz + pz - oz], [ax + px - ox, g0, az + pz - oz],
-              [-onx, 0, -onz], [0, 0], [1, 0], [1, 1], [0, 1], cCurb);
-            // concrete slab seams every 2.3 m across the walk — v2.42:
-            // suburb streets skip them (they are ~80% of a street's
-            // geometry; the ring would carry ~470k verts of seams alone)
-            if (!rd.sub) for (let d = 1.2; d < len; d += 2.3) {
-              const mx = ax + ux * d + px, mz = az + uz * d + pz;
-              rib(walk, mx - ox, mz - oz, mx + ox, mz + oz, .07, .163, cSeam);
+            // v2.64: fine-step the walk; each step stays a raised walk
+            // or becomes a crossing ramp depending on whether ANOTHER
+            // road claims the ground. Consecutive same-mode steps merge
+            // into one quad; ramps slope down at their boundaries.
+            const nf = Math.max(1, Math.ceil(len / FINE));
+            const flags = new Array(nf);
+            for (let f = 0; f < nf; f++) {
+              const d = (f + .5) * len / nf;
+              flags[f] = inJunction(ax + ux * d + px, az + uz * d + pz, ri, 2.0);
+            }
+            const rampY = RAMP0 + yJ * .68;                          // unique per road, ≤ .0538
+            const DX = f => ax + ux * (f * len / nf), DZ = f => az + uz * (f * len / nf);
+            let f0 = 0;
+            while (f0 < nf) {
+              const fl = flags[f0];
+              let f1 = f0;
+              while (f1 + 1 < nf && flags[f1 + 1] === fl) f1++;
+              const x0 = DX(f0) + px, z0 = DZ(f0) + pz, x1 = DX(f1 + 1) + px, z1 = DZ(f1 + 1) + pz;
+              if (fl) {
+                // crossing ramp: near-asphalt surface, sloped entry/exit
+                const bIn = f0 > 0, bOut = f1 + 1 < nf;
+                const s0 = bIn ? f0 + 1 : f0, s1 = bOut ? f1 : f1 + 1;
+                if (bIn) ribSlope(walk, DX(f0) + px, DZ(f0) + pz, WALKY, DX(f0 + 1) + px, DZ(f0 + 1) + pz, rampY, 3.5, cRamp);
+                if (s1 > s0) rib(walk, DX(s0) + px, DZ(s0) + pz, DX(s1) + px, DZ(s1) + pz, 3.5, rampY, cRamp);
+                if (bOut) ribSlope(walk, DX(f1) + px, DZ(f1) + pz, rampY, DX(f1 + 1) + px, DZ(f1 + 1) + pz, WALKY, 3.5, cRamp);
+              } else {
+                // raised walk surface + curb faces
+                rib(walk, x0, z0, x1, z1, 3.5, WALKY, cWalk);
+                const g0 = .02, g1 = .165;
+                // outer face (points away from road)
+                pushQuad(walk,
+                  [x0 + ox, g1, z0 + oz], [x1 + ox, g1, z1 + oz],
+                  [x1 + ox, g0, z1 + oz], [x0 + ox, g0, z0 + oz],
+                  [onx, 0, onz], [0, 0], [1, 0], [1, 1], [0, 1], cCurb);
+                // inner face (toward the road)
+                pushQuad(walk,
+                  [x0 - ox, g1, z0 - oz], [x1 - ox, g1, z1 - oz],
+                  [x1 - ox, g0, z1 - oz], [x0 - ox, g0, z0 - oz],
+                  [-onx, 0, -onz], [0, 0], [1, 0], [1, 1], [0, 1], cCurb);
+                // concrete slab seams every 2.3 m across the walk — v2.42:
+                // suburb streets skip them (they are ~80% of a street's
+                // geometry; the ring would carry ~470k verts of seams alone)
+                if (!rd.sub) {
+                  const runLen = Math.hypot(x1 - x0, z1 - z0);
+                  for (let d = 1.2; d < runLen; d += 2.3) {
+                    const mx = x0 + ux * d, mz = z0 + uz * d;
+                    rib(walk, mx - ox, mz - oz, mx + ox, mz + oz, .07, .163, cSeam);
+                  }
+                }
+              }
+              f0 = f1 + 1;
             }
           }
         }
       }
-      // yellow center dashes on cls>=2
+      // yellow center dashes on cls>=2 (v2.64: they stop short of every
+      // crossing — a center line never runs through an intersection)
       if (rd.cls >= 2 && !rd.ped) {
         for (let i = 0; i < pts.length - 1; i++) {
           const [ax, az] = pts[i], [bx, bz] = pts[i + 1];
@@ -381,23 +512,34 @@ export const CITY = (() => {
           const ux = (bx - ax) / len, uz = (bz - az) / len;
           for (let d = 3; d < len - 3; d += 7) {
             const e = Math.min(d + 3, len - .5);
-            rib(mark, ax + ux * d, az + uz * d, ax + ux * e, az + uz * e, .38, .055, cYel);
+            const mx = ax + ux * (d + e) / 2, mz = az + uz * (d + e) / 2;
+            if (inJunction(mx, mz, ri, 3.2)) continue;   // 3.2: dash tips stay clear of shallow-angle mouths too
+            rib(mark, ax + ux * d, az + uz * d, ax + ux * e, az + uz * e, .38, .0585, cYel);
           }
         }
       }
-      // white edge lines on main avenues (cls 3)
+      // white edge lines on main avenues (cls 3) — v2.64: substepped so
+      // they, too, break at junctions
       if (rd.cls === 3) {
         for (const side of [1, -1]) {
           const off = rd.w / 2 - .7;
           for (let i = 0; i < pts.length - 1; i++) {
             const [ax, az] = pts[i], [bx, bz] = pts[i + 1];
             const dx = bx - ax, dz = bz - az, len = Math.hypot(dx, dz) || 1;
-            const px = -dz / len * off * side, pz = dx / len * off * side;
-            rib(mark, ax + px, az + pz, bx + px, bz + pz, .22, .052, cWht);
+            const ux = dx / len, uz = dz / len;
+            const px = -uz * off * side, pz = ux * off * side;
+            const n = Math.max(1, Math.ceil(len / 3.5));
+            for (let k = 0; k < n; k++) {
+              const d0 = k * len / n, d1 = (k + 1) * len / n;
+              const mx = ax + ux * (d0 + d1) / 2 + px, mz = az + uz * (d0 + d1) / 2 + pz;
+              if (inJunction(mx, mz, ri, 2.2)) continue;
+              rib(mark, ax + ux * d0 + px, az + uz * d0 + pz, ax + ux * d1 + px, az + uz * d1 + pz, .22, .0545, cWht);
+            }
           }
         }
       }
-      // manhole covers (v2.14: urban plumbing — country roads get none)
+      // manhole covers (v2.14: urban plumbing — country roads get none;
+      // v2.64: never in a junction square)
       if (rd.cls >= 2 && !rd.ped && !rd.country) {
         for (let i = 0; i < pts.length - 1; i++) {
           const [ax, az] = pts[i], [bx, bz] = pts[i + 1];
@@ -406,14 +548,16 @@ export const CITY = (() => {
           const ux = (bx - ax) / len, uz = (bz - az) / len;
           for (let d = 9; d < len - 4; d += 16) {
             const side = (Math.floor(d / 16) % 2) ? 1 : -1;
-            manholes.push([ax + ux * d - uz * rd.w * .22 * side, az + uz * d + ux * rd.w * .22 * side]);
+            const mx = ax + ux * d - uz * rd.w * .22 * side, mz = az + uz * d + ux * rd.w * .22 * side;
+            if (inJunction(mx, mz, ri, 2.2)) continue;
+            manholes.push([mx, mz]);
           }
         }
       }
-    }
+    });
 
     // ---------- zebra crosswalks at road intersections ---------------
-    const ints = [];
+    const raw = [];
     const rbbox = roads.map(rd => {
       let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
       rd.pts.forEach(p => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); z0 = Math.min(z0, p[1]); z1 = Math.max(z1, p[1]); });
@@ -423,6 +567,7 @@ export const CITY = (() => {
     for (let i = 0; i < roads.length; i++) for (let j = i + 1; j < roads.length; j++) {
       const A = roads[i], B = roads[j];
       if (A.ped || B.ped || A.country || B.country) continue;   // v2.14: no zebras in the country
+      if (A.sub && B.sub) continue;   // v2.64: suburb ring×radial crossings skip the paint budget
       const ba = rbbox[i], bb = rbbox[j];
       if (ba[1] < bb[0] || bb[1] < ba[0] || ba[3] < bb[2] || bb[3] < ba[2]) continue;
       for (let s = 0; s < A.pts.length - 1; s++) for (let t = 0; t < B.pts.length - 1; t++) {
@@ -432,10 +577,20 @@ export const CITY = (() => {
         const r = segX(p1, p2, p3, p4);
         if (!r) continue;
         const x = p1[0] + (p2[0] - p1[0]) * r.t, z = p1[1] + (p2[1] - p1[1]) * r.t;
-        if (ints.some(m => Math.hypot(m.x - x, m.z - z) < 9)) continue;
-        ints.push({ x, z, A, B, s, t });
-        if (ints.length >= 90) break outer;
+        raw.push({ x, z, A, B, s, t });
+        if (raw.length >= 700) break outer;   // safety valve
       }
+    }
+    // v2.64: paint the DENSE CORE first. The cap used to fill in road-
+    // order, so the first few streets in the list hoovered the entire
+    // paint budget and the visible core got none.
+    const ccx = cityAnchor ? cityAnchor.x : 0, ccz = cityAnchor ? cityAnchor.z : 0;
+    raw.sort((a, b) => Math.hypot(a.x - ccx, a.z - ccz) - Math.hypot(b.x - ccx, b.z - ccz));
+    const ints = [];
+    for (const m of raw) {
+      if (ints.some(q => Math.hypot(q.x - m.x, q.z - m.z) < 9)) continue;
+      ints.push(m);
+      if (ints.length >= 170) break;   // v2.64: 90→170, center-out
     }
     let stripes = 0;
     for (const m of ints) {
@@ -454,7 +609,7 @@ export const CITY = (() => {
         const span = Math.max(3, Math.min(R.w - 3.4, 6.4));
         const n = Math.max(3, Math.round(span / .92));
         for (let k = 0; k < n; k++) {
-          if (stripes >= 620) break;
+          if (stripes >= 1500) break;   // v2.64: 620→1500 (more painted junctions downtown)
           const q = -span / 2 + (n > 1 ? span * k / (n - 1) : 0);
           const cxk = bx + ux * q, czk = bz + uz * q;
           rib(mark, cxk - prx * stripeLen / 2, czk - prz * stripeLen / 2,
@@ -506,6 +661,7 @@ export const CITY = (() => {
     pitchedRects = [];
     const rnd = _mulberry(hashStr('b' + (city.key || city.name)));
     let si = 0, nTier = 0;
+    let tallest = null;   // v2.64: the skyline crown — track the tallest building
     const tintsUsed = [], roofsUsed = [];
 
     // ---- shared builders -------------------------------------------
@@ -744,6 +900,7 @@ export const CITY = (() => {
         }
       }
       const rec = { poly: p, h, bkey: b.bkey, area, x: cx, z: cz };
+      if (!tallest || h > tallest.h) tallest = { poly: p, h, x: cx, z: cz, area };   // v2.64
       buildingPolys.push(rec);
       if (h >= 18 && area >= 380 && si < 260) {
         const sqm = Math.round(area * .72);
@@ -754,6 +911,21 @@ export const CITY = (() => {
         });
         si++;
       }
+    }
+
+    // ---- v2.64 CITY BEAUTIFUL — the crown: the single tallest -----
+    // building gets a setback crown + slim tapering spire with a red
+    // aviation tip, so every skyline carries one punctuation mark (the
+    // Willis read). Crowns only on towers 55 m+. Emitted into the trim
+    // array BEFORE mesh assembly so the geometry actually ships.
+    if (tallest && tallest.h >= 55) {
+      const yT = .15 + tallest.h;
+      const rr = Math.max(2.6, Math.sqrt(tallest.area / Math.PI) * .34);
+      boxInto(trim, tallest.x, tallest.z, yT, yT + 5.2, rr * .78, rr * .78, jit(colOf(0x9fb4c4), 1.04));
+      boxInto(trim, tallest.x, tallest.z, yT + 5.2, yT + 8.6, rr * .5, rr * .5, jit(colOf(0x8496a8), 1.02));
+      boxInto(trim, tallest.x, tallest.z, yT + 8.6, yT + 16.5, .48, .48, jit(colOf(0x4a4f55), 1));
+      boxInto(trim, tallest.x, tallest.z, yT + 16.5, yT + 21.5, .26, .26, jit(colOf(0x3d4247), 1));
+      boxInto(trim, tallest.x, tallest.z, yT + 21.5, yT + 22.3, .5, .5, colOf(0xc0392b));   // beacon
     }
 
     // ---- assemble meshes -------------------------------------------
@@ -819,14 +991,19 @@ export const CITY = (() => {
     if (antennas.length) {
       const inst = new THREE.InstancedMesh(new THREE.CylinderGeometry(.05, .09, 1, 6),
         new THREE.MeshLambertMaterial({ color: 0x4a4f55 }), antennas.length);
+      // v2.64: aviation-red tips — every mast carries a little beacon
+      const tip = new THREE.InstancedMesh(new THREE.BoxGeometry(.22, .22, .22),
+        new THREE.MeshLambertMaterial({ color: 0xc0392b, emissive: 0x5a1008 }), antennas.length);
       const mat4 = new THREE.Matrix4();
       antennas.forEach((v, i) => {
         mat4.makeScale(1, v[3], 1);
         mat4.setPosition(v[0] - AX, v[1] + v[3] / 2, v[2] - AZ);
         inst.setMatrixAt(i, mat4);
+        mat4.identity(); mat4.setPosition(v[0] - AX, v[1] + v[3] + .11, v[2] - AZ);
+        tip.setMatrixAt(i, mat4);
       });
-      inst.position.set(AX, 0, AZ);   // v2.27: city-local instances
-      group.add(inst);
+      inst.position.set(AX, 0, AZ); tip.position.set(AX, 0, AZ);   // v2.27: city-local instances
+      group.add(inst, tip);
     }
     buildStats = {
       pitched: pitchedRects.length, tiered: nTier, suites: suites.length,
@@ -926,16 +1103,22 @@ export const CITY = (() => {
     }
     const rnd = _mulberry(hashStr('t' + (city.key || city.name)));
     for (const rd of city.roads) {
-      if (rd.cls !== 1 || rd.ped) continue;
+      // v2.64 CITY BEAUTIFUL: avenues (cls 2 — the secondary streets
+      // and the suburb rings) get street trees too, not just residential
+      // lanes: tree-lined boulevards are the single biggest downtown
+      // upgrade. Rings/avenues plant slightly denser and sit just off
+      // the outer walk edge (+4.3) so they never fight the bollard row.
+      const av = rd.cls === 2;
+      if ((rd.cls !== 1 && !av) || rd.ped) continue;
       for (let i = 0; i < rd.pts.length - 1; i++) {
         const [ax, az] = rd.pts[i], [bx, bz] = rd.pts[i + 1];
         const len = Math.hypot(bx - ax, bz - az);
         if (len < 14) continue;
         const ux = (bx - ax) / len, uz = (bz - az) / len;
-        for (let d = 12; d < len; d += 26) {
-          if (rnd() < .45) continue;
+        for (let d = 12; d < len; d += av ? 19 : 26) {
+          if (rnd() < (av ? .3 : .45)) continue;
           const side = rnd() < .5 ? 1 : -1;
-          const off = rd.w / 2 + 3.4;
+          const off = rd.w / 2 + (av ? 4.3 : 3.4);
           const tx = ax + ux * d - uz * off * side, tz = az + uz * d + ux * off * side;
           if (plotAt(tx, tz)) continue;                 // keep trees off purchasable land
           if (pointInBuilding(tx, tz)) continue;        // v2.42: never inside a house either
@@ -1006,13 +1189,13 @@ export const CITY = (() => {
 
     const bolls = [];
     for (const rd of city.roads) {
-      if (rd.cls < 2 || rd.ped || rd.country) continue;   // v2.14: no bollards in the country
+      if (rd.cls < 2 || rd.ped || rd.country || rd.sub) continue;   // v2.14: no bollards in the country; v2.64: none on suburb shoulders either
       for (let i = 0; i < rd.pts.length - 1; i++) {
         const [ax, az] = rd.pts[i], [bx, bz] = rd.pts[i + 1];
         const len = Math.hypot(bx - ax, bz - az);
         if (len < 10) continue;
         const ux = (bx - ax) / len, uz = (bz - az) / len;
-        for (let d = 8; d < len; d += 13) {
+        for (let d = 8; d < len; d += rd.cls === 2 ? 26 : 13) {   // v2.64: sparser on avenues (trees took the curb line)
           const off = rd.w / 2 + 3.7;
           const qx = ax + ux * d - uz * off, qz = az + uz * d + ux * off;
           if (!offAsphalt(qx, qz, 1.4)) continue;   // v2.07: never in a crossing road
@@ -1753,15 +1936,41 @@ export const CITY = (() => {
     };
     const tryPath = pts => {
       for (const p of pts) if (blocked(p[0], p[1])) return null;
+      // v2.64 NO RIDING ON TOP OF ANOTHER ROAD: interior samples must
+      // clear every lane's corridor unless they CROSS it near-perpendic-
+      // ularly (a legitimate junction). Near-parallel + close = overlapping
+      // ribbons — the exact artifact this build removes. The first/last
+      // ~18 m are exempt: that is the connector's own departure/arrival.
+      for (let i = 2; i < pts.length - 2; i++) {
+        const p = pts[i];
+        const ddx = pts[i + 1][0] - pts[i - 1][0], ddz = pts[i + 1][1] - pts[i - 1][1];
+        const dl = Math.hypot(ddx, ddz) || 1;
+        let bad = false;
+        near(p[0], p[1], 30, s => {
+          if (bad) return;
+          const rr = roads[s.ri];
+          if (Math.hypot(s.x - p[0], s.z - p[1]) > (7.5 + rr.w) / 2 - 2) return;
+          if (Math.abs((ddx / dl) * s.dz - (ddz / dl) * s.dx) < .5) bad = true;   // riding along it
+        });
+        if (bad) return null;
+      }
       return pts;
     };
-    const buildPath = (P, Q, tp, tq) => {
+    // Cubic bezier leaving P along tp and arriving at Q ACROSS ITS LANE
+    // (v2.64: the arrival tangent is Q's perpendicular, not Q's course —
+    // arriving along the course made the connector merge INTO Q's asphalt
+    // for up to k meters, two ribbons stacked in one street). Both bow
+    // senses, then mid-perp quadratic bows, then the straight line —
+    // first dry, wall-clear, overlap-free path wins.
+    const buildPath = (P, Q, tp) => {
       const d = Math.hypot(Q.x - P.x, Q.z - P.z) || 1;
       const k = Math.min(90, Math.max(16, d * .3));
+      let tqx = -(Q.dz || 0), tqz = (Q.dx || 0);              // perpendicular to Q's course
+      if (tqx * (P.x - Q.x) + tqz * (P.z - Q.z) < 0) { tqx = -tqx; tqz = -tqz; }   // face P's side
       const cands = [];
       for (const s of [1, -1])
         cands.push(cubic([P.x, P.z], [P.x + tp[0] * k * s, P.z + tp[1] * k * s],
-          [Q.x + tq[0] * k * s, Q.z + tq[1] * k * s], [Q.x, Q.z]));
+          [Q.x + tqx * k * s, Q.z + tqz * k * s], [Q.x, Q.z]));
       const mx = (P.x + Q.x) / 2, mz = (P.z + Q.z) / 2;
       const nx = -(Q.z - P.z) / d, nz = (Q.x - P.x) / d;
       for (const b of [.2, .38]) for (const s of [1, -1])
@@ -1799,14 +2008,25 @@ export const CITY = (() => {
     };
 
     // ---- phase A: the verge — every suburb tip reaches town ----------
+    // v2.64 ONE BRIDGE PER NEIGHBORHOOD: a closed ring fires this pass at
+    // BOTH ends — the same physical point — and clustered radial tips all
+    // used to dive for the same street endpoint, stacking two or three
+    // parallel ribbons on one line. Origins dedupe on a 30 m grid, land-
+    // ings spread along the street edge on a 25 m grid, and a closed
+    // loop only bridges once.
+    const bridgedOrigins = [], landedAt = new Set();
+    const keyOf = (x, z, g) => Math.round(x / g) + ',' + Math.round(z / g);
     for (const r of roads.slice()) {
       if (!r.sub || r.link || r.pts.length < 2) continue;
       for (const e of [0, r.pts.length - 1]) {
         const p = r.pts[e];
+        if (e > 0 && Math.hypot(p[0] - r.pts[0][0], p[1] - r.pts[0][1]) < 30) continue;   // closed loop: one end
         if (Math.hypot(p[0] - ax, p[1] - az) > SUB_R0 + 90) continue;      // outer tips are cul-de-sacs by design
+        if (bridgedOrigins.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < 30)) continue;   // cluster served
         let best = null, bd = 1e9;
         near(p[0], p[1], 360, s => {
           if (roads[s.ri].sub) return;
+          if (landedAt.has(keyOf(s.x, s.z, 25))) return;                    // spread landings along the edge
           const d = Math.hypot(s.x - p[0], s.z - p[1]);
           if (d < bd) { bd = d; best = s; }
         });
@@ -1814,8 +2034,12 @@ export const CITY = (() => {
         const o = e === 0 ? r.pts[1] : r.pts[r.pts.length - 2];
         const L = Math.hypot(p[0] - o[0], p[1] - o[1]) || 1;
         const tp = [(p[0] - o[0]) / L, (p[1] - o[1]) / L];                   // continue the lane's course
-        const path = buildPath({ x: p[0], z: p[1] }, best, tp, [best.dx, best.dz]);
-        if (path) pushConnector(path, roads.indexOf(r), best.ri);
+        const path = buildPath({ x: p[0], z: p[1] }, best, tp);   // v2.64: arrival is perpendicular inside buildPath
+        if (path) {
+          pushConnector(path, roads.indexOf(r), best.ri);
+          bridgedOrigins.push([p[0], p[1]]);
+          landedAt.add(keyOf(best.x, best.z, 25));
+        }
       }
     }
 
@@ -1850,7 +2074,12 @@ export const CITY = (() => {
         pairs.sort((a, b) => a.d - b.d);
         for (let pi = 0; pi < pairs.length && pi < 50 && !joined; pi++) {
           const { s, t } = pairs[pi];
-          const path = buildPath(s, t, [s.dx, s.dz], [t.dx, t.dz]);
+          // v2.64: s and t sit MID-road here — leaving along the road's
+          // own course would run the connector ON the street for the
+          // whole tangent stretch. Depart across it instead.
+          let dpx = -s.dz, dpz = s.dx;
+          if (dpx * (t.x - s.x) + dpz * (t.z - s.z) < 0) { dpx = -dpx; dpz = -dpz; }
+          const path = buildPath(s, t, [dpx, dpz]);
           if (path) { pushConnector(path, s.ri, t.ri); joined = true; }
         }
         if (joined) { groups = comps().sort((a, b) => roadLen(b) - roadLen(a)); }
