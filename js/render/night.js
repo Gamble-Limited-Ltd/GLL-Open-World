@@ -340,11 +340,11 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.62 — DEEP WATER', `
-    <p><b>The ocean is now an oil field — build rigs on the open water.</b></p>
-    <div class="kv"><span class="k">THE SITE</span><span class="v">MINE button → <b>OFFSHORE</b> → BUILD A RIG: pick a spot of open ocean (at least 400 m off any coast, clear of your other rigs) — a $185,000 platform plus <b>260 t of steel and 60 t of stone</b>, steel pulled from your exchange stockpile first</span></div>
-    <div class="kv"><span class="k">THE PUMP</span><span class="v">Hire up to 32 workers — a short crew pumps slower. Crude stacks up in the rig's own <b>2,000 t tank</b>; offload it to the ORE exchange ($2/t freight) and sell it like any resource. Wages and upkeep come due every game day, the field's pressure falls as it drains, and a played-out field leaves salvage</span></div>
-    <div class="kv"><span class="k">YOUR SAVE</span><span class="v">Same <b>openworld-v2</b> save — rigs ride a new <b>rigs</b> field, and older saves keep working untouched</span></div>
+  openModal('Welcome to v2.63 — ONE NETWORK', `
+    <p><b>Every road now reaches every other — the lanes may curve to get there.</b></p>
+    <div class="kv"><span class="k">RINGS→TOWN</span><span class="v">Curved connector lanes tie the suburb rings straight into the downtown streets — the empty grass gap between town and the neighborhoods is gone</span></div>
+    <div class="kv"><span class="k">STRAYS</span><span class="v">Shoreline-clipped arcs and orphaned service roads are knotted back into one web; connectors stay on dry ground and steer around buildings</span></div>
+    <div class="kv"><span class="k">YOUR SAVE</span><span class="v">Same <b>openworld-v2</b> save — roads regenerate as you enter each city, nothing to migrate</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
