@@ -129,6 +129,13 @@ export function loadGame() {
     for (const k of ['Wood', 'Stone', 'Steel', 'Glass']) { const v = +__mt[k]; if (isFinite(v) && v > 0) STATE.mat[k] = +Math.min(1e6, v).toFixed(1); }
     // v2.59 THE GRID: the power state (absent on older saves — grid at par, empty meters)
     STATE.pow = { g: { m: 1, pm: 1 }, b: {} };
+    // v2.62 DEEP WATER: the offshore oil rigs (absent on older saves — none built)
+    STATE.rigs = (p.rigs || []).filter(r => r && typeof r.id === 'string' && r.id.charAt(0) === 'r' && isFinite(+r.x) && isFinite(+r.z) && +r.ore > 0)
+      .slice(0, 8)
+      .map(r => ({ id: r.id.slice(0, 24), name: String(r.name || 'Oil Field').slice(0, 40), x: +r.x || 0, z: +r.z || 0,
+        price: Math.max(0, +r.price || 0), ore: Math.max(0, Math.round(+r.ore || 0)), got: Math.min(Math.max(0, +r.got || 0), Math.max(0, Math.round(+r.ore || 0))),
+        crew: Math.min(32, Math.max(0, r.crew | 0)), walked: !!r.walked, wageAcc: +(+r.wageAcc || 0).toFixed(2),
+        sto: Math.min(2000, Math.max(0, +r.sto || 0)), near: r.near || null, nearKey: r.nearKey || null }));   // crew 0–32 · tank 0–2000 t (same clamps the game enforces)
     const __pw = (p.pow && typeof p.pow === 'object') ? p.pow : {};
     if (__pw.g && typeof __pw.g === 'object') {
       if (isFinite(+__pw.g.m)) STATE.pow.g.m = Math.max(.55, Math.min(1.7, +__pw.g.m));
@@ -184,6 +191,7 @@ export function saveGame() {
       works: (() => { const o = {}; for (const k in (STATE.works || {})) { const v = STATE.works[k] | 0; if (v > 0) o[k] = Math.min(99, v); } return o; })(),   // v2.53 THE WORKS (optional field — older builds ignore it)
       mat: (() => { const o = {}; for (const k of ['Wood', 'Stone', 'Steel', 'Glass']) { const v = +((STATE.mat || {})[k]) || 0; if (isFinite(v) && v > 0) o[k] = +Math.min(1e6, v).toFixed(1); } return o; })(),   // v2.56 GROUND UP (optional field — older builds ignore it)
       pow: (() => { const s = STATE.pow || {}, g = s.g || {}; const o = { g: { m: +(g.m || 1).toFixed(3), pm: +(g.pm || 1).toFixed(3) }, b: {} }; for (const k in (s.b || {})) { const e = s.b[k]; if (e && typeof e === 'object' && (isFinite(+e.m) || e.cut || isFinite(+e.due))) o.b[k] = { m: +Math.min(1e6, Math.max(0, +e.m || 0)).toFixed(1), cut: e.cut ? 1 : 0, due: +Math.min(1e6, Math.max(0, +e.due || 0)).toFixed(2) }; } return o; })(),   // v2.59 THE GRID (optional field — older builds ignore it)
+      rigs: (STATE.rigs || []).map(r => ({ id: r.id, name: r.name, x: +r.x || 0, z: +r.z || 0, price: +r.price || 0, ore: Math.round(+r.ore || 0), got: +(+r.got || 0).toFixed(1), crew: r.crew | 0, walked: !!r.walked, wageAcc: +(+r.wageAcc || 0).toFixed(2), sto: +(+r.sto || 0).toFixed(1), near: r.near || null, nearKey: r.nearKey || null })),   // v2.62 DEEP WATER (optional field — older builds ignore it)
       market: STATE.market ? STATE.market.pack() : null,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(pack));
