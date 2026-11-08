@@ -38,6 +38,7 @@ import { __late as exchLate, EXCH } from './systems/exchange.js';
 import { WORKS } from './systems/works.js';
 import { BLD } from './systems/builder.js';
 import { FACT } from './systems/factory.js';   // v2.61 FACTORY FLOOR — after builder (rides its live shells); wraps the click/empire/update chains
+import { OIL } from './systems/oilrig.js';      // v2.62 DEEP WATER — after factory (outermost in the click chain); wraps the click/hover/mine-panel/empire/update chains
 import { FURN } from './systems/furniture.js';
 import { PWR } from './systems/power.js';
 
@@ -57,4 +58,4 @@ rivLate({ EXCH, BLD, FURN });
 exchLate({ WORKS });
 
 try { NIGHT.settle(); } catch (e) { console.error('[night]', e); }   // v2.55 NIGHT SHIFT: settle the offline gap — invoked here, at the END of the module, so ECO/MINE/WORKS are all up (the boot screen blocks until the ready log, so no click can beat it)
-console.log('%cOPEN WORLD v2.61 — FACTORY FLOOR', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.62 — DEEP WATER', 'color:#38BDF8;font-weight:700', 'ready.');
