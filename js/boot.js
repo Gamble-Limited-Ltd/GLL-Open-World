@@ -58,4 +58,4 @@ rivLate({ EXCH, BLD, FURN });
 exchLate({ WORKS });
 
 try { NIGHT.settle(); } catch (e) { console.error('[night]', e); }   // v2.55 NIGHT SHIFT: settle the offline gap — invoked here, at the END of the module, so ECO/MINE/WORKS are all up (the boot screen blocks until the ready log, so no click can beat it)
-console.log('%cOPEN WORLD v2.62 — DEEP WATER', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.64 — CLEAN STREETS', 'color:#38BDF8;font-weight:700', 'ready.');
