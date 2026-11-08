@@ -131,16 +131,23 @@ export const NIGHT = (() => {
       }
     }
 
+    // v2.62 DEEP WATER: the rigs pump into their own tanks while you
+    // sleep (no auto-sale — the crude waits for the exchange), running
+    // costs come due day by day, and a full tank lays the crew up for
+    // the night (the mine's night-off rule, applied to tanks)
+    let oilT = 0, oilW = 0, oilU = 0; const oilWalk = [], oilOut = [], oilFull = [];
+    if (window.OIL) { try { const r = OIL.nightSettle(days); if (r) { oilT = r.pumped || 0; oilW = r.wages || 0; oilU = r.upkeep || 0; oilWalk.push(...(r.walked || [])); oilOut.push(...(r.out || [])); oilFull.push(...(r.full || [])); } } catch (er) { } }
+
     vendInc = +vendInc.toFixed(2);
     // v2.56 GROUND UP: the sites rise while you sleep — time works, no wages due
     let bDays = 0, bDone = 0;
     if (days > 0 && window.BLD) { try { const r = BLD.advance(days); bDays = r.days; bDone = r.done; } catch (er) { } }
     STATE.money = +STATE.money.toFixed(2);
-    const net = +(vendInc + sold - wages - pwrBill).toFixed(2);
+    const net = +(vendInc + sold - wages - pwrBill - oilW - oilU).toFixed(2);
     if (net > 0) STATE.gdp += net;
     try { uiBalance(); } catch (e) { }
 
-    if (!cartN && !dug && !walked.length && !workedOut.length && !nightOff.length && !bDays && !pwrBill && !pwrCut.length) return null;   // no workers, no shift, no card (sites still rise silently)
+    if (!cartN && !dug && !walked.length && !workedOut.length && !nightOff.length && !bDays && !pwrBill && !pwrCut.length && !oilT && !oilWalk.length && !oilOut.length && !oilFull.length) return null;   // no workers, no shift, no card (sites still rise silently)
     summary = {
       awayMs: away, capped, days, mins: Math.round(mins),
       cartN, vendN, vendInc: Math.round(vendInc),
@@ -148,6 +155,7 @@ export const NIGHT = (() => {
       walked, workedOut, nightOff, net: Math.round(net),
       bdays: bDays, bdone: bDone,   // v2.56 GROUND UP: the construction sites
       pwr: pwrBill, pcut: pwrCut,   // v2.59 THE GRID: the night's power bills
+      oilT: Math.round(oilT * 10) / 10, oilW: Math.round(oilW), oilU: Math.round(oilU), oilWalk, oilOut, oilFull,   // v2.62 DEEP WATER: the rigs' night
     };
     return summary;
   }
@@ -161,12 +169,17 @@ export const NIGHT = (() => {
     if (s.vendN) rows += '<div class="kv"><span class="k">VENDORS</span><span class="v g">+' + fmt$(s.vendInc) + ' — ' + s.vendN + ' vendor' + (s.vendN > 1 ? 's' : '') + ' served the night crowd across ' + s.cartN + ' cart' + (s.cartN > 1 ? 's' : '') + '</span></div>';
     if (s.dug) rows += '<div class="kv"><span class="k">CREWS</span><span class="v g">+' + fmt$(s.sold) + ' — dug ' + s.dug.toLocaleString('en-US') + ' t of ore; the night buyer paid par for every tonne</span></div>';
     if (s.bdays) rows += '<div class="kv"><span class="k">SITES</span><span class="v g">+' + s.bdays + ' game day' + (s.bdays > 1 ? 's' : '') + ' of construction' + (s.bdone ? ' — ' + s.bdone + ' building' + (s.bdone > 1 ? 's' : '') + ' topped out' : '') + '</span></div>';   // v2.56 GROUND UP
+    if (s.oilT) rows += '<div class="kv"><span class="k">RIGS</span><span class="v g">' + s.oilT.toLocaleString('en-US') + ' t of crude pumped into the tanks — waiting for the exchange, not sold</span></div>';   // v2.62 DEEP WATER
     if (s.wages) rows += '<div class="kv"><span class="k">WAGES</span><span class="v">-' + fmt$(s.wages) + ' — payday came due as always</span></div>';
     if (s.pwr) rows += '<div class="kv"><span class="k">POWER</span><span class="v">-' + fmt$(s.pwr) + ' — the grid took its kilowatts' + ((s.pcut || []).length ? ' · <b>' + s.pcut.length + ' cart' + (s.pcut.length > 1 ? 's' : '') + ' cut off</b> — pay at the POWER panel' : '') + '</span></div>';   // v2.59 THE GRID
+    if (s.oilW || s.oilU) rows += '<div class="kv"><span class="k">RIG COSTS</span><span class="v">-' + fmt$(s.oilW + s.oilU) + ' — the crews and the marine upkeep</span></div>';   // v2.62 DEEP WATER
     for (const n of s.walked) rows += '<div class="kv"><span class="k">WALKED OFF</span><span class="v">The ' + n + ' crew — payday came up short. Re-hire them when your balance can cover the wages</span></div>';
     for (const n of s.workedOut) rows += '<div class="kv"><span class="k">WORKED OUT</span><span class="v">' + n + ' — the assay ran dry and the crew was released</span></div>';
     for (const n of s.nightOff) rows += '<div class="kv"><span class="k">NIGHT OFF</span><span class="v">' + n + ' — the dig at par wouldn\'t cover the wages, so the crew got the night off</span></div>';
-    rows += '<div class="kv" style="margin-top:6px"><span class="k">NET</span><span class="v g" style="font-size:1.15em">+' + fmt$(s.net) + '</span></div>';
+    for (const n of (s.oilWalk || [])) rows += '<div class="kv"><span class="k">RIGS OFF</span><span class="v">The ' + n + ' crew — payday came up short offshore. Re-hire them from the rig when you can cover the running costs</span></div>';   // v2.62 DEEP WATER
+    for (const n of (s.oilOut || [])) rows += '<div class="kv"><span class="k">PLAYED OUT</span><span class="v">' + n + ' — the field ran dry and the crew was released. Salvage the steel at the rig</span></div>';   // v2.62 DEEP WATER
+    for (const n of (s.oilFull || [])) rows += '<div class="kv"><span class="k">TANKS FULL</span><span class="v">' + n + ' laid the crew up — the tank filled, so nothing pumped and nothing was charged. Offload the crude to pump on</span></div>';   // v2.62 DEEP WATER
+    rows += '<div class="kv" style="margin-top:6px"><span class="k">NET</span><span class="v g" style="font-size:1.15em">' + (s.net >= 0 ? '+' : '') + fmt$(s.net) + '</span></div>';   // v2.62: signed — a costly night reads honestly
     if (s.capped) rows += '<div class="kv"><span class="k">THE CAP</span><span class="v">You were away ' + awayLabel + ' — the night shift pays the first 24 hours</span></div>';
     openModal('🌙 While You Were Away', `
       <p>You were gone <b>${awayLabel}</b> — <b>${s.days}</b> game day${s.days > 1 ? 's' : ''} of night shift, and your hired hands kept the money moving:</p>
@@ -327,11 +340,11 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.61 — FACTORY FLOOR', `
-    <p><b>Your factory shells can now be filled with working machines — the floor is open.</b></p>
-    <div class="kv"><span class="k">THE SHOP</span><span class="v">Click a finished factory shell → <b>MACHINES</b> — six new heavy machines from a $26,000 Packaging Station to a $160,000 Injection Molder, plus the six classics (vending to server rack): twelve machines can stand on one floor</span></div>
-    <div class="kv"><span class="k">THE FLOOR</span><span class="v">Pick one and click to set it down — the shell itself fades to a cutaway so you can see inside; machines pay every day (~45-day payback), count in WORTH, and sell back for 60%</span></div>
-    <div class="kv"><span class="k">YOUR SAVE</span><span class="v">Same <b>openworld-v2</b> save — factory machines ride the building entries, and older saves keep working untouched</span></div>
+  openModal('Welcome to v2.62 — DEEP WATER', `
+    <p><b>The ocean is now an oil field — build rigs on the open water.</b></p>
+    <div class="kv"><span class="k">THE SITE</span><span class="v">MINE button → <b>OFFSHORE</b> → BUILD A RIG: pick a spot of open ocean (at least 400 m off any coast, clear of your other rigs) — a $185,000 platform plus <b>260 t of steel and 60 t of stone</b>, steel pulled from your exchange stockpile first</span></div>
+    <div class="kv"><span class="k">THE PUMP</span><span class="v">Hire up to 32 workers — a short crew pumps slower. Crude stacks up in the rig's own <b>2,000 t tank</b>; offload it to the ORE exchange ($2/t freight) and sell it like any resource. Wages and upkeep come due every game day, the field's pressure falls as it drains, and a played-out field leaves salvage</span></div>
+    <div class="kv"><span class="k">YOUR SAVE</span><span class="v">Same <b>openworld-v2</b> save — rigs ride a new <b>rigs</b> field, and older saves keep working untouched</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -396,6 +409,7 @@ function openHelp() {
     <div class="kv"><span class="k">EMPIRE</span><span class="v">avatar (top right) → TELEPORT to any plot you own</span></div>
     <div class="kv"><span class="k">BUILD</span><span class="v g">BUILD button → pick a house, shop, apartment block or factory shell, stock the materials (wood & stone at the yard; steel & glass at the yard or pulled from your ore-exchange stockpile), then PLACE — a 1 m grid overlays your plot, a ghost follows the cursor and a click sites it; buildings rise over real game days, pay every day and demolish back to 60% of their materials</span></div>
     <div class="kv"><span class="k">FACTORIES</span><span class="v g">Click a finished factory shell → MACHINES: twelve machines can stand on its floor — six heavy (packaging station, CNC, stamping press, assembly line, weld cell, injection molder) plus the six classics — each pays every day; the shell fades to a cutaway while you place them, and selling back pays 60%</span></div>   <!-- v2.61 FACTORY FLOOR -->
+    <div class="kv"><span class="k">OFFSHORE</span><span class="v g">MINE button → OFFSHORE → BUILD A RIG on open ocean (400 m off any coast, clear of your other rigs): $185,000 + 260 t steel + 60 t stone, then hire up to 32 workers — crude pumps into the rig's own 2,000 t tank (a short crew pumps slower), wages and upkeep come due daily, pressure falls as the field drains, and OFFLOAD moves the crude to the Ore Exchange for $2/t freight — decommission salvages 60%</span></div>   <!-- v2.62 DEEP WATER -->
     <div class="kv"><span class="k">FURNISH</span><span class="v g">Hold a room or floor? FURNISH in its panel opens the furniture shop — craft pieces from shed materials or buy with cash, click to place (<b>R</b> rotates the ghost), and click any placed piece to turn, move or sell it back for 60% — computers sit on desks (place the desk first)</span></div>
     <div class="kv"><span class="k">POWER</span><span class="v g">POWER button → every cart you run draws power — the meter spins, the grid bills each game day at a price that moves, and an unpaid bill cuts the power and the income until you pay (PAY &amp; RECONNECT at the cart’s panel or the POWER panel)</span></div>   <!-- v2.59 THE GRID -->
     <div class="kv"><span class="k">SERVE</span><span class="v">[E] when standing at your cart</span></div>
@@ -472,7 +486,8 @@ function buildTicker() {
       + (window.EXCH ? EXCH.stockValue() : 0)
       + (window.BLD ? BLD.valueOf() : 0)
       + (window.FACT ? FACT.valueOf() : 0)
-      + (window.FURN ? FURN.valueOfRooms() : 0));   // v2.51 MONEY LIST + v2.52 ORE EXCHANGE + v2.56 GROUND UP · v2.57 FURNITURE · v2.61 FACTORY FLOOR: one formula feeds the ticker chip and the board
+      + (window.FURN ? FURN.valueOfRooms() : 0)
+      + (window.OIL ? OIL.valueOf() : 0));   // v2.51 MONEY LIST + v2.52 ORE EXCHANGE + v2.56 GROUND UP · v2.57 FURNITURE · v2.61 FACTORY FLOOR · v2.62 DEEP WATER: one formula feeds the ticker chip and the board
     track.innerHTML = items +
       `<span class="tk"><span class="s g">GDP</span><span class="p">${fmtK(STATE.gdp)}</span><span class="up">▲</span></span>` +
       `<span class="tk"><span class="s o">WORTH</span><span class="p">${fmtK(worth)}</span><span class="up">${window.RIVALS ? '#' + RIVALS.rankNo() + '/' + RIVALS.count() : ''}</span></span>` +   // v2.51 MONEY LIST: your live rank rides the WORTH chip
