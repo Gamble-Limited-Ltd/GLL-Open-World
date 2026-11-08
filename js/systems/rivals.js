@@ -95,7 +95,8 @@ export const RIVALS = (() => {
       + (window.EXCH ? EXCH.stockValue() : 0)
       + (window.BLD ? BLD.valueOf() : 0)
       + (window.FACT ? FACT.valueOf() : 0)
-      + (window.FURN ? FURN.valueOfRooms() : 0);   // v2.52 ORE EXCHANGE · v2.56 GROUND UP · v2.57 FURNITURE · v2.61 FACTORY FLOOR
+      + (window.FURN ? FURN.valueOfRooms() : 0)
+      + (window.OIL ? OIL.valueOf() : 0);   // v2.52 ORE EXCHANGE · v2.56 GROUND UP · v2.57 FURNITURE · v2.61 FACTORY FLOOR · v2.62 DEEP WATER (platforms + tanked crude at par)
   }
 
   // the board: sixteen rows, richest first, you among them
