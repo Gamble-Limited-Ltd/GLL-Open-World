@@ -50,6 +50,7 @@ export const WF = (() => {
   const DISPOSE_R = MAX_R + 450;        // fixed hysteresis — no churn on zoom cycles
 
   const chunks = new Map();             // 'cx,cz' -> group | null (null = built empty)
+  let shown = true;                      // v2.66 PICTURE: the TREES lever — false hides every standing forest chunk (and any new one)
   let queue = [], lastUpd = 0, root = null, trees = 0;
 
   const wcol = hex => { const c = new THREE.Color(hex); return [c.r, c.g, c.b]; };
@@ -175,6 +176,7 @@ export const WF = (() => {
     if (B.count < 6) return;
     const cg = new THREE.Group();
     cg.add(B.mesh());
+    cg.visible = shown;                  // v2.66 PICTURE: respect the TREES lever as chunks stream in
     if (root) root.add(cg);
     chunks.set(key, cg);
   }
@@ -241,7 +243,13 @@ export const WF = (() => {
     }
     return { trees, badCity, badWater, badRoad };
   }
-  return { tick, reset, audit, get count() { return chunks.size; }, get meshed() { let n = 0; for (const v of chunks.values()) if (v) n++; return n; }, get trees() { return trees; },
+  // v2.66 PICTURE: the TREES lever — flip every standing chunk now; the
+  // flag also gates every chunk built after (build() reads it).
+  function setShown(on) {
+    shown = !!on;
+    for (const g of chunks.values()) if (g) g.visible = shown;
+  }
+  return { tick, reset, audit, setShown, get shown() { return shown; }, get count() { return chunks.size; }, get meshed() { let n = 0; for (const v of chunks.values()) if (v) n++; return n; }, get trees() { return trees; },
     // QA: world-frame data of every standing forest chunk (null = built empty)
     get debug() { return [...chunks.entries()].map(([k, g]) => g ? { k, x: g.children[0].position.x, z: g.children[0].position.z, verts: g.children[0].geometry.attributes.position.count } : { k, empty: true }); } };
 })();
