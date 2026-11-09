@@ -4,7 +4,7 @@
 // ====================================================================
 import * as THREE from 'three';
 import { ECON } from '../config.js';
-import { _ihash, _mulberry, _polyArea, hashStr } from '../util.js';
+import { _ihash, _mulberry, _polyArea, hashStr, cityDNA } from '../util.js';
 import { LANDGEO } from '../core.js';
 import { WORLD } from '../world/world.js';
 
@@ -651,6 +651,7 @@ export const CITY = (() => {
   // roofs with dormers + chimneys, wedding-cake setbacks, cornices,
   // bulkheads, parapets, water tanks, antennas) -----------------------
   function buildBuildings(city) {
+    const dna = cityDNA(city);   // v2.65 CITY DNA
     const wallArrs = [0, 1, 2, 3].map(() => ({ pos: [], norm: [], uv: [], col: [] }));
     const shops = { pos: [], norm: [], uv: [], col: [] };
     const roofs = { pos: [], norm: [], uv: [], col: [] };    // decks, parapets, cornices
@@ -843,25 +844,29 @@ export const CITY = (() => {
       const cz = p.reduce((s, v) => s + v[1], 0) / p.length;
       const h = b.h;
       // ---- per-building style roll (deterministic by bkey) ----
+      // v2.65 CITY DNA: the city's warm↔cool bias rides the existing
+      // height-driven palette odds, and every palette draw comes from
+      // the city's ROTATED slice — downtowns stop wearing the same colors
       const srnd = _mulberry(hashStr('s' + b.bkey));
-      const warmP = Math.min(.94, Math.max(.34, 1.15 - h / 44));
+      const warmP = Math.min(.96, Math.max(.06, 1.15 - h / 44 + dna.warm));
       const PAL = srnd() < warmP ? PAL_WARM : PAL_COOL;
       // walls push past white (vertex colors >1 are legal) so the pastel
       // palette reads BRIGHT against the reference, not muted mid-tone
-      const tint = jit(colOf(PAL[Math.floor(srnd() * PAL.length)]), 1.28 + srnd() * .14);
+      const tint = jit(colOf(PAL[(Math.floor(srnd() * PAL.length) + dna.palOff) % PAL.length]), 1.28 + srnd() * .14);
       const shopTint = h >= 8.5 ? tint.clone().lerp(colOf(0xffffff), .5) : null;
       const y0 = shopTint ? 3.55 : .15;
       const sr = srnd();
-      let style;                                        // facade system by scale
-      if (h >= 26) style = sr < .58 ? 1 : 3;            // towers: curtain or pre-war bays
-      else if (h >= 12) style = sr < .38 ? 0 : sr < .68 ? 3 : 2;
-      else style = sr < .55 ? 0 : 2;                    // low-rise: classic or punched
+      let style;                                        // facade system by scale + the city's glass bias
+      if (h >= 26) style = sr < Math.max(.2, Math.min(.9, .58 + dna.glass)) ? 1 : 3;   // towers: curtain or pre-war bays
+      else if (h >= 12) style = sr < Math.max(.1, Math.min(.6, .38 - dna.glass * .8)) ? 0
+        : sr < Math.max(.2, Math.min(.9, .68 + dna.glass * .5)) ? 3 : 2;
+      else style = sr < .55 ? 0 : 2;                   // low-rise: classic or punched
       const uOff = Math.floor(srnd() * 16);             // shift lit-window pattern
       const vOff = Math.floor(srnd() * 4);
-      const deckC = jit(colOf(ROOF_DECKS[Math.floor(srnd() * ROOF_DECKS.length)]), .84 + srnd() * .18);
-      const rimC = jit(colOf(TRIMS[Math.floor(srnd() * TRIMS.length)]), .9 + srnd() * .2);
+      const deckC = jit(colOf(ROOF_DECKS[(Math.floor(srnd() * ROOF_DECKS.length) + dna.palOff) % ROOF_DECKS.length]), .84 + srnd() * .18);
+      const rimC = jit(colOf(TRIMS[(Math.floor(srnd() * TRIMS.length) + dna.palOff) % TRIMS.length]), .9 + srnd() * .2);
       const trimC = jit(rimC, 1.1);
-      const shinC = jit(colOf(SHINGLES[Math.floor(srnd() * SHINGLES.length)]), .9 + srnd() * .2);
+      const shinC = jit(colOf(SHINGLES[(Math.floor(srnd() * SHINGLES.length) + dna.palOff) % SHINGLES.length]), .9 + srnd() * .2);
       // ---- silhouette roll ----
       let obb = null;
       if (h <= 16.5 && area >= 60 && p.length <= 8) obb = obbOf(p);
@@ -1020,6 +1025,7 @@ export const CITY = (() => {
 
   // ---------- greens, water, park paths, trees, bollards ------------
   function buildGreensWater(city) {
+    const dna = cityDNA(city);   // v2.65 CITY DNA: greenery density
     const flat = (polys, hex, y) => {
       if (!polys || !polys.length) return;
       const arr = { pos: [], norm: [], uv: [], col: [] };
@@ -1093,7 +1099,7 @@ export const CITY = (() => {
       const poly = gp.poly;
       if (!poly) continue;
       const area = Math.abs(_polyArea(poly));
-      const n = Math.min(34, Math.floor(area / 340));
+      const n = Math.min(34, Math.floor(area / 340 * Math.max(.55, dna.green)));   // v2.65: the city's greenery rides the park fill
       const cx = poly.reduce((s, v) => s + v[0], 0) / poly.length, cz = poly.reduce((s, v) => s + v[1], 0) / poly.length;
       for (let i = 0; i < n; i++) {
         const r = Math.sqrt(area / Math.PI) * .68 * Math.sqrt((i + 1) / (n + 1));
@@ -1116,7 +1122,7 @@ export const CITY = (() => {
         if (len < 14) continue;
         const ux = (bx - ax) / len, uz = (bz - az) / len;
         for (let d = 12; d < len; d += av ? 19 : 26) {
-          if (rnd() < (av ? .3 : .45)) continue;
+          if (rnd() < Math.min(.8, (av ? .3 : .45) * dna.green)) continue;   // v2.65: green cities line their streets, dry ones stay bare
           const side = rnd() < .5 ? 1 : -1;
           const off = rd.w / 2 + (av ? 4.3 : 3.4);
           const tx = ax + ux * d - uz * off * side, tz = az + uz * d + ux * off * side;
@@ -1560,10 +1566,11 @@ export const CITY = (() => {
     group.add(plotGroup);
     const rnd = _mulberry(hashStr('p' + (city.key || city.name)));
     const tierMult = { 1: 1, 2: 1.35, 3: 1.8 }[city.tier || 2];
+    const dna = cityDNA(city);   // v2.65: street length rides the ring — metros list more vendor spots
     const axc = cityAnchor ? cityAnchor.x : 0, azc = cityAnchor ? cityAnchor.z : 0;
     const seen = [];
     const PW = 3.4, PD = 9.5;                 // across the walk / along the road
-    const MAXN = isMob ? 70 : 150;            // v2.09: was 24 — way more spots
+    const MAXN = isMob ? 70 : Math.min(170, Math.round(150 * (0.78 + 0.22 * dna.sub)));   // v2.09: was 24 — way more spots · v2.65: DNA-scaled
     let n = 0;
     outer:
     for (let rdx = 0; rdx < city.roads.length; rdx++) {
@@ -1791,20 +1798,29 @@ export const CITY = (() => {
   // inspector opens it too (houses list their ROOMS). The chunk pass's
   // wild content (belt trees, groves, paddocks, rocks, ponds) moves out
   // past the ring, so nothing wild grows in the yards.
-  const SUB_R0 = 865, SUB_R1 = 2360;   // the ring (CITY_R 745 + verge → +1615)
+  const SUB_R0 = 865, SUB_R1 = 2360;   // the ring (CITY_R 745 + verge → +1615) — v2.65: the base every city's DNA scales
   let suburbRec = null;
   let suburbGroup = null;              // v2.42: distance-LOD host (houses/trees/cars)
   const SUB_TREES = ['Maple', 'Oak', 'Cedar', 'Elm', 'Pine', 'Birch', 'Willow', 'Aspen', 'Rowan', 'Poplar', 'Hawthorn', 'Juniper'];
   const SUB_KINDS = ['Lane', 'Street', 'Drive', 'Court', 'Way', 'Terrace', 'Circle', 'Road'];
 
   function addSuburbRoads(meta, ax, az) {
+    const dna = cityDNA(meta);
     const rnd = _mulberry(hashStr('sub' + (meta.key || meta.name)));
     const out = [];
     const rot = rnd() * 6.2832;                    // the whole ring turns per city
-    // six collector rings (cls 2): polygonal circles, a point every ≤44 m,
-    // radii wobbling ±18 m so no ring ever reads as a perfect circle
-    for (let i = 0; i < 6; i++) {
-      const r = 880 + i * 280 + (rnd() - .5) * 70;
+    // collector rings (cls 2): polygonal circles, a point every ≤44 m,
+    // radii wobbling ±18 m so no ring ever reads as a perfect circle.
+    // v2.65 CITY DNA: the COUNT and REACH are the city's own — a small
+    // town loops 4–5 tight rings inside ~1.5 km, a metro lays up to 8
+    // out past 3 km. Ring 0 stays pinned at 880 m (the accepted downtown
+    // verge — it never creeps onto the plate), and the last ring lands
+    // 80 m inside the suburb edge, exactly the v2.64 2280/2360 pair
+    // whenever sub = 1, rings = 6.
+    const R0 = 880, R1 = Math.max(R0 + 180, dna.subR1 - 80);
+    for (let i = 0; i < dna.rings; i++) {
+      const fr = dna.rings > 1 ? i / (dna.rings - 1) : 0;
+      const r = R0 + fr * (R1 - R0) + (rnd() - .5) * 70;
       const n = Math.max(48, Math.ceil(6.2832 * r / 44));
       const a0 = rot + i * .22, pts = [];
       for (let k = 0; k <= n; k++) {
@@ -1815,13 +1831,14 @@ export const CITY = (() => {
       out.push({ pts, w: 11.5, cls: 2, sub: 1,
         name: (i + 1) + ' ' + SUB_TREES[Math.floor(rnd() * SUB_TREES.length)] + ' Ring' });
     }
-    // sixteen radial lanes (cls 1), each with its own gentle bow
-    for (let i = 0; i < 16; i++) {
-      const a = rot + i / 16 * 6.2832 + (rnd() - .5) * .06;
+    // radial lanes (cls 1), each with its own gentle bow — count and
+    // reach from the DNA (was a flat sixteen)
+    for (let i = 0; i < dna.radials; i++) {
+      const a = rot + i / dna.radials * 6.2832 + (rnd() - .5) * .06;
       const bow = (rnd() - .5) * 70;
       const pts = [];
       for (let k = 0; k <= 10; k++) {
-        const t = k / 10, r = SUB_R0 + t * (SUB_R1 - SUB_R0);
+        const t = k / 10, r = SUB_R0 + t * (dna.subR1 - SUB_R0);
         const aa = a + Math.sin(t * 3.1416) * (bow / Math.max(r, 1));
         pts.push([ax + Math.cos(aa) * r, az + Math.sin(aa) * r]);
       }
@@ -2095,13 +2112,19 @@ export const CITY = (() => {
 
   function buildSuburbs(city) {
     suburbRec = { roads: 0, houses: 0, trees: 0, lamps: 0, cars: 0, verts: 0 };
+    const dna = cityDNA(city);   // v2.65 CITY DNA
     const subRoads = roads.filter(r => r.sub);
     if (!subRoads.length) return;
     suburbRec.roads = subRoads.length;
     suburbGroup = new THREE.Group();   // v2.42: gated by view distance (see the WORLD.update wrap)
     const rnd = _mulberry(hashStr('sb' + (city.key || city.name)));
     const axc = cityAnchor ? cityAnchor.x : 0, azc = cityAnchor ? cityAnchor.z : 0;
-    const MAXH = isMob ? 420 : (city.tier === 3 ? 950 : city.tier === 1 ? 640 : 820);
+    // v2.65 CITY DNA: the house cap rides the ring's AREA (sub²) — a metro
+    // that sprawls 40% wider grows ~2× the houses, a town that tightens
+    // sheds them (capped at 1600 so the merged buffers stay bounded)
+    const MAXH = Math.min(1600, Math.round((isMob ? 420 : (city.tier === 3 ? 950 : city.tier === 1 ? 640 : 820)) * dna.sub * dna.sub));
+    // v2.65: warm↔cool house palette + the city's rotated slice of it
+    const warmP = Math.max(.12, Math.min(.95, .62 + dna.warm));
     const wall = { pos: [], norm: [], uv: [], col: [] };   // style-2 punched-residential walls
     const roof = { pos: [], norm: [], uv: [], col: [] };   // pitches, gables, dormers, chimneys, doors
     const flat = { pos: [], norm: [], uv: [], col: [] };   // lawns + driveways
@@ -2209,7 +2232,11 @@ export const CITY = (() => {
       return dOf(a) - dOf(b);
     });
     for (const rd of ordered) {
-      const LOTW = 21 + rnd() * 6;
+      // v2.65 CITY DNA: lot width rides the villa scale — compact rows
+      // in dense towns, generous lots in villa country
+      const LOTW = Math.min(40, (21 + rnd() * 6) * dna.villa);
+      // v2.65: the town-outward fill profile scales with the ring itself
+      const fill1 = SUB_R0 + 620 * dna.sub, fill2 = SUB_R0 + 1180 * dna.sub;
       let arc = 0, next = rnd() * 9;               // cumulative arc walk (buildEdgePlots' pattern)
       for (let i = 0; i < rd.pts.length - 1 && placed < MAXH; i++) {
         const A = rd.pts[i], B = rd.pts[i + 1];
@@ -2222,9 +2249,9 @@ export const CITY = (() => {
           for (const side of [1, -1]) {
             if (placed >= MAXH) break;
             const rr = Math.hypot(A[0] + ux * d - axc, A[1] + uz * d - azc);
-            const fill = rr < SUB_R0 + 620 ? .92 : rr < SUB_R0 + 1180 ? .7 : .52;
+            const fill = rr < fill1 ? .92 : rr < fill2 ? .7 : .52;
             if (rnd() > fill) continue;
-            const depth = 26 + rnd() * 8;
+            const depth = Math.min(40, (26 + rnd() * 8) * dna.villa);
             const off0 = rd.w / 2 + 1.75 + 1.2;    // past the sidewalk
             const lotHW = LOTW / 2 - .7, lotHD = depth / 2;
             const ov = off0 + depth / 2;
@@ -2248,14 +2275,18 @@ export const CITY = (() => {
             if (!lotGrid.has(gkk)) lotGrid.set(gkk, []);
             lotGrid.get(gkk).push([lx, lz, lotHW, lotHD]);
             // ---- the house ------------------------------------------
-            const HW = 8.5 + rnd() * 4.5, HD = 6.5 + rnd() * 3;
-            const hh = rnd() < .3 ? 7 + rnd() * .9 : 4.4 + rnd() * 1.5;
+            // v2.65 CITY DNA: villa scale on the footprint, height
+            // character on the two-story odds
+            const HW = Math.min(17, (8.5 + rnd() * 4.5) * dna.villa), HD = Math.min(14, (6.5 + rnd() * 3) * dna.villa);
+            const hh = rnd() < Math.min(.5, .3 * dna.tall) ? 7 + rnd() * .9 : 4.4 + rnd() * 1.5;
             const back = rnd() * Math.max(2, depth - HD - 8);
             const hv = off0 + 6.5 + back + HD / 2;
             const hx = A[0] + ux * d + px * hv * side, hz = A[1] + uz * d + pz * hv * side;
             const srnd = _mulberry(hashStr('h' + (city.key || 'c') + placed));
-            const tint = jit(colOf(PAL_WARM[Math.floor(srnd() * PAL_WARM.length)]), 1.24 + srnd() * .16);
-            const shinC = jit(colOf(SHINGLES[Math.floor(srnd() * SHINGLES.length)]), .9 + srnd() * .2);
+            // v2.65: warm↔cool palette choice + the city's rotated slice
+            const HPAL = srnd() < warmP ? PAL_WARM : PAL_COOL;
+            const tint = jit(colOf(HPAL[(Math.floor(srnd() * HPAL.length) + dna.palOff) % HPAL.length]), 1.24 + srnd() * .16);
+            const shinC = jit(colOf(SHINGLES[(Math.floor(srnd() * SHINGLES.length) + dna.palOff) % SHINGLES.length]), .9 + srnd() * .2);
             const uOff = Math.floor(srnd() * 16), vOff = Math.floor(srnd() * 4);
             let hp = [
               [hx - ux * HW / 2 - px * HD / 2, hz - uz * HW / 2 - pz * HD / 2],
@@ -2975,6 +3006,7 @@ export const CITY = (() => {
     get buildingPolys() { return buildingPolys; },   // v2.21: world-space, water-filtered — the dense-core spawn reads this
     get suburb() { return suburbRec; },              // v2.42: the neighborhood census (houses/verts/trees…)
     get suburbGroup() { return suburbGroup; },       // v2.42: distance-LOD host
+    get dna() { return cityRec ? cityDNA(cityRec) : null; },   // v2.65: the standing city's DNA (QA)
   };
 })();
 
