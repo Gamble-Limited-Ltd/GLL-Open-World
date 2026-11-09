@@ -23,6 +23,7 @@ export const STATE = {
   rigs: [],                      // v2.62 DEEP WATER: the offshore oil rigs {id, name, x, z, price, ore, got, crew, walked, wageAcc, sto, near, nearKey} — tanked crude + the field's reserve
   mat: { Wood: 0, Stone: 0, Steel: 0, Glass: 0 },   // v2.56 GROUND UP: the materials shed — tonnes of wood/stone/steel/glass for construction
   pow: { g: { m: 1, pm: 1 }, b: {} },   // v2.59 THE GRID: the power state — grid price multiplier {m, pm} + per-business meters {plotId: {m, cut, due}}
+  gfx: { shadows: true, trees: true, scale: 1, lite: false },   // v2.66 PICTURE: the graphics levers behind the Help tab's GRAPHICS button — saved with the world
   market: null,                  // MARKET module state (positions/orders)
   lastCityKey: null,
   seenNews: false,
