@@ -28,8 +28,8 @@ import { TUT } from '../systems/tutorial.js';
 import { bootEl, camera, canvas, clampPan, enterBtn, enterWorld, landAtWorld, leftCity, pnameEl, renderer, returnToGlobe, skyDome, sun, walkIntoCity, worldScene } from '../render/main.js';
 
 // ---- late binding (boot binds after every module evaluates) --------
-export let PWR, MINE, BLD, EXCH, RIVALS, MACH, FURN;
-export function __late(b) { ({ PWR, MINE, BLD, EXCH, RIVALS, MACH, FURN } = b); }
+export let PWR, MINE, BLD, EXCH, RIVALS, MACH, FURN, GFX;
+export function __late(b) { ({ PWR, MINE, BLD, EXCH, RIVALS, MACH, FURN, GFX } = b); }
 
 // ======== section: 66_night.js ========
 // ====================================================================
@@ -341,11 +341,12 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.65 — CITY DNA', `
-    <p><b>No two cities share a size or a face any more — all 64 roll their own identity.</b></p>
-    <div class="kv"><span class="k">SIZE</span><span class="v">Small towns loop 4–5 tight rings inside ~1.5 km and read as towns from orbit; metros sprawl past 3 km with up to 8 rings and 20 radials — and the skyline, ground rings, farms and streaming all follow the same per-city numbers</span></div>
-    <div class="kv"><span class="k">LOOK</span><span class="v">Each downtown draws from its own rotated palette slice with its own warm↔cool bias, glass↔classic facades, height character, greenery and villa-scale suburbs — houses, roofs and street trees included</span></div>
-    <div class="kv"><span class="k">SAME STREETS</span><span class="v">The real OSM streets, tagged heights and shorelines never change — the DNA dresses the city around them, deterministically, the same on every visit (your cached maps re-import once to pick up the look)</span></div>
+  openModal('Welcome to v2.66 — PICTURE', `
+    <p><b>A GRAPHICS button in the Help tab — the picture is yours to tune.</b></p>
+    <div class="kv"><span class="k">SHADOWS &amp; TREES</span><span class="v">switch the sun's shadows and the world forest off or on, live</span></div>
+    <div class="kv"><span class="k">RENDER SCALE</span><span class="v">100 · 75 · 50% — the same world at a friendlier price on slower devices</span></div>
+    <div class="kv"><span class="k">DETAIL</span><span class="v">FULL or LITE street detail — LITE halves the props, like a phone</span></div>
+    <div class="kv"><span class="k">SAVED</span><span class="v">your settings ride in the world save — every city, every device, same picture</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -397,6 +398,7 @@ document.getElementById('bb-next').addEventListener('click', () => {
 
 function openHelp() {
   openModal('Open World ' + GAME_VERSION + ' — Help', `
+    <div style="display:flex;gap:8px;margin:0 0 12px"><button class="btn primary" id="hp-gfx" style="flex:1">GRAPHICS SETTINGS — shadows · trees · render scale · detail</button></div>   <!-- v2.66 PICTURE: first thing in Help, no scrolling to find it -->
     <p><b>Controls</b></p>
     <div class="kv"><span class="k">MOVE</span><span class="v g">Tap / click anywhere — your tycoon walks there (the only way they move)</span></div>
     <div class="kv"><span class="k">LOOK AROUND</span><span class="v">Drag or WASD / arrows / joystick to glide the bird\u2019s-eye view across the map — no distance cap, roam the whole Earth; detail streams wherever you look</span></div>
@@ -424,6 +426,7 @@ function openHelp() {
     </div>`);
   document.getElementById('hp-x').onclick = closeModal;
   document.getElementById('hp-tut').onclick = () => { closeModal(); TUT.restart(); };
+  document.getElementById('hp-gfx').onclick = () => { closeModal(); if (GFX) GFX.open(); };   // v2.66 PICTURE: the graphics settings panel (GFX arrives late-bound from boot.js)
 }
 
 // search box
