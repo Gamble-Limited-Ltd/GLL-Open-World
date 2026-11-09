@@ -46,7 +46,7 @@ a:hover{text-decoration:underline}
   <p>The game itself makes only these network calls:</p>
   <ul>
     <li><b>City search and street data</b> — OpenStreetMap's Nominatim (search) and Overpass (map data) services receive your search terms or the map area you visit, and your IP address, as with any web request. They are governed by OpenStreetMap's own privacy policy. Map data © OpenStreetMap contributors (ODbL).</li>
-    <li><b>The three.js 3D library</b> — loaded from the unpkg.com CDN, which sees that one script request.</li>
+    <li><b>The three.js 3D library</b> — served from this site together with the game (no third-party request).</li>
     <li><b>The update check</b> — on boot the game fetches <b>version.json</b> from this same site to see if a newer build is live. That request stays between your browser and this site.</li>
   </ul>
 
