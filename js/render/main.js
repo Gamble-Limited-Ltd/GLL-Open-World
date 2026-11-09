@@ -10,6 +10,7 @@ import { CAM_FAR, CITIES, DEG_M } from '../config.js';
 import { hashStr, latLonToWorld } from '../util.js';
 import { STATE } from '../state.js';
 import { loadGame, saveGame } from '../save.js';
+import { hydrate, resetSave, showAccount } from '../sync.js';
 import { uiBalance } from '../systems/economy.js';
 import { hideTooltip, toast, veilOff, veilOn } from '../ui/dom.js';
 import { LANDGEO } from '../core.js';
@@ -421,7 +422,9 @@ EARTH.onLandPick = (lat, lon) => {
 export const bootEl = document.getElementById('boot');
 export const pnameEl = document.getElementById('pname');
 export const enterBtn = document.getElementById('enter');
+await hydrate();   // hosted site: sign-in + account save into localStorage first (no-op elsewhere)
 const hadSave = loadGame();
+showAccount();
 if (hadSave && STATE.name) {
   pnameEl.value = STATE.name;
   enterBtn.textContent = 'CONTINUE';
@@ -429,9 +432,8 @@ if (hadSave && STATE.name) {
   reset.className = 'go';
   reset.style.cssText = 'background:transparent;color:#6B7280;box-shadow:none;border:1px solid #4A5568';
   reset.textContent = 'NEW GAME';
-  reset.onclick = () => {
-    localStorage.removeItem('openworld-v2');
-    location.reload();
+  reset.onclick = async () => {
+    if (await resetSave()) location.reload();
   };
   document.querySelector('#boot .row').appendChild(reset);
 }
