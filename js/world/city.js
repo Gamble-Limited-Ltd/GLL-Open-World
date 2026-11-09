@@ -7,6 +7,7 @@ import { ECON } from '../config.js';
 import { _ihash, _mulberry, _polyArea, hashStr, cityDNA } from '../util.js';
 import { LANDGEO } from '../core.js';
 import { WORLD } from '../world/world.js';
+import { STATE } from '../state.js';   // v2.66 PICTURE: the DETAIL lever — LITE reads the saved gfx pack at build time
 
 // ======== section: 40_city.js ========
 // ======== section: 40_city.js ========
@@ -2876,7 +2877,7 @@ export const CITY = (() => {
     const shifted = { ...cityData, ...cityMeta, roads, buildings: buildingPolys, greens: greensShift, waters: watersShift };
     suites = [];
     benchScratch = [];
-    isMob = matchMedia('(pointer:coarse)').matches;
+    isMob = matchMedia('(pointer:coarse)').matches || !!(STATE.gfx && STATE.gfx.lite);   // v2.66 PICTURE: LITE detail forces the light densities on any device
 
     // ---------- v2.14 — OPEN COUNTRY: the settle-anywhere pasture --------
     // No buildings, no skyline, no street grid: grass ground, country
@@ -3007,6 +3008,7 @@ export const CITY = (() => {
     get suburb() { return suburbRec; },              // v2.42: the neighborhood census (houses/verts/trees…)
     get suburbGroup() { return suburbGroup; },       // v2.42: distance-LOD host
     get dna() { return cityRec ? cityDNA(cityRec) : null; },   // v2.65: the standing city's DNA (QA)
+    get isMob() { return isMob; },   // v2.66 PICTURE: the DETAIL lever, read at build time (QA — proof LITE landed)
   };
 })();
 
