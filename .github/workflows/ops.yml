@@ -2,7 +2,8 @@ name: Ops
 
 # Start, stop, restart, check or update the hosted game without server access.
 # Run by hand: Actions tab > Ops > Run workflow, or `gh workflow run ops.yml -f action=restart`.
-# The server only accepts these five actions; nothing else can be run through it.
+# This workflow does nothing itself. The server watches for runs of it (within about a minute) and
+# then performs exactly one of these five actions. The run name below is what the server reads.
 on:
   workflow_dispatch:
     inputs:
@@ -12,30 +13,17 @@ on:
         type: choice
         options: [status, restart, start, stop, sync]
 
+run-name: Ops ${{ inputs.action }} by ${{ github.actor }}
+
 permissions:
   contents: read
 
-concurrency: ops
-
 jobs:
-  ops:
+  request:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 2
     steps:
-      - name: Call the ops endpoint
+      - name: Request recorded
         env:
           ACTION: ${{ inputs.action }}
-          OPS_URL: ${{ secrets.OPS_URL }}
-          OPS_TOKEN: ${{ secrets.OPS_TOKEN }}
-          CF_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-          ACTOR: ${{ github.actor }}
-        run: |
-          set -euo pipefail
-          out=$(curl -sS --max-time 90 -X POST "$OPS_URL/ops/$ACTION" \
-            -H "Authorization: Bearer $OPS_TOKEN" \
-            -H "CF-Access-Client-Id: $CF_ID" \
-            -H "CF-Access-Client-Secret: $CF_SECRET" \
-            -H "X-Ops-Actor: $ACTOR" -w '\nHTTP %{http_code}')
-          echo "$out"
-          case "$out" in *'"ok":true'*) ;; *) exit 1 ;; esac
+        run: echo "Requested '$ACTION'. The server picks it up within about a minute. Check https://open-world.taps-holdings.org/__ops/status.json"
