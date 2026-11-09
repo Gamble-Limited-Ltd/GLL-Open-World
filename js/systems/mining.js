@@ -4,7 +4,7 @@
 // ====================================================================
 import * as THREE from 'three';
 import { CITIES } from '../config.js';
-import { fmt$, hashStr } from '../util.js';
+import { fmt$, hashStr, cityDNA } from '../util.js';
 import { STATE } from '../state.js';
 import { saveGame } from '../save.js';
 import { earn, spend, uiBalance } from '../systems/economy.js';
@@ -63,7 +63,7 @@ export const MINE = (() => {
   const DAY = 90;                 // seconds per game day (the office/deed/acres beat)
   const SNAP = 10;                // claim corners snap to a 10 m grid
   const MIN_SIDE = 40, MAX_SIDE = 320;
-  const SUB_R = 2400;             // quilt/suburb boundary — claims start past it
+  const SUB_R = 2400;             // quilt/suburb boundary — claims start past it (v2.65: nearCity is edge-relative, so +40 m past the rim)
   const CLAIM_RATE = 4;           // $/m² of claim
   const DENS = .9;                // tonnes of ore per m² of claim
   const CAP_MAX = 14, MAX_MINES = 12;
@@ -101,10 +101,13 @@ export const MINE = (() => {
 
   // ---- little helpers --------------------------------------------------
   const isW = (x, z) => { try { return !!(LANDGEO.ready && LANDGEO.isWaterWorld(x, z)); } catch (e) { return false; } };
+  // v2.65 CITY DNA: edge-relative — distance PAST the nearest city's own
+  // suburb edge (negative inside the city+suburbs). Claims stake out
+  // past whatever that city's rim actually is.
   function nearCity(x, z) {
-    let best = 1e9;
-    for (const c of CITIES) { const d = Math.hypot(x - c.wx, z - c.wz); if (d < best) best = d; }
-    return best;
+    let best = 1e9, bc = null;
+    for (const c of CITIES) { const d = Math.hypot(x - c.wx, z - c.wz); if (d < best) { best = d; bc = c; } }
+    return bc ? best - cityDNA(bc).subR1 + (SUB_R - 2360) : best;
   }
   function nearestCity(x, z) {
     let best = null;
