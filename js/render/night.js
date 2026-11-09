@@ -340,11 +340,11 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.64 — CLEAN STREETS', `
-    <p><b>Junctions draw like junctions now — and no road ever rides on top of another.</b></p>
-    <div class="kv"><span class="k">CLEAN CROSSINGS</span><span class="v">Sidewalks step down to crossing ramps where streets meet — no more curb walls slicing through crossings — and center lines, edge lines and manholes stay out of intersections</span></div>
-    <div class="kv"><span class="k">NO STACKED ROADS</span><span class="v">Connector lanes arrive perpendicular at proper T-junctions, never merge along another street, and one bridge serves each neighborhood — the doubled ribbons are gone, everything still connected</span></div>
-    <div class="kv"><span class="k">CITY BEAUTIFUL</span><span class="v">Tree-lined avenues and rings, richer facade and roof palettes, and every skyline's tallest tower wears a crown, spire and red beacon</span></div>
+  openModal('Welcome to v2.65 — CITY DNA', `
+    <p><b>No two cities share a size or a face any more — all 64 roll their own identity.</b></p>
+    <div class="kv"><span class="k">SIZE</span><span class="v">Small towns loop 4–5 tight rings inside ~1.5 km and read as towns from orbit; metros sprawl past 3 km with up to 8 rings and 20 radials — and the skyline, ground rings, farms and streaming all follow the same per-city numbers</span></div>
+    <div class="kv"><span class="k">LOOK</span><span class="v">Each downtown draws from its own rotated palette slice with its own warm↔cool bias, glass↔classic facades, height character, greenery and villa-scale suburbs — houses, roofs and street trees included</span></div>
+    <div class="kv"><span class="k">SAME STREETS</span><span class="v">The real OSM streets, tagged heights and shorelines never change — the DNA dresses the city around them, deterministically, the same on every visit (your cached maps re-import once to pick up the look)</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
