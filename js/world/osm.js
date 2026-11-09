@@ -2,7 +2,7 @@
 // js/world/osm.js — the Overpass/OSM street importer + local cache
 // (Stage 6).
 // ====================================================================
-import { _mulberry, hashStr } from '../util.js';
+import { _mulberry, hashStr, cityDNA } from '../util.js';
 
 // ======== section: 30_osm.js ========
 // ======== section: 30_osm.js ========
@@ -113,8 +113,13 @@ out geom;`;
     return { roads, buildings, greens, waters };
   }
 
-  // heights for buildings without tags (deterministic by bkey)
-  function fillHeights(buildings, seedCityKey) {
+  // heights for buildings without tags (deterministic by bkey).
+  // v2.65 CITY DNA: untagged heights wear the city's height character
+  // (dna.tall) — a high-rise city rolls tall even on blank footprints,
+  // a low town stays low. Tagged heights (real OSM skyscrapers) pass
+  // through untouched, so truth stays truth.
+  function fillHeights(buildings, meta) {
+    const dna = cityDNA(meta || {});
     let sum = 0;
     buildings.forEach(b => {
       const a = Math.abs(polyArea(b.poly));
@@ -122,9 +127,9 @@ out geom;`;
       if (!isFinite(b.h)) {
         const r = _h(b.bkey, 7);
         const r2 = _h(b.bkey, 13);
-        if (a > 2200) b.h = 28 + r * 66;         // big footprint → office tower
-        else if (a > 900) b.h = 12 + r * 26;
-        else b.h = 5 + r * 13 + (r2 > .8 ? 12 : 0);
+        if (a > 2200) b.h = (28 + r * 66) * dna.tall;         // big footprint → office tower
+        else if (a > 900) b.h = (12 + r * 26) * dna.tall;
+        else b.h = (5 + r * 13 + (r2 > .8 ? 12 : 0)) * dna.tall;
       }
       b.h = Math.min(120, Math.max(4, b.h));
       b.area = a;
@@ -149,13 +154,13 @@ out geom;`;
       const raw = localStorage.getItem(cacheKey(id));
       if (!raw) return null;
       const d = JSON.parse(raw);
-      if (d.fmt !== 3) return null;
+      if (d.fmt !== 4) return null;   // v2.65: DNA heights — re-import once
       return d;
     } catch (e) { return null; }
   }
   function cachePut(id, data) {
     try {
-      const raw = JSON.stringify({ ...data, fmt: 3, ts: Date.now() });
+      const raw = JSON.stringify({ ...data, fmt: 4, ts: Date.now() });
       if (raw.length > 3.6e6) return;    // too big for localStorage
       // prune: keep newest 6 ow2-osm-* entries (v2.04: was 4 — faster
       // re-entry for players hopping between a few cities)
@@ -212,7 +217,7 @@ out geom;`;
     const got = await fetchOverpass(bbox);
     if (got) {
       const d = parseOSM(got.json, meta.lat, meta.lon);
-      fillHeights(d.buildings, meta.key);
+      fillHeights(d.buildings, meta);
       if (d.roads.length < 8) { /* too sparse — fall through to generator */ }
       else {
         const out = { id, key: meta.key, name: meta.name, lat: meta.lat, lon: meta.lon, half: HALF, ...d };
@@ -234,9 +239,13 @@ out geom;`;
   }
 
   // ---------------- procedural fallback ----------------
+  // v2.65 CITY DNA: the generated city wears the same DNA as an imported
+  // one — height character on every block roll, greenery on the park
+  // odds — so the offline fallback reads like the same city.
   function generateCity(meta) {
     const seed = hashStr((meta.key || meta.name) + '');
     const rnd = _mulberry(seed);
+    const dna = cityDNA(meta);
     const roads = [], buildings = [], greens = [], waters = [];
     const H = HALF * 0.92;
     // main avenues (E-W cls 3 + N-S cls 3) through center
@@ -266,7 +275,7 @@ out geom;`;
       const x0 = xs[i] + 7.5, x1 = xs[i + 1] - 7.5, z0 = zs[j] + 7.5, z1 = zs[j + 1] - 7.5;
       if (x1 - x0 < 26 || z1 - z0 < 26) continue;
       const cd = Math.hypot((x0 + x1) / 2, (z0 + z1) / 2) / H;   // 0 center → 1 edge
-      if (block === parkAt || (cd > .55 && rnd() < .05)) {
+      if (block === parkAt || (cd > .55 && rnd() < .05 * dna.green)) {
         greens.push({ poly: [[x0, z0], [x1, z0], [x1, z1], [x0, z1]] });
         continue;
       }
@@ -288,9 +297,9 @@ out geom;`;
         const a = (bx1 - bx0) * (bz1 - bz0);
         let h;
         const r = rnd();
-        if (cd < .3) h = r < .3 ? 55 + rnd() * 55 : 22 + r * 30;   // downtown core
-        else if (cd < .6) h = r < .15 ? 35 + rnd() * 30 : 12 + r * 18;
-        else h = 6 + r * 12;
+        if (cd < .3) h = (r < .3 ? 55 + rnd() * 55 : 22 + r * 30) * dna.tall;   // downtown core
+        else if (cd < .6) h = (r < .15 ? 35 + rnd() * 30 : 12 + r * 18) * dna.tall;
+        else h = (6 + r * 12) * Math.min(dna.tall, 1.05);   // the outskirts stay low-rise even in tall cities
         buildings.push({ poly: [[bx0, bz0], [bx1, bz0], [bx1, bz1], [bx0, bz1]], h, bkey: seed + (bkey++), area: a });
       }
     }
