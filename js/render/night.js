@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { CITIES, DEG_M, ECON, GAME_VERSION, ZOOM_MAX } from '../config.js';
 import { VNUM, fmt$, fmtK } from '../util.js';
+import { isHosted } from '../sync.js';
 import { STATE } from '../state.js';
 import { saveGame } from '../save.js';
 import { uiBalance } from '../systems/economy.js';
@@ -274,11 +275,11 @@ document.querySelectorAll('#boot .foot a').forEach(a => {
     const LNK = (f, t) => `<a href="${f}" target="_blank" style="color:#7DD3FC">${t}</a>`;
     const B = {
       privacy: `<p><b>Open World</b> runs entirely in your browser: no accounts, no analytics, no tracking, no payments.</p>
-      <p>Your world saves locally in this browser (key <b>openworld-v2</b>) and never leaves your device.</p>
+      ${isHosted() ? '<p>You sign in with a GLL ID. Your world is saved to your account on our server (with a working copy in this browser) so it follows you to any device. NEW GAME deletes it.</p>' : '<p>Your world saves locally in this browser (key <b>openworld-v2</b>) and never leaves your device.</p>'}
       <p>City search and map data call OpenStreetMap (Nominatim / Overpass); those services see the query and your IP, as with any web request. Map data © OpenStreetMap contributors (ODbL).</p>
       <p>${LNK('privacy.html', 'Read the full Privacy Policy →')}</p>`,
       terms: `<p>Open World is free to play. All money in the game is fictional play money — there is no way to spend real money in it, and nothing to cash out.</p>
-      <p>Your save lives only in your browser; we keep no backup. The game is provided as-is, under the PolyForm Noncommercial license.</p>
+      ${isHosted() ? '<p>Your save is stored on our server under your GLL ID. The game is provided as-is, under the PolyForm Noncommercial license.</p>' : '<p>Your save lives only in your browser; we keep no backup. The game is provided as-is, under the PolyForm Noncommercial license.</p>'}
       <p>${LNK('terms.html', 'Read the full Terms of Service →')}</p>`,
       support: `<p>Open World is a small project — the best support is to keep playing and build something big.</p>
       <p>Bugs and problems: open an issue on the project's GitHub repository.</p>`

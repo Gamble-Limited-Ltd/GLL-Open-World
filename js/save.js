@@ -8,6 +8,7 @@
 import { CITIES, DEG_M_K, ECON, OLD_LAYOUT, SAVE_KEY } from './config.js';
 import { worldAnchorOf } from './util.js';
 import { STATE } from './state.js';
+import { onSaved } from './sync.js';
 
 // ---- late binding (boot binds after every module evaluates) --------
 export let ACTORS;
@@ -195,5 +196,6 @@ export function saveGame() {
       market: STATE.market ? STATE.market.pack() : null,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(pack));
+    onSaved();   // hosted site only: schedules the upload to the player's account
   } catch (e) { /* quota — keep playing in memory */ }
 }
