@@ -6,7 +6,7 @@
 // ====================================================================
 import * as THREE from 'three';
 import { CITIES, DEG_M, ECON, WORLD_BOUNDS, WORLD_CONTS } from '../config.js';
-import { _mulberry, hashStr, worldAnchorOf } from '../util.js';
+import { _mulberry, hashStr, worldAnchorOf, cityDNA } from '../util.js';
 import { STATE } from '../state.js';
 import { LANDGEO, WORLD_EDGES } from '../core.js';
 import { OSM } from '../world/osm.js';
@@ -34,7 +34,17 @@ export const WORLD = (() => {
   const CH = 500;                    // pasture chunk size (m)
   const CITY_R = 745;                // city import extent radius
   const BUILD_DIST = 950;            // detailed city streams in
-  const LEAVE_DIST = 2900;           // v2.42: streams out past the suburb ring (was 1250)
+  const LEAVE_DIST = 2900;           // v2.42 base: streams out past the suburb ring (was 1250)
+                                     // v2.65 CITY DNA: the LIVE leave distance is the active
+                                     // city's own suburb edge + 540 (cityDNA(meta).subR1),
+                                     // so a wide metro keeps standing while you cross its burbs
+  // v2.65: distance past the nearest catalog city's suburb edge — the
+  // per-city replacement for every flat `CITY_R + const` world gate
+  const subEdge = c => cityDNA(c).subR1;
+  const pastEdge = (x, z) => {
+    const n = distToCity(x, z);
+    return n.city ? n.d - subEdge(n.city) : n.d;
+  };
   // v2.29 REAL JUNCTIONS: inter-city roads end at the first street of
   // the city they serve, not at the anchor. The last TAIL_CAP meters
   // of every land route before each city are a re-trimmable TAIL (a
@@ -988,7 +998,12 @@ export const WORLD = (() => {
     // 3D trees in the same annulus once you walk its way.
     function buildForestBelt(c) {
       const pos = [], norm = [], colr = [];
-      const R0 = CITY_R + 1900, R1 = 3300, BANDS = 9, SECT = 44;   // v2.42: past the suburbs
+      // v2.65 CITY DNA: the belt hugs the city's OWN suburb edge (subR1),
+      // keeping the +285 m / 940 m margins the v2.42 tuning set — so
+      // woods never grow inside a wide metro's ring, and a small town's
+      // forest starts a full km sooner
+      const E = subEdge(c);
+      const R0 = E + 285, R1 = E + 940, BANDS = 9, SECT = 44;   // v2.42: past the suburbs
       const greens = [0x3d6f2c, 0x477d34, 0x356226, 0x528a3e];
       const step = (R1 - R0) / BANDS;
       for (let i = 0; i < BANDS; i++) {
@@ -1044,7 +1059,8 @@ export const WORLD = (() => {
     // houses stand on, and it renders at every zoom like the belt does.
     function buildSuburbDecal(c) {
       const pos = [], norm = [], colr = [];
-      const R0 = CITY_R + 120, R1 = CITY_R + 1615, BANDS = 7, SECT = 44;
+      // v2.65 CITY DNA: the lawn ring runs to the city's OWN suburb edge
+      const R0 = CITY_R + 120, R1 = subEdge(c), BANDS = 7, SECT = 44;
       const greens = [0x7cb45e, 0x8ec96a, 0x74b056, 0x86c262];
       const step = (R1 - R0) / BANDS;
       for (let i = 0; i < BANDS; i++) {
@@ -1707,24 +1723,25 @@ export const WORLD = (() => {
     // "shard" artifacts at range (kept out in v2.32 too).
 
     // v2.35 FOREST BELT: real 3D trees in the woodland ring — a chunk that
-    // touches any city's belt annulus (CITY_R+170 … 3.3 km, the same ring
-    // the tile-level decal paints) grows CLUMPED STANDS of trees, not an
-    // orchard grid: a woodland reads as clumps. 3-6 stands per 500 m chunk,
-    // each 9-18 trees across ~150 m, so walking out of town crosses a real
-    // tree line before the open pastures (~4x the first pass's sparse
-    // scatter, which read as 'a few trees'). addTree's own guards still
-    // apply to every tree (off the plate, off roads, dry land only).
-    if (nearC.d < CITY_R + 3300 + CH * .75) {
+    // touches any city's belt annulus (edge+285 … edge+940, the same ring
+    // the tile-level decal paints — v2.65: per-city edges now) grows
+    // CLUMPED STANDS of trees, not an orchard grid: a woodland reads as
+    // clumps. 3-6 stands per 500 m chunk, each 9-18 trees across ~150 m,
+    // so walking out of town crosses a real tree line before the open
+    // pastures (~4x the first pass's sparse scatter, which read as 'a few
+    // trees'). addTree's own guards still apply to every tree (off the
+    // plate, off roads, dry land only).
+    if (nearC.city && nearC.d < subEdge(nearC.city) + 940 + CH * .75) {
       const stands = Math.round((3 + rnd() * 3) * mobF);
       for (let s = 0; s < stands; s++) {
         const sx = x0 + rnd() * CH, sz = z0 + rnd() * CH;
-        const sd = distToCity(sx, sz).d;
-        if (sd < CITY_R + 1900 || sd > CITY_R + 3300) continue;   // v2.42: past the suburbs
+        const sd = pastEdge(sx, sz);
+        if (sd < 285 || sd > 940) continue;   // v2.42: past the suburbs · v2.65: per-city edge
         const cnt = 9 + Math.floor(rnd() * 10);
         for (let i = 0; i < cnt; i++) {
           const bx = sx + (rnd() - .5) * 150, bz = sz + (rnd() - .5) * 150;
-          const bd = distToCity(bx, bz).d;
-          if (bd > CITY_R + 1900 && bd < CITY_R + 3300) addTree(B, bx, bz, .95 + rnd() * .65, rnd);   // v2.42
+          const bd = pastEdge(bx, bz);
+          if (bd > 285 && bd < 940) addTree(B, bx, bz, .95 + rnd() * .65, rnd);   // v2.42 · v2.65
         }
       }
     }
@@ -1744,7 +1761,7 @@ export const WORLD = (() => {
         const w = 60 + rnd() * 90, d = 46 + rnd() * 70;
         const px = x0 + w / 2 + 20 + rnd() * Math.max(10, CH - w - 40);
         const pz = z0 + d / 2 + 20 + rnd() * Math.max(10, CH - d - 40);
-        if (distToCity(px, pz).d > CITY_R + 1950 && !nearRoad(px, pz, 26) &&   // v2.42: farms past the suburbs
+        if (pastEdge(px, pz) > 335 && !nearRoad(px, pz, 26) &&   // v2.42: farms past the suburbs · v2.65: per-city edge
           !(LANDGEO.ready && (LANDGEO.isWaterWorld(px, pz) ||   // v2.36: whole footprint dry
             LANDGEO.isWaterWorld(px - w / 2, pz - d / 2) || LANDGEO.isWaterWorld(px + w / 2, pz - d / 2) ||
             LANDGEO.isWaterWorld(px - w / 2, pz + d / 2) || LANDGEO.isWaterWorld(px + w / 2, pz + d / 2)))) {
@@ -1754,7 +1771,7 @@ export const WORLD = (() => {
       const rocks = Math.floor((2 + rnd() * 6) * mobF);
       for (let i = 0; i < rocks; i++) {
         const rx = x0 + rnd() * CH, rz = z0 + rnd() * CH;
-        if (distToCity(rx, rz).d < CITY_R + 1950 || nearRoad(rx, rz, 8)) continue;   // v2.42
+        if (pastEdge(rx, rz) < 335 || nearRoad(rx, rz, 8)) continue;   // v2.42 · v2.65
         if (LANDGEO.ready && LANDGEO.isWaterWorld(rx, rz)) continue;   // v2.18
         const s = .5 + rnd() * 1.6;
         const g = new THREE.IcosahedronGeometry(s, 0);
@@ -1762,7 +1779,7 @@ export const WORLD = (() => {
       }
       if (rnd() < .13) {   // pond
         const px = x0 + 60 + rnd() * (CH - 120), pz = z0 + 60 + rnd() * (CH - 120);
-        if (distToCity(px, pz).d > CITY_R + 1950 && !nearRoad(px, pz, 20) &&   // v2.42
+        if (pastEdge(px, pz) > 335 && !nearRoad(px, pz, 20) &&   // v2.42 · v2.65
           !(LANDGEO.ready && LANDGEO.isWaterWorld(px, pz))) {   // v2.18
           const g = new THREE.CircleGeometry(9 + rnd() * 9, 18); g.rotateX(-Math.PI / 2);
           B.addGeo(g, trs(px, .040, pz, 0, 1, 1, 1), col(0x3479bd));   // v2.44 PATCHWORK: above the farm quilt (.028) so ponds keep their water over the fields
@@ -1778,9 +1795,10 @@ export const WORLD = (() => {
   }
 
   function addTree(B, x, z, s, rnd) {
-    // v2.42: CITY_R+1900 — no wild trees inside the city OR its suburb
-    // ring (yard trees come from the suburb builder instead)
-    if (distToCity(x, z).d < CITY_R + 1900 || nearRoad(x, z, 8)) return;
+    // v2.42: no wild trees inside the city OR its suburb ring (yard trees
+    // come from the suburb builder instead). v2.65: the ring is the
+    // nearest city's OWN edge + the same 285 m margin.
+    if (pastEdge(x, z) < 285 || nearRoad(x, z, 8)) return;
     if (LANDGEO.ready && LANDGEO.isWaterWorld(x, z)) return;   // v2.18: trees don't grow at sea
     const pine = rnd() < .42;
     const trunk = new THREE.CylinderGeometry(.22 * s, .3 * s, 2.2 * s, 6);
@@ -1949,6 +1967,9 @@ export const WORLD = (() => {
   // their true widths and heights) so from altitude a city reads as the
   // real sprawl of a metropolis — and walking in still upgrades the
   // dense true core you can actually play.
+  // v2.65 CITY DNA: the spread is the CITY'S OWN — small towns read as
+  // towns from orbit (×5.6–8.2), metros as true giants (×10.6–13).
+  // SKY_SPREAD stays as the v2.64 reference value (what sub=1 rolls).
   const SKY_SPREAD = 10;
 
   function skyEnsure() {
@@ -1991,8 +2012,10 @@ export const WORLD = (() => {
     if (!data || !Array.isArray(data.roads) || !data.roads.length) { data = OSM.generateCity(meta); dsrc = 'gen'; }
     const ax = c.wx, az = c.wz;
     // v2.27: spread to metro scale AND keep the logic in world coords,
-    // but the mesh itself is emitted ANCHOR-LOCAL (float32-safe at 1:1)
-    const shift = pts => pts.map(p => [p[0] * SKY_SPREAD + ax, p[1] * SKY_SPREAD + az]);
+    // but the mesh itself is emitted ANCHOR-LOCAL (float32-safe at 1:1).
+    // v2.65 CITY DNA: the spread is per-city (dna.spread).
+    const spread = cityDNA(c).spread;
+    const shift = pts => pts.map(p => [p[0] * spread + ax, p[1] * spread + az]);
     let roads = (data.roads || []).map(r => ({ ...r, pts: shift(r.pts) }));
     let buildings = (data.buildings || []).map(b => ({ ...b, poly: shift(b.poly) }));
     let greens = (data.greens || []).map(g => ({ ...g, poly: shift(g.poly) }));
@@ -2114,10 +2137,11 @@ export const WORLD = (() => {
     const jit = (c2, f) => [c2[0] * f, c2[1] * f, c2[2] * f];
     const BASES = [0x8a857c, 0x7f7a72, 0x767d84, 0x918672, 0x6f7278, 0x83766a];   // v2.31: darker CR masses — silhouettes read against the bright taupe land
     // ground plate: dry tiles only, a hair above the land shield
-    // (v2.27: the plate spans the METRO footprint — SKY_SPREAD × 1490 m)
+    // (v2.27: the plate spans the METRO footprint — spread × 1490 m;
+    //  v2.65: that spread is the city's own)
     const cPlate = col(0x7f7a6c);   // v2.33: warm urban gray, darker against the vivid grass — CR masses read DARK on bright land
     {
-      const size = 1490 * SKY_SPREAD, NT = 12, T = size / NT;
+      const size = 1490 * cityDNA(c).spread, NT = 12, T = size / NT;
       for (let i = 0; i < NT; i++) for (let j = 0; j < NT; j++) {
         const x0 = ax - size / 2 + i * T, z0 = az - size / 2 + j * T;
         const x1 = x0 + T, z1 = z0 + T;
@@ -2317,15 +2341,20 @@ export const WORLD = (() => {
     // player: inside a built city's footprint → that city; else → rural)
     const near = distToCity(px, pz);
     let dOwn = activeCity ? Math.hypot(px - activeCity.anchor.x, pz - activeCity.anchor.z) : 1e9;
-    // v2.42: the region holds through the neighborhoods (CITY_R+1615 =
-    // the suburb edge) — carts don't vanish while you walk the burbs
-    const wantRegion = (activeCity && dOwn <= CITY_R + 1615) ? activeCity.key : 'rural';
+    // v2.42: the region holds through the neighborhoods — carts don't
+    // vanish while you walk the burbs. v2.65 CITY DNA: the hold runs to
+    // THIS city's own suburb edge (was a flat CITY_R+1615).
+    const holdR = activeCity ? cityDNA(activeCity.meta).subR1 : 0;
+    const wantRegion = (activeCity && dOwn <= holdR) ? activeCity.key : 'rural';
     if (wantRegion !== curRegion) {
       curRegion = wantRegion;
       req = { type: 'region', region: wantRegion };
     }
     if (activeCity) {
-      if (dOwn > LEAVE_DIST && near.d > BUILD_DIST) {
+      // v2.65: streams out past THIS city's suburb edge + 540 (was the
+      // flat 2900 — same number whenever the DNA rolls sub=1)
+      const leaveD = holdR + 540;
+      if (dOwn > leaveD && near.d > BUILD_DIST) {
         clearCity();
         dOwn = 1e9;
         req = { type: 'leftCity' };
