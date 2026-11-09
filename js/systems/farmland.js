@@ -4,7 +4,7 @@
 // ====================================================================
 import * as THREE from 'three';
 import { CITIES } from '../config.js';
-import { _mulberry, fmt$, hashStr } from '../util.js';
+import { _mulberry, fmt$, hashStr, cityDNA } from '../util.js';
 import { STATE } from '../state.js';
 import { saveGame } from '../save.js';
 import { earn, spend } from '../systems/economy.js';
@@ -71,7 +71,7 @@ export const FARM = (() => {
   const BASE_R = MOB ? 800 : 1200;      // quilted radius at street level
   const MAX_R = MOB ? 1700 : 3000;      // breathing room with altitude
   const DISPOSE_R = MAX_R + 450;        // fixed hysteresis, like the forest
-  const SUB_R = 2400;                   // quilt starts past the suburb ring (2360)
+  const SUB_R = 2400;                   // quilt starts past the suburb ring (2360) — v2.65: nearCity is edge-relative now, so this reads as +40 m past the rim
   const LAT_B = 260, LAT_J = 70;        // jittered parcel lattice (cells 120–400 m)
   const Y_F = .028, Y_S = .0295, Y_H = .032;   // field / stripe / hedge heights
   const RO_QUILT = 1.8;                 // flat-ground ladder: above the plate (1.6), under the skyline (2)
@@ -99,10 +99,14 @@ export const FARM = (() => {
   let acc = 0;                          // income accumulator (1 s beat, like rooms)
 
   // ---- helpers ---------------------------------------------------------
+  // v2.65 CITY DNA: edge-relative — distance PAST the nearest city's own
+  // suburb edge (negative inside the city+suburbs, +40 m where the quilt
+  // starts: SUB_R 2400 − the 2360 base edge). Small towns farm closer
+  // in, wide metros push the fields out with them.
   function nearCity(x, z) {
-    let best = 1e9;
-    for (const c of CITIES) { const d = Math.hypot(x - c.wx, z - c.wz); if (d < best) best = d; }
-    return best;
+    let best = 1e9, bc = null;
+    for (const c of CITIES) { const d = Math.hypot(x - c.wx, z - c.wz); if (d < best) { best = d; bc = c; } }
+    return bc ? best - cityDNA(bc).subR1 + (SUB_R - 2360) : best;
   }
   function nearestCity(x, z) {
     let best = null;
