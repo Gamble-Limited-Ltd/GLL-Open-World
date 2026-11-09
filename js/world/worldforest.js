@@ -4,7 +4,7 @@
 // ====================================================================
 import * as THREE from 'three';
 import { CITIES } from '../config.js';
-import { _mulberry, hashStr } from '../util.js';
+import { _mulberry, hashStr, cityDNA } from '../util.js';
 import { LANDGEO } from '../core.js';
 import { WORLD, camCtl } from '../world/world.js';
 
@@ -38,7 +38,11 @@ import { WORLD, camCtl } from '../world/world.js';
 export const WF = (() => {
   const CH = 500;                       // same chunk grid as the pasture pass
   const CITY_R = 745;                   // mirrors WORLD's CITY_R (city import extent)
-  const BELT_R = CITY_R + 3300;         // the v2.35 woodland belt owns everything inside this
+  // v2.65 CITY DNA: the belt boundary is per-city now — nearCity()
+  // returns distance PAST the nearest city's own suburb edge, and
+  // BELT_PAST is the old belt margin (CITY_R + 3300 − 2360 = 1685 m
+  // past the edge: the belt's 940 + the 745 m city breathing room)
+  const BELT_PAST = 1685;
   const MOB = matchMedia('(pointer:coarse)').matches;
   const MOBF = MOB ? .55 : 1;
   const BASE_R = MOB ? 750 : 1050;      // matches WORLD.CHUNK_R at street level
@@ -102,10 +106,14 @@ export const WF = (() => {
     return _m4.compose(_s3.set(x, y, z), _q, new THREE.Vector3(sx, sy, sz)).clone();
   }
 
+  // v2.65 CITY DNA: edge-relative — distance PAST the nearest city's own
+  // suburb edge (negative inside the city+suburbs, 0 at the ring rim).
+  // Same shape as before, but a metro's belt now reaches as far as the
+  // metro itself does.
   function nearCity(x, z) {
-    let best = 1e9;
-    for (const c of CITIES) { const d = Math.hypot(x - c.wx, z - c.wz); if (d < best) best = d; }
-    return best;
+    let best = 1e9, bc = null;
+    for (const c of CITIES) { const d = Math.hypot(x - c.wx, z - c.wz); if (d < best) { best = d; bc = c; } }
+    return bc ? best - cityDNA(bc).subR1 : best;
   }
 
   // plot snapshot — green $ pads AND sold roadside plots (sold recs stay
@@ -124,7 +132,7 @@ export const WF = (() => {
   // the tree — the exact recipe the world's own addTree uses (unit
   // template geometries scaled by s ≡ the per-tree geometries it bakes)
   function addTree(B, x, z, s, rnd) {
-    if (nearCity(x, z) < BELT_R) return;                      // belt + cities keep their approved look
+    if (nearCity(x, z) < BELT_PAST) return;                   // belt + cities keep their approved look (v2.65: per-city edge)
     if (WORLD.nearRoad(x, z, 8)) return;                      // off the asphalt, 8 m like every tree
     if (LANDGEO.ready && LANDGEO.isWaterWorld(x, z)) return;  // never at sea / never in a lake
     if (onPlot(x, z)) return;                                 // never on a roadside vendor plot
@@ -146,7 +154,7 @@ export const WF = (() => {
       LANDGEO.isWaterWorld(x0, z0) && LANDGEO.isWaterWorld(x0 + CH, z0) &&
       LANDGEO.isWaterWorld(x0, z0 + CH) && LANDGEO.isWaterWorld(x0 + CH, z0 + CH)) return;
     // whole chunk inside the belt / city — the belt owns it
-    if (nearCity(xm, zm) < BELT_R - CH * .8) return;
+    if (nearCity(xm, zm) < BELT_PAST - CH * .8) return;
 
     // v2.39c woodland density: ~263 trees per full chunk (one per ~30 m —
     // open woodland), wider character swing (.4-1.0) so thick woods meet
@@ -156,7 +164,7 @@ export const WF = (() => {
     const stands = Math.max(4, Math.round((14 + rnd() * 10) * density * MOBF));
     for (let s = 0; s < stands; s++) {
       const sx = x0 + 40 + rnd() * (CH - 80), sz = z0 + 40 + rnd() * (CH - 80);
-      if (nearCity(sx, sz) < BELT_R + 160) continue;   // stand head past the belt edge
+      if (nearCity(sx, sz) < BELT_PAST + 160) continue;   // stand head past the belt edge
       const cnt = 9 + Math.floor(rnd() * 9);
       for (let i = 0; i < cnt; i++)
         addTree(B, sx + (rnd() - .5) * 320, sz + (rnd() - .5) * 320, .8 + rnd() * .7, rnd);
@@ -226,7 +234,7 @@ export const WF = (() => {
         if (pos.getY(i) > .01) continue;
         const wx = ox + pos.getX(i), wz = oz + pos.getZ(i);
         trees++;
-        if (nearCity(wx, wz) < BELT_R) badCity++;
+        if (nearCity(wx, wz) < BELT_PAST) badCity++;   // v2.65: per-city edge
         if (LANDGEO.ready && LANDGEO.isWaterWorld(wx, wz)) badWater++;
         if (WORLD.nearRoad(wx, wz, 8)) badRoad++;
       }
