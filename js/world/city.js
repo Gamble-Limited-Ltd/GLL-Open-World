@@ -851,9 +851,10 @@ export const CITY = (() => {
       const srnd = _mulberry(hashStr('s' + b.bkey));
       const warmP = Math.min(.96, Math.max(.06, 1.15 - h / 44 + dna.warm));
       const PAL = srnd() < warmP ? PAL_WARM : PAL_COOL;
-      // walls push past white (vertex colors >1 are legal) so the pastel
-      // palette reads BRIGHT against the reference, not muted mid-tone
-      const tint = jit(colOf(PAL[(Math.floor(srnd() * PAL.length) + dna.palOff) % PAL.length]), 1.28 + srnd() * .14);
+      // v2.67 THE ARCHITECT (picture pass): the walls settle to a muted
+      // FLAT mid-tone — the low-poly reference look reads calm and clean,
+      // with the grass, water and gold frames carrying the saturation
+      const tint = jit(colOf(PAL[(Math.floor(srnd() * PAL.length) + dna.palOff) % PAL.length]), 1.02 + srnd() * .1);
       const shopTint = h >= 8.5 ? tint.clone().lerp(colOf(0xffffff), .5) : null;
       const y0 = shopTint ? 3.55 : .15;
       const sr = srnd();
@@ -864,7 +865,8 @@ export const CITY = (() => {
       else style = sr < .55 ? 0 : 2;                   // low-rise: classic or punched
       const uOff = Math.floor(srnd() * 16);             // shift lit-window pattern
       const vOff = Math.floor(srnd() * 4);
-      const deckC = jit(colOf(ROOF_DECKS[(Math.floor(srnd() * ROOF_DECKS.length) + dna.palOff) % ROOF_DECKS.length]), .84 + srnd() * .18);
+      const deckPool = h >= 12 ? ROOF_DECKS.slice(0, 3) : ROOF_DECKS;   // v2.67: mid-rise+ flat roofs lean GRAY (the reference skyline); low-rise keeps the gravel/tan mix
+      const deckC = jit(colOf(deckPool[(Math.floor(srnd() * deckPool.length) + dna.palOff) % deckPool.length]), .8 + srnd() * .14);
       const rimC = jit(colOf(TRIMS[(Math.floor(srnd() * TRIMS.length) + dna.palOff) % TRIMS.length]), .9 + srnd() * .2);
       const trimC = jit(rimC, 1.1);
       const shinC = jit(colOf(SHINGLES[(Math.floor(srnd() * SHINGLES.length) + dna.palOff) % SHINGLES.length]), .9 + srnd() * .2);
@@ -1624,7 +1626,132 @@ export const CITY = (() => {
       }
     }
     if (n) buildPlotViz();
+    buildLots(city, seen, tierMult, dna);   // v2.67 THE ARCHITECT: buildable city lots — after the instanced layer so they carry their own meshes
     return plotRecs;
+  }
+
+  // ---------- v2.67 THE ARCHITECT: BUILDABLE CITY LOTS --------------------
+  // The ask: "some plots in the cities able to build buildings on them."
+  // Sidewalk spots are cart-sized by design; buildings need room. Every
+  // city now sprinkles true 15×20 m BUILD LOTS along its streets — set
+  // back off the asphalt, clear of buildings, greens and water, capped by
+  // tier and DNA. A lot reads differently from a cart spot: a warm sand
+  // pad, white dashed stakes, a floating ⌂ marker. Buy one like any plot
+  // (ECO's flow) and up to eight buildings of yours rise on it — catalog
+  // classics or your own designs (BUILD → DESIGN YOUR OWN).
+  function lotMarkerTex() {
+    const cv = document.createElement('canvas'); cv.width = 64; cv.height = 64;
+    const ctx = cv.getContext('2d');
+    ctx.font = '900 44px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 7; ctx.shadowOffsetY = 3;
+    ctx.fillStyle = '#f5cc74';
+    ctx.fillText('\u2302', 32, 36);   // the house glyph — gold, like the owned-plot ring
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+  let _lotMarkerTex = null, _lotSpriteMat = null;
+  function buildLots(city, seen, tierMult, dna) {
+    const LW = 15, LD = 20;                       // same carrying size as a roadside plot
+    const base = { 1: 6, 2: 10, 3: 14 }[city.tier || 2];
+    const MAXL = isMob ? Math.ceil(base / 2) : Math.min(16, Math.round(base * (.85 + .3 * dna.sub)));
+    const axc = cityAnchor ? cityAnchor.x : 0, azc = cityAnchor ? cityAnchor.z : 0;
+    const rnd = _mulberry(hashStr('L' + (city.key || city.name)));
+    let nl = 0;
+    outerLots:
+    for (let rdx = 0; rdx < city.roads.length; rdx++) {
+      const rd = city.roads[rdx];
+      if (rd.ped || rd.country) continue;
+      // walk the polyline by cumulative arc length (roads are dense
+      // polylines — per-segment sampling would never place anything)
+      let dist = 0, next = 60 + rnd() * 40;
+      for (let i = 0; i < rd.pts.length - 1; i++) {
+        const [ax, az] = rd.pts[i], [bx, bz] = rd.pts[i + 1];
+        const len = Math.hypot(bx - ax, bz - az) || 1;
+        const ux = (bx - ax) / len, uz = (bz - az) / len;
+        while (next <= dist + len) {
+          if (nl >= MAXL) break outerLots;
+          const d = next - dist;
+          next += 110;
+          if (rnd() < .45) continue;              // not every slot sells land
+          for (const side of [1, -1]) {
+            if (nl >= MAXL) break outerLots;
+            const off = rd.w / 2 + 4.6 + LW / 2; // set back off the walk
+            const cx = ax + ux * d - uz * off * side;
+            const cz = az + uz * d + ux * off * side;
+            if (Math.hypot(cx - axc, cz - azc) > 640) continue;
+            // the four corners + edge midpoints clear every road's asphalt
+            let ok = true;
+            const hw = LW / 2, hd = LD / 2;
+            for (let ci = 0; ci < 8 && ok; ci++) {
+              const sx = (ci & 1 ? hw : -hw) * (ci < 4 ? 1 : .5), sz = (ci & 2 ? hd : -hd) * (ci < 4 ? 1 : .5);
+              const px = cx + sx * uz + sz * ux, pz = cz - sx * ux + sz * uz;
+              const h = distToRoad(px, pz);
+              if (h.rd && h.d < h.rd.w / 2 - .12) ok = false;
+            }
+            if (!ok) continue;
+            // no other road crossing the lot
+            const near = roadsNear(cx, cz, 16);
+            if (near.some(ri => ri !== rdx)) continue;
+            // clear of buildings (4×4 sample grid over the rect)
+            for (let sx = 0; sx <= 3 && ok; sx++) for (let sz = 0; sz <= 3 && ok; sz++) {
+              const px = cx + (sx / 3 - .5) * (LW - 1.4), pz = cz + (sz / 3 - .5) * (LD - 1.4);
+              if (pointInBuilding(px, pz)) ok = false;
+            }
+            if (!ok) continue;
+            // not inside greens/waters (corners + center)
+            for (const g of [...(city.greens || []), ...(city.waters || [])]) {
+              if (!g.poly) continue;
+              if (inPoly(cx, cz, g.poly)) { ok = false; break; }
+              for (const [sx, sz] of [[hw - .5, 0], [-hw + .5, 0], [0, hd - .5], [0, -hd + .5]]) {
+                const px = cx + sx * uz + sz * ux, pz = cz - sx * ux + sz * uz;
+                if (inPoly(px, pz, g.poly)) { ok = false; break; }
+              }
+              if (!ok) break;
+            }
+            if (!ok) continue;
+            // v2.19: dry land only
+            if (LANDGEO.ready && LANDGEO.isWaterWorld(cx, cz)) continue;
+            // spacing: sidewalk spots hug the asphalt and the lot sets back
+            // behind them, so rects can only crowd along the road — 13 m of
+            // along-axis air. Lot-vs-lot keeps 42 m (two 15×20 rects never
+            // touch, and neighbors read as a proper row of building land).
+            if (seen.some(s => Math.hypot(s[0] - cx, s[1] - cz) < 13)) continue;
+            if (plotRecs.some(p => p.lot && Math.hypot(p.x - cx, p.z - cz) < 42)) continue;
+            seen.push([cx, cz]);
+            const rotY = Math.atan2(ux, uz);
+            const price = Math.round((ECON.plotBase * tierMult * (1 + Math.hypot(cx - axc, cz - azc) / 900) * 1.25) / 50) * 50;
+            // the lot's own mesh — sand pad, white dashed stakes, gold ⌂
+            const g = new THREE.Group();
+            const pad = new THREE.Mesh(new THREE.PlaneGeometry(LW, LD),
+              new THREE.MeshLambertMaterial({ color: 0xc9a86a, transparent: true, opacity: .9 }));
+            pad.rotation.x = -Math.PI / 2; pad.position.y = .105;
+            g.add(pad);
+            const hwq = LW / 2 - .5, hdq = LD / 2 - .5;
+            const pts = [new THREE.Vector3(-hwq, .13, -hdq), new THREE.Vector3(hwq, .13, -hdq),
+              new THREE.Vector3(hwq, .13, hdq), new THREE.Vector3(-hwq, .13, hdq), new THREE.Vector3(-hwq, .13, -hdq)];
+            const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+              new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 1.3, gapSize: .8, transparent: true, opacity: .95 }));
+            line.computeLineDistances();
+            g.add(line);
+            if (!_lotSpriteMat) {
+              _lotMarkerTex = lotMarkerTex();
+              _lotSpriteMat = new THREE.SpriteMaterial({ map: _lotMarkerTex, transparent: true, depthWrite: false });
+            }
+            const sp = new THREE.Sprite(_lotSpriteMat);
+            sp.scale.set(4, 4, 1); sp.position.y = 5.2;
+            g.add(sp);
+            g.position.set(cx - AX, 0, cz - AZ);
+            g.rotation.y = rotY;
+            plotGroup.add(g);   // rides the city-local plot layer (cleared on dispose)
+            plotRecs.push({ id: (city.key || 'c') + '-L' + nl, x: cx, z: cz, rot: rotY, w: LW, d: LD, price, owned: false, cityKey: city.key, lot: true, mesh: g });
+            nl++;
+          }
+        }
+        dist += len;   // advance the cumulative arc length
+      }
+    }
+    return nl;
   }
 
   // instanced plot layer: pads + dashed borders + floating $ markers

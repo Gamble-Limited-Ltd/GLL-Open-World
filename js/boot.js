@@ -60,4 +60,4 @@ exchLate({ WORKS });
 
 try { GFX.apply(); } catch (e) { console.error('[gfx]', e); }   // v2.66 PICTURE: the saved picture applies once the save has loaded (loadGame runs inside render/main.js's module body, before this line)
 try { NIGHT.settle(); } catch (e) { console.error('[night]', e); }   // v2.55 NIGHT SHIFT: settle the offline gap — invoked here, at the END of the module, so ECO/MINE/WORKS are all up (the boot screen blocks until the ready log, so no click can beat it)
-console.log('%cOPEN WORLD v2.66 — PICTURE', 'color:#38BDF8;font-weight:700', 'ready.');
+console.log('%cOPEN WORLD v2.67 — THE ARCHITECT', 'color:#38BDF8;font-weight:700', 'ready.');

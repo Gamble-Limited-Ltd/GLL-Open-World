@@ -341,12 +341,12 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.66 — PICTURE', `
-    <p><b>A GRAPHICS button in the Help tab — the picture is yours to tune.</b></p>
-    <div class="kv"><span class="k">SHADOWS &amp; TREES</span><span class="v">switch the sun's shadows and the world forest off or on, live</span></div>
-    <div class="kv"><span class="k">RENDER SCALE</span><span class="v">100 · 75 · 50% — the same world at a friendlier price on slower devices</span></div>
-    <div class="kv"><span class="k">DETAIL</span><span class="v">FULL or LITE street detail — LITE halves the props, like a phone</span></div>
-    <div class="kv"><span class="k">SAVED</span><span class="v">your settings ride in the world save — every city, every device, same picture</span></div>
+  openModal('Welcome to v2.67 — THE ARCHITECT', `
+    <p><b>Design your own unique buildings — and the city lots to raise them on.</b></p>
+    <div class="kv"><span class="k">DESIGN YOUR OWN</span><span class="v">BUILD → DESIGN YOUR OWN: footprint, floors, one of four styles, a name — priced honestly by size</span></div>
+    <div class="kv"><span class="k">CITY LOTS</span><span class="v">every city sells buildable 15×20 m lots (the gold ⌂ marker) — eight buildings each</span></div>
+    <div class="kv"><span class="k">GOLD FRAMES</span><span class="v">your finished buildings stand inside a dashed gold frame — the picture reads like the map</span></div>
+    <div class="kv"><span class="k">THE PICTURE</span><span class="v">a calmer, muted low-poly tone — grass, water and gold carry the saturation</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
@@ -410,7 +410,7 @@ function openHelp() {
     <div class="kv"><span class="k">WORLD MAP</span><span class="v">minimap (bottom right) · [M] or click it for the big map</span></div>
     <div class="kv"><span class="k">THE EARTH</span><span class="v">the real planet at TRUE SCALE — 40,007 km around, real distances between cities. Cross continents by orbit flight, search or the world map [M]; sea bridges still span the straits</span></div>
     <div class="kv"><span class="k">EMPIRE</span><span class="v">avatar (top right) → TELEPORT to any plot you own</span></div>
-    <div class="kv"><span class="k">BUILD</span><span class="v g">BUILD button → pick a house, shop, apartment block or factory shell, stock the materials (wood & stone at the yard; steel & glass at the yard or pulled from your ore-exchange stockpile), then PLACE — a 1 m grid overlays your plot, a ghost follows the cursor and a click sites it; buildings rise over real game days, pay every day and demolish back to 60% of their materials</span></div>
+    <div class="kv"><span class="k">BUILD</span><span class="v g">BUILD button → the catalog (house, shop, apartment block, factory shell) or <b>DESIGN YOUR OWN</b> — footprint, floors, style, a name; stock the materials (wood & stone at the yard; steel & glass at the yard or pulled from your ore-exchange stockpile), then PLACE — a 1 m grid overlays your plot, a ghost follows the cursor and a click sites it; buildings rise over real game days, pay every day and demolish back to 60% of their materials. City lots (15×20 m, the gold ⌂ marker) and roadside plots carry them — up to eight a plot</span></div>
     <div class="kv"><span class="k">FACTORIES</span><span class="v g">Click a finished factory shell → MACHINES: twelve machines can stand on its floor — six heavy (packaging station, CNC, stamping press, assembly line, weld cell, injection molder) plus the six classics — each pays every day; the shell fades to a cutaway while you place them, and selling back pays 60%</span></div>   <!-- v2.61 FACTORY FLOOR -->
     <div class="kv"><span class="k">OFFSHORE</span><span class="v g">MINE button → OFFSHORE → BUILD A RIG on open ocean (400 m off any coast, clear of your other rigs): $185,000 + 260 t steel + 60 t stone, then hire up to 32 workers — crude pumps into the rig's own 2,000 t tank (a short crew pumps slower), wages and upkeep come due daily, pressure falls as the field drains, and OFFLOAD moves the crude to the Ore Exchange for $2/t freight — decommission salvages 60%</span></div>   <!-- v2.62 DEEP WATER -->
     <div class="kv"><span class="k">FURNISH</span><span class="v g">Hold a room or floor? FURNISH in its panel opens the furniture shop — craft pieces from shed materials or buy with cash, click to place (<b>R</b> rotates the ghost), and click any placed piece to turn, move or sell it back for 60% — computers sit on desks (place the desk first)</span></div>

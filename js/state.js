@@ -24,9 +24,11 @@ export const STATE = {
   mat: { Wood: 0, Stone: 0, Steel: 0, Glass: 0 },   // v2.56 GROUND UP: the materials shed — tonnes of wood/stone/steel/glass for construction
   pow: { g: { m: 1, pm: 1 }, b: {} },   // v2.59 THE GRID: the power state — grid price multiplier {m, pm} + per-business meters {plotId: {m, cut, due}}
   gfx: { shadows: true, trees: true, scale: 1, lite: false },   // v2.66 PICTURE: the graphics levers behind the Help tab's GRAPHICS button — saved with the world
+  designs: [],                   // v2.67 THE ARCHITECT: your drafted buildings {name, w, d, h, floors, style, mat, days, inc, val} — placed buildings save t = 100 + index
   market: null,                  // MARKET module state (positions/orders)
   lastCityKey: null,
   seenNews: false,
   tut: { step: 0, done: false },   // v2.05 starter-guide progress
   playerW: null, playerZ: null,  // last world position (v2.15 saves)
 };
+window.STATE = STATE;   // QA surface — the same convention as window.CITY/BLD/GFX (v2.67)

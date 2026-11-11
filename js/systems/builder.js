@@ -1,6 +1,11 @@
 // ====================================================================
 // js/systems/builder.js — ground-up construction (Stage 7c):
 // materials yard, catalog, ghost placement, rising sites.
+// v2.67 THE ARCHITECT: DESIGN YOUR OWN — the studio (footprint, floors,
+// style, a name of your own) writes a design into STATE.designs and the
+// catalog carries it beside the classics; buildings placed from a design
+// save t >= 100 (index + 100). City lots (15×20 m, city.js) and roadside
+// plots both carry buildings; sidewalk spots stay cart-sized.
 // ====================================================================
 import * as THREE from 'three';
 import { fmt$ } from '../util.js';
@@ -56,6 +61,51 @@ export const BLD = (() => {
     { id: 'apts',  name: 'Apartment Block', icon: '🏢', w: 10, d: 9,  h: 16,  days: 2,  inc: 118, val: 5400, mat: { Stone: 60, Steel: 40, Glass: 24 } },
     { id: 'fact',  name: 'Factory Shell',   icon: '🏭', w: 12, d: 10, h: 7.5, days: 3,  inc: 128, val: 5800, mat: { Stone: 45, Steel: 60 } },
   ];
+
+  // ---- v2.67 THE ARCHITECT: your own designs --------------------------
+  // The ask: "Allow people to build their own unique buildings." The studio
+  // composes one: footprint (6–14 × 6–12 m), floors (1–12), one of four
+  // styles, a NAME — materials, cost, build days, income and worth all
+  // derive from the same per-m²-per-floor rates the classics pay, so a
+  // big landmark tower is a big landmark project. Designs save with the
+  // world (STATE.designs ← pack dsg); a placed building records
+  // t = 100 + designIndex, and T(t) below resolves either kind.
+  const STYLES = [
+    { id: 'brick',  name: 'Brick Walk-up', icon: '🧱', wall: 0xb0685a, band: 0x2e2a28, roofC: 0x5a4a4e, pitched: false, mat: (a, f) => ({ Stone: +(a * f * .13).toFixed(1), Wood: +(a * f * .02).toFixed(1) }) },
+    { id: 'glass',  name: 'Glass Tower',   icon: '🏙️', wall: 0x7fa8c4, band: 0x31445c, roofC: 0x5a6472, pitched: false, mat: (a, f) => ({ Glass: +(a * f * .08).toFixed(1), Steel: +(a * f * .04).toFixed(1) }) },
+    { id: 'modern', name: 'Modern Block',  icon: '🏢', wall: 0xb7b0a6, band: 0x37414d, roofC: 0x4c5258, pitched: false, mat: (a, f) => ({ Stone: +(a * f * .08).toFixed(1), Steel: +(a * f * .04).toFixed(1), Glass: +(a * f * .03).toFixed(1) }) },
+    { id: 'timber', name: 'Timber Lodge',  icon: '🏡', wall: 0xa8845c, band: 0x2e2a28, roofC: 0x8a4a3c, pitched: true,  mat: (a, f) => ({ Wood: +(a * f * .10).toFixed(1), Stone: +(a * f * .03).toFixed(1) }) },
+  ];
+  const YARD_COST = o => Object.entries(o).reduce((s, [k, n]) => s + n * YARD[k], 0);
+  function designOf(w, d, floors, styleId, name) {
+    const st = STYLES.find(s => s.id === styleId) || STYLES[0];
+    const area = w * d, f = Math.max(1, floors | 0);
+    const mat = st.mat(area, f);
+    for (const k in mat) if (!mat[k]) delete mat[k];   // a zero tonne line reads as noise
+    const cost = Math.round(YARD_COST(mat));
+    const h = +(f * 3.2).toFixed(1);
+    const days = +Math.max(.5, (area / 80 + f * .28)).toFixed(1);
+    return {
+      id: 'dsg', name: (name || '').trim().slice(0, 24) || 'Your Building', icon: st.icon,
+      w, d: +d, h, floors: f, style: st.id, mat,
+      days, inc: Math.max(8, Math.round(cost / 46)), val: Math.round(cost * .95),
+    };
+  }
+  // t < 100 → the classic catalog; t >= 100 → design (t - 100). A design
+  // deleted while nothing stands from it keeps saves honest (the studio
+  // refuses the delete while one does); a stale index still degrades to
+  // the House, never a crash.
+  function ensureDesigns() {   // raw packs from save.js → full specs, once per session
+    const ds = STATE.designs || (STATE.designs = []);
+    for (let i = 0; i < ds.length; i++) {
+      if (ds[i] && ds[i].name === undefined && ds[i].n !== undefined)
+        ds[i] = designOf(ds[i].w, ds[i].d, ds[i].f, ds[i].s, ds[i].n);
+    }
+  }
+  function T(t) {
+    if (t >= 100) { ensureDesigns(); const x = ((STATE.designs || [])[t - 100]); if (x) return x; }
+    return TYPES[t] || TYPES[0];
+  }
   let placing = null;                  // { t } — placement armed
   const live = new Map();              // plot.id + '#' + idx -> { root, body, scaffold, site, lastP }
   let acc = 0, meshT = 0;
@@ -119,7 +169,7 @@ export const BLD = (() => {
     if (p.cart && Math.abs(lx) < CART_W + T.w / 2 && Math.abs(lz) < CART_D + T.d / 2)
       return { ok: false, why: 'cart' };
     for (const o of (p.bld || [])) {
-      const T2 = TYPES[o.t] || TYPES[0];
+      const T2 = T(o.t);
       if (Math.abs(o.x - lx) < (T.w + T2.w) / 2 + CLEAR && Math.abs(o.z - lz) < (T.d + T2.d) / 2 + CLEAR)
         return { ok: false, why: 'overlap' };
     }
@@ -143,7 +193,56 @@ export const BLD = (() => {
     return M;
   }
   const box = (mt, w, h, d) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mt);
+  // v2.67 THE ARCHITECT: the custom mesh — one body, per-floor window
+  // bands, a roof by style, and a wedding-cake setback on towers of 8+
+  // floors (the same silhouette move the city's own skyline makes).
+  function partsC(D) {
+    const st = STYLES.find(s => s.id === D.style) || STYLES[0];
+    if (!st._m) st._m = { wall: LM(st.wall), band: LM(st.band), roof: LM(st.roofC) };   // one material set per style
+    const wall = st._m.wall, band = st._m.band, roof = st._m.roof;
+    const g = new THREE.Group();
+    const w = D.w - .4, d = D.d - .4, fh = 3.2, fl = D.floors;
+    const tiered = fl >= 8;
+    const bodyH = tiered ? fh * fl * .68 : fh * fl;
+    const b = box(wall, w, bodyH, d); b.position.y = bodyH / 2; g.add(b);
+    // window bands — front + back every floor, sides every other floor
+    const yAt = f => fh * (f + .5);
+    for (let f = 0; f < (tiered ? Math.floor(fl * .68) : fl); f++) {
+      const y = yAt(f);
+      if (y + 1.1 > bodyH) break;
+      const wb = box(band, w * .74, 1.05, .12); wb.position.set(0, y, d / 2 + .05); g.add(wb);
+      const wb2 = box(band, w * .74, 1.05, .12); wb2.position.set(0, y, -d / 2 - .05); g.add(wb2);
+      if (f % 2 === 0) {
+        const sb = box(band, .12, 1.05, d * .74); sb.position.set(w / 2 + .05, y, 0); g.add(sb);
+        const sb2 = box(band, .12, 1.05, d * .74); sb2.position.set(-w / 2 - .05, y, 0); g.add(sb2);
+      }
+    }
+    if (tiered) {                                   // the setback crown
+      const p2w = w * .68, p2d = d * .68, p2H = fh * fl - bodyH;
+      const p2 = box(wall, p2w, p2H, p2d); p2.position.y = bodyH + p2H / 2; g.add(p2);
+      for (let f = Math.floor(fl * .68); f < fl; f++) {
+        const y = bodyH + (f - Math.floor(fl * .68)) * fh + fh * .5;
+        if (y + 1.1 > bodyH + p2H) break;
+        const wb = box(band, p2w * .7, 1.05, .12); wb.position.set(0, y, p2d / 2 + .05); g.add(wb);
+        const wb2 = box(band, p2w * .7, 1.05, .12); wb2.position.set(0, y, -p2d / 2 - .05); g.add(wb2);
+      }
+      const cap = box(roof, p2w + .5, .35, p2d + .5); cap.position.y = bodyH + p2H + .17; g.add(cap);
+    } else if (st.pitched) {                        // the lodge — warm pitched roof
+      const rw = w + 1.2, rd = d / 2 + .8;
+      const r1 = box(roof, rw, .3, Math.hypot(rd, 1.6)); r1.position.set(0, fh * fl + .75, -rd / 2); r1.rotation.x = -.5; g.add(r1);
+      const r2 = box(roof, rw, .3, Math.hypot(rd, 1.6)); r2.position.set(0, fh * fl + .75, rd / 2); r2.rotation.x = .5; g.add(r2);
+    } else {                                        // flat roof + parapet lip
+      const cap = box(roof, w + .5, .35, d + .5); cap.position.y = fh * fl + .17; g.add(cap);
+      const lip = box(band, w + .62, .55, d + .62); lip.position.y = fh * fl - .1; g.add(lip);
+      if (fl >= 4) {                                 // a roof-access bulkhead on the bigger ones
+        const bh = box(wall, Math.min(2.6, w * .3), 1.7, Math.min(2.2, d * .3));
+        bh.position.set(w * .22, fh * fl + 1.2, -d * .22); g.add(bh);
+      }
+    }
+    return g;
+  }
   function parts(t) {   // the finished building, in the plot-local frame
+    if (t >= 100) return partsC(T(t));               // v2.67 THE ARCHITECT
     const m = mats(), g = new THREE.Group();
     if (t === 0) {                                     // 🏠 house
       const w = box(m.wallH, 5.4, 3, 5.4); w.position.y = 1.5; g.add(w);
@@ -178,25 +277,36 @@ export const BLD = (() => {
     return g;
   }
   function makeLive(t, prog) {   // root + scaffold + rising body
-    const T = TYPES[t];
+    const TT = T(t);
     const root = new THREE.Group();
-    const site = new THREE.Mesh(new THREE.PlaneGeometry(T.w, T.d), mats().site);
+    const site = new THREE.Mesh(new THREE.PlaneGeometry(TT.w, TT.d), mats().site);
     site.rotation.x = -Math.PI / 2; site.position.y = .06; root.add(site);
-    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(T.w - .5, T.h, T.d - .5)), mats().scaff);
-    edges.position.y = T.h / 2; root.add(edges);
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(TT.w - .5, TT.h, TT.d - .5)), mats().scaff);
+    edges.position.y = TT.h / 2; root.add(edges);
     const body = parts(t); root.add(body);
-    const r = { root, site, scaffold: edges, body, lastP: -1 };
+    // v2.67 THE ARCHITECT: the gold dashed frame — the player's own
+    // buildings stand inside one once finished (the reference look:
+    // a dashed gold rectangle around what is yours, on the ground).
+    const fw = TT.w + 1.6, fd = TT.d + 1.6;
+    const fpts = [new THREE.Vector3(-fw / 2, .22, -fd / 2), new THREE.Vector3(fw / 2, .22, -fd / 2),
+      new THREE.Vector3(fw / 2, .22, fd / 2), new THREE.Vector3(-fw / 2, .22, fd / 2), new THREE.Vector3(-fw / 2, .22, -fd / 2)];
+    const frame = new THREE.Line(new THREE.BufferGeometry().setFromPoints(fpts),
+      new THREE.LineDashedMaterial({ color: 0xf5cc74, dashSize: 1, gapSize: .6, transparent: true, opacity: .9 }));
+    frame.computeLineDistances();
+    frame.visible = false; root.add(frame);
+    const r = { root, site, scaffold: edges, body, frame, lastP: -1 };
     refresh(r, t, prog);
     return r;
   }
   function refresh(r, t, prog) {   // the body rises out of the ground as the site builds
-    const T = TYPES[t], fin = Math.max(0, Math.min(1, prog / T.days));
+    const TT = T(t), fin = Math.max(0, Math.min(1, prog / TT.days));
     if (r.lastP >= 0 && Math.abs(fin - r.lastP) < .02) return;
     r.lastP = fin;
     r.body.scale.y = .18 + .82 * fin;
     const done = fin >= 1;
     r.scaffold.visible = !done;
     r.site.visible = !done;
+    if (r.frame) r.frame.visible = done;   // v2.67: the gold frame draws on topping-out
   }
 
   // ---- the runtime registry (spawn / keep alive) -----------------------
@@ -230,10 +340,10 @@ export const BLD = (() => {
   const list = () => { const o = []; for (const p of STATE.plots) (p.bld || []).forEach((b, i) => o.push({ p, b, i })); return o; };
   function valueOf() {
     let v = 0;
-    for (const x of list()) v += TYPES[x.b.t].val * (x.b.p >= TYPES[x.b.t].days ? 1 : .6);
+    for (const x of list()) v += T(x.b.t).val * (x.b.p >= T(x.b.t).days ? 1 : .6);
     return Math.round(v);
   }
-  function income() { let d = 0; for (const x of list()) if (x.b.p >= TYPES[x.b.t].days) d += TYPES[x.b.t].inc; return d; }
+  function income() { let d = 0; for (const x of list()) if (x.b.p >= T(x.b.t).days) d += T(x.b.t).inc; return d; }
 
   // ---- placement ghost + grid -------------------------------------------
   let ghostG = null, ghost = null, ghostEdge = null, grids = new Map();
@@ -265,16 +375,16 @@ export const BLD = (() => {
       for (const [, g] of grids) g.visible = false;
       return { off: true };
     }
-    const { p, rec } = hit, T = TYPES[placing.t];
+    const { p, rec } = hit, Tg = T(placing.t);
     gridFor(rec).visible = true;
     for (const [k, g] of grids) if (k !== rec.id) g.visible = false;
     const [rx, rz] = toLocal(rec, x, z);
     const lx = Math.round(rx), lz = Math.round(rz);
-    const v = validFoot(p, rec, T, lx, lz);
+    const v = validFoot(p, rec, Tg, lx, lz);
     if (!ghostG) {
       ghostG = new THREE.Group();
-      ghost = new THREE.Mesh(new THREE.BoxGeometry(T.w, T.h, T.d), new THREE.MeshBasicMaterial({ transparent: true, opacity: .3, depthWrite: false }));
-      ghostEdge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(T.w, T.h, T.d)), mats().edge);
+      ghost = new THREE.Mesh(new THREE.BoxGeometry(Tg.w, Tg.h, Tg.d), new THREE.MeshBasicMaterial({ transparent: true, opacity: .3, depthWrite: false }));
+      ghostEdge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(Tg.w, Tg.h, Tg.d)), mats().edge);
       ghost.renderOrder = ghostEdge.renderOrder = 4;
       ghostG.add(ghost); ghostG.add(ghostEdge);
       const host = grpFor(rec); if (!host) return { off: true };
@@ -283,9 +393,9 @@ export const BLD = (() => {
     ghostG.visible = true;
     ghostG.position.set(rec.x, 0, rec.z);
     ghostG.rotation.y = rec.rot;
-    ghost.position.set(lx, T.h / 2, lz);
-    ghostEdge.position.set(lx, T.h / 2, lz);
-    const col = (v.ok && matReady(T)) ? 0x4dff88 : 0xff5470;
+    ghost.position.set(lx, Tg.h / 2, lz);
+    ghostEdge.position.set(lx, Tg.h / 2, lz);
+    const col = (v.ok && matReady(Tg)) ? 0x4dff88 : 0xff5470;
     ghost.material.color.setHex(col);
     ghostEdge.material.color.setHex(col);
     return { hit, lx, lz, v };
@@ -313,12 +423,12 @@ export const BLD = (() => {
     if (STATE.mode !== 'city' || !WORLD.group) { toast('Enter the world first — buildings need ground under your boots.'); return; }
     try { closeModal(); } catch (er) { }
     placing = { t };
-    const T = TYPES[t];
-    bar('PLACING <b>' + T.name.toUpperCase() + '</b> · materials from your shed · <span style="color:var(--mut)">' + fmt$(STATE.money) + '</span>', 'DONE', () => exitPlacing(true));
-    toast('Click a green cell on <b>a plot you own</b> to set the ' + T.name + ' down. ESC or DONE to finish.', 'warn');
+    const TT = T(t);
+    bar('PLACING <b>' + TT.name.toUpperCase() + '</b> · materials from your shed · <span style="color:var(--mut)">' + fmt$(STATE.money) + '</span>', 'DONE', () => exitPlacing(true));
+    toast('Click a green cell on <b>a plot you own</b> to set the ' + TT.name + ' down. ESC or DONE to finish.', 'warn');
   }
   function exitPlacing(reopen) {
-    const was = placing ? TYPES[placing.t] : null;
+    const was = placing ? T(placing.t) : null;
     placing = null; killGhost(); hideBar();
     if (reopen && was) try { open(); } catch (er) { }
   }
@@ -326,11 +436,11 @@ export const BLD = (() => {
 
   // ---- the commit (mouse path + QA path, same validation) -------------
   function commit(p, rec, t, lx, lz) {
-    const T = TYPES[t];
-    const v = validFoot(p, rec, T, lx, lz);
+    const TT = T(t);
+    const v = validFoot(p, rec, TT, lx, lz);
     if (!v.ok) return { ok: false, why: v.why };
-    if (!matReady(T)) return { ok: false, why: 'mat' };
-    deduct(T);
+    if (!matReady(TT)) return { ok: false, why: 'mat' };
+    deduct(TT);
     (p.bld || (p.bld = [])).push({ t: t | 0, x: Math.round(lx * 10) / 10, z: Math.round(lz * 10) / 10, p: 0 });
     try { saveGame(); } catch (er) { }
     ensureRegion();
@@ -338,7 +448,7 @@ export const BLD = (() => {
   }
   function placeAttempt(x, z) {
     if (!placing) return;
-    const T = TYPES[placing.t];
+    const TT = T(placing.t);
     const hit = ownedUnder(x, z);
     if (!hit) { toast('<b>Stand over a plot you own.</b> Buildings rise on your own land — roadside plots (15×20 m) carry them; sidewalk spots are cart-sized.', 'warn'); return; }
     const { p, rec } = hit;
@@ -368,10 +478,10 @@ export const BLD = (() => {
       const b = p && p.bld && p.bld[+idxS];
       if (!b) continue;
       const rec = recOf(p); if (!rec) continue;
-      const T = TYPES[b.t];
+      const TT = T(b.t);
       const [lx, lz] = toLocal(rec, x, z);
-      if (Math.abs(lx - b.x) <= T.w / 2 + .25 && Math.abs(lz - b.z) <= T.d / 2 + .25)
-        return { p, b, rec, T, i: +idxS };
+      if (Math.abs(lx - b.x) <= TT.w / 2 + .25 && Math.abs(lz - b.z) <= TT.d / 2 + .25)
+        return { p, b, rec, T: TT, i: +idxS };
     }
     return null;
   }
@@ -379,13 +489,13 @@ export const BLD = (() => {
     if (STATE.mode !== 'city' || !WORLD.group) return null;
     if (placing) {
       const g = moveGhost(x, z);
-      const T = TYPES[placing.t];
-      if (!g || g.off) return { t: T.icon + ' ' + T.name + ' — placement', s: 'Ghost hidden — hover a plot you own', p: '', a: '', l: 'Click your plot to place · ESC to finish' };
+      const TT = T(placing.t);
+      if (!g || g.off) return { t: TT.icon + ' ' + TT.name + ' — placement', s: 'Ghost hidden — hover a plot you own', p: '', a: '', l: 'Click your plot to place · ESC to finish' };
       const why = !g.v.ok ? (g.v.why === 'bounds' ? 'outside the stakes' : g.v.why === 'overlap' ? 'too close to another building' : g.v.why === 'cart' ? 'the cart\u2019s space' : 'plot full')
-        : (!matReady(T) ? 'short on materials' : '');
+        : (!matReady(TT) ? 'short on materials' : '');
       return {
-        t: T.icon + ' ' + T.name + ' — ' + (why ? 'invalid here' : 'green — click to site'),
-        s: T.w + '×' + T.d + ' m · ' + (T.days === .5 ? '½ day' : T.days + ' days') + ' · pays ' + fmt$(T.inc) + '/day',
+        t: TT.icon + ' ' + TT.name + ' — ' + (why ? 'invalid here' : 'green — click to site'),
+        s: TT.w + '×' + TT.d + ' m · ' + (TT.days === .5 ? '½ day' : TT.days + ' days') + ' · pays ' + fmt$(TT.inc) + '/day',
         p: '', a: why ? '✗ ' + why : '✓ fits', l: why ? 'Move over your plot' : 'Click to set it down',
       };
     }
@@ -449,10 +559,22 @@ export const BLD = (() => {
   }
 
   // ---- the BUILD panel + materials yard --------------------------------
+  function cardOf(T, i) {   // one catalog row — classic (i < 4) or design (i >= 100)
+    const need = Object.entries(T.mat).map(([k, n]) => {
+      const a = avail(k), sh = Math.max(0, n - a);
+      return k + ' ' + n + ' t' + (sh > 1e-9 ? ' <b style="color:#f5cc74">short ' + (Math.round(sh * 10) / 10) + '</b>' : ' <b style="color:#48BB78">✓</b>');
+    }).join(' · ');
+    const miss = missCost(T);
+    return `
+      <div class="kv"><span class="k">${T.icon} ${T.name.toUpperCase()}</span><span class="v">${T.w}×${T.d} m${T.floors ? ' · ' + T.floors + ' floors' : ''} · ${T.days === .5 ? '½ day' : T.days + ' days'} to build · pays ${fmt$(T.inc)}/day · ${fmt$(T.val)} worth</span></div>
+      <div class="kv"><span class="k">MATERIALS</span><span class="v">${need}</span>${miss > 0 ? '<button class="tpbtn" data-bm="' + i + '">BUY MISSING — ' + fmt$(miss) + '</button>' : ''}<button class="tpbtn" data-bp="${i}">PLACE ▸</button></div>`;
+  }
   function open() {
     if (STATE.mode !== 'city') { toast('Enter the world first — buildings need ground under your boots.'); return; }
+    ensureDesigns();
     const rural = STATE.plots.filter(p => p.cityKey === 'rural').length;
     const cityP = STATE.plots.filter(p => p.cityKey !== 'rural').length;
+    const lots = STATE.plots.filter(p => p.lot).length;
     const yard = MAT_KEYS.map(k => {
       const st = (k === 'Steel' || k === 'Glass') ? stock(k) : 0;
       return `<div class="kv"><span class="k">${k.toUpperCase()} — ${Math.round(shed(k) * 10) / 10} t${st > .005 ? ' <span style="color:var(--mut)">(+' + (Math.round(st * 10) / 10) + ' t on the exchange)</span>' : ''}</span>
@@ -460,26 +582,24 @@ export const BLD = (() => {
         <button class="tpbtn" data-my="${k}">BUY 10 t — $${YARD[k] * 10}</button>
         ${st > .005 ? '<button class="tpbtn" data-pu="' + k + '">PULL ' + (Math.round(st * 10) / 10) + ' t</button>' : ''}</div>`;
     }).join('');
-    const cards = TYPES.map((T, i) => {
-      const need = Object.entries(T.mat).map(([k, n]) => {
-        const a = avail(k), sh = Math.max(0, n - a);
-        return k + ' ' + n + ' t' + (sh > 1e-9 ? ' <b style="color:#f5cc74">short ' + (Math.round(sh * 10) / 10) + '</b>' : ' <b style="color:#48BB78">✓</b>');
-      }).join(' · ');
-      const miss = missCost(T);
-      return `
-      <div class="kv"><span class="k">${T.icon} ${T.name.toUpperCase()}</span><span class="v">${T.w}×${T.d} m · ${T.days === .5 ? '½ day' : T.days + ' days'} to build · pays ${fmt$(T.inc)}/day · ${fmt$(T.val)} worth</span></div>
-      <div class="kv"><span class="k">MATERIALS</span><span class="v">${need}</span>${miss > 0 ? '<button class="tpbtn" data-bm="' + i + '">BUY MISSING — ' + fmt$(miss) + '</button>' : ''}<button class="tpbtn" data-bp="${i}">PLACE ▸</button></div>`;
-    }).join('');
+    const cards = TYPES.map((T, i) => cardOf(T, i)).join('');
+    const dsg = (STATE.designs || []);
+    const dCards = dsg.length
+      ? '<div class="msec" style="margin-top:14px">Your designs — ' + dsg.length + ' of 12</div>' + dsg.map((D, j) => cardOf(D, 100 + j)).join('')
+      : '';
     openModal('Ground Up — Build on Your Land', `
       <p>Pick a building, stock the materials, then <b>PLACE</b> — a grid overlays your plot, a ghost follows the cursor, and a click sites it. Buildings take real game days to rise, pay every day, and demolish back to 60% of their materials.</p>
-      <div class="kv"><span class="k">YOUR LAND</span><span class="v">${rural} roadside plot${rural === 1 ? '' : 's'} (15×20 m — they carry buildings)${cityP ? ' · ' + cityP + ' city spot' + (cityP === 1 ? '' : 's') + ' (cart-sized)' : ''}</span></div>
+      <div style="display:flex;gap:8px;margin:0 0 12px"><button class="btn primary" id="bg-new" style="flex:1">✏️ DESIGN YOUR OWN BUILDING</button></div>
+      <div class="kv"><span class="k">YOUR LAND</span><span class="v">${rural} roadside plot${rural === 1 ? '' : 's'} (15×20 m)${lots ? ' · ' + lots + ' city lot' + (lots === 1 ? '' : 's') + ' (15×20 m)' : ''}${cityP ? ' · ' + cityP + ' city spot' + (cityP === 1 ? '' : 's') + ' (cart-sized)' : ''} — the big ones carry buildings</span></div>
       <div class="msec" style="margin-top:14px">The materials yard — ${fmt$(STATE.money)}</div>
       ${yard}
       <div class="msec" style="margin-top:14px">The catalog</div>
       ${cards}
+      ${dCards}
       <div class="kv" style="margin-top:8px"><span class="k">STEEL &amp; GLASS</span><span class="v">Run the Works and PULL your own for less — yard prices sit above exchange par ($58 steel, $38 glass)</span></div>
       <div style="display:flex;gap:8px;margin-top:16px"><button class="btn" id="bg-x" style="flex:1">CLOSE</button></div>`);
     document.getElementById('bg-x').onclick = closeModal;
+    document.getElementById('bg-new').onclick = () => { try { openStudio(); } catch (er) { console.error('[bld]', er); } };
     document.querySelectorAll('[data-my]').forEach(b => b.onclick = () => {
       const k = b.dataset.my, cost = YARD[k] * 10;
       if (!spend(cost)) { toast('<b>Not enough money.</b> Ten tonnes of ' + k.toLowerCase() + ' runs ' + fmt$(cost) + '.', 'warn'); return; }
@@ -498,17 +618,87 @@ export const BLD = (() => {
       open();
     });
     document.querySelectorAll('[data-bm]').forEach(b => b.onclick = () => {
-      const T = TYPES[+b.dataset.bm], sh = shortOf(T);
+      const T1 = T(+b.dataset.bm), sh = shortOf(T1);
       let cost = 0; for (const k in sh) cost += sh[k] * YARD[k];
       cost = Math.round(cost);
       if (cost <= 0) { open(); return; }
       if (!spend(cost)) { toast('<b>Not enough money.</b> The shortfall runs ' + fmt$(cost) + ' at the yard.', 'warn'); return; }
       for (const k in sh) STATE.mat[k] = Math.min(1e6, +((shed(k)) + sh[k]).toFixed(1));
       try { saveGame(); } catch (er) { }
-      toast('🧱 <b>Materials bought</b> — the ' + T.name + ' is ready to place.');
+      toast('🧱 <b>Materials bought</b> — the ' + T1.name + ' is ready to place.');
       open();
     });
     document.querySelectorAll('[data-bp]').forEach(b => b.onclick = () => armPlace(+b.dataset.bp));
+  }
+
+  // ---- v2.67 THE ARCHITECT: the studio ---------------------------------
+  // DESIGN YOUR OWN — a footprint, a floor count, one of four styles and
+  // a name; materials, cost, days, income and worth derive live from the
+  // sliders, all on the same per-m²-per-floor rates the catalog pays, so
+  // whatever you dream up prices like the rest of the world. SAVE puts it
+  // in the catalog (and the world save); REMOVE takes it back out again
+  // — only while nothing of yours still stands from it.
+  function openStudio() {
+    if (STATE.mode !== 'city') { toast('Enter the world first — buildings need ground under your boots.'); return; }
+    ensureDesigns();
+    const S = { w: 10, d: 8, floors: 3, style: 'brick', name: '' };
+    const step = (id, val, min, max, by, unit, fmt) => `<div class="kv"><span class="k">${id}</span><span class="v" id="st-${id.toLowerCase()}">${fmt(val)}</span>
+      <button class="tpbtn" data-st="${id.toLowerCase()}" data-d="-${by}">−</button><button class="tpbtn" data-st="${id.toLowerCase()}" data-d="${by}">+</button></div>`;
+    const draw = () => {
+      const D = designOf(S.w, S.d, S.floors, S.style, S.name);
+      const matList = Object.entries(D.mat).map(([k, n]) => k + ' ' + n + ' t').join(' · ');
+      const yours = (STATE.designs || []);
+      const styleChips = STYLES.map(s => `<button class="tpbtn" data-sy="${s.id}" style="${S.style === s.id ? 'font-weight:700;background:rgba(245,204,116,.25)' : ''}">${s.icon} ${s.name}</button>`).join(' ');
+      openModal('The Architect — Design Your Own', `
+        <p>Compose a building only you would think of. Cost, build time and income scale honestly with the size — a twelve-floor landmark is a twelve-floor project.</p>
+        ${step('WIDTH', S.w, 6, 14, 2, 'm', v => v + ' m')}
+        ${step('DEPTH', S.d, 6, 12, 2, 'm', v => v + ' m')}
+        ${step('FLOORS', S.floors, 1, 12, 1, '', v => v)}
+        <div class="kv"><span class="k">STYLE</span><span class="v">${styleChips}</span></div>
+        <div class="kv"><span class="k">NAME</span><span class="v"><input id="st-name" maxlength="24" placeholder="${(STATE.name || 'Your') + ' ' + (S.floors >= 8 ? 'Tower' : S.floors >= 4 ? 'Block' : 'House')}" value="${S.name.replace(/"/g, '&quot;')}" style="background:rgba(13,17,23,.8);border:1px solid #4A5568;color:#E2E8F0;padding:6px 10px;border-radius:7px;font-size:12px;width:180px"></span></div>
+        <div class="kv"><span class="k">THE DRAFT</span><span class="v">${D.w}×${D.d} m · ${D.floors} floors · ${D.h} m tall${D.floors >= 8 ? ' · wedding-cake setback' : ''}</span></div>
+        <div class="kv"><span class="k">MATERIALS</span><span class="v">${matList}</span></div>
+        <div class="kv"><span class="k">COST AT THE YARD</span><span class="v">${fmt$(Math.round(YARD_COST(D.mat)))}${missCost(D) > 0 ? ' <span style="color:#f5cc74">(short ' + fmt$(missCost(D)) + ')</span>' : ''}</span></div>
+        <div class="kv"><span class="k">BUILDS & PAYS</span><span class="v">${D.days === .5 ? '½ day' : D.days + ' days'} to rise · ${fmt$(D.inc)}/day · ${fmt$(D.val)} worth</span></div>
+        ${yours.length ? '<div class="msec" style="margin-top:14px">Your designs</div>' + yours.map((X, j) => `<div class="kv"><span class="k">${X.icon} ${X.name}</span><span class="v">${X.w}×${X.d} · ${X.floors} fl</span><button class="tpbtn" data-rm="${j}">REMOVE</button></div>`).join('') : ''}
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button class="btn good" id="st-save" style="flex:1">SAVE TO CATALOG</button>
+          <button class="btn" id="st-x" style="flex:1">CLOSE</button>
+        </div>`);
+      document.getElementById('st-x').onclick = () => { closeModal(); try { open(); } catch (er) { } };
+      const nm = document.getElementById('st-name');
+      nm.oninput = () => { S.name = nm.value; };
+      document.querySelectorAll('[data-st]').forEach(b => b.onclick = () => {
+        const k = b.dataset.st, dv = +b.dataset.d;
+        if (k === 'width') S.w = Math.max(6, Math.min(14, S.w + dv * 2));
+        if (k === 'depth') S.d = Math.max(6, Math.min(12, S.d + dv * 2));
+        if (k === 'floors') S.floors = Math.max(1, Math.min(12, S.floors + dv));
+        draw();
+      });
+      document.querySelectorAll('[data-sy]').forEach(b => b.onclick = () => { S.style = b.dataset.sy; draw(); });
+      document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => {
+        const j = +b.dataset.rm;
+        const inUse = list().some(x => x.b.t === 100 + j);
+        if (inUse) { toast('<b>A building of yours still stands from this design.</b> Demolish it first — then remove the drawing.', 'warn'); return; }
+        (STATE.designs || []).splice(j, 1);
+        // re-seat any standing buildings from later designs onto their new indices
+        for (const p of STATE.plots) for (const bb of (p.bld || []))
+          if (bb.t > 100 + j) bb.t--;
+        try { saveGame(); } catch (er) { }
+        toast('Design removed — the catalog is yours to redraw.');
+        draw();
+      });
+      document.getElementById('st-save').onclick = () => {
+        if (!(STATE.designs)) STATE.designs = [];
+        if (STATE.designs.length >= 12) { toast('<b>Twelve designs</b> fit on the shelf — remove one first.', 'warn'); return; }
+        STATE.designs.push(designOf(S.w, S.d, S.floors, S.style, S.name));
+        try { saveGame(); } catch (er) { }
+        toast('📐 <b>' + STATE.designs[STATE.designs.length - 1].name + '</b> drafted — find it in the catalog, PLACE to site it.');
+        closeModal();
+        try { open(); } catch (er) { }
+      };
+    };
+    draw();
   }
 
   // ---- the beat: rise, pay, stay alive ----------------------------------
@@ -517,12 +707,12 @@ export const BLD = (() => {
     dt = Math.min(dt, 2);
     let topped = 0;
     for (const p of STATE.plots) for (const b of (p.bld || [])) {
-      const T = TYPES[b.t];
-      if (b.p < T.days) {
+      const TT = T(b.t);
+      if (b.p < TT.days) {
         b.p = +(b.p + dt / DAY).toFixed(4);
-        if (b.p >= T.days) {
-          b.p = T.days; topped++;
-          try { toast(T.icon + ' <b>' + T.name + ' topped out</b> — it pays ' + fmt$(T.inc) + ' every game day.' + (T.id === 'fact' ? ' Click it to open <b>the factory floor</b> for machines.' : '')); } catch (er) { }   // v2.61 FACTORY FLOOR: the shell's floor opens
+        if (b.p >= TT.days) {
+          b.p = TT.days; topped++;
+          try { toast(TT.icon + ' <b>' + TT.name + ' topped out</b> — it pays ' + fmt$(TT.inc) + ' every game day.' + (TT.id === 'fact' ? ' Click it to open <b>the factory floor</b> for machines.' : '')); } catch (er) { }   // v2.61 FACTORY FLOOR: the shell's floor opens
         }
       }
     }
@@ -531,7 +721,7 @@ export const BLD = (() => {
     if (acc >= 1) {
       const secs = Math.min(acc, 30); acc = 0;
       let d = 0;
-      for (const p of STATE.plots) for (const b of (p.bld || [])) if (b.p >= TYPES[b.t].days) d += TYPES[b.t].inc / DAY * secs;
+      for (const p of STATE.plots) for (const b of (p.bld || [])) if (b.p >= T(b.t).days) d += T(b.t).inc / DAY * secs;
       if (d > 0) earn(d);
     }
     meshT += dt;
@@ -541,8 +731,8 @@ export const BLD = (() => {
   function advance(days) {
     let d = 0, done = 0;
     for (const p of STATE.plots) for (const b of (p.bld || [])) {
-      const T = TYPES[b.t];
-      if (b.p < T.days) { b.p = Math.min(T.days, +(b.p + days).toFixed(4)); d += days; if (b.p >= T.days) done++; }
+      const TT0 = T(b.t);
+      if (b.p < TT0.days) { b.p = Math.min(TT0.days, +(b.p + days).toFixed(4)); d += days; if (b.p >= TT0.days) done++; }
     }
     if (d > 0) try { saveGame(); } catch (er) { }
     return { days: Math.round(d), done };
@@ -555,11 +745,11 @@ export const BLD = (() => {
     if (!body) return;
     const close = document.getElementById('em-x');
     const anchorEl = close ? close.parentElement : null;
-    const all = list(), standing = all.filter(x => x.b.p >= TYPES[x.b.t].days);
+    const all = list(), standing = all.filter(x => x.b.p >= T(x.b.t).days);
     const rows = all.map(x => {
-      const T = TYPES[x.b.t], fin = x.b.p >= T.days;
-      return '<div class="kv"><span class="k">' + T.icon + ' ' + T.name + ' · ' + T.w + '×' + T.d + ' m · ' +
-        (fin ? fmt$(T.inc) + '/day' : Math.round(100 * x.b.p / T.days) + '% built') +
+      const TT = T(x.b.t), fin = x.b.p >= TT.days;
+      return '<div class="kv"><span class="k">' + TT.icon + ' ' + TT.name + ' · ' + TT.w + '×' + TT.d + ' m · ' +
+        (fin ? fmt$(TT.inc) + '/day' : Math.round(100 * x.b.p / TT.days) + '% built') +
         ((x.b.mach || []).length ? ' · ' + x.b.mach.length + ' mach' : '') +   // v2.61 FACTORY FLOOR: the row counts the factory's machines
         '</span>' +
         '<span class="v">' + (x.p.cityName || (x.p.cityKey === 'rural' ? 'Countryside' : '—')) + '</span></div>';
@@ -575,8 +765,8 @@ export const BLD = (() => {
   }
 
   return {
-    open, tip, click, tick, empireInto, advance, qaDay,
-    valueOf, income, list, shed, stock,
+    open, openStudio, tip, click, tick, empireInto, advance, qaDay,
+    valueOf, income, list, shed, stock, designs: () => STATE.designs || [], T,
     place(plotId, t, lx, lz) {   // QA: programmatic placement (same validation, same commit)
       const p = STATE.plots.find(q => q.id === plotId);
       if (!p) return { ok: false, why: 'no plot' };
@@ -588,7 +778,7 @@ export const BLD = (() => {
       const p = STATE.plots.find(q => q.id === plotId);
       const b = p && p.bld && p.bld[i | 0];
       if (!b) return { ok: false };
-      const T = TYPES[b.t], rf = refundOf(T);
+      const T0 = T(b.t), rf = refundOf(T0);
       let machGot = 0;
       try { if (window.FACT) { const r = FACT.onDemolish(p, b); if (r) machGot = r.got; } } catch (er) { }   // v2.61 FACTORY FLOOR
       for (const k in rf) if (rf[k] > 0) STATE.mat[k] = Math.min(1e6, +((shed(k)) + rf[k]).toFixed(1));

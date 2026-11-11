@@ -32,6 +32,8 @@ export function loadGame() {
     // (boolean true = the v2.0 launch news)
     STATE.seenNews = p.seenNews === true ? 'v2.0' : (p.seenNews || false);
     STATE.gfx = p.gfx ? { shadows: p.gfx.sh !== 0, trees: p.gfx.tr !== 0, scale: p.gfx.sc === .75 || p.gfx.sc === .5 ? p.gfx.sc : 1, lite: !!p.gfx.lt } : STATE.gfx;   // v2.66 PICTURE (optional field — older builds ignore it)
+    STATE.designs = (p.dsg || []).filter(x => x && typeof x.n === 'string' && isFinite(+x.w) && isFinite(+x.f)).slice(0, 12)
+      .map(x => ({ n: x.n.slice(0, 24), w: Math.max(6, Math.min(14, +x.w)), d: Math.max(6, Math.min(12, +x.d || 8)), f: Math.max(1, Math.min(12, x.f | 0)), s: x.s || 'brick' }));   // v2.67 THE ARCHITECT: raw drafts — builder.js re-derives the full spec (cost/days/income) on first use, so a balance tweak re-prices saved designs honestly
     // v2.18 PLANET EARTH: the world was re-projected onto the real globe —
     // v3-era world coordinates no longer mean anything. City plots ride
     // their city's new anchor; rural plots snap to the nearest dry land;
@@ -71,8 +73,8 @@ export function loadGame() {
     STATE.playerZ = (typeof p.wz === 'number') ? p.wz : null;
     STATE.plots = (p.plots || []).map(o => {
       const q = { ...o, crew: o.crew || [] };
-      q.bld = (Array.isArray(o.bld) ? o.bld : []).filter(b => b && b.t >= 0 && b.t < 4 && isFinite(+b.x) && isFinite(+b.z)).slice(0, 8)
-        .map(b => ({ t: b.t | 0, x: Math.round(+b.x * 10) / 10, z: Math.round(+b.z * 10) / 10, p: Math.max(0, Math.min(3, +(+b.p || 0))),
+      q.bld = (Array.isArray(o.bld) ? o.bld : []).filter(b => b && ((b.t >= 0 && b.t < 4) || (b.t >= 100 && b.t < 112)) && isFinite(+b.x) && isFinite(+b.z)).slice(0, 8)
+        .map(b => ({ t: b.t | 0, x: Math.round(+b.x * 10) / 10, z: Math.round(+b.z * 10) / 10, p: Math.max(0, Math.min(30, +(+b.p || 0))),   // v2.67 THE ARCHITECT: t>=100 = design index +100 (12 designs max); taller customs run longer build-days, so the progress cap eases to 30
           // v2.61 FACTORY FLOOR: the machines on a factory shell's floor (absent on older saves — an empty floor)
           mach: (Array.isArray(b.mach) ? b.mach : []).filter(m => m && m.t >= 0 && m.t < 16 && isFinite(+m.x) && isFinite(+m.z)).slice(0, 16)
             .map(m => ({ t: m.t | 0, x: +(+m.x || 0).toFixed(2), z: +(+m.z || 0).toFixed(2) })) }));   // v2.56 GROUND UP (absent on older saves — nothing built; coords are plot-LOCAL, so world migrations never touch them) · v2.61: mach t<6 heavy line, t 10-15 the classic machines
@@ -174,7 +176,7 @@ export function saveGame() {
       wx: ACTORS.player ? +ACTORS.player.group.position.x.toFixed(1) : null,
       wz: ACTORS.player ? +ACTORS.player.group.position.z.toFixed(1) : null,
       plots: STATE.plots.map(p => ({
-        id: p.id, cityKey: p.cityKey, cityName: p.cityName || null, price: p.price || 0, x: +p.x.toFixed(2), z: +p.z.toFixed(2),   // v2.47 LANDLORD: price feeds the land market rate
+        id: p.id, cityKey: p.cityKey, cityName: p.cityName || null, price: p.price || 0, x: +p.x.toFixed(2), z: +p.z.toFixed(2), lot: !!p.lot,   // v2.47 LANDLORD: price feeds the land market rate · v2.67 THE ARCHITECT: lot rides the pack
         cart: p.cart ? { cuisine: p.cart.cuisine } : null,
         crew: (p.crew || []).map(c => ({ name: c.name, stars: c.stars })),
         bld: (p.bld || []).map(b => ({ t: b.t | 0, x: +(+b.x || 0).toFixed(1), z: +(+b.z || 0).toFixed(1), p: +(+b.p || 0).toFixed(2),
@@ -195,6 +197,7 @@ export function saveGame() {
       pow: (() => { const s = STATE.pow || {}, g = s.g || {}; const o = { g: { m: +(g.m || 1).toFixed(3), pm: +(g.pm || 1).toFixed(3) }, b: {} }; for (const k in (s.b || {})) { const e = s.b[k]; if (e && typeof e === 'object' && (isFinite(+e.m) || e.cut || isFinite(+e.due))) o.b[k] = { m: +Math.min(1e6, Math.max(0, +e.m || 0)).toFixed(1), cut: e.cut ? 1 : 0, due: +Math.min(1e6, Math.max(0, +e.due || 0)).toFixed(2) }; } return o; })(),   // v2.59 THE GRID (optional field — older builds ignore it)
       rigs: (STATE.rigs || []).map(r => ({ id: r.id, name: r.name, x: +r.x || 0, z: +r.z || 0, price: +r.price || 0, ore: Math.round(+r.ore || 0), got: +(+r.got || 0).toFixed(1), crew: r.crew | 0, walked: !!r.walked, wageAcc: +(+r.wageAcc || 0).toFixed(2), sto: +(+r.sto || 0).toFixed(1), near: r.near || null, nearKey: r.nearKey || null })),   // v2.62 DEEP WATER (optional field — older builds ignore it)
       gfx: STATE.gfx ? { sh: STATE.gfx.shadows === false ? 0 : 1, tr: STATE.gfx.trees === false ? 0 : 1, sc: STATE.gfx.scale === .75 || STATE.gfx.scale === .5 ? STATE.gfx.scale : 1, lt: STATE.gfx.lite ? 1 : 0 } : null,   // v2.66 PICTURE (optional field — older builds ignore it)
+      dsg: (STATE.designs || []).slice(0, 12).map(d => ({ n: d.name, w: +d.w || 10, d: +d.d || 8, f: d.floors | 0, s: d.style || 'brick' })),   // v2.67 THE ARCHITECT (optional field — older builds ignore it; cost/days/income re-derive on load, so a balance tweak in a later build re-prices old designs honestly)
       market: STATE.market ? STATE.market.pack() : null,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(pack));

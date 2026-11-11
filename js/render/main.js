@@ -76,9 +76,9 @@ function skyTexture() {
   const cv = document.createElement('canvas'); cv.width = 2; cv.height = 256;
   const ctx = cv.getContext('2d');
   const gr = ctx.createLinearGradient(0, 0, 0, 256);
-  gr.addColorStop(0, '#7cb0d0');     // zenith — soft azure (CR clear day)
-  gr.addColorStop(.34, '#9cc2d8');   // mid sky — azure paling
-  gr.addColorStop(.46, '#7fa8cc');   // the sky deepens toward the horizon
+  gr.addColorStop(0, '#6f9fc6');     // zenith — muted azure (v2.67: the calm low-poly tone)
+  gr.addColorStop(.34, '#8fb2ca');   // mid sky — azure paling
+  gr.addColorStop(.46, '#75a0c2');   // the sky deepens toward the horizon
   gr.addColorStop(.5, '#3479bd');    // horizon = the water blue — the far-plane clip melts here, no fog
   gr.addColorStop(1, '#3479bd');     // below the horizon (the far sea blends into this)
   ctx.fillStyle = gr; ctx.fillRect(0, 0, 2, 256);
@@ -104,8 +104,8 @@ function buildWorldScene() {
   skyDome.scale.setScalar(CAM_FAR * .88);
   skyDome.renderOrder = -1;
   worldScene.add(skyDome);
-  worldScene.add(new THREE.HemisphereLight(0xf0f7fa, 0x97a184, 2.5));   // sky fill, warm green-earth bounce
-  sun = new THREE.DirectionalLight(0xfff3df, 2.1);              // v2.33: a touch brighter — CR's flat bright noon
+  worldScene.add(new THREE.HemisphereLight(0xf0f7fa, 0x8d9a80, 2.1));   // v2.67: sky fill eases down — the muted picture
+  sun = new THREE.DirectionalLight(0xfff2e2, 1.86);              // v2.67: a step gentler sun (was 2.1) — saturation moves to grass, water and the gold frames
   sun.position.set(-170, 180, 95);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);

@@ -132,7 +132,7 @@ export const ECO = (() => {
 
   // ---------------- owned plot visuals --------------------------------
   function markPlotOwned(rec) {
-    if (rec && rec.rural) {        // v2.15: roadside plots carry their own mesh
+    if (rec && (rec.rural || rec.lot)) {   // v2.15: roadside plots carry their own mesh · v2.67 THE ARCHITECT: so do city lots
       rec.sold = true;
       if (rec.mesh) {
         rec.mesh.traverse(o => {
@@ -462,6 +462,9 @@ export const ECO = (() => {
         const cui = CUISINES.find(c => c.id === owned.cart.cuisine);
         return { t: cui.name + ' cart', s: (plot.rural ? 'Roadside stand · ' : 'Street business · ') + regionName(), p: revPerMin(owned) >= 0 ? '+$' + revPerMin(owned).toFixed(0) + '/min' : '', a: (window.PWR && PWR.isCut(owned) ? '⚠ POWER CUT — pay at the POWER panel' : '✓ Open'), l: 'Click to manage' };   // v2.59 THE GRID
       }
+      if (plot.lot) return owned   // v2.67 THE ARCHITECT
+        ? { t: 'Your city lot', s: '15×20 m building lot · ' + regionName(), p: (window.BLD ? (BLD.list().filter(x => x.p.id === plot.id).length ? 'buildings standing' : 'empty — press BUILD') : ''), a: '✓ Owned', l: 'Click to manage · BUILD to raise buildings' }
+        : { t: 'City Lot — buildable', s: Math.round(plot.w * plot.d) + ' m² · carries up to 8 buildings · ' + regionName(), p: fmt$(plot.price), a: '✓ Available to buy', l: 'Click to purchase' };
       if (owned) return { t: plot.rural ? 'Your roadside plot' : 'Your sidewalk spot', s: plot.rural ? 'Country-road vending plot' : 'Food-cart spot · ' + regionName(), p: '', a: '✓ Owned', l: 'Click to build' };
       return { t: plot.rural ? 'Roadside plot' : 'Sidewalk spot', s: Math.round(plot.w * plot.d) + ' m² · ' + (plot.rural ? 'open country' : regionName()), p: fmt$(plot.price), a: '✓ Available to buy', l: 'Click to purchase' };
     }
@@ -498,6 +501,16 @@ export const ECO = (() => {
 
   // ---------------- modals ---------------------------------------------
   function openBuyPlot(plot) {
+    if (plot.lot) {   // v2.67 THE ARCHITECT: a buildable city lot — the copy stays honest
+      openModal('City Lot — ' + (CITY.rec ? CITY.rec.name : 'City'), `
+        <p>A <b>${Math.round(plot.w * plot.d)} m²</b> building lot, set back off the street — the only city ground that carries buildings. Up to eight of them rise here: catalog classics, or your own drafted designs (BUILD → DESIGN YOUR OWN).</p>
+        <div class="kv"><span class="k">PRICE</span><span class="v g">${fmt$(plot.price)}</span></div>
+        <div class="kv"><span class="k">BALANCE</span><span class="v">${fmt$(STATE.money)}</span></div>
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button class="btn good" id="bp-buy" style="flex:1">BUY LOT</button>
+          <button class="btn" id="bp-x">CLOSE</button>
+        </div>`);
+    } else {
     openModal(plot.rural ? 'Roadside Plot — Open Country' : 'Sidewalk Spot — ' + (CITY.rec ? CITY.rec.name : 'City'), `
       <p>A <b>${Math.round(plot.w * plot.d)} m²</b> ${plot.rural ? 'vending plot on a country road — open for business anywhere in the world' : 'sidewalk vending spot — park your food cart right on the walk'}.</p>
       <div class="kv"><span class="k">PRICE</span><span class="v g">${fmt$(plot.price)}</span></div>
@@ -506,14 +519,16 @@ export const ECO = (() => {
         <button class="btn good" id="bp-buy" style="flex:1">BUY PLOT</button>
         <button class="btn" id="bp-x">CLOSE</button>
       </div>`);
+    }
     document.getElementById('bp-buy').onclick = () => {
       if (!spend(plot.price)) { toast('<b>Not enough money.</b> Sell some food first.', 'warn'); return; }
-      const st = { id: plot.id, cityKey: plot.cityKey || (CITY.rec ? CITY.rec.key : 'rural'), cityName: plot.rural ? 'Countryside' : (CITY.rec ? CITY.rec.name : null), x: plot.x, z: plot.z, price: plot.price || 0, cart: null, crew: [] };   // v2.10: cityName for travel; v2.47 LANDLORD: price feeds the land market rate
+      const st = { id: plot.id, cityKey: plot.cityKey || (CITY.rec ? CITY.rec.key : 'rural'), cityName: plot.rural ? 'Countryside' : (CITY.rec ? CITY.rec.name : null), x: plot.x, z: plot.z, price: plot.price || 0, cart: null, crew: [], lot: !!plot.lot };   // v2.10: cityName for travel; v2.47 LANDLORD: price feeds the land market rate · v2.67 THE ARCHITECT: lot rides the plot pack
       STATE.plots.push(st);
       markPlotOwned(plot);
       saveGameSafe();
       closeModal();
-      toast('Plot bought — <b>' + fmt$(plot.price) + '</b>. Click it again to park a food cart.');
+      toast(plot.lot ? 'Lot bought — <b>' + fmt$(plot.price) + '</b>. Press <b>BUILD</b> to raise something of your own on it.'
+        : 'Plot bought — <b>' + fmt$(plot.price) + '</b>. Click it again to park a food cart.');
     };
     document.getElementById('bp-x').onclick = closeModal;
   }
@@ -523,7 +538,7 @@ export const ECO = (() => {
     const grid = CUISINES.map(c => `
       <div class="cui" data-c="${c.id}"><div class="e">${c.emoji}</div><div class="n">${c.name}</div><div class="c">${fmt$(ECON.cartCost + permit)}</div></div>`).join('');
     openModal('Park a Food Cart', `
-      <p>Choose your cuisine${permit ? ' — includes your first <b>$' + permit + '</b> street-vending permit' : ''}.</p>
+      <p>${plotRec && plotRec.lot ? 'A lot with room for both — the cart parks mid-lot, and up to <b>8 buildings</b> of yours rise around it (press <b>BUILD</b>). ' : ''}Choose your cuisine${permit ? ' — includes your first <b>$' + permit + '</b> street-vending permit' : ''}.</p>
       <div class="cuisine-grid">${grid}</div>
       <button class="btn good" id="bc-rent" style="width:100%;margin-top:14px">RENT OUT THE LAND — SET YOUR PRICE</button>
       <div style="display:flex;gap:8px;margin-top:10px"><button class="btn" id="bc-x" style="flex:1">CLOSE</button></div>`);
