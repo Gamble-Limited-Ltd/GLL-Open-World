@@ -341,12 +341,11 @@ function checkForUpdate() {
 function openWhatsNew() {
   STATE.seenNews = GAME_VERSION;
   saveGame();
-  openModal('Welcome to v2.67 — THE ARCHITECT', `
-    <p><b>Design your own unique buildings — and the city lots to raise them on.</b></p>
-    <div class="kv"><span class="k">DESIGN YOUR OWN</span><span class="v">BUILD → DESIGN YOUR OWN: footprint, floors, one of four styles, a name — priced honestly by size</span></div>
-    <div class="kv"><span class="k">CITY LOTS</span><span class="v">every city sells buildable 15×20 m lots (the gold ⌂ marker) — eight buildings each</span></div>
-    <div class="kv"><span class="k">GOLD FRAMES</span><span class="v">your finished buildings stand inside a dashed gold frame — the picture reads like the map</span></div>
-    <div class="kv"><span class="k">THE PICTURE</span><span class="v">a calmer, muted low-poly tone — grass, water and gold carry the saturation</span></div>
+  openModal('Welcome to v2.68 — RUSH HOUR', `
+    <p><b>The streets finally move.</b></p>
+    <div class="kv"><span class="k">TRAFFIC</span><span class="v">cars drive the real road net — right-hand lanes, class speeds (motorway to side street), full stops for you at the curb</span></div>
+    <div class="kv"><span class="k">STREET SMART</span><span class="v">cars queue bumper-to-bumper, hop to connected streets at the ends, and only U-turn at dead ends</span></div>
+    <div class="kv"><span class="k">THE FLEET</span><span class="v">20/30/40 cars by city tier (halved on phones and LITE detail), taxis included — same look as the parked rows</span></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="wn-x" style="flex:1">EXPLORE</button></div>`);
   document.getElementById('wn-x').onclick = () => { closeModal(); setTimeout(autoEnterLast, 250); };
 }
