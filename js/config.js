@@ -6,7 +6,7 @@
 // Pure data — no imports.
 // ====================================================================
 
-export const GAME_VERSION = 'v2.67';
+export const GAME_VERSION = 'v2.68';
 export const SAVE_KEY = 'openworld-v2';
 // ---- city catalog: [name, lat, lon, tier] (public geographic facts)
 export const RAW_CITIES = [
